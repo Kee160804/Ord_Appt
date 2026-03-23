@@ -22,7 +22,7 @@
 "use client";
 
 import { TopBar } from "@/app/components/TopBar";
-import { AppointmentsView } from "@/app/components/AppointmentView";
+import { AppointmentsView } from "@/app/components/AppointmentsView";
 import { useAuth } from "@/app/contexts/auth";
 import { mockTenants } from "@/app/data/mock";
 
