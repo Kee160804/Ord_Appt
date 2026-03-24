@@ -1,39 +1,3 @@
-// import { TopBar } from "../dashboard/TopBar";
-// import { DashboardOverview } from "../dashboard/DashboardOverview";
-// import { mockTenants } from "../data/mock";
-
-// export default function DashboardPage() {
-//   // In real app, derive tenant from auth session
-//   const tenant = mockTenants[0];
-//   return (
-//     <>
-//       <TopBar title="Dashboard" />
-//       <DashboardOverview tenant={tenant} />
-//     </>
-//   );
-// }
-
-// "use client";
-// import { useAuth } from "../contexts/auth";
-// import { TopBar } from "../components/TopBar";
-// import { DashboardOverview } from "../components/DashboardOverview";
-
-// export default function DashboardPage() {
-//   const { tenant } = useAuth();
-//   if (!tenant) return null;
-//   return (
-//     <>
-//       <TopBar
-//         title="Dashboard"
-//         subtitle={`${tenant.name} — ${tenant.businessType === "appointment" ? "Appointment" : "Ordering"} Business`}
-//       />
-//       <DashboardOverview tenant={tenant} />
-//     </>
-//   );
-// }
-
-
-
 "use client";
 import { useAuth } from "@/app/contexts/auth";
 import { TopBar } from "@/app/components/TopBar";
