@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import Image from "next/image";
 import { Minus, Plus, ShoppingBag, Trash2, Eye } from "lucide-react";
 import { Button } from "@/app/components/Button";
 import { Modal } from "@/app/components/Modal";
@@ -89,7 +90,7 @@ export function OrderingMenu({
       name: currentProduct.name,
       price: currentProduct.price,
       quantity,
-      addons: selectedAddons,
+      addons: selectedAddons.map(({ name, price }) => ({ name, price })),
       image: currentProduct.image,
     });
     setModalOpen(false);
@@ -104,7 +105,13 @@ export function OrderingMenu({
   };
 
   const removeItem = (id: string) => updateCart(cart.filter((i) => i.id !== id));
-  const clearCart = () => updateCart([]);
+
+  // ✅ ADDED CONFIRMATION
+  const clearCart = () => {
+    if (window.confirm("Are you sure you want to clear your entire order?")) {
+      updateCart([]);
+    }
+  };
 
   return (
     <>
@@ -115,10 +122,19 @@ export function OrderingMenu({
         {/* LEFT: Menu */}
         <div className="overflow-y-auto bg-white dark:bg-slate-900 p-6">
           <div className="flex items-center justify-between mb-5">
-            <h2 className="text-xl font-bold text-slate-900 dark:text-white">Menu</h2>
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+              Menu for {tenant.name}
+            </h2>
             <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 w-52">
-              <svg className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+              <svg
+                className="w-3.5 h-3.5 text-slate-400 flex-shrink-0"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <circle cx="11" cy="11" r="8" />
+                <path d="m21 21-4.35-4.35" />
               </svg>
               <input
                 type="text"
@@ -128,7 +144,9 @@ export function OrderingMenu({
                 className="bg-transparent text-xs outline-none text-slate-700 dark:text-slate-300 placeholder-slate-400 dark:placeholder-slate-500 w-full"
                 aria-label="Search foods"
               />
-              <span className="text-[10px] text-slate-300 dark:text-slate-600 hidden sm:block whitespace-nowrap">⌘ K</span>
+              <span className="text-[10px] text-slate-300 dark:text-slate-600 hidden sm:block whitespace-nowrap">
+                ⌘ K
+              </span>
             </div>
           </div>
 
@@ -163,11 +181,16 @@ export function OrderingMenu({
                   className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden hover:shadow-md transition group"
                 >
                   <div className="relative h-36 w-full overflow-hidden bg-slate-100 dark:bg-slate-700">
-                    <img
+                    <Image
                       src={product.image || PLACEHOLDER_IMG}
                       alt={product.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      onError={(e) => (e.currentTarget.src = PLACEHOLDER_IMG)}
+                      fill
+                      sizes="(max-width: 768px) 100vw, 50vw"
+                      className="object-cover group-hover:scale-105 transition-transform duration-300"
+                      unoptimized
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = PLACEHOLDER_IMG;
+                      }}
                     />
                     <span className="absolute top-2 left-2 bg-white/90 dark:bg-slate-900/90 text-violet-600 dark:text-violet-400 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">
                       {categories.find((c) => c.id === product.categoryId)?.name ?? "Item"}
@@ -183,7 +206,10 @@ export function OrderingMenu({
                     <div className="flex items-center justify-between mt-2.5">
                       <span className="text-sm font-bold text-slate-900 dark:text-white">
                         {formatCurrency(product.price)}
-                        <span className="text-[10px] font-normal text-slate-400 dark:text-slate-500"> / serving</span>
+                        <span className="text-[10px] font-normal text-slate-400 dark:text-slate-500">
+                          {" "}
+                          / serving
+                        </span>
                       </span>
                       <div className="flex items-center gap-1">
                         <button
@@ -198,7 +224,9 @@ export function OrderingMenu({
                           {cartItem?.quantity ?? 0}
                         </span>
                         <button
-                          onClick={() => cartItem ? updateQty(product.id, 1) : openAddModal(product)}
+                          onClick={() =>
+                            cartItem ? updateQty(product.id, 1) : openAddModal(product)
+                          }
                           className="w-5 h-5 rounded-full border border-slate-200 dark:border-slate-600 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-700 transition"
                           aria-label="Increase quantity"
                         >
@@ -224,7 +252,10 @@ export function OrderingMenu({
           <div className="flex-1 overflow-y-auto p-5 space-y-5">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-bold text-slate-900 dark:text-white">Order Summary</h3>
-              <button className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition" aria-label="View order details">
+              <button
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition"
+                aria-label="View order details"
+              >
                 <Eye className="w-4 h-4" />
               </button>
             </div>
@@ -282,16 +313,24 @@ export function OrderingMenu({
             ) : (
               <div className="space-y-4">
                 {cart.map((item) => {
-                  const addonsTotal = item.addons.reduce((a, ad) => a + ad.price * item.quantity, 0);
+                  const addonsTotal = item.addons.reduce(
+                    (a, ad) => a + ad.price * item.quantity,
+                    0
+                  );
                   const lineTotal = item.price * item.quantity + addonsTotal;
                   return (
                     <div key={item.id} className="flex gap-3">
-                      <div className="w-14 h-14 flex-shrink-0 rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-700">
-                        <img
+                      <div className="relative w-14 h-14 flex-shrink-0 rounded-lg overflow-hidden bg-slate-100 dark:bg-slate-700">
+                        <Image
                           src={item.image || PLACEHOLDER_IMG}
                           alt={item.name}
-                          className="w-full h-full object-cover"
-                          onError={(e) => (e.currentTarget.src = PLACEHOLDER_IMG)}
+                          fill
+                          sizes="80px"
+                          className="object-cover"
+                          unoptimized
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = PLACEHOLDER_IMG;
+                          }}
                         />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -309,7 +348,9 @@ export function OrderingMenu({
                         {item.addons.length > 0 && (
                           <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 space-y-0.5">
                             {item.addons.map((ad, i) => (
-                              <div key={i}>• {ad.name} (+{formatCurrency(ad.price)})</div>
+                              <div key={i}>
+                                • {ad.name} (+{formatCurrency(ad.price)})
+                              </div>
                             ))}
                           </div>
                         )}
@@ -387,12 +428,17 @@ export function OrderingMenu({
         {currentProduct && (
           <div className="space-y-4">
             <div className="flex gap-4">
-              <div className="w-24 h-24 flex-shrink-0 bg-slate-100 dark:bg-slate-700 rounded-xl overflow-hidden">
-                <img
+              <div className="relative w-24 h-24 flex-shrink-0 bg-slate-100 dark:bg-slate-700 rounded-xl overflow-hidden">
+                <Image
                   src={currentProduct.image || PLACEHOLDER_IMG}
                   alt={currentProduct.name}
-                  className="w-full h-full object-cover"
-                  onError={(e) => (e.currentTarget.src = PLACEHOLDER_IMG)}
+                  fill
+                  sizes="96px"
+                  className="object-cover"
+                  unoptimized
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = PLACEHOLDER_IMG;
+                  }}
                 />
               </div>
               <div>
@@ -462,7 +508,10 @@ export function OrderingMenu({
               onClick={handleAddToCart}
               className="w-full bg-violet-600 hover:bg-violet-700 text-white font-semibold"
             >
-              Add to Cart — {formatCurrency((currentProduct.price + selectedAddons.reduce((s, a) => s + a.price, 0)) * quantity)}
+              Add to Cart —{" "}
+              {formatCurrency(
+                (currentProduct.price + selectedAddons.reduce((s, a) => s + a.price, 0)) * quantity
+              )}
             </Button>
           </div>
         )}

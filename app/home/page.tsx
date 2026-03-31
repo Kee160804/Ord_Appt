@@ -144,10 +144,10 @@ export default function HomePage() {
             Start free trial <ArrowRight className="w-5 h-5" />
           </Link>
           <Link
-            href="/login"
+            href="/register"
             className="inline-flex items-center gap-2 px-8 py-4 border border-white/10 light:border-gray-300 hover:border-white/20 light:hover:border-gray-400 text-slate-300 light:text-gray-700 hover:text-white light:hover:text-gray-900 font-bold rounded-2xl transition-colors text-base"
           >
-            View Demo Dashboard
+            Sign Up
           </Link>
         </div>
 
@@ -228,54 +228,58 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Live Demos */}
-      <section id="demos" className="py-24">
-        <div className="max-w-6xl mx-auto px-6 md:px-12">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-black text-white light:text-gray-900 mb-3">See it live</h2>
-            <p className="text-slate-400 light:text-gray-600">Real business storefronts — built on LocalSpace</p>
-          </div>
+  
+{/* Live Demos */}
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            {demos.map((d) => (
-              <Link
-                key={d.slug}
-                href={`/store/${d.slug}`}
-                className="bg-slate-800/60 light:bg-white border border-slate-700/50 light:border-gray-200 rounded-2xl p-5 hover:border-slate-500 light:hover:border-gray-300 hover:-translate-y-1 transition-all group text-center space-y-4"
-              >
-                <div
-                  className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl mx-auto shadow-lg light:shadow-sm"
-                  style={{ backgroundColor: d.color + "30", border: `1px solid ${d.color}50` }}
-                >
-                  {d.emoji}
-                </div>
-                <div>
-                  <p className="font-bold text-white light:text-gray-900 text-sm">{d.name}</p>
-                  <p className="text-xs text-slate-500 light:text-gray-500 mt-0.5">{d.city}</p>
-                </div>
-                <span
-                  className="inline-flex items-center gap-1 text-xs font-semibold px-3 py-1 rounded-full"
-                  style={{ backgroundColor: d.color + "20", color: d.color }}
-                >
-                  {d.type}
-                </span>
-                <div className="flex items-center justify-center gap-1 text-xs text-slate-500 light:text-gray-500 group-hover:text-slate-300 light:group-hover:text-gray-700 transition-colors">
-                  Visit store <ChevronRight className="w-3 h-3" />
-                </div>
-              </Link>
-            ))}
-          </div>
+<section id="demos" className="py-24">
+  <div className="max-w-6xl mx-auto px-6 md:px-12">
+    <div className="text-center mb-12">
+      <h2 className="text-3xl md:text-4xl font-black text-white light:text-gray-900 mb-3">See it live</h2>
+      <p className="text-slate-400 light:text-gray-600">Real business storefronts — built on LocalSpace</p>
+    </div>
 
-          <div className="mt-10 text-center">
-            <Link
-              href="/login"
-              className="inline-flex items-center gap-2 text-sm text-violet-400 light:text-violet-600 hover:text-violet-300 light:hover:text-violet-700 font-semibold transition-colors"
-            >
-              Log in to see the owner dashboard <ArrowRight className="w-4 h-4" />
-            </Link>
+    <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
+      {demos.map((d) => (
+        <Link
+          key={d.slug}
+          href={`/store-front/${d.slug}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="bg-slate-800/60 light:bg-white border border-slate-700/50 light:border-gray-200 rounded-2xl p-5 hover:border-slate-500 light:hover:border-gray-300 hover:-translate-y-1 transition-all group text-center space-y-4"
+        >
+          <div
+            className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl mx-auto shadow-lg light:shadow-sm"
+            style={{ backgroundColor: d.color + "30", border: `1px solid ${d.color}50` }}
+          >
+            {d.emoji}
           </div>
-        </div>
-      </section>
+          <div>
+            <p className="font-bold text-white light:text-gray-900 text-sm">{d.name}</p>
+            <p className="text-xs text-slate-500 light:text-gray-500 mt-0.5">{d.city}</p>
+          </div>
+          <span
+            className="inline-flex items-center gap-1 text-xs font-semibold px-3 py-1 rounded-full"
+            style={{ backgroundColor: d.color + "20", color: d.color }}
+          >
+            {d.type}
+          </span>
+          <div className="flex items-center justify-center gap-1 text-xs text-slate-500 light:text-gray-500 group-hover:text-slate-300 light:group-hover:text-gray-700 transition-colors">
+            Visit store <ChevronRight className="w-3 h-3" />
+          </div>
+        </Link>
+      ))}
+    </div>
+
+    <div className="mt-10 text-center">
+      <Link
+        href="/login"
+        className="inline-flex items-center gap-2 text-sm text-violet-400 light:text-violet-600 hover:text-violet-300 light:hover:text-violet-700 font-semibold transition-colors"
+      >
+        Log in to see the owner dashboard <ArrowRight className="w-4 h-4" />
+      </Link>
+    </div>
+  </div>
+</section>
 
       {/* Pricing */}
       <section id="pricing" className="bg-slate-900/40 light:bg-gray-50 border-y border-white/5 light:border-gray-200 py-24">
@@ -373,7 +377,7 @@ export default function HomePage() {
             <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center">
               <Sparkles className="w-3.5 h-3.5 text-white" />
             </div>
-            <span className="font-black text-white light:text-gray-900">LocalSpace</span>
+            <span className="font-black text-white light:text-gray-900">BzLocalSpace</span>
           </div>
           <div className="flex items-center gap-6 text-sm text-slate-500 light:text-gray-600">
             <Link href="/login" className="hover:text-slate-300 light:hover:text-gray-900 transition-colors">
@@ -388,7 +392,7 @@ export default function HomePage() {
             <Link href="/admin" className="hover:text-slate-300 light:hover:text-gray-900 transition-colors">
               Admin
             </Link>
-            <span>© 2025 LocalSpace Platform</span>
+            <span>© 2025 BzLocalSpace Platform</span>
           </div>
         </div>
       </footer>

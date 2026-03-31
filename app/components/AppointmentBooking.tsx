@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import Image from "next/image";
 import {
   ChevronLeft,
   ChevronRight,
@@ -80,7 +81,6 @@ export function AppointmentBooking({
     [services, searchQuery]
   );
 
-  // Cast services to ExtendedService for safe access to optional fields
   const extendedServices = filteredServices as ExtendedService[];
   const detailService = extendedServices.find((s) => s.id === selectedServiceId) ?? null;
   const reviews = detailService ? (FAKE_REVIEWS[detailService.id] ?? []) : [];
@@ -106,7 +106,7 @@ export function AppointmentBooking({
       <aside className="flex flex-col gap-6 overflow-y-auto border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
         <div>
           <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-4">
-            Booking Appointment
+            Booking for {tenant.name}
           </p>
 
           <div className="flex items-center justify-between mb-3">
@@ -287,11 +287,16 @@ export function AppointmentBooking({
                 }`}
               >
                 <div className="relative h-36 w-full overflow-hidden bg-slate-100 dark:bg-slate-700">
-                  <img
+                  <Image
                     src={service.image || PLACEHOLDER_IMG}
                     alt={service.name}
-                    className="w-full h-full object-cover"
-                    onError={(e) => (e.currentTarget.src = PLACEHOLDER_IMG)}
+                    fill
+                    sizes="(max-width: 768px) 100vw, 50vw"
+                    className="object-cover"
+                    unoptimized
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = PLACEHOLDER_IMG;
+                    }}
                   />
                 </div>
                 <div className="p-4">
@@ -345,11 +350,16 @@ export function AppointmentBooking({
         {detailService ? (
           <>
             <div className="relative h-48 w-full overflow-hidden bg-slate-100 dark:bg-slate-700 flex-shrink-0">
-              <img
+              <Image
                 src={detailService.image || PLACEHOLDER_IMG}
                 alt={detailService.name}
-                className="w-full h-full object-cover"
-                onError={(e) => (e.currentTarget.src = PLACEHOLDER_IMG)}
+                fill
+                sizes="(max-width: 768px) 100vw, 33vw"
+                className="object-cover"
+                unoptimized
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = PLACEHOLDER_IMG;
+                }}
               />
             </div>
 
