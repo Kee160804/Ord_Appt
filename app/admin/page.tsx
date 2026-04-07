@@ -1,20 +1,29 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo } from "react";
 import Link from "next/link";
 import { useAuth } from "@/app/contexts/auth";
+// NEW: Import useRealtime to get real-time registered users and tenants
+import { useRealtime } from "@/app/contexts/realtime";
 import { mockTenants, mockAnalytics } from "@/app/data/mock";
-import { Card, CardHeader, CardBody } from "@/app/components/Card";
+import { Card, CardHeader } from "@/app/components/Card";
 import { formatCurrency, cn } from "@/app/lib/utils"; // added cn import
-import { Building2, Users, DollarSign, Calendar, ShoppingBag, ArrowRight } from "lucide-react";
+import { Building2, Users, DollarSign, ShoppingBag, ArrowRight } from "lucide-react";
 
 export default function AdminPage() {
-  const { user, logout } = useAuth();
-  const [selectedTenant, setSelectedTenant] = useState<string | null>(null);
+  // COMMENT: Removed unused 'user' - not needed in admin view
+  const { logout } = useAuth();
+  // NEW: Get realtime context to show registered users and tenants
+  const realtime = useRealtime();
+
+  // NEW: Combine mock tenants with dynamically created tenants from signup
+  const registeredUsers = useMemo(() => realtime.getAllRegisteredUsers(), [realtime]);
+  const dynamicTenants = useMemo(() => realtime.getTenantTenants(), [realtime]);
+  const allTenants = [...mockTenants, ...dynamicTenants];
 
   const totalRevenue = Object.values(mockAnalytics).reduce((sum, a) => sum + a.totalRevenue, 0);
   const totalActivity = Object.values(mockAnalytics).reduce((sum, a) => sum + a.totalActivity, 0);
-  const totalCustomers = Object.values(mockAnalytics).reduce((sum, a) => sum + a.newCustomers, 0);
+  const totalCustomers = Object.values(mockAnalytics).reduce((sum, a) => sum + a.newCustomers, 0) + registeredUsers.length;
 
   return (
     <div className="p-8 space-y-6 bg-[#070b14] light:bg-white min-h-screen text-white light:text-gray-900">
@@ -22,7 +31,7 @@ export default function AdminPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-black text-white light:text-gray-900">Admin Dashboard</h1>
-          <p className="text-slate-400 light:text-gray-600">Super admin overview — all tenants</p>
+          <p className="text-slate-400 light:text-gray-600">Super admin overview — all tenants & real-time activity</p>
         </div>
         <button
           onClick={logout}
@@ -54,11 +63,14 @@ export default function AdminPage() {
         />
         <StatCard
           label="Active Tenants"
-          value={mockTenants.length.toString()}
+          value={allTenants.length.toString()}
           icon={<Building2 className="w-5 h-5 text-amber-500" />}
           bg="bg-amber-500/20 light:bg-amber-50"
         />
       </div>
+
+      {/* COMMENT: Removed "New Signups" section - new businesses now appear in "All Businesses" as tenants */}
+      {/* The dynamicTenants are shown below in the All Businesses section with "✨ New" badge */}
 
       {/* Tenant list */}
       <Card className="bg-slate-800/50 light:bg-white border-slate-700 light:border-gray-200">
@@ -66,15 +78,20 @@ export default function AdminPage() {
           <h3 className="font-semibold text-white light:text-gray-900">All Businesses</h3>
         </CardHeader>
         <div className="divide-y divide-slate-700 light:divide-slate-100">
-          {mockTenants.map(tenant => {
+          {/* ENHANCED: Show both mock and dynamically created tenants */}
+          {allTenants.map(tenant => {
             const analytics = mockAnalytics[tenant.id];
             return (
               <div
                 key={tenant.id}
                 className="px-6 py-4 flex items-center gap-4 hover:bg-slate-700 light:hover:bg-gray-50 transition-colors"
               >
+                {/* COMMENT: Using inline style for dynamic background color from tenant.logoBg */}
+                {/* This is necessary because logoBg is dynamic hex color (e.g. #c084fc) */}
+                {/* and cannot be predicted by Tailwind's static class generation */}
                 <div
                   className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold"
+                  // @ts-ignore: Dynamic color style
                   style={{ backgroundColor: tenant.logoBg }}
                 >
                   {tenant.logo}
@@ -92,6 +109,12 @@ export default function AdminPage() {
                     >
                       {tenant.businessType}
                     </span>
+                    {/* NEW: Badge for newly created tenants */}
+                    {dynamicTenants.some(t => t.id === tenant.id) && (
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400">
+                        ✨ New
+                      </span>
+                    )}
                   </div>
                   <p className="text-xs text-slate-400 light:text-gray-600 mt-0.5">
                     Revenue: {formatCurrency(analytics?.totalRevenue ?? 0)} · Transactions: {analytics?.totalActivity}

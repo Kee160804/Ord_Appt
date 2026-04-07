@@ -7,6 +7,8 @@ import { Button } from "../components/Button";
 import { StatusBadge } from "../components/Badge";
 import { getOrdersByTenant } from "../data/mock";
 import { formatCurrency, capitalise, cn } from "../lib/utils";
+// NEW: Import useRealtime for emitting order events
+import { useRealtime } from "../contexts/realtime";
 import type { Order, OrderStatus, Tenant } from "../types/index";
 
 const STATUS_FLOW: OrderStatus[] = ["pending", "confirmed", "preparing", "ready", "delivered"];
@@ -24,14 +26,32 @@ const STATUS_BG: Record<string, string> = {
 interface Props { tenant: Tenant }
 
 export function OrdersView({ tenant }: Props) {
+  // NEW: Get realtime context to emit order events
+  const realtime = useRealtime();
+  
   const [orders, setOrders] = useState<Order[]>(getOrdersByTenant(tenant.id));
   const [selected, setSelected] = useState<Order | null>(null);
   const [filter, setFilter] = useState<OrderStatus | "all">("all");
 
   const filtered = filter === "all" ? orders : orders.filter(o => o.status === filter);
 
+  // ENHANCED: Emit real-time event when order status changes
   const advance = (id: string, status: OrderStatus) => {
-    setOrders(prev => prev.map(o => o.id === id ? { ...o, status } : o));
+    setOrders(prev => {
+      const updated = prev.map(o => o.id === id ? { ...o, status } : o);
+      
+      // NEW: Emit real-time event for order updated
+      const updatedOrder = updated.find(o => o.id === id);
+      if (updatedOrder) {
+        realtime.addEvent({
+          type: "order_updated",
+          tenantId: tenant.id,
+          order: updatedOrder,
+        });
+      }
+      
+      return updated;
+    });
     setSelected(prev => prev?.id === id ? { ...prev, status } : prev);
   };
 

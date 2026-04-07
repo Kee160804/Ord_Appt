@@ -1,13 +1,20 @@
 "use client";
 import { useAuth } from "@/app/contexts/auth";
+// NEW: Import useRealtime to find dynamic tenants created via signup
+import { useRealtime } from "@/app/contexts/realtime";
 import { TopBar } from "@/app/components/TopBar";
 import { DashboardOverview } from "@/app/components/DashboardOverview";
 import { mockTenants } from "@/app/data/mock";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 
 export default function DashboardPage() {
   const { user, isLoading } = useAuth();
+  // NEW: Get dynamic tenants from realtime context
+  const realtime = useRealtime();
+  // ENHANCED: Get dynamic tenants and combine with mock tenants
+  const dynamicTenants = useMemo(() => realtime.getTenantTenants(), [realtime]);
+  const allTenants = useMemo(() => [...mockTenants, ...dynamicTenants], [dynamicTenants]);
   const router = useRouter();
 
   useEffect(() => {
@@ -28,8 +35,8 @@ export default function DashboardPage() {
     return null; // Will redirect via useEffect
   }
 
-  // Find tenant based on user's tenantId
-  const tenant = mockTenants.find(t => t.id === user.tenantId);
+  // ENHANCED: Find tenant from both mock and dynamic tenants
+  const tenant = allTenants.find(t => t.id === user.tenantId);
 
   if (!tenant) {
     return (

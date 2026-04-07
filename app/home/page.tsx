@@ -22,12 +22,36 @@ export default function HomePage() {
   const { theme, toggleTheme } = useTheme();
 
   const features = [
-    { icon: Calendar, title: "Smart Scheduling", desc: "Appointment booking with automatic confirmations, deposits, and reminders." },
-    { icon: ShoppingBag, title: "Online Ordering", desc: "Let customers order products and services directly from your business page." },
-    { icon: BarChart3, title: "Real-Time Analytics", desc: "Track revenue, bookings, and customer trends all in one dashboard." },
-    { icon: Globe, title: "Your Own Storefront", desc: "Each business gets a branded public page — no coding required." },
-    { icon: Shield, title: "Secure Payments", desc: "Stripe-powered payments with deposit support and payout tracking." },
-    { icon: Users, title: "Team Management", desc: "Add staff, assign roles, and manage your whole team from one place." },
+    {
+      icon: Calendar,
+      title: "Smart Scheduling",
+      desc: "Appointment booking with automatic confirmations, deposits, and reminders.",
+    },
+    {
+      icon: ShoppingBag,
+      title: "Online Ordering",
+      desc: "Let customers order products and services directly from your business page.",
+    },
+    {
+      icon: BarChart3,
+      title: "Real-Time Analytics",
+      desc: "Track revenue, bookings, and customer trends all in one dashboard.",
+    },
+    {
+      icon: Globe,
+      title: "Your Own Storefront",
+      desc: "Each business gets a branded public page — no coding required.",
+    },
+    {
+      icon: Shield,
+      title: "Secure Payments",
+      desc: "Stripe-powered payments with deposit support and payout tracking.",
+    },
+    {
+      icon: Users,
+      title: "Team Management",
+      desc: "Add staff, assign roles, and manage your whole team from one place.",
+    },
   ];
 
   const plans = [
@@ -37,7 +61,12 @@ export default function HomePage() {
       period: "/mo",
       color: "border-slate-600 light:border-gray-200",
       badge: null,
-      features: ["1 business location", "Up to 50 bookings/mo", "Basic storefront", "Email support"],
+      features: [
+        "1 business location",
+        "Up to 50 bookings/mo",
+        "Basic storefront",
+        "Email support",
+      ],
     },
     {
       name: "Pro",
@@ -45,7 +74,14 @@ export default function HomePage() {
       period: "/mo",
       color: "border-violet-500 light:border-violet-300",
       badge: "Most Popular",
-      features: ["1 business location", "Unlimited bookings", "Custom domain", "Analytics dashboard", "Priority support", "Stripe payouts"],
+      features: [
+        "1 business location",
+        "Unlimited bookings",
+        "Custom domain",
+        "Analytics dashboard",
+        "Priority support",
+        "Stripe payouts",
+      ],
     },
     {
       name: "Enterprise",
@@ -53,15 +89,49 @@ export default function HomePage() {
       period: "/mo",
       color: "border-slate-600 light:border-gray-200",
       badge: null,
-      features: ["Multiple locations", "Unlimited everything", "White-label option", "Dedicated support", "Custom integrations"],
+      features: [
+        "Multiple locations",
+        "Unlimited everything",
+        "White-label option",
+        "Dedicated support",
+        "Custom integrations",
+      ],
     },
   ];
 
   const demos = [
-    { name: "Luxe Beauty Studio", slug: "luxe-beauty", type: "Appointments", emoji: "💅", color: "#c084fc", city: "Miami, FL" },
-    { name: "Iron Edge Barbershop", slug: "iron-edge", type: "Appointments", emoji: "💈", color: "#34d399", city: "Atlanta, GA" },
-    { name: "Ember & Oak Kitchen", slug: "ember-oak", type: "Ordering", emoji: "🔥", color: "#fb923c", city: "Austin, TX" },
-    { name: "Blossom Bakehouse", slug: "blossom-bakehouse", type: "Ordering", emoji: "🥐", color: "#f472b6", city: "Portland, OR" },
+    {
+      name: "Luxe Beauty Studio",
+      slug: "luxe-beauty",
+      type: "Appointments",
+      emoji: "💅",
+      color: "#c084fc",
+      city: "Miami, FL",
+    },
+    {
+      name: "Iron Edge Barbershop",
+      slug: "iron-edge",
+      type: "Appointments",
+      emoji: "💈",
+      color: "#34d399",
+      city: "Atlanta, GA",
+    },
+    {
+      name: "Ember & Oak Kitchen",
+      slug: "ember-oak",
+      type: "Ordering",
+      emoji: "🔥",
+      color: "#fb923c",
+      city: "Austin, TX",
+    },
+    {
+      name: "Blossom Bakehouse",
+      slug: "blossom-bakehouse",
+      type: "Ordering",
+      emoji: "🥐",
+      color: "#f472b6",
+      city: "Portland, OR",
+    },
   ];
 
   return (
@@ -72,31 +142,59 @@ export default function HomePage() {
           <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-violet-900/40 light:shadow-violet-500/30">
             <Sparkles className="w-4 h-4 text-white" />
           </div>
-          <span className="font-black text-white light:text-gray-900 text-lg tracking-tight">LocalSpace</span>
+          <span className="font-black text-white light:text-gray-900 text-lg tracking-tight">
+            LocalSpace
+          </span>
         </div>
 
         <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-400 light:text-gray-600">
-          <Link href="/" className="hover:text-white light:hover:text-gray-900 transition-colors">
+          <Link
+            href="/"
+            className="hover:text-white light:hover:text-gray-900 transition-colors"
+          >
             Home
           </Link>
-          <a href="#features" className="hover:text-white light:hover:text-gray-900 transition-colors">
+          <a
+            href="#features"
+            className="hover:text-white light:hover:text-gray-900 transition-colors"
+          >
             Features
           </a>
-          <a href="#pricing" className="hover:text-white light:hover:text-gray-900 transition-colors">
+          <a
+            href="#pricing"
+            className="hover:text-white light:hover:text-gray-900 transition-colors"
+          >
             Pricing
           </a>
-          <a href="#demos" className="hover:text-white light:hover:text-gray-900 transition-colors">
+          <a
+            href="#demos"
+            className="hover:text-white light:hover:text-gray-900 transition-colors"
+          >
             Live Demos
           </a>
         </div>
 
         <div className="flex items-center gap-3">
+          {/* NEW: Enhanced theme toggle button with better visibility and feedback */}
           <button
-            onClick={toggleTheme}
-            className="p-2 rounded-xl text-slate-400 light:text-gray-600 hover:bg-white/5 light:hover:bg-gray-100 transition-colors"
-            aria-label="Toggle theme"
+            onClick={() => {
+              // NEW: AGGRESSIVE DEBUG - Verify button click is registered
+              console.log("🎯 HOME PAGE BUTTON CLICKED!");
+              console.log("🎯 Current theme before toggle:", theme);
+              toggleTheme();
+              console.log("🎯 toggleTheme() function called");
+              console.log("✨ Theme button clicked! Current theme:", theme);
+            }}
+            className="p-2.5 rounded-xl text-slate-400 light:text-gray-600 hover:bg-white/10 light:hover:bg-gray-200 hover:text-white light:hover:text-gray-800 transition-all duration-300 cursor-pointer border border-slate-700 light:border-gray-300"
+            aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+            title={`Switch to ${theme === "dark" ? "light" : "dark"} mode (currently ${theme})`}
           >
-            {theme === "dark" ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+            {/* NEW: Sun icon for dark mode (click to switch to light), Moon for light mode (click to switch to dark) */}
+            {theme === "dark" ? (
+              <Sun className="w-5 h-5 text-yellow-400" />
+            ) : (
+              <Moon className="w-5 h-5 text-slate-600" />
+            )}
           </button>
 
           <Link
@@ -121,19 +219,21 @@ export default function HomePage() {
         </div>
 
         <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-violet-500/10 light:bg-violet-100 border border-violet-500/20 light:border-violet-200 text-violet-300 light:text-violet-700 text-xs font-bold rounded-full mb-8">
-          <Zap className="w-3 h-3" /> The all-in-one platform for local businesses
+          <Zap className="w-3 h-3" /> The all-in-one platform for local
+          businesses
         </div>
 
         <h1 className="text-5xl sm:text-6xl lg:text-7xl font-black text-white light:text-gray-900 leading-[1.05] tracking-tight mb-6">
-          Your business.<br />
+          Your business.
+          <br />
           <span className="bg-gradient-to-r from-violet-400 to-indigo-400 light:from-violet-600 light:to-indigo-600 bg-clip-text text-transparent">
             Online in minutes.
           </span>
         </h1>
 
         <p className="text-xl text-slate-400 light:text-gray-600 max-w-2xl mx-auto leading-relaxed mb-10">
-          Give your business a professional online presence. Accept bookings, take orders, and manage
-          everything from one powerful dashboard.
+          Give your business a professional online presence. Accept bookings,
+          take orders, and manage everything from one powerful dashboard.
         </p>
 
         <div className="flex items-center justify-center gap-4 flex-wrap">
@@ -151,7 +251,9 @@ export default function HomePage() {
           </Link>
         </div>
 
-        <p className="text-sm text-slate-600 light:text-gray-500 mt-5">No credit card required · 14-day free trial</p>
+        <p className="text-sm text-slate-600 light:text-gray-500 mt-5">
+          No credit card required · 14-day free trial
+        </p>
       </section>
 
       {/* Business Types */}
@@ -162,12 +264,22 @@ export default function HomePage() {
             <div className="w-12 h-12 bg-violet-500/20 light:bg-violet-100 rounded-2xl flex items-center justify-center mb-5">
               <Calendar className="w-6 h-6 text-violet-400 light:text-violet-600" />
             </div>
-            <h3 className="text-xl font-black text-white light:text-gray-900 mb-2">Appointment Businesses</h3>
+            <h3 className="text-xl font-black text-white light:text-gray-900 mb-2">
+              Appointment Businesses
+            </h3>
             <p className="text-slate-400 light:text-gray-600 text-sm mb-5">
-              Let clients book your services 24/7. Manage your calendar, deposits, and confirmations effortlessly.
+              Let clients book your services 24/7. Manage your calendar,
+              deposits, and confirmations effortlessly.
             </p>
             <div className="flex flex-wrap gap-2">
-              {["Hair Salons", "Barbershops", "Med Spas", "Yoga Studios", "Consultants", "Personal Trainers"].map((e) => (
+              {[
+                "Hair Salons",
+                "Barbershops",
+                "Med Spas",
+                "Yoga Studios",
+                "Consultants",
+                "Personal Trainers",
+              ].map((e) => (
                 <span
                   key={e}
                   className="text-xs font-semibold px-3 py-1.5 bg-violet-500/10 light:bg-violet-100 border border-violet-500/20 light:border-violet-200 rounded-full text-violet-300 light:text-violet-700"
@@ -183,12 +295,22 @@ export default function HomePage() {
             <div className="w-12 h-12 bg-orange-500/20 light:bg-orange-100 rounded-2xl flex items-center justify-center mb-5">
               <ShoppingBag className="w-6 h-6 text-orange-400 light:text-orange-600" />
             </div>
-            <h3 className="text-xl font-black text-white light:text-gray-900 mb-2">Ordering Businesses</h3>
+            <h3 className="text-xl font-black text-white light:text-gray-900 mb-2">
+              Ordering Businesses
+            </h3>
             <p className="text-slate-400 light:text-gray-600 text-sm mb-5">
-              Take orders online for pickup or delivery. Manage your menu, inventory, and fulfilment all in one place.
+              Take orders online for pickup or delivery. Manage your menu,
+              inventory, and fulfilment all in one place.
             </p>
             <div className="flex flex-wrap gap-2">
-              {["Restaurants", "Bakeries", "Cafes", "Food Trucks", "Catering", "Specialty Shops"].map((e) => (
+              {[
+                "Restaurants",
+                "Bakeries",
+                "Cafes",
+                "Food Trucks",
+                "Catering",
+                "Specialty Shops",
+              ].map((e) => (
                 <span
                   key={e}
                   className="text-xs font-semibold px-3 py-1.5 bg-orange-500/10 light:bg-orange-100 border border-orange-500/20 light:border-orange-200 rounded-full text-orange-300 light:text-orange-700"
@@ -202,11 +324,18 @@ export default function HomePage() {
       </section>
 
       {/* Features */}
-      <section id="features" className="bg-slate-900/40 light:bg-gray-50 border-y border-white/5 light:border-gray-200 py-24">
+      <section
+        id="features"
+        className="bg-slate-900/40 light:bg-gray-50 border-y border-white/5 light:border-gray-200 py-24"
+      >
         <div className="max-w-6xl mx-auto px-6 md:px-12">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-black text-white light:text-gray-900 mb-3">Everything your business needs</h2>
-            <p className="text-slate-400 light:text-gray-600 text-lg">All the tools. One platform. Zero setup headaches.</p>
+            <h2 className="text-3xl md:text-4xl font-black text-white light:text-gray-900 mb-3">
+              Everything your business needs
+            </h2>
+            <p className="text-slate-400 light:text-gray-600 text-lg">
+              All the tools. One platform. Zero setup headaches.
+            </p>
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {features.map((f) => {
@@ -219,8 +348,12 @@ export default function HomePage() {
                   <div className="w-10 h-10 bg-violet-500/10 light:bg-violet-100 rounded-xl flex items-center justify-center mb-4 group-hover:bg-violet-500/20 light:group-hover:bg-violet-200 transition-colors">
                     <Icon className="w-5 h-5 text-violet-400 light:text-violet-600" />
                   </div>
-                  <h3 className="font-bold text-white light:text-gray-900 mb-2">{f.title}</h3>
-                  <p className="text-sm text-slate-400 light:text-gray-600 leading-relaxed">{f.desc}</p>
+                  <h3 className="font-bold text-white light:text-gray-900 mb-2">
+                    {f.title}
+                  </h3>
+                  <p className="text-sm text-slate-400 light:text-gray-600 leading-relaxed">
+                    {f.desc}
+                  </p>
                 </div>
               );
             })}
@@ -228,65 +361,83 @@ export default function HomePage() {
         </div>
       </section>
 
-  
-{/* Live Demos */}
+      {/* Live Demos */}
 
-<section id="demos" className="py-24">
-  <div className="max-w-6xl mx-auto px-6 md:px-12">
-    <div className="text-center mb-12">
-      <h2 className="text-3xl md:text-4xl font-black text-white light:text-gray-900 mb-3">See it live</h2>
-      <p className="text-slate-400 light:text-gray-600">Real business storefronts — built on LocalSpace</p>
-    </div>
+      <section id="demos" className="py-24">
+        <div className="max-w-6xl mx-auto px-6 md:px-12">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-black text-white light:text-gray-900 mb-3">
+              See it live
+            </h2>
+            <p className="text-slate-400 light:text-gray-600">
+              Real business storefronts — built on LocalSpace
+            </p>
+          </div>
 
-    <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
-      {demos.map((d) => (
-        <Link
-          key={d.slug}
-          href={`/store-front/${d.slug}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="bg-slate-800/60 light:bg-white border border-slate-700/50 light:border-gray-200 rounded-2xl p-5 hover:border-slate-500 light:hover:border-gray-300 hover:-translate-y-1 transition-all group text-center space-y-4"
-        >
-          <div
-            className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl mx-auto shadow-lg light:shadow-sm"
-            style={{ backgroundColor: d.color + "30", border: `1px solid ${d.color}50` }}
-          >
-            {d.emoji}
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            {demos.map((d) => (
+              <Link
+                key={d.slug}
+                href={`/store-front/${d.slug}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="bg-slate-800/60 light:bg-white border border-slate-700/50 light:border-gray-200 rounded-2xl p-5 hover:border-slate-500 light:hover:border-gray-300 hover:-translate-y-1 transition-all group text-center space-y-4"
+              >
+                <div
+                  className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl mx-auto shadow-lg light:shadow-sm"
+                  style={{
+                    backgroundColor: d.color + "30",
+                    border: `1px solid ${d.color}50`,
+                  }}
+                >
+                  {d.emoji}
+                </div>
+                <div>
+                  <p className="font-bold text-white light:text-gray-900 text-sm">
+                    {d.name}
+                  </p>
+                  <p className="text-xs text-slate-500 light:text-gray-500 mt-0.5">
+                    {d.city}
+                  </p>
+                </div>
+                <span
+                  className="inline-flex items-center gap-1 text-xs font-semibold px-3 py-1 rounded-full"
+                  style={{ backgroundColor: d.color + "20", color: d.color }}
+                >
+                  {d.type}
+                </span>
+                <div className="flex items-center justify-center gap-1 text-xs text-slate-500 light:text-gray-500 group-hover:text-slate-300 light:group-hover:text-gray-700 transition-colors">
+                  Visit store <ChevronRight className="w-3 h-3" />
+                </div>
+              </Link>
+            ))}
           </div>
-          <div>
-            <p className="font-bold text-white light:text-gray-900 text-sm">{d.name}</p>
-            <p className="text-xs text-slate-500 light:text-gray-500 mt-0.5">{d.city}</p>
-          </div>
-          <span
-            className="inline-flex items-center gap-1 text-xs font-semibold px-3 py-1 rounded-full"
-            style={{ backgroundColor: d.color + "20", color: d.color }}
-          >
-            {d.type}
-          </span>
-          <div className="flex items-center justify-center gap-1 text-xs text-slate-500 light:text-gray-500 group-hover:text-slate-300 light:group-hover:text-gray-700 transition-colors">
-            Visit store <ChevronRight className="w-3 h-3" />
-          </div>
-        </Link>
-      ))}
-    </div>
 
-    <div className="mt-10 text-center">
-      <Link
-        href="/login"
-        className="inline-flex items-center gap-2 text-sm text-violet-400 light:text-violet-600 hover:text-violet-300 light:hover:text-violet-700 font-semibold transition-colors"
-      >
-        Log in to see the owner dashboard <ArrowRight className="w-4 h-4" />
-      </Link>
-    </div>
-  </div>
-</section>
+          <div className="mt-10 text-center">
+            <Link
+              href="/login"
+              className="inline-flex items-center gap-2 text-sm text-violet-400 light:text-violet-600 hover:text-violet-300 light:hover:text-violet-700 font-semibold transition-colors"
+            >
+              Log in to see the owner dashboard{" "}
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+        </div>
+      </section>
 
       {/* Pricing */}
-      <section id="pricing" className="bg-slate-900/40 light:bg-gray-50 border-y border-white/5 light:border-gray-200 py-24">
+      <section
+        id="pricing"
+        className="bg-slate-900/40 light:bg-gray-50 border-y border-white/5 light:border-gray-200 py-24"
+      >
         <div className="max-w-5xl mx-auto px-6 md:px-12">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-black text-white light:text-gray-900 mb-3">Simple, transparent pricing</h2>
-            <p className="text-slate-400 light:text-gray-600">Start free. Scale as you grow. Cancel anytime.</p>
+            <h2 className="text-3xl md:text-4xl font-black text-white light:text-gray-900 mb-3">
+              Simple, transparent pricing
+            </h2>
+            <p className="text-slate-400 light:text-gray-600">
+              Start free. Scale as you grow. Cancel anytime.
+            </p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-6 items-start">
@@ -300,14 +451,23 @@ export default function HomePage() {
                     {p.badge}
                   </div>
                 )}
-                <p className="font-bold text-slate-400 light:text-gray-500 text-sm mb-2">{p.name}</p>
+                <p className="font-bold text-slate-400 light:text-gray-500 text-sm mb-2">
+                  {p.name}
+                </p>
                 <div className="flex items-end gap-1 mb-6">
-                  <span className="text-4xl font-black text-white light:text-gray-900">{p.price}</span>
-                  <span className="text-slate-500 light:text-gray-500 text-sm mb-1">{p.period}</span>
+                  <span className="text-4xl font-black text-white light:text-gray-900">
+                    {p.price}
+                  </span>
+                  <span className="text-slate-500 light:text-gray-500 text-sm mb-1">
+                    {p.period}
+                  </span>
                 </div>
                 <ul className="space-y-3 mb-8">
                   {p.features.map((f) => (
-                    <li key={f} className="flex items-center gap-3 text-sm text-slate-300 light:text-gray-700">
+                    <li
+                      key={f}
+                      className="flex items-center gap-3 text-sm text-slate-300 light:text-gray-700"
+                    >
                       <div className="w-4 h-4 bg-emerald-500/20 light:bg-emerald-100 border border-emerald-500/30 light:border-emerald-300 rounded-full flex items-center justify-center flex-shrink-0">
                         <Check className="w-2.5 h-2.5 text-emerald-400 light:text-emerald-600" />
                       </div>
@@ -341,8 +501,12 @@ export default function HomePage() {
               { value: "98%", label: "Satisfaction rate" },
             ].map((s) => (
               <div key={s.label}>
-                <p className="text-4xl font-black text-white light:text-gray-900 mb-2">{s.value}</p>
-                <p className="text-slate-400 light:text-gray-600 text-sm">{s.label}</p>
+                <p className="text-4xl font-black text-white light:text-gray-900 mb-2">
+                  {s.value}
+                </p>
+                <p className="text-slate-400 light:text-gray-600 text-sm">
+                  {s.label}
+                </p>
               </div>
             ))}
           </div>
@@ -352,8 +516,12 @@ export default function HomePage() {
       {/* CTA */}
       <section className="py-20 bg-gradient-to-r from-violet-900/40 to-indigo-900/40 light:from-violet-100 light:to-indigo-100 border-y border-violet-500/20 light:border-violet-200">
         <div className="max-w-3xl mx-auto px-6 text-center">
-          <h2 className="text-3xl md:text-4xl font-black text-white light:text-gray-900 mb-4">Ready to grow your business?</h2>
-          <p className="text-slate-400 light:text-gray-600 mb-8">Join thousands of local businesses already using LocalSpace.</p>
+          <h2 className="text-3xl md:text-4xl font-black text-white light:text-gray-900 mb-4">
+            Ready to grow your business?
+          </h2>
+          <p className="text-slate-400 light:text-gray-600 mb-8">
+            Join thousands of local businesses already using LocalSpace.
+          </p>
           <Link
             href="/register"
             className="inline-flex items-center gap-2 px-8 py-4 bg-violet-600 hover:bg-violet-500 light:bg-violet-600 light:hover:bg-violet-700 text-white font-bold rounded-2xl transition-colors shadow-lg shadow-violet-900/30 light:shadow-violet-600/30"
@@ -361,11 +529,14 @@ export default function HomePage() {
             Create your free account <ArrowRight className="w-5 h-5" />
           </Link>
           <div className="flex items-center justify-center gap-6 mt-8 text-sm text-slate-500 light:text-gray-600">
-            {["No credit card", "14-day free trial", "Cancel anytime"].map((t) => (
-              <span key={t} className="flex items-center gap-1.5">
-                <Check className="w-3.5 h-3.5 text-emerald-500 light:text-emerald-600" /> {t}
-              </span>
-            ))}
+            {["No credit card", "14-day free trial", "Cancel anytime"].map(
+              (t) => (
+                <span key={t} className="flex items-center gap-1.5">
+                  <Check className="w-3.5 h-3.5 text-emerald-500 light:text-emerald-600" />{" "}
+                  {t}
+                </span>
+              ),
+            )}
           </div>
         </div>
       </section>
@@ -377,19 +548,33 @@ export default function HomePage() {
             <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center">
               <Sparkles className="w-3.5 h-3.5 text-white" />
             </div>
-            <span className="font-black text-white light:text-gray-900">BzLocalSpace</span>
+            <span className="font-black text-white light:text-gray-900">
+              BzLocalSpace
+            </span>
           </div>
           <div className="flex items-center gap-6 text-sm text-slate-500 light:text-gray-600">
-            <Link href="/login" className="hover:text-slate-300 light:hover:text-gray-900 transition-colors">
+            <Link
+              href="/login"
+              className="hover:text-slate-300 light:hover:text-gray-900 transition-colors"
+            >
               Sign In
             </Link>
-            <Link href="/register" className="hover:text-slate-300 light:hover:text-gray-900 transition-colors">
+            <Link
+              href="/register"
+              className="hover:text-slate-300 light:hover:text-gray-900 transition-colors"
+            >
               Register
             </Link>
-            <Link href="/dashboard" className="hover:text-slate-300 light:hover:text-gray-900 transition-colors">
+            <Link
+              href="/dashboard"
+              className="hover:text-slate-300 light:hover:text-gray-900 transition-colors"
+            >
               Dashboard
             </Link>
-            <Link href="/admin" className="hover:text-slate-300 light:hover:text-gray-900 transition-colors">
+            <Link
+              href="/admin"
+              className="hover:text-slate-300 light:hover:text-gray-900 transition-colors"
+            >
               Admin
             </Link>
             <span>© 2025 BzLocalSpace Platform</span>

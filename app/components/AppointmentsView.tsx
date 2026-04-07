@@ -23,6 +23,8 @@ import {
   formatDuration,
   cn,
 } from "../lib/utils";
+// NEW: Import useRealtime for emitting appointment events
+import { useRealtime } from "../contexts/realtime";
 import type { Appointment, AppointmentStatus, Tenant } from "../types/index";
 
 type Filter = "all" | AppointmentStatus;
@@ -32,6 +34,9 @@ interface Props {
 }
 
 export function AppointmentsView({ tenant }: Props) {
+  // NEW: Get realtime context to emit appointment events
+  const realtime = useRealtime();
+  
   const [apts, setApts] = useState<Appointment[]>(
     getAppointmentsByTenant(tenant.id),
   );
@@ -55,8 +60,23 @@ export function AppointmentsView({ tenant }: Props) {
   const filtered =
     filter === "all" ? apts : apts.filter((a) => a.status === filter);
 
+  // ENHANCED: Emit real-time event when appointment status changes
   const updateStatus = (id: string, status: AppointmentStatus) => {
-    setApts((prev) => prev.map((a) => (a.id === id ? { ...a, status } : a)));
+    setApts((prev) => {
+      const updated = prev.map((a) => (a.id === id ? { ...a, status } : a));
+      
+      // NEW: Emit real-time event for appointment updated
+      const updatedApt = updated.find(a => a.id === id);
+      if (updatedApt) {
+        realtime.addEvent({
+          type: "appointment_updated",
+          tenantId: tenant.id,
+          appointment: updatedApt,
+        });
+      }
+      
+      return updated;
+    });
     setSelected((prev) => (prev?.id === id ? { ...prev, status } : prev));
   };
 

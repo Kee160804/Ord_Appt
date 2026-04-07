@@ -4,23 +4,61 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Sparkles, Check, Calendar, ShoppingBag, ArrowRight, ArrowLeft } from "lucide-react";
 import { cn } from "../lib/utils";
+// NEW: Import useAuth to access signup method
+import { useAuth } from "../contexts/auth";
 import type { BusinessType } from "../types/index";
 
 export default function RegisterPage() {
   const router = useRouter();
+  // NEW: Get signup method from auth context
+  const { signup } = useAuth();
   const [step, setStep] = useState(1);
   const [bType, setBType] = useState<BusinessType | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const [form, setForm] = useState({ firstName: "", lastName: "", email: "", password: "", businessName: "", city: "", phone: "", slug: "" });
 
   const update = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
 
+  // ENHANCED: Use the new signup method from auth context to create accounts
   const submit = async () => {
     setLoading(true);
-    // Simulate API call – replace with actual registration logic
-    await new Promise(r => setTimeout(r, 1200));
-    // Redirect to login page so user can sign in with new credentials
-    router.push("/login");
+    setError("");
+    
+    // Validate required fields
+    if (!form.firstName || !form.lastName || !form.email || !form.password) {
+      setError("Please fill in all account details");
+      setLoading(false);
+      return;
+    }
+
+    if (!bType) {
+      setError("Please select a business type");
+      setLoading(false);
+      return;
+    }
+
+    if (!form.businessName) {
+      setError("Please enter a business name");
+      setLoading(false);
+      return;
+    }
+
+    const fullName = `${form.firstName} ${form.lastName}`;
+    
+    // NEW: Call the signup method from auth context
+    const result = await signup(form.email, form.password, fullName, form.businessName, bType);
+    
+    // ENHANCED: Wait a moment before redirecting to ensure user data is saved
+    if (result.success) {
+      // COMMENT: Added small delay to ensure state updates are persisted
+      await new Promise(resolve => setTimeout(resolve, 300));
+      // Redirect to dashboard after successful signup
+      router.push("/dashboard");
+    } else {
+      setError(result.error || "Signup failed. Please try again.");
+      setLoading(false);
+    }
   };
 
   const steps = ["Account", "Business Type", "Business Details"];
@@ -40,6 +78,14 @@ export default function RegisterPage() {
           <h1 className="text-2xl font-black text-white">Create your business</h1>
           <p className="text-slate-500 text-sm mt-1">Set up your digital storefront in minutes</p>
         </div>
+
+        {/* NEW: Error display */}
+        {error && (
+          <div className="mb-6 p-4 bg-red-500/20 border border-red-500/30 rounded-xl text-sm text-red-300 flex items-start gap-3">
+            <span className="text-base">⚠️</span>
+            <p>{error}</p>
+          </div>
+        )}
 
         {/* Progress */}
         <div className="flex items-center gap-2 mb-8 px-2">

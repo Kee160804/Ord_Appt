@@ -2,15 +2,17 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Calendar, Scissors, ShoppingBag, Package,
   Users, BarChart3, Settings, LogOut, ExternalLink,
-  ChevronLeft, ChevronRight, Sparkles, ChevronDown, Plus,
+  ChevronLeft, ChevronRight, Sparkles, ChevronDown, Plus, Moon, Sun,
 } from "lucide-react";
 import { cn } from "../lib/utils";
 import type { Tenant, User } from "../types/index";
 import { useAuth } from "../contexts/auth";
+// NEW: Import useTheme for dark mode toggle
+import { useTheme } from "../contexts/theme";
 
 interface SidebarProps {
   tenant: Tenant;
@@ -19,8 +21,10 @@ interface SidebarProps {
 
 export function Sidebar({ tenant, user }: SidebarProps) {
   const pathname = usePathname();
-  const router = useRouter();
+  // COMMENT: Removed unused router variable
   const { logout } = useAuth();
+  // NEW: Get theme toggle function
+  const { theme, toggleTheme } = useTheme();
   const [collapsed, setCollapsed] = useState(false);
   const [tenantOpen, setTenantOpen] = useState(false);
 
@@ -175,6 +179,24 @@ export function Sidebar({ tenant, user }: SidebarProps) {
             <ExternalLink className="w-4 h-4" />
             View Storefront
           </Link>
+          {/* NEW: Dark mode toggle button */}
+          <button
+            onClick={toggleTheme}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm text-slate-400 light:text-gray-600 hover:text-white light:hover:text-gray-900 hover:bg-slate-800 light:hover:bg-gray-100 transition-colors mt-1"
+            title="Toggle dark/light mode"
+          >
+            {theme === "dark" ? (
+              <>
+                <Sun className="w-4 h-4" />
+                Light Mode
+              </>
+            ) : (
+              <>
+                <Moon className="w-4 h-4" />
+                Dark Mode
+              </>
+            )}
+          </button>
         </div>
       )}
 

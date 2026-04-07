@@ -10,11 +10,16 @@ import { Input, Textarea, Select } from "../components/input";
 import { getProductsByTenant, getCategoriesByTenant } from "../data/mock";
 import { formatCurrency, cn } from "../lib/utils";
 import { getStoredProducts, setStoredProducts } from "../lib/storage";
+// NEW: Import useRealtime for emitting product events
+import { useRealtime } from "../contexts/realtime";
 import type { Product, Tenant } from "../types/index";
 
 interface Props { tenant: Tenant }
 
 export function ProductsView({ tenant }: Props) {
+  // NEW: Get realtime context to emit events
+  const realtime = useRealtime();
+  
   // Initialize products from localStorage (if any) or fallback to mock data
   const initialProducts = getStoredProducts(tenant.id) ?? getProductsByTenant(tenant.id);
   const [products, setProducts] = useState<Product[]>(initialProducts);
@@ -85,6 +90,13 @@ export function ProductsView({ tenant }: Props) {
     const updated = [...products, product];
     setProducts(updated);
     setStoredProducts(tenant.id, updated);
+
+    // NEW: Emit real-time event for product added
+    realtime.addEvent({
+      type: "product_added",
+      tenantId: tenant.id,
+      product: product,
+    });
 
     // Reset form and close modal
     setNewProduct({ name: "", price: "", description: "", categoryId: "", inventory: "", image: "", tags: [] });

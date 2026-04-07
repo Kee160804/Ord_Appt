@@ -1,6 +1,8 @@
 "use client";
 
-import { Bell, Search, Plus } from "lucide-react";
+import { Bell, Search, Plus, Sun, Moon } from "lucide-react";
+// NEW: Import useTheme hook to access theme state and toggle function
+import { useTheme } from "@/app/contexts/theme";
 
 interface TopBarProps {
   title: string;
@@ -9,6 +11,9 @@ interface TopBarProps {
 }
 
 export function TopBar({ title, subtitle, action }: TopBarProps) {
+  // NEW: Get current theme and toggle function
+  const { theme, toggleTheme } = useTheme();
+
   const today = new Date().toLocaleDateString("en-US", {
     weekday: "long",
     month: "long",
@@ -19,7 +24,9 @@ export function TopBar({ title, subtitle, action }: TopBarProps) {
     <header className="flex items-center justify-between px-6 md:px-8 py-4 bg-[#070b14] light:bg-white border-b border-white/5 light:border-gray-200 flex-shrink-0">
       {/* Left: Title and subtitle/date */}
       <div>
-        <h1 className="text-xl font-bold text-white light:text-gray-900">{title}</h1>
+        <h1 className="text-xl font-bold text-white light:text-gray-900">
+          {title}
+        </h1>
         <p className="text-sm text-slate-400 light:text-gray-600 mt-0.5">
           {subtitle ?? today}
         </p>
@@ -40,9 +47,33 @@ export function TopBar({ title, subtitle, action }: TopBarProps) {
         </div>
 
         {/* Notifications */}
-        <button title="Notifications" className="relative p-2 text-slate-400 light:text-gray-600 hover:text-white light:hover:text-gray-900 hover:bg-white/5 light:hover:bg-gray-200 rounded-xl transition-colors">
+        <button
+          title="Notifications"
+          className="relative p-2 text-slate-400 light:text-gray-600 hover:text-white light:hover:text-gray-900 hover:bg-white/5 light:hover:bg-gray-200 rounded-xl transition-colors"
+        >
           <Bell className="w-5 h-5" />
           <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
+        </button>
+
+        {/* NEW: Theme toggle button in TopBar */}
+        <button
+          onClick={() => {
+            // NEW: AGGRESSIVE DEBUG - Verify button click is registered
+            console.log("🎯 TOPBAR BUTTON CLICKED!");
+            console.log("🎯 Current theme before toggle:", theme);
+            toggleTheme();
+            console.log("🎯 toggleTheme() function called");
+          }}
+          className="p-2 rounded-xl text-slate-400 light:text-gray-600 hover:bg-white/10 light:hover:bg-gray-200 hover:text-white light:hover:text-gray-900 transition-colors cursor-pointer"
+          aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+          title={`Switch to ${theme === "dark" ? "light" : "dark"} mode (currently ${theme})`}
+        >
+          {/* NEW: Show Sun icon in dark mode, Moon icon in light mode */}
+          {theme === "dark" ? (
+            <Sun className="w-5 h-5 text-yellow-400" />
+          ) : (
+            <Moon className="w-5 h-5 text-slate-700" />
+          )}
         </button>
 
         {/* Action button */}
