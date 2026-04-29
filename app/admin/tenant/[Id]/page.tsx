@@ -15,7 +15,9 @@ import { useRouter } from "next/navigation";
 export default function TenantDetailPage() {
   const router = useRouter();
   // COMMENT: Get the tenant ID from the URL parameter
-  const { id } = useParams<{ id: string }>();
+  // NOTE: The folder is [Id] so the param is 'Id' not 'id' (capital I)
+  const params = useParams<{ Id: string }>();
+  const id = Array.isArray(params?.Id) ? params.Id[0] : params?.Id;
 
   // NEW: Add state management for tenant status (active, disabled, deleted)
   const [tenantStatus, setTenantStatus] = useState<
@@ -34,10 +36,13 @@ export default function TenantDetailPage() {
     () => [...mockTenants, ...dynamicTenants],
     [dynamicTenants],
   );
-  // FIXED: Decode URL parameter and handle case-sensitivity
-  const decodedId = id ? decodeURIComponent(id) : "";
-  const tenant = allTenants.find((t) => t.id === decodedId);
-  const analytics = mockAnalytics[decodedId];
+
+  // FIXED: Proper handling of URL parameter - decode and trim whitespace
+  const decodedId = id ? decodeURIComponent(String(id)).trim() : "";
+
+  // COMMENT: Search for tenant by ID in both mock and dynamic tenants
+  const tenant = allTenants.find((t) => t.id.trim() === decodedId);
+  const analytics = mockAnalytics[decodedId] || mockAnalytics[decodedId.trim()];
 
   // COMMENT: If tenant is not found, show error message with helpful info
   if (!tenant) {
@@ -164,9 +169,12 @@ export default function TenantDetailPage() {
 
       {/* COMMENT: Tenant header with logo, name and details */}
       <div className="flex items-center gap-4">
+        {/* COMMENT: Using inline style for dynamic background color from tenant.logoBg */}
+        {/* This is necessary because logoBg is dynamic hex color (e.g. #c084fc) */}
+        {/* and cannot be predicted by Tailwind's static class generation */}
         <div
           className="w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold text-lg"
-          // COMMENT: Using inline style for dynamic background color since it's not a Tailwind class
+          // @ts-ignore: Dynamic color style for tenant branding
           style={{ backgroundColor: tenant.logoBg }}
         >
           {tenant.logo}
