@@ -1,49 +1,20 @@
-// import { TopBar } from "../dashboard/TopBar";
-// import { DashboardOverview } from "../dashboard/DashboardOverview";
-// import { mockTenants } from "../data/mock";
-
-// export default function DashboardPage() {
-//   // In real app, derive tenant from auth session
-//   const tenant = mockTenants[0];
-//   return (
-//     <>
-//       <TopBar title="Dashboard" />
-//       <DashboardOverview tenant={tenant} />
-//     </>
-//   );
-// }
-
-// "use client";
-// import { useAuth } from "../contexts/auth";
-// import { TopBar } from "../components/TopBar";
-// import { DashboardOverview } from "../components/DashboardOverview";
-
-// export default function DashboardPage() {
-//   const { tenant } = useAuth();
-//   if (!tenant) return null;
-//   return (
-//     <>
-//       <TopBar
-//         title="Dashboard"
-//         subtitle={`${tenant.name} — ${tenant.businessType === "appointment" ? "Appointment" : "Ordering"} Business`}
-//       />
-//       <DashboardOverview tenant={tenant} />
-//     </>
-//   );
-// }
-
-
-
 "use client";
 import { useAuth } from "@/app/contexts/auth";
+// NEW: Import useRealtime to find dynamic tenants created via signup
+import { useRealtime } from "@/app/contexts/realtime";
 import { TopBar } from "@/app/components/TopBar";
 import { DashboardOverview } from "@/app/components/DashboardOverview";
 import { mockTenants } from "@/app/data/mock";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 
 export default function DashboardPage() {
   const { user, isLoading } = useAuth();
+  // NEW: Get dynamic tenants from realtime context
+  const realtime = useRealtime();
+  // ENHANCED: Get dynamic tenants and combine with mock tenants
+  const dynamicTenants = useMemo(() => realtime.getTenantTenants(), [realtime]);
+  const allTenants = useMemo(() => [...mockTenants, ...dynamicTenants], [dynamicTenants]);
   const router = useRouter();
 
   useEffect(() => {
@@ -64,8 +35,8 @@ export default function DashboardPage() {
     return null; // Will redirect via useEffect
   }
 
-  // Find tenant based on user's tenantId
-  const tenant = mockTenants.find(t => t.id === user.tenantId);
+  // ENHANCED: Find tenant from both mock and dynamic tenants
+  const tenant = allTenants.find(t => t.id === user.tenantId);
 
   if (!tenant) {
     return (

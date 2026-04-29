@@ -1,120 +1,170 @@
-/* @import "tailwindcss";
-
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
-} */
-
-
-/* 
-
-@import "tailwindcss";
-
-:root {
-  --background: #ffffff;
-  --foreground: #0f172a;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-}
-
-* { box-sizing: border-box; }
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  -webkit-font-smoothing: antialiased;
-}
-
-.no-scrollbar::-webkit-scrollbar { display: none; }
-.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-
-::-webkit-scrollbar { width: 5px; height: 5px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
-::-webkit-scrollbar-thumb:hover { background: #94a3b8; } */
-
-
-
-
-
 @import "tailwindcss";
 
 :root {
   --background: #0a0f1a;
   --foreground: #f1f5f9;
+  /* COMMENT: CSS variables for theme colors */
+  --bg-color: #070b14;
+  --text-color: white;
+  /* NEW: Added explicit color scheme variable for dark mode */
+  --color-scheme: dark;
 }
 
-* { box-sizing: border-box; }
+* {
+  box-sizing: border-box;
+}
 
 body {
   background: var(--background);
   color: var(--foreground);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* NEW: Smooth transition between themes */
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease,
+    border-color 0.3s ease;
 }
 
-/* Scrollbar */
-::-webkit-scrollbar { width: 5px; height: 5px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #334155; border-radius: 999px; }
-::-webkit-scrollbar-thumb:hover { background: #475569; }
-.no-scrollbar::-webkit-scrollbar { display: none; }
-.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-
-/* Animations */
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-@keyframes slideIn {
-  from { opacity: 0; transform: translateX(-12px); }
-  to { opacity: 1; transform: translateX(0); }
-}
-@keyframes pulse-slow {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+html {
+  /* NEW: Explicitly set dark mode as default */
+  color-scheme: dark;
 }
 
-.animate-fade-in { animation: fadeIn 0.3s ease forwards; }
-.animate-slide-in { animation: slideIn 0.25s ease forwards; }
-
-
-/* In your global.css */
-:root {
-  --bg-color: #070b14;
-  --text-color: white;
+/* NEW: Light mode CSS variables override - this is the key section */
+html.light {
+  --color-scheme: light;
+  color-scheme: light;
 }
 
 .light {
   --bg-color: white;
   --text-color: #111827;
+  /* NEW: Ensure light mode is applied */
+  color-scheme: light;
 }
 
+/* NEW: Apply theme to html and body elements */
+html.light,
+.light {
+  background-color: white;
+  color: #111827;
+}
+
+/* COMMENT: Apply CSS variables with smooth transition */
 body {
   background-color: var(--bg-color);
   color: var(--text-color);
-  transition: background-color 0.2s, color 0.2s;
+}
+
+/* NEW: CRITICAL THEME OVERRIDE RULES - Force light mode colors when class is present */
+/* These rules ensure that clicking the theme button IMMEDIATELY changes visible colors */
+html.light {
+  --bg-color: white !important;
+  --text-color: #111827 !important;
+  background-color: white !important;
+  color: #111827 !important;
+}
+
+html.light body {
+  background-color: white !important;
+  color: #111827 !important;
+}
+
+html.light * {
+  color-scheme: light;
+}
+
+/* NEW: Dark mode is the default */
+html {
+  --bg-color: #070b14 !important;
+  --text-color: white !important;
+  background-color: #070b14 !important;
+  color: white !important;
+  color-scheme: dark;
+}
+
+html body {
+  background-color: #070b14 !important;
+  color: white !important;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+/* COMMENT: Light mode scrollbar styling */
+html.light ::-webkit-scrollbar-thumb,
+.light ::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+}
+
+html.light ::-webkit-scrollbar-thumb:hover,
+.light ::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* COMMENT: Hide scrollbar when using no-scrollbar class */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes pulse-slow {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease forwards;
+}
+.animate-slide-in {
+  animation: slideIn 0.25s ease forwards;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease forwards;
+}
+.animate-slide-in {
+  animation: slideIn 0.25s ease forwards;
 }
