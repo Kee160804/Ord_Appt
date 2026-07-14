@@ -3,11 +3,12 @@
 import { TopBar } from "@/app/components/TopBar";
 import { AppointmentsView } from "@/app/components/AppointmentsView";
 import { useAuth } from "@/app/contexts/auth";
-import { mockTenants } from "@/app/data/mock";
+import { getTenantById } from "@/app/lib/data";
 
 export default function AppointmentsPage() {
   const { user } = useAuth();
-  const tenant = mockTenants.find(t => t.id === user?.tenantId)!;
+  const tenant = getTenantById(user?.tenantId ?? "");
+  if (!tenant) return null;
 
   return (
     <>

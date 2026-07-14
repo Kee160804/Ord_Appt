@@ -3,11 +3,12 @@
 import { useAuth } from "@/app/contexts/auth";
 import { TopBar } from "@/app/components/TopBar";
 import { ProductsView } from "@/app/components/ProductsView";
-import { mockTenants } from "@/app/data/mock";
+import { getTenantById } from "@/app/lib/data";
 
 export default function ProductsPage() {
   const { user } = useAuth();
-  const tenant = mockTenants.find(t => t.id === user?.tenantId)!;
+  const tenant = getTenantById(user?.tenantId ?? "");
+  if (!tenant) return null;
 
   return (
     <>

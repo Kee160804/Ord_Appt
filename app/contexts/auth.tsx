@@ -2,46 +2,115 @@
 
 import { createContext, useContext, useState, ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { demoAccounts } from "@/app/data/mock";   // Ensure this path is correct
-import { User, Tenant } from "@/app/types/index";
+import { demoAccounts } from "@/app/data/mock";
+import {
+  findUserRecordByEmail,
+  getUserByEmail,
+  getUserById,
+  saveStoredUserRecord,
+  saveStoredTenant,
+  getAllTenants,
+} from "@/app/lib/data";
+import type { User, Tenant, BusinessType } from "@/app/types/index";
 
 interface AuthContextType {
   user: User | null;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  // NEW: Added signup method to create new accounts
-  signup: (email: string, password: string, name: string, businessName: string, businessType: "appointment" | "ordering") => Promise<{ success: boolean; error?: string; user?: User }>;
+  signup: (
+    email: string,
+    password: string,
+    name: string,
+    businessName: string,
+    businessType: BusinessType,
+    city: string,
+    phone: string,
+    slug: string,
+  ) => Promise<{ success: boolean; error?: string; user?: User }>;
   logout: () => void;
   isLoading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const SESSION_KEY = "ls_session";
+
+function parseSession() {
+  if (typeof window === "undefined") return null;
+  const saved = window.localStorage.getItem(SESSION_KEY);
+  if (!saved) return null;
+  try {
+    const parsed = JSON.parse(saved);
+    return typeof parsed?.userId === "string" ? parsed.userId : null;
+  } catch {
+    window.localStorage.removeItem(SESSION_KEY);
+    return null;
+  }
+}
+
+function getInitialUser(): User | null {
+  const userId = parseSession();
+  if (!userId) return null;
+  return getUserById(userId);
+}
+
+function saveSession(user: User) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(SESSION_KEY, JSON.stringify({ userId: user.id }));
+}
+
+function createUniqueSlug(initial: string) {
+  const baseSlug = initial
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, "");
+  const existing = getAllTenants().map((t) => t.slug.toLowerCase());
+  if (!existing.includes(baseSlug)) return baseSlug;
+  let suffix = 1;
+  while (existing.includes(`${baseSlug}-${suffix}`)) {
+    suffix += 1;
+  }
+  return `${baseSlug}-${suffix}`;
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  // Lazy initializer – runs only once when the component mounts on the client
-  const [user, setUser] = useState<User | null>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("user");
-      if (saved) {
-        try {
-          return JSON.parse(saved);
-        } catch {
-          localStorage.removeItem("user");
-        }
-      }
-    }
-    return null;
-  });
+  const [user, setUser] = useState<User | null>(getInitialUser);
 
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);
-    // Simulate network delay – replace with real API call
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const storedUser = findUserRecordByEmail(normalizedEmail);
+
+    if (storedUser) {
+      if (storedUser.password !== password) {
+        setIsLoading(false);
+        return { success: false, error: "Invalid email or password." };
+      }
+
+      const userData: User = {
+        id: storedUser.id,
+        email: storedUser.email,
+        name: storedUser.name,
+        role: storedUser.role,
+        tenantId: storedUser.tenantId,
+        avatar: storedUser.avatar,
+        createdAt: storedUser.createdAt,
+        lastLogin: new Date().toISOString().split("T")[0],
+      };
+
+      saveStoredUserRecord({ ...storedUser, lastLogin: userData.lastLogin });
+      setUser(userData);
+      saveSession(userData);
+      setIsLoading(false);
+      return { success: true };
+    }
 
     const account = demoAccounts.find(
-      a => a.email.toLowerCase() === email.toLowerCase() && a.password === password
+      (a) => a.email.toLowerCase() === normalizedEmail && a.password === password,
     );
 
     if (!account) {
@@ -49,72 +118,65 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { success: false, error: "Invalid email or password." };
     }
 
-    // Build user object – adjust fields to match your User type
+    const demoUser = getUserByEmail(account.email);
+    if (!demoUser) {
+      setIsLoading(false);
+      return { success: false, error: "Account not found." };
+    }
+
     const userData: User = {
-      id: account.email,                     // Using email as a unique ID
-      email: account.email,
-      name: account.label,                    // Display name from mock
-      role: account.role,
-      tenantId: account.tenantId,
-      avatar: account.label.charAt(0).toUpperCase(),
-      createdAt: new Date().toISOString().split('T')[0],
-      lastLogin: new Date().toISOString().split('T')[0],
+      ...demoUser,
+      lastLogin: new Date().toISOString().split("T")[0],
     };
 
     setUser(userData);
-    localStorage.setItem("user", JSON.stringify(userData));
+    saveSession(userData);
     setIsLoading(false);
     return { success: true };
   };
 
-  // NEW: Signup method to create new user accounts and businesses
-  const signup = async (email: string, password: string, name: string, businessName: string, businessType: "appointment" | "ordering") => {
+  const signup = async (
+    email: string,
+    password: string,
+    name: string,
+    businessName: string,
+    businessType: BusinessType,
+    city: string,
+    phone: string,
+    slug: string,
+  ) => {
     setIsLoading(true);
-    
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise((resolve) => setTimeout(resolve, 500));
 
-    // Check if email already exists in demo accounts or registered users
-    const existingUser = demoAccounts.find(a => a.email.toLowerCase() === email.toLowerCase());
-    if (existingUser) {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (
+      findUserRecordByEmail(normalizedEmail) ||
+      demoAccounts.some((a) => a.email.toLowerCase() === normalizedEmail)
+    ) {
       setIsLoading(false);
       return { success: false, error: "Email already registered. Please use a different email." };
     }
 
-    // Check registered users in localStorage
-    try {
-      const registeredUsers = localStorage.getItem("registered_users");
-      if (registeredUsers) {
-        const users: Array<{email: string; password: string; name: string; tenantId: string}> = JSON.parse(registeredUsers);
-        if (users.some((u) => u.email.toLowerCase() === email.toLowerCase())) {
-          setIsLoading(false);
-          return { success: false, error: "Email already registered. Please use a different email." };
-        }
-      }
-    } catch {
-      console.log("Error checking registered users");
-    }
-
-    // Validate password
     if (password.length < 6) {
       setIsLoading(false);
       return { success: false, error: "Password must be at least 6 characters." };
     }
 
-    // Create new tenant
+    const tenantSlug = createUniqueSlug(slug.trim() || businessName);
     const tenantId = `tenant-${Date.now()}`;
+
     const newTenant: Tenant = {
       id: tenantId,
-      name: businessName,
-      slug: businessName.toLowerCase().replace(/\s+/g, "-"),
-      businessType: businessType,
-      logo: name.charAt(0).toUpperCase(),
+      name: businessName.trim(),
+      slug: tenantSlug,
+      businessType,
+      logo: businessName.trim().charAt(0).toUpperCase() || "B",
       logoBg: "#8b5cf6",
-      description: `Welcome to ${businessName}! We're excited to serve you.`,
-      phone: "",
-      email: email,
+      description: `Welcome to ${businessName.trim()}! We're excited to serve you.`,
+      phone: phone.trim(),
+      email: normalizedEmail,
       address: "",
-      city: "",
+      city: city.trim(),
       coverImage: "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=1200&q=80",
       businessHours: [
         { day: "Monday", open: "09:00", close: "18:00", closed: false },
@@ -128,71 +190,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       socialLinks: {},
       primaryColor: "#8b5cf6",
       accentColor: "#a78bfa",
-      createdAt: new Date().toISOString().split('T')[0],
+      createdAt: new Date().toISOString().split("T")[0],
       isActive: true,
       plan: "starter",
       stripeConnected: false,
       subscriptionStatus: "trial",
-      trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)
+        .toISOString()
+        .split("T")[0],
     };
 
-    // Create new user
     const newUser: User = {
-      id: email,
-      email: email,
-      name: name,
+      id: normalizedEmail,
+      email: normalizedEmail,
+      name: name.trim(),
       role: "owner",
-      tenantId: tenantId,
-      avatar: name.charAt(0).toUpperCase(),
-      createdAt: new Date().toISOString().split('T')[0],
-      lastLogin: new Date().toISOString().split('T')[0],
+      tenantId,
+      avatar: name.trim().charAt(0).toUpperCase() || "U",
+      createdAt: new Date().toISOString().split("T")[0],
+      lastLogin: new Date().toISOString().split("T")[0],
     };
 
-    // Save registered user
-    try {
-      const existingUsers = localStorage.getItem("registered_users");
-      const users: Array<{email: string; password: string; name: string; tenantId: string}> = existingUsers ? JSON.parse(existingUsers) : [];
-      users.push({ email, password, name, tenantId });
-      localStorage.setItem("registered_users", JSON.stringify(users));
-    } catch {
-      console.log("Error saving registered user");
-    }
-
-    // Save tenant
-    try {
-      const existingTenants = localStorage.getItem("custom_tenants");
-      const tenants: Tenant[] = existingTenants ? JSON.parse(existingTenants) : [];
-      tenants.push(newTenant);
-      localStorage.setItem("custom_tenants", JSON.stringify(tenants));
-    } catch {
-      console.log("Error saving tenant");
-    }
-
-    // NEW: Emit realtime event for new tenant creation (so it shows in All Businesses)
-    try {
-      const realtimeEvents = localStorage.getItem("realtime_events");
-      // ENHANCED: Changed to emit tenant_created instead of user_registered
-      // This allows getTenantTenants() to find the new business
-      const events: Array<{type: string; tenant: Tenant; user?: User}> = realtimeEvents ? JSON.parse(realtimeEvents) : [];
-      events.unshift({
-        type: "tenant_created",
-        tenant: newTenant,
-        user: newUser,
-      });
-      localStorage.setItem("realtime_events", JSON.stringify(events));
-    } catch {
-      console.log("Error emitting realtime event");
-    }
+    saveStoredTenant(newTenant);
+    saveStoredUserRecord({
+      id: newUser.id,
+      email: newUser.email,
+      password,
+      name: newUser.name,
+      role: newUser.role,
+      tenantId: newUser.tenantId,
+      avatar: newUser.avatar,
+      createdAt: newUser.createdAt,
+      lastLogin: newUser.lastLogin,
+    });
 
     setUser(newUser);
-    localStorage.setItem("user", JSON.stringify(newUser));
+    saveSession(newUser);
     setIsLoading(false);
     return { success: true, user: newUser };
   };
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem("user");
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem(SESSION_KEY);
+      window.localStorage.removeItem("user");
+    }
     router.push("/login");
   };
 

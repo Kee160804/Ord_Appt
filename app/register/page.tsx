@@ -47,7 +47,16 @@ export default function RegisterPage() {
     const fullName = `${form.firstName} ${form.lastName}`;
     
     // NEW: Call the signup method from auth context
-    const result = await signup(form.email, form.password, fullName, form.businessName, bType);
+    const result = await signup(
+      form.email,
+      form.password,
+      fullName,
+      form.businessName,
+      bType,
+      form.city,
+      form.phone,
+      form.slug,
+    );
     
     // ENHANCED: Wait a moment before redirecting to ensure user data is saved
     if (result.success) {

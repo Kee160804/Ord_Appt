@@ -3,11 +3,12 @@
 import { TopBar } from "@/app/components/TopBar";
 import { AnalyticsView } from "@/app/components/AnalyticsView";
 import { useAuth } from "@/app/contexts/auth";
-import { mockTenants } from "@/app/data/mock";
+import { getTenantById } from "@/app/lib/data";
 
 export default function AnalyticsPage() {
   const { user } = useAuth();
-  const tenant = mockTenants.find(t => t.id === user?.tenantId)!;
+  const tenant = getTenantById(user?.tenantId ?? "");
+  if (!tenant) return null;
 
   return (
     <>

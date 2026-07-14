@@ -1,4 +1,4 @@
-import { getTenantBySlug } from "@/app/data/mock";
+import { getTenantBySlug } from "@/app/lib/data";
 import StorefrontClient from "@/app/components/store";
 import { notFound } from "next/navigation";
 
