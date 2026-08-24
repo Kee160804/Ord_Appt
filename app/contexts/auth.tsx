@@ -11,6 +11,8 @@ import {
   saveStoredTenant,
   getAllTenants,
 } from "@/app/lib/data";
+import { isSupabaseEnabled } from "@/app/lib/supabase";
+import { supabaseLogin, supabaseSignup } from "@/app/services/authService";
 import type { User, Tenant, BusinessType } from "@/app/types/index";
 
 interface AuthContextType {
@@ -33,13 +35,18 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const SESSION_KEY = "ls_session";
 
-function parseSession() {
+interface SessionData {
+  userId: string;
+  user?: User;
+}
+
+function parseSession(): SessionData | null {
   if (typeof window === "undefined") return null;
   const saved = window.localStorage.getItem(SESSION_KEY);
   if (!saved) return null;
   try {
-    const parsed = JSON.parse(saved);
-    return typeof parsed?.userId === "string" ? parsed.userId : null;
+    const parsed = JSON.parse(saved) as SessionData;
+    return typeof parsed?.userId === "string" ? parsed : null;
   } catch {
     window.localStorage.removeItem(SESSION_KEY);
     return null;
@@ -47,14 +54,17 @@ function parseSession() {
 }
 
 function getInitialUser(): User | null {
-  const userId = parseSession();
-  if (!userId) return null;
-  return getUserById(userId);
+  const session = parseSession();
+  if (!session) return null;
+  if (session.user && typeof session.user.id === "string" && typeof session.user.email === "string") {
+    return session.user;
+  }
+  return getUserById(session.userId);
 }
 
 function saveSession(user: User) {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(SESSION_KEY, JSON.stringify({ userId: user.id }));
+  window.localStorage.setItem(SESSION_KEY, JSON.stringify({ userId: user.id, user }));
 }
 
 function createUniqueSlug(initial: string) {
@@ -83,6 +93,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await new Promise((resolve) => setTimeout(resolve, 500));
 
     const normalizedEmail = email.trim().toLowerCase();
+
+    if (isSupabaseEnabled()) {
+      const authResult = await supabaseLogin(normalizedEmail, password);
+      if (!authResult.user) {
+        setIsLoading(false);
+        return { success: false, error: authResult.error ?? "Invalid email or password." };
+      }
+
+      setUser(authResult.user);
+      saveSession(authResult.user);
+      setIsLoading(false);
+      return { success: true };
+    }
+
     const storedUser = findUserRecordByEmail(normalizedEmail);
 
     if (storedUser) {
@@ -160,6 +184,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (password.length < 6) {
       setIsLoading(false);
       return { success: false, error: "Password must be at least 6 characters." };
+    }
+
+    if (isSupabaseEnabled()) {
+      const authResult = await supabaseSignup(
+        normalizedEmail,
+        password,
+        name,
+        businessName,
+        businessType,
+        city,
+        phone,
+        slug,
+      );
+
+      if (!authResult.user) {
+        setIsLoading(false);
+        return { success: false, error: authResult.error ?? "Unable to create account." };
+      }
+
+      setUser(authResult.user);
+      saveSession(authResult.user);
+      setIsLoading(false);
+      return { success: true, user: authResult.user };
     }
 
     const tenantSlug = createUniqueSlug(slug.trim() || businessName);

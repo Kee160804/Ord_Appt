@@ -174,7 +174,6 @@ export default function TenantDetailPage() {
         {/* and cannot be predicted by Tailwind's static class generation */}
         <div
           className="w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold text-lg"
-          // @ts-ignore: Dynamic color style for tenant branding
           style={{ backgroundColor: tenant.logoBg }}
         >
           {tenant.logo}

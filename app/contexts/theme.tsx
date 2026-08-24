@@ -15,69 +15,62 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
+const THEME_KEY = "theme";
+const DEMO_THEME_KEY = "theme-demo";
+
+function getBrowserTheme(): Theme {
+  const savedTheme = localStorage.getItem(THEME_KEY) as Theme | null;
+  if (savedTheme === "light" || savedTheme === "dark") return savedTheme;
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  // Main theme for business owner signup area
-  const [theme, setThemeState] = useState<Theme>(() => {
-    if (typeof window !== "undefined") {
-      const savedTheme = localStorage.getItem("theme-main") as Theme | null;
-      return savedTheme || "dark";
-    }
-    return "dark";
-  });
+  const [theme, setThemeState] = useState<Theme>("dark");
+  const [demoTheme, setDemoThemeState] = useState<Theme>("dark");
 
-  // Separate theme for live demos section
-  const [demoTheme, setDemoThemeState] = useState<Theme>(() => {
-    if (typeof window !== "undefined") {
-      const savedDemoTheme = localStorage.getItem("theme-demo") as Theme | null;
-      return savedDemoTheme || "dark";
-    }
-    return "dark";
-  });
+  useEffect(() => {
+    const initialTheme = getBrowserTheme();
+    setThemeState(initialTheme);
 
-  // Apply main theme to page
+    const savedDemoTheme = localStorage.getItem(DEMO_THEME_KEY) as Theme | null;
+    setDemoThemeState(
+      savedDemoTheme === "light" || savedDemoTheme === "dark" ? savedDemoTheme : "dark"
+    );
+  }, []);
+
   useEffect(() => {
     const root = document.documentElement;
     const body = document.body;
 
     if (theme === "light") {
       root.classList.add("light");
-      root.setAttribute("data-theme", "light");
-      document.documentElement.style.colorScheme = "light";
-      document.documentElement.style.backgroundColor = "white";
-      document.documentElement.style.color = "#111827";
+      root.classList.remove("dark");
       body.classList.add("light");
+      body.classList.remove("dark");
+      root.style.colorScheme = "light";
+      root.style.backgroundColor = "white";
+      root.style.color = "#111827";
     } else {
+      root.classList.add("dark");
       root.classList.remove("light");
-      root.setAttribute("data-theme", "dark");
-      document.documentElement.style.colorScheme = "dark";
-      document.documentElement.style.backgroundColor = "#070b14";
-      document.documentElement.style.color = "white";
+      body.classList.add("dark");
       body.classList.remove("light");
+      root.style.colorScheme = "dark";
+      root.style.backgroundColor = "#070b14";
+      root.style.color = "white";
     }
 
-    localStorage.setItem("theme-main", theme);
+    localStorage.setItem(THEME_KEY, theme);
   }, [theme]);
 
-  // Store demo theme for section-level styling
   useEffect(() => {
-    localStorage.setItem("theme-demo", demoTheme);
+    localStorage.setItem(DEMO_THEME_KEY, demoTheme);
   }, [demoTheme]);
 
-  const toggleTheme = () => {
-    setThemeState((prev) => (prev === "dark" ? "light" : "dark"));
-  };
-
-  const toggleDemoTheme = () => {
-    setDemoThemeState((prev) => (prev === "dark" ? "light" : "dark"));
-  };
-
-  const setTheme = (newTheme: Theme) => {
-    setThemeState(newTheme);
-  };
-
-  const setDemoTheme = (newTheme: Theme) => {
-    setDemoThemeState(newTheme);
-  };
+  const toggleTheme = () => setThemeState((prev) => (prev === "dark" ? "light" : "dark"));
+  const toggleDemoTheme = () => setDemoThemeState((prev) => (prev === "dark" ? "light" : "dark"));
+  const setTheme = (newTheme: Theme) => setThemeState(newTheme);
+  const setDemoTheme = (newTheme: Theme) => setDemoThemeState(newTheme);
 
   return (
     <ThemeContext.Provider

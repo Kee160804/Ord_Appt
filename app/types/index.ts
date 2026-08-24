@@ -42,6 +42,7 @@ export interface Tenant {
   id: string;
   name: string;
   slug: string;
+  domain?: string;
   businessType: BusinessType;
   logo: string;
   logoBg: string;

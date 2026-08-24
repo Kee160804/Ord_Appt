@@ -26,7 +26,6 @@ export default function AdminPage() {
   const { logout } = useAuth();
   const realtime = useRealtime();
 
-  const [isMounted, setIsMounted] = useState(false);
   const [activeTab, setActiveTab] = useState<
     "overview" | "tenants" | "agents" | "roles"
   >("overview");
@@ -57,12 +56,8 @@ export default function AdminPage() {
   ]);
   const [agents, setAgents] = useState<Agent[]>([]);
 
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
-  const registeredUsers = isMounted ? realtime.getAllRegisteredUsers() : [];
-  const dynamicTenants = isMounted ? realtime.getTenantTenants() : [];
+  const registeredUsers = realtime.getAllRegisteredUsers();
+  const dynamicTenants = realtime.getTenantTenants();
   const allTenants = [...mockTenants, ...dynamicTenants];
 
   const totalRevenue = Object.values(mockAnalytics).reduce(

@@ -19,6 +19,7 @@ import { getServicesByTenant, getProductsByTenant, getCategoriesByTenant } from 
 import { getStoredProducts, getStoredServices } from "@/app/lib/storage";
 import { AppointmentBooking } from "../components/AppointmentBooking";
 import { OrderingMenu } from "../components/OrderingMenu";
+import { useTheme } from "@/app/contexts/theme";
 import type { Tenant, Service, Product } from "@/app/types/index";
 
 // Extend Tenant with optional fields used in this component
@@ -105,28 +106,11 @@ export default function StorefrontClient({ tenant }: { tenant: Tenant }) {
   }, [tenant.id, isAppt]);
 
 
-  // ---------- Theme Toggle ----------
-const getInitialTheme = (): "light" | "dark" => {
-  if (typeof window === "undefined") return "light";
-  const saved = localStorage.getItem("theme") as "light" | "dark" | null;
-  if (saved) return saved;
-  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-};
-
-const [theme, setTheme] = useState<"light" | "dark">(getInitialTheme);
-
-useEffect(() => {
-  // Apply theme class to document
-  document.documentElement.classList.toggle("dark", theme === "dark");
-  localStorage.setItem("theme", theme);
-}, [theme]);
-
-const toggleTheme = () => {
-  setTheme(prev => prev === "light" ? "dark" : "light");
-};
 
   // ---------- Tab Navigation ----------
   const [activeTab, setActiveTab] = useState<"home" | "contact">("home");
+
+  const { theme, toggleTheme } = useTheme();
 
   // ---------- Contact Information ----------
   const contactInfo = {

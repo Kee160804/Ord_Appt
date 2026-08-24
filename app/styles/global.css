@@ -33,60 +33,41 @@ html {
 
 /* NEW: Light mode CSS variables override - this is the key section */
 html.light {
-  --color-scheme: light;
   color-scheme: light;
 }
 
-.light {
-  --bg-color: white;
-  --text-color: #111827;
-  /* NEW: Ensure light mode is applied */
-  color-scheme: light;
-}
-
-/* NEW: Apply theme to html and body elements */
-html.light,
-.light {
-  background-color: white;
-  color: #111827;
-}
-
-/* COMMENT: Apply CSS variables with smooth transition */
 body {
   background-color: var(--bg-color);
   color: var(--text-color);
 }
 
-/* NEW: CRITICAL THEME OVERRIDE RULES - Force light mode colors when class is present */
-/* These rules ensure that clicking the theme button IMMEDIATELY changes visible colors */
-html.light {
-  --bg-color: white !important;
-  --text-color: #111827 !important;
-  background-color: white !important;
-  color: #111827 !important;
+html.light,
+body.light {
+  --bg-color: white;
+  --text-color: #111827;
 }
 
-html.light body {
-  background-color: white !important;
-  color: #111827 !important;
+html.dark,
+body.dark {
+  --bg-color: #070b14;
+  --text-color: white;
 }
 
-html.light * {
-  color-scheme: light;
+html,
+body {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
 }
 
-/* NEW: Dark mode is the default */
-html {
-  --bg-color: #070b14 !important;
-  --text-color: white !important;
-  background-color: #070b14 !important;
-  color: white !important;
-  color-scheme: dark;
+html.light ::selection,
+body.light ::selection {
+  background: #e9d5ff;
+  color: #1f2937;
 }
 
-html body {
-  background-color: #070b14 !important;
-  color: white !important;
+html.dark ::selection,
+body.dark ::selection {
+  background: #4338ca;
+  color: white;
 }
 
 /* Scrollbar */

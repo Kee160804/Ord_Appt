@@ -15,10 +15,14 @@ export default function AgentsManagementPage() {
   const [editingAgent, setEditingAgent] = useState<
     (typeof mockUsers)[0] | null
   >(null);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    name: string;
+    email: string;
+    role: "staff" | "admin";
+  }>({
     name: "",
     email: "",
-    role: "staff" as "staff" | "admin",
+    role: "staff",
   });
 
   // COMMENT: Filter out super admin and get all staff/admin users
@@ -71,7 +75,7 @@ export default function AgentsManagementPage() {
     setFormData({
       name: agent.name,
       email: agent.email,
-      role: agent.role as any,
+      role: agent.role === "admin" ? "admin" : "staff",
     });
     setShowAddAgent(true);
   };

@@ -77,10 +77,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/app/contexts/theme";
-import { AuthProvider } from "@/app/contexts/auth"; // Adjust path if needed
-// NEW: Import RealtimeProvider for real-time updates
+import { AuthProvider } from "@/app/contexts/auth";
 import { RealtimeProvider } from "@/app/contexts/realtime";
-// FIXED: CSS import - using @/app alias as defined in tsconfig.json paths
 import "@/app/styles/global.css";
 
 const geistSans = Geist({
@@ -111,7 +109,6 @@ export default function RootLayout({
       >
         <ThemeProvider>
           <AuthProvider>
-            {/* NEW: Wrap children with RealtimeProvider for real-time updates */}
             <RealtimeProvider>{children}</RealtimeProvider>
           </AuthProvider>
         </ThemeProvider>
