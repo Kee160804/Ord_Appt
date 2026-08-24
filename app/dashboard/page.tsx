@@ -4,10 +4,9 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/app/contexts/auth";
 import { TopBar } from "@/app/components/TopBar";
 import { DashboardOverview } from "@/app/components/DashboardOverview";
-import { getTenantById } from "@/app/lib/data";
 
 export default function DashboardPage() {
-  const { user, isLoading } = useAuth();
+  const { user, tenant, isLoading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -27,8 +26,6 @@ export default function DashboardPage() {
   if (!user) {
     return null; // Will redirect via useEffect
   }
-
-  const tenant = getTenantById(user.tenantId ?? "") || null;
 
   if (!tenant) {
     return (

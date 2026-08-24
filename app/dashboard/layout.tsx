@@ -4,10 +4,9 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Sidebar } from "@/app/components/Sidebar";
 import { useAuth } from "@/app/contexts/auth";
-import { getTenantById } from "@/app/lib/data";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { user, isLoading } = useAuth();
+  const { user, tenant, isLoading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
@@ -23,7 +22,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return <div className="flex items-center justify-center h-screen">Loading...</div>;
   }
 
-  const tenant = getTenantById(user.tenantId ?? "") || null;
   if (!tenant) return null;
 
   return (

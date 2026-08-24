@@ -62,22 +62,19 @@ export function AppointmentsView({ tenant }: Props) {
 
   // ENHANCED: Emit real-time event when appointment status changes
   const updateStatus = (id: string, status: AppointmentStatus) => {
-    setApts((prev) => {
-      const updated = prev.map((a) => (a.id === id ? { ...a, status } : a));
-      
-      // NEW: Emit real-time event for appointment updated
-      const updatedApt = updated.find(a => a.id === id);
-      if (updatedApt) {
-        realtime.addEvent({
-          type: "appointment_updated",
-          tenantId: tenant.id,
-          appointment: updatedApt,
-        });
-      }
-      
-      return updated;
-    });
+    const appointment = apts.find((candidate) => candidate.id === id);
+    if (!appointment) return;
+
+    const updatedAppointment = { ...appointment, status };
+    setApts((previous) =>
+      previous.map((candidate) => (candidate.id === id ? updatedAppointment : candidate)),
+    );
     setSelected((prev) => (prev?.id === id ? { ...prev, status } : prev));
+    realtime.addEvent({
+      type: "appointment_updated",
+      tenantId: tenant.id,
+      appointment: updatedAppointment,
+    });
   };
 
   return (

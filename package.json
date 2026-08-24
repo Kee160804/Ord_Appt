@@ -6,10 +6,12 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.109.0",
+    "@supabase/ssr": "0.10.3",
+    "@supabase/supabase-js": "2.109.0",
     "clsx": "^2.1.1",
     "lucide-react": "^0.577.0",
     "next": "^16.1.7",

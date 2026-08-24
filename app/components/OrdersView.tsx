@@ -37,22 +37,19 @@ export function OrdersView({ tenant }: Props) {
 
   // ENHANCED: Emit real-time event when order status changes
   const advance = (id: string, status: OrderStatus) => {
-    setOrders(prev => {
-      const updated = prev.map(o => o.id === id ? { ...o, status } : o);
-      
-      // NEW: Emit real-time event for order updated
-      const updatedOrder = updated.find(o => o.id === id);
-      if (updatedOrder) {
-        realtime.addEvent({
-          type: "order_updated",
-          tenantId: tenant.id,
-          order: updatedOrder,
-        });
-      }
-      
-      return updated;
-    });
+    const order = orders.find((candidate) => candidate.id === id);
+    if (!order) return;
+
+    const updatedOrder = { ...order, status };
+    setOrders((previous) =>
+      previous.map((candidate) => (candidate.id === id ? updatedOrder : candidate)),
+    );
     setSelected(prev => prev?.id === id ? { ...prev, status } : prev);
+    realtime.addEvent({
+      type: "order_updated",
+      tenantId: tenant.id,
+      order: updatedOrder,
+    });
   };
 
   return (

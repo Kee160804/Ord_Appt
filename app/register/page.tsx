@@ -16,6 +16,7 @@ export default function RegisterPage() {
   const [bType, setBType] = useState<BusinessType | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
   const [form, setForm] = useState({ firstName: "", lastName: "", email: "", password: "", businessName: "", city: "", phone: "", slug: "" });
 
   const update = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
@@ -24,6 +25,7 @@ export default function RegisterPage() {
   const submit = async () => {
     setLoading(true);
     setError("");
+    setSuccessMessage("");
     
     // Validate required fields
     if (!form.firstName || !form.lastName || !form.email || !form.password) {
@@ -60,6 +62,13 @@ export default function RegisterPage() {
     
     // ENHANCED: Wait a moment before redirecting to ensure user data is saved
     if (result.success) {
+      if (result.requiresEmailConfirmation) {
+        setSuccessMessage(
+          "Account created. Check your email to confirm your address, then sign in to finish setting up your business.",
+        );
+        setLoading(false);
+        return;
+      }
       // COMMENT: Added small delay to ensure state updates are persisted
       await new Promise(resolve => setTimeout(resolve, 300));
       // Redirect to dashboard after successful signup
@@ -93,6 +102,12 @@ export default function RegisterPage() {
           <div className="mb-6 p-4 bg-red-500/20 border border-red-500/30 rounded-xl text-sm text-red-300 flex items-start gap-3">
             <span className="text-base">⚠️</span>
             <p>{error}</p>
+          </div>
+        )}
+
+        {successMessage && (
+          <div className="mb-6 p-4 bg-emerald-500/20 border border-emerald-500/30 rounded-xl text-sm text-emerald-200">
+            {successMessage}
           </div>
         )}
 

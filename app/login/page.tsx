@@ -24,8 +24,7 @@ export default function LoginPage() {
     const result = await login(email, password);
     setLoading(false);
     if (!result.success) { setError(result.error ?? "Login failed."); return; }
-    const account = demoAccounts.find(a => a.email.toLowerCase() === email.toLowerCase());
-    if (account?.role === "superadmin") router.push("/admin");
+    if (result.user?.role === "superadmin") router.push("/admin");
     else router.push("/dashboard");
   };
 

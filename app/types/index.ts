@@ -1,6 +1,6 @@
 // ─── Business / Tenant ────────────────────────────────────────
 export type BusinessType = "appointment" | "ordering";
-export type UserRole = "owner" | "admin" | "staff" | "superadmin";
+export type UserRole = "owner" | "admin" | "manager" | "staff" | "superadmin";
 export type PlanType = "starter" | "pro" | "enterprise";
 export type OrderStatus =
   | "pending"

@@ -1,19 +1,17 @@
 "use client";
 
 import { TopBar } from "@/app/components/TopBar";
-import { AnalyticsView } from "@/app/components/AnalyticsView";
+import { CustomersView } from "@/app/components/CustomersView";
 import { useAuth } from "@/app/contexts/auth";
-import { getTenantById } from "@/app/lib/data";
 
-export default function AnalyticsPage() {
-  const { user } = useAuth();
-  const tenant = getTenantById(user?.tenantId ?? "");
+export default function CustomersPage() {
+  const { tenant } = useAuth();
   if (!tenant) return null;
 
   return (
     <>
-      <TopBar title="Analytics" />
-      <AnalyticsView tenant={tenant} />
+      <TopBar title="Customers" />
+      <CustomersView tenant={tenant} />
     </>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Plus, Edit2, Trash2, Search, Package, ToggleLeft, ToggleRight } from "lucide-react";
 import { Card } from "../components/Card";
 import { Button } from "../components/Button";
@@ -12,7 +12,15 @@ import { formatCurrency, cn } from "../lib/utils";
 import { getStoredProducts, setStoredProducts } from "../lib/storage";
 // NEW: Import useRealtime for emitting product events
 import { useRealtime } from "../contexts/realtime";
-import type { Product, Tenant } from "../types/index";
+import { isSupabaseConfigured } from "../lib/supabase/config";
+import {
+  createProduct,
+  deleteProduct,
+  listCategories,
+  listProducts,
+  setProductAvailability,
+} from "../services/productService";
+import type { Category, Product, Tenant } from "../types/index";
 
 interface Props { tenant: Tenant }
 
@@ -20,13 +28,46 @@ export function ProductsView({ tenant }: Props) {
   // NEW: Get realtime context to emit events
   const realtime = useRealtime();
   
-  // Initialize products from localStorage (if any) or fallback to mock data
-  const initialProducts = getStoredProducts(tenant.id) ?? getProductsByTenant(tenant.id);
-  const [products, setProducts] = useState<Product[]>(initialProducts);
+  const [products, setProducts] = useState<Product[]>(getProductsByTenant(tenant.id));
+  const [categories, setCategories] = useState<Category[]>(getCategoriesByTenant(tenant.id));
   const [search, setSearch] = useState("");
   const [cat, setCat] = useState("All");
   const [showAdd, setShowAdd] = useState(false);
-  const categories = getCategoriesByTenant(tenant.id);
+  const [isLoading, setIsLoading] = useState(isSupabaseConfigured());
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!isSupabaseConfigured()) {
+      const frame = window.requestAnimationFrame(() => {
+        const storedProducts = getStoredProducts(tenant.id);
+        if (storedProducts) setProducts(storedProducts);
+        setIsLoading(false);
+      });
+
+      return () => window.cancelAnimationFrame(frame);
+    }
+    let active = true;
+
+    Promise.all([listProducts(tenant.id), listCategories(tenant.id)])
+      .then(([loadedProducts, loadedCategories]) => {
+        if (!active) return;
+        setProducts(loadedProducts);
+        setCategories(loadedCategories);
+        setError("");
+      })
+      .catch((loadError: unknown) => {
+        if (!active) return;
+        setError(loadError instanceof Error ? loadError.message : "Unable to load products.");
+      })
+      .finally(() => {
+        if (active) setIsLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [tenant.id]);
 
   // State for the new product form
   const [newProduct, setNewProduct] = useState({
@@ -45,62 +86,105 @@ export function ProductsView({ tenant }: Props) {
     return matchSearch && matchCat;
   });
 
-  const toggle = (id: string) => {
-    setProducts(prev => {
-      const updated = prev.map(p => p.id === id ? { ...p, isActive: !p.isActive } : p);
-      setStoredProducts(tenant.id, updated);
-      return updated;
-    });
+  const toggle = async (id: string) => {
+    const current = products.find((product) => product.id === id);
+    if (!current) return;
+
+    const updated = products.map((product) =>
+      product.id === id ? { ...product, isActive: !product.isActive } : product,
+    );
+    setProducts(updated);
+    setError("");
+
+    try {
+      if (isSupabaseConfigured()) await setProductAvailability(id, !current.isActive);
+      else setStoredProducts(tenant.id, updated);
+
+      realtime.addEvent({
+        type: "product_updated",
+        tenantId: tenant.id,
+        product: { ...current, isActive: !current.isActive },
+      });
+    } catch (updateError) {
+      setProducts(products);
+      setError(updateError instanceof Error ? updateError.message : "Unable to update product.");
+    }
   };
 
-  const del = (id: string) => {
-    setProducts(prev => {
-      const updated = prev.filter(p => p.id !== id);
-      setStoredProducts(tenant.id, updated);
-      return updated;
-    });
+  const del = async (id: string) => {
+    const previous = products;
+    const updated = products.filter((product) => product.id !== id);
+    setProducts(updated);
+    setError("");
+
+    try {
+      if (isSupabaseConfigured()) await deleteProduct(id);
+      else setStoredProducts(tenant.id, updated);
+      realtime.addEvent({ type: "product_deleted", tenantId: tenant.id, productId: id });
+    } catch (deleteError) {
+      setProducts(previous);
+      setError(deleteError instanceof Error ? deleteError.message : "Unable to delete product.");
+    }
   };
 
-  const handleAddProduct = () => {
+  const handleAddProduct = async () => {
     if (!newProduct.name || !newProduct.price) {
-      alert("Please fill in at least name and price");
+      setError("Please fill in at least name and price.");
       return;
     }
 
-    const category = categories.find(c => c.id === newProduct.categoryId);
-    // Generate a unique ID – using timestamp + random (safe in event handler)
-    // eslint-disable-next-line react-hooks/purity
-    const newId = `p${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const price = Number(newProduct.price);
+    if (!Number.isFinite(price) || price < 0) {
+      setError("Enter a valid product price.");
+      return;
+    }
 
-    const product: Product = {
-      id: newId,
-      tenantId: tenant.id,
-      name: newProduct.name,
-      description: newProduct.description || "",
-      price: parseFloat(newProduct.price),
-      image: newProduct.image || "",
-      categoryId: newProduct.categoryId || "",
-      categoryName: category?.name || "",
-      isActive: true,
-      inventory: newProduct.inventory ? parseInt(newProduct.inventory) : 0,
-      tags: newProduct.tags,
-      createdAt: new Date().toISOString(),
-    };
+    setIsSaving(true);
+    setError("");
+    const category = categories.find((candidate) => candidate.id === newProduct.categoryId);
 
-    const updated = [...products, product];
-    setProducts(updated);
-    setStoredProducts(tenant.id, updated);
+    try {
+      let product: Product;
+      if (isSupabaseConfigured()) {
+        product = await createProduct(
+          tenant.id,
+          {
+            name: newProduct.name,
+            description: newProduct.description,
+            price,
+            image: newProduct.image,
+            categoryId: newProduct.categoryId,
+            inventory: newProduct.inventory ? Number(newProduct.inventory) : 0,
+          },
+          category?.name ?? "Uncategorized",
+        );
+      } else {
+        product = {
+          id: `p${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+          tenantId: tenant.id,
+          name: newProduct.name,
+          description: newProduct.description,
+          price,
+          image: newProduct.image,
+          categoryId: newProduct.categoryId,
+          categoryName: category?.name ?? "Uncategorized",
+          isActive: true,
+          inventory: newProduct.inventory ? Number(newProduct.inventory) : 0,
+          tags: newProduct.tags,
+          createdAt: new Date().toISOString(),
+        };
+        setStoredProducts(tenant.id, [...products, product]);
+      }
 
-    // NEW: Emit real-time event for product added
-    realtime.addEvent({
-      type: "product_added",
-      tenantId: tenant.id,
-      product: product,
-    });
-
-    // Reset form and close modal
-    setNewProduct({ name: "", price: "", description: "", categoryId: "", inventory: "", image: "", tags: [] });
-    setShowAdd(false);
+      setProducts((current) => [...current, product]);
+      realtime.addEvent({ type: "product_added", tenantId: tenant.id, product });
+      setNewProduct({ name: "", price: "", description: "", categoryId: "", inventory: "", image: "", tags: [] });
+      setShowAdd(false);
+    } catch (createError) {
+      setError(createError instanceof Error ? createError.message : "Unable to create product.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -116,6 +200,14 @@ export function ProductsView({ tenant }: Props) {
           <Plus className="w-4 h-4" /> Add Product
         </Button>
       </div>
+
+      {error && (
+        <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+          {error}
+        </div>
+      )}
+
+      {isLoading && <p className="text-sm text-slate-400">Loading products from Supabase...</p>}
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
@@ -168,8 +260,8 @@ export function ProductsView({ tenant }: Props) {
             <Button variant="outline" onClick={() => setShowAdd(false)} className="flex-1 border-slate-600 light:border-gray-300 text-white light:text-gray-800 hover:bg-slate-700 light:hover:bg-gray-100">
               Cancel
             </Button>
-            <Button className="flex-1 bg-violet-600 hover:bg-violet-500 light:bg-violet-600 light:hover:bg-violet-700 text-white" onClick={handleAddProduct}>
-              Save Product
+            <Button disabled={isSaving} className="flex-1 bg-violet-600 hover:bg-violet-500 light:bg-violet-600 light:hover:bg-violet-700 text-white" onClick={handleAddProduct}>
+              {isSaving ? "Saving..." : "Save Product"}
             </Button>
           </div>
         }

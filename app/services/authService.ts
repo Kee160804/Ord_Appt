@@ -1,63 +1,301 @@
-import type { BusinessType, Tenant, User } from "@/app/types/index";
-import { getSupabaseClient, isSupabaseEnabled } from "@/app/lib/supabase";
+import type { SupabaseClient, User as SupabaseUser } from "@supabase/supabase-js";
+import { getSupabaseBrowserClient } from "@/app/lib/supabase/client";
+import type { BusinessType, Tenant, User, UserRole } from "@/app/types/index";
+import type {
+  BusinessHourRow,
+  MembershipRow,
+  ProfileRow,
+  TenantRow,
+} from "@/app/types/supabase";
 
-interface SupabaseProfile {
-  id: string;
-  auth_user_id: string;
-  tenant_id: string;
-  email: string;
-  name: string;
-  role: string;
-  avatar?: string;
-  created_at?: string;
-  last_login?: string;
+export interface AuthenticatedAppSession {
+  user: User;
+  tenant: Tenant | null;
 }
 
-interface SupabaseAuthResult {
-  data: { user: { id: string } } | null;
-  error: { message?: string } | null;
+export interface AuthResult extends Partial<AuthenticatedAppSession> {
+  error?: string;
+  requiresEmailConfirmation?: boolean;
 }
 
-function mapProfileToUser(profile: SupabaseProfile): User {
+interface SignupBusinessMetadata {
+  full_name: string;
+  business_name: string;
+  business_type: BusinessType;
+  business_city: string;
+  business_phone: string;
+  business_slug: string;
+}
+
+const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+function errorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message) return error.message;
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "message" in error &&
+    typeof error.message === "string" &&
+    error.message
+  ) {
+    return error.message;
+  }
+  return fallback;
+}
+
+function roleName(membership: MembershipRow | null) {
+  if (!membership?.roles) return "STAFF";
+  return Array.isArray(membership.roles)
+    ? membership.roles[0]?.name ?? "STAFF"
+    : membership.roles.name;
+}
+
+function mapRole(profile: ProfileRow, membership: MembershipRow | null): UserRole {
+  if (profile.platform_role?.toUpperCase() === "SUPER_ADMIN") return "superadmin";
+
+  switch (roleName(membership).toUpperCase()) {
+    case "OWNER":
+      return "owner";
+    case "ADMIN":
+      return "admin";
+    case "MANAGER":
+      return "manager";
+    default:
+      return "staff";
+  }
+}
+
+function mapUser(profile: ProfileRow, membership: MembershipRow | null): User {
+  const name = profile.full_name?.trim() || profile.email?.split("@")[0] || "User";
   return {
-    id: profile.auth_user_id,
-    email: profile.email,
-    name: profile.name,
-    role: profile.role as User["role"],
-    tenantId: profile.tenant_id,
-    avatar: profile.avatar || profile.name?.charAt(0).toUpperCase() || "U",
-    createdAt: profile.created_at || new Date().toISOString().split("T")[0],
-    lastLogin: profile.last_login || new Date().toISOString().split("T")[0],
+    id: profile.id,
+    tenantId: membership?.tenant_id ?? null,
+    name,
+    email: profile.email ?? "",
+    role: mapRole(profile, membership),
+    avatar: name
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((part) => part.charAt(0).toUpperCase())
+      .join(""),
+    createdAt: profile.created_at ?? new Date().toISOString(),
+    lastLogin: new Date().toISOString(),
   };
 }
 
-export async function supabaseLogin(email: string, password: string): Promise<{ user?: User; error?: string }> {
-  if (!isSupabaseEnabled()) {
-    return { error: "Supabase is not configured." };
-  }
+function normalizeBusinessType(value: string | null | undefined): BusinessType {
+  return value?.toLowerCase() === "ordering" ? "ordering" : "appointment";
+}
 
-  const supabase = await getSupabaseClient();
-  if (!supabase) {
-    return { error: "Supabase client unavailable." };
-  }
+function mapTenant(row: TenantRow, hours: BusinessHourRow[]): Tenant {
+  const businessName = row.business_name;
+  const businessHours = [...hours]
+    .sort((a, b) => a.day_of_week - b.day_of_week)
+    .map((hour) => ({
+      day: DAYS[hour.day_of_week] ?? `Day ${hour.day_of_week}`,
+      open: hour.open_time?.slice(0, 5) ?? "",
+      close: hour.close_time?.slice(0, 5) ?? "",
+      closed: hour.is_closed,
+    }));
 
-  const result = await supabase.auth.signInWithPassword({ email, password }) as SupabaseAuthResult;
-  if (result.error || !result.data?.user) {
-    return { error: result.error?.message ?? "Failed to sign in with Supabase." };
-  }
+  return {
+    id: row.id,
+    name: businessName,
+    slug: row.slug,
+    businessType: normalizeBusinessType(row.business_type),
+    logo: row.logo ?? businessName.charAt(0).toUpperCase(),
+    logoBg: row.logo_bg ?? row.primary_color ?? "#8b5cf6",
+    description: row.description ?? `Welcome to ${businessName}.`,
+    phone: row.phone ?? "",
+    email: row.email ?? "",
+    address: row.address ?? "",
+    city: row.city ?? "",
+    coverImage:
+      row.cover_image ??
+      "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=1200&q=80",
+    businessHours,
+    socialLinks: {},
+    primaryColor: row.primary_color ?? "#8b5cf6",
+    accentColor: row.accent_color ?? "#a78bfa",
+    createdAt: row.created_at ?? new Date().toISOString(),
+    isActive: row.is_active && row.status.toUpperCase() === "ACTIVE",
+    plan: row.plan === "pro" || row.plan === "enterprise" ? row.plan : "starter",
+    stripeConnected: row.stripe_connected ?? false,
+    subscriptionStatus:
+      row.subscription_status === "active" ||
+      row.subscription_status === "cancelled" ||
+      row.subscription_status === "past_due"
+        ? row.subscription_status
+        : "trial",
+    trialEndsAt: row.trial_ends_at ?? undefined,
+  };
+}
 
-  const authUser = result.data.user;
-  const profile = await supabase
-    .from<SupabaseProfile>("profiles")
-    .select("*")
-    .eq("auth_user_id", authUser.id)
+async function getMembership(supabase: SupabaseClient, profileId: string) {
+  const { data, error } = await supabase
+    .from("tenant_memberships")
+    .select("id, tenant_id, profile_id, role_id, is_active, roles(name)")
+    .eq("profile_id", profileId)
+    .eq("is_active", true)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  return (data as MembershipRow | null) ?? null;
+}
+
+function metadataFromUser(user: SupabaseUser): SignupBusinessMetadata | null {
+  const metadata = user.user_metadata as Partial<SignupBusinessMetadata>;
+  if (!metadata.business_name || !metadata.business_type) return null;
+
+  return {
+    full_name: metadata.full_name ?? user.email?.split("@")[0] ?? "Owner",
+    business_name: metadata.business_name,
+    business_type: metadata.business_type,
+    business_city: metadata.business_city ?? "",
+    business_phone: metadata.business_phone ?? "",
+    business_slug: metadata.business_slug ?? "",
+  };
+}
+
+function slugify(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, "")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+async function createAvailableSlug(supabase: SupabaseClient, requested: string) {
+  const base = slugify(requested) || `business-${Date.now()}`;
+  const { data, error } = await supabase
+    .from("tenants")
+    .select("slug, subdomain")
+    .or(`slug.like.${base}%,subdomain.like.${base}%`);
+  if (error) throw error;
+
+  const existing = new Set(
+    (data ?? []).flatMap((tenant) =>
+      [tenant.slug, tenant.subdomain]
+        .filter((value): value is string => typeof value === "string")
+        .map((value) => value.toLowerCase()),
+    ),
+  );
+  if (!existing.has(base)) return base;
+
+  let suffix = 2;
+  while (existing.has(`${base}-${suffix}`)) suffix += 1;
+  return `${base}-${suffix}`;
+}
+
+async function provisionTenantFromMetadata(supabase: SupabaseClient, authUser: SupabaseUser) {
+  const metadata = metadataFromUser(authUser);
+  if (!metadata) return null;
+
+  const slug = await createAvailableSlug(
+    supabase,
+    metadata.business_slug || metadata.business_name,
+  );
+  const { data, error } = await supabase
+    .from("tenants")
+    .insert({
+      business_name: metadata.business_name.trim(),
+      slug,
+      subdomain: slug,
+      business_type: metadata.business_type,
+      city: metadata.business_city.trim(),
+      phone: metadata.business_phone.trim(),
+      email: authUser.email ?? "",
+      created_by: authUser.id,
+      status: "ACTIVE",
+      is_active: true,
+    })
+    .select("id")
     .single();
 
-  if (profile.error || !profile.data) {
-    return { error: "Supabase profile not found for authenticated user." };
-  }
+  if (error) throw error;
 
-  return { user: mapProfileToUser(profile.data) };
+  await supabase
+    .from("business_modules")
+    .update({
+      appointments: metadata.business_type === "appointment",
+      ordering: metadata.business_type === "ordering",
+      inventory: metadata.business_type === "ordering",
+    })
+    .eq("tenant_id", data.id);
+
+  return data.id as string;
+}
+
+export async function loadAuthenticatedAppSession(
+  suppliedAuthUser?: SupabaseUser,
+): Promise<AuthResult> {
+  const supabase = getSupabaseBrowserClient();
+  if (!supabase) return { error: "Supabase is not configured." };
+
+  try {
+    let authUser = suppliedAuthUser;
+    if (!authUser) {
+      const { data, error } = await supabase.auth.getUser();
+      if (error || !data.user) return { error: error?.message ?? "Not authenticated." };
+      authUser = data.user;
+    }
+
+    const { data: profileData, error: profileError } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", authUser.id)
+      .single();
+
+    if (profileError || !profileData) {
+      return { error: profileError?.message ?? "Your application profile was not found." };
+    }
+
+    const profile = profileData as ProfileRow;
+    if (!profile.is_active) return { error: "This account has been deactivated." };
+
+    let membership = await getMembership(supabase, profile.id);
+    if (!membership && profile.platform_role?.toUpperCase() !== "SUPER_ADMIN") {
+      const tenantId = await provisionTenantFromMetadata(supabase, authUser);
+      if (tenantId) membership = await getMembership(supabase, profile.id);
+    }
+
+    const user = mapUser(profile, membership);
+    if (!membership) return { user, tenant: null };
+
+    const [{ data: tenantData, error: tenantError }, { data: hoursData, error: hoursError }] =
+      await Promise.all([
+        supabase.from("tenants").select("*").eq("id", membership.tenant_id).single(),
+        supabase
+          .from("business_hours")
+          .select("day_of_week, open_time, close_time, is_closed")
+          .eq("tenant_id", membership.tenant_id),
+      ]);
+
+    if (tenantError || !tenantData) {
+      return { error: tenantError?.message ?? "Your business could not be loaded." };
+    }
+    if (hoursError) return { error: hoursError.message };
+
+    return {
+      user,
+      tenant: mapTenant(tenantData as TenantRow, (hoursData ?? []) as BusinessHourRow[]),
+    };
+  } catch (error) {
+    return { error: errorMessage(error, "Unable to load your account.") };
+  }
+}
+
+export async function supabaseLogin(email: string, password: string): Promise<AuthResult> {
+  const supabase = getSupabaseBrowserClient();
+  if (!supabase) return { error: "Supabase is not configured." };
+
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error || !data.user) return { error: error?.message ?? "Invalid email or password." };
+
+  return loadAuthenticatedAppSession(data.user);
 }
 
 export async function supabaseSignup(
@@ -69,78 +307,31 @@ export async function supabaseSignup(
   city: string,
   phone: string,
   slug: string,
-): Promise<{ user?: User; tenant?: Tenant; error?: string }> {
-  if (!isSupabaseEnabled()) {
-    return { error: "Supabase is not configured." };
-  }
+): Promise<AuthResult> {
+  const supabase = getSupabaseBrowserClient();
+  if (!supabase) return { error: "Supabase is not configured." };
 
-  const supabase = await getSupabaseClient();
-  if (!supabase) {
-    return { error: "Supabase client unavailable." };
-  }
-
-  const signUpResult = await supabase.auth.signUp({ email, password }) as SupabaseAuthResult;
-  if (signUpResult.error || !signUpResult.data?.user) {
-    return { error: signUpResult.error?.message ?? "Failed to sign up with Supabase." };
-  }
-
-  const authUser = signUpResult.data.user;
-  const tenantId = `tenant-${Date.now()}`;
-  const tenantSlug = slug.trim() || businessName.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
-  const tenant: Tenant = {
-    id: tenantId,
-    name: businessName.trim(),
-    slug: tenantSlug,
-    businessType,
-    logo: businessName.trim().charAt(0).toUpperCase() || "B",
-    logoBg: "#8b5cf6",
-    description: `Welcome to ${businessName.trim()}!`,
-    phone: phone.trim(),
-    email,
-    address: "",
-    city: city.trim(),
-    coverImage: "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=1200&q=80",
-    businessHours: [
-      { day: "Monday", open: "09:00", close: "18:00", closed: false },
-      { day: "Tuesday", open: "09:00", close: "18:00", closed: false },
-      { day: "Wednesday", open: "09:00", close: "18:00", closed: false },
-      { day: "Thursday", open: "09:00", close: "18:00", closed: false },
-      { day: "Friday", open: "09:00", close: "18:00", closed: false },
-      { day: "Saturday", open: "10:00", close: "16:00", closed: false },
-      { day: "Sunday", open: "", close: "", closed: true },
-    ],
-    socialLinks: {},
-    primaryColor: "#8b5cf6",
-    accentColor: "#a78bfa",
-    createdAt: new Date().toISOString().split("T")[0],
-    isActive: true,
-    plan: "starter",
-    stripeConnected: false,
-    subscriptionStatus: "trial",
-    trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
+  const metadata: SignupBusinessMetadata = {
+    full_name: name.trim(),
+    business_name: businessName.trim(),
+    business_type: businessType,
+    business_city: city.trim(),
+    business_phone: phone.trim(),
+    business_slug: slugify(slug || businessName),
   };
-
-  const profile: SupabaseProfile = {
-    id: authUser.id,
-    auth_user_id: authUser.id,
-    tenant_id: tenantId,
+  const { data, error } = await supabase.auth.signUp({
     email,
-    name: name.trim(),
-    role: "owner",
-    avatar: name.trim().charAt(0).toUpperCase() || "U",
-    created_at: new Date().toISOString().split("T")[0],
-    last_login: new Date().toISOString().split("T")[0],
-  };
+    password,
+    options: { data: metadata },
+  });
 
-  const { error: tenantError } = await supabase.from<Tenant>("tenants").insert([tenant]);
-  if (tenantError) {
-    return { error: tenantError.message ?? "Failed to create tenant." };
-  }
+  if (error || !data.user) return { error: error?.message ?? "Unable to create account." };
+  if (!data.session) return { requiresEmailConfirmation: true };
 
-  const { error: profileError } = await supabase.from<SupabaseProfile>("profiles").insert([profile]);
-  if (profileError) {
-    return { error: profileError.message ?? "Failed to create profile." };
-  }
+  return loadAuthenticatedAppSession(data.user);
+}
 
-  return { user: mapProfileToUser(profile), tenant };
+export async function supabaseLogout() {
+  const supabase = getSupabaseBrowserClient();
+  if (supabase) await supabase.auth.signOut();
 }

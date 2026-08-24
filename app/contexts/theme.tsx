@@ -29,13 +29,16 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [demoTheme, setDemoThemeState] = useState<Theme>("dark");
 
   useEffect(() => {
-    const initialTheme = getBrowserTheme();
-    setThemeState(initialTheme);
+    const frame = window.requestAnimationFrame(() => {
+      setThemeState(getBrowserTheme());
 
-    const savedDemoTheme = localStorage.getItem(DEMO_THEME_KEY) as Theme | null;
-    setDemoThemeState(
-      savedDemoTheme === "light" || savedDemoTheme === "dark" ? savedDemoTheme : "dark"
-    );
+      const savedDemoTheme = localStorage.getItem(DEMO_THEME_KEY) as Theme | null;
+      setDemoThemeState(
+        savedDemoTheme === "light" || savedDemoTheme === "dark" ? savedDemoTheme : "dark",
+      );
+    });
+
+    return () => window.cancelAnimationFrame(frame);
   }, []);
 
   useEffect(() => {

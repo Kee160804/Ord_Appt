@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useCallback } from "react";
+import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
 import type { Product, Appointment, Order, User, Tenant } from "@/app/types/index";
 
 // NEW: Realtime event types for tracking real-time updates
@@ -27,26 +27,29 @@ interface RealtimeContextType {
 const RealtimeContext = createContext<RealtimeContextType | undefined>(undefined);
 
 export function RealtimeProvider({ children }: { children: React.ReactNode }) {
-  // NEW: Store all real-time events in state
-  const [events, setEvents] = useState<RealtimeEvent[]>(() => {
-    if (typeof window !== "undefined") {
+  const [events, setEvents] = useState<RealtimeEvent[]>([]);
+  const [hasHydrated, setHasHydrated] = useState(false);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
       try {
         const saved = localStorage.getItem("realtime_events");
-        return saved ? JSON.parse(saved) : [];
+        setEvents(saved ? JSON.parse(saved) : []);
       } catch {
-        return [];
+        setEvents([]);
       }
-    }
-    return [];
-  });
-
-  // NEW: Add a new real-time event and persist to localStorage
-  const addEvent = useCallback((event: RealtimeEvent) => {
-    setEvents((prev) => {
-      const updated = [event, ...prev]; // Add to front for most recent first
-      localStorage.setItem("realtime_events", JSON.stringify(updated));
-      return updated;
+      setHasHydrated(true);
     });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
+
+  useEffect(() => {
+    if (hasHydrated) localStorage.setItem("realtime_events", JSON.stringify(events));
+  }, [events, hasHydrated]);
+
+  const addEvent = useCallback((event: RealtimeEvent) => {
+    setEvents((previous) => [event, ...previous]);
   }, []);
 
   // NEW: Get all events for a specific tenant
@@ -92,7 +95,6 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   // NEW: Clear all events (for testing/reset)
   const clearEvents = useCallback(() => {
     setEvents([]);
-    localStorage.setItem("realtime_events", JSON.stringify([]));
   }, []);
 
   return (

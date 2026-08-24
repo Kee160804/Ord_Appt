@@ -17,10 +17,11 @@ import {
 } from "lucide-react";
 import { getServicesByTenant, getProductsByTenant, getCategoriesByTenant } from "@/app/data/mock";
 import { getStoredProducts, getStoredServices } from "@/app/lib/storage";
+import { isSupabaseConfigured } from "@/app/lib/supabase/config";
 import { AppointmentBooking } from "../components/AppointmentBooking";
 import { OrderingMenu } from "../components/OrderingMenu";
 import { useTheme } from "@/app/contexts/theme";
-import type { Tenant, Service, Product } from "@/app/types/index";
+import type { Category, Tenant, Service, Product } from "@/app/types/index";
 
 // Extend Tenant with optional fields used in this component
 interface ExtendedTenant extends Tenant {
@@ -40,29 +41,38 @@ interface CartItem {
   image?: string;
 }
 
-export default function StorefrontClient({ tenant }: { tenant: Tenant }) {
+interface StorefrontClientProps {
+  tenant: Tenant;
+  initialCategories?: Category[];
+  initialProducts?: Product[];
+  initialServices?: Service[];
+}
+
+export default function StorefrontClient({
+  tenant,
+  initialCategories,
+  initialProducts,
+  initialServices,
+}: StorefrontClientProps) {
   // Cast to extended type to safely access optional fields
   const extendedTenant = tenant as ExtendedTenant;
   const isAppt = tenant.businessType === "appointment";
 
-  // Load data from localStorage or fallback to mock
   const [services, setServices] = useState<Service[]>(() => {
     if (isAppt) {
-      const stored = getStoredServices(tenant.id);
-      return stored ?? getServicesByTenant(tenant.id).filter((s) => s.isActive);
+      return initialServices ?? getServicesByTenant(tenant.id).filter((s) => s.isActive);
     }
     return [];
   });
 
   const [products, setProducts] = useState<Product[]>(() => {
     if (!isAppt) {
-      const stored = getStoredProducts(tenant.id);
-      return stored ?? getProductsByTenant(tenant.id).filter((p) => p.isActive);
+      return initialProducts ?? getProductsByTenant(tenant.id).filter((p) => p.isActive);
     }
     return [];
   });
 
-  const categories = !isAppt ? getCategoriesByTenant(tenant.id) : [];
+  const categories = !isAppt ? initialCategories ?? getCategoriesByTenant(tenant.id) : [];
 
   // Cart state (for ordering)
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -92,6 +102,18 @@ export default function StorefrontClient({ tenant }: { tenant: Tenant }) {
 
   // Storage event listener
   useEffect(() => {
+    if (isSupabaseConfigured()) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      if (isAppt) {
+        const storedServices = getStoredServices(tenant.id);
+        if (storedServices) setServices(storedServices.filter((service) => service.isActive));
+      } else {
+        const storedProducts = getStoredProducts(tenant.id);
+        if (storedProducts) setProducts(storedProducts.filter((product) => product.isActive));
+      }
+    });
+
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === `tenant_${tenant.id}_products` && !isAppt) {
         const newProducts = getStoredProducts(tenant.id);
@@ -102,7 +124,10 @@ export default function StorefrontClient({ tenant }: { tenant: Tenant }) {
       }
     };
     window.addEventListener("storage", handleStorageChange);
-    return () => window.removeEventListener("storage", handleStorageChange);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("storage", handleStorageChange);
+    };
   }, [tenant.id, isAppt]);
 
 
