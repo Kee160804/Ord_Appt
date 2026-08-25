@@ -254,9 +254,6 @@ export default function StorefrontClient({
             <AppointmentBooking
               tenant={tenant}
               services={services}
-              onBook={(serviceId, date, time) => {
-                alert(`Booking requested for ${serviceId} on ${date} at ${time}`);
-              }}
             />
           ) : (
             <OrderingMenu

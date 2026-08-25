@@ -1,8 +1,10 @@
 "use client";
 
-import { Bell, Search, Plus, Sun, Moon } from "lucide-react";
-// NEW: Import useTheme hook to access theme state and toggle function
+import { useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import { Bell, Menu, Moon, Plus, Search, Sun } from "lucide-react";
 import { useTheme } from "@/app/contexts/theme";
+import { useAuth } from "@/app/contexts/auth";
 
 interface TopBarProps {
   title: string;
@@ -10,79 +12,126 @@ interface TopBarProps {
   action?: { label: string; onClick: () => void };
 }
 
-export function TopBar({ title, subtitle, action }: TopBarProps) {
-  // NEW: Get current theme and toggle function
+export function TopBar({ title, action }: TopBarProps) {
+  const router = useRouter();
   const { theme, toggleTheme } = useTheme();
+  const { user, tenant } = useAuth();
+  const [search, setSearch] = useState("");
+  const [searchMessage, setSearchMessage] = useState("");
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
 
-  const today = new Date().toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-  });
+  const handleSearch = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const query = search.trim().toLowerCase();
+    if (!query) return;
+    const destinations = [
+      { terms: ["dashboard", "overview", "home"], href: "/dashboard" },
+      ...(tenant?.businessType === "appointment"
+        ? [
+            { terms: ["appointment", "appointments", "booking", "bookings"], href: "/dashboard/appointments" },
+            { terms: ["service", "services"], href: "/dashboard/services" },
+          ]
+        : [
+            { terms: ["order", "orders"], href: "/dashboard/orders" },
+            { terms: ["product", "products"], href: "/dashboard/products" },
+          ]),
+      { terms: ["customer", "customers"], href: "/dashboard/customers" },
+      { terms: ["analytics", "reports", "report"], href: "/dashboard/analytics" },
+      { terms: ["settings", "business", "storefront", "hours"], href: "/dashboard/settings" },
+    ];
+    const destination = destinations.find((candidate) =>
+      candidate.terms.some((term) => term.includes(query) || query.includes(term)),
+    );
+    if (destination) {
+      setSearchMessage("");
+      setSearch("");
+      router.push(destination.href);
+      return;
+    }
+    setSearchMessage("Try appointments, services, customers, analytics, or settings.");
+  };
 
   return (
-    <header className="flex items-center justify-between px-6 md:px-8 py-4 bg-[#070b14] light:bg-white border-b border-white/5 light:border-gray-200 flex-shrink-0">
-      {/* Left: Title and subtitle/date */}
-      <div>
-        <h1 className="text-xl font-bold text-white light:text-gray-900">
-          {title}
-        </h1>
-        <p className="text-sm text-slate-400 light:text-gray-600 mt-0.5">
-          {subtitle ?? today}
-        </p>
+    <header className="sticky top-0 z-20 flex h-[56px] flex-shrink-0 items-center justify-between border-b border-slate-700/60 light:border-[#e7ebf2] bg-[#0b1424]/95 light:bg-white/95 px-4 backdrop-blur md:px-5">
+      <div className="flex min-w-0 items-center gap-3">
+        <button
+          onClick={() => window.dispatchEvent(new Event("dashboard-sidebar-toggle"))}
+          aria-label="Toggle sidebar"
+          title="Toggle sidebar"
+          className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-800 light:hover:bg-slate-100 hover:text-white light:hover:text-slate-900"
+        >
+          <Menu className="h-4 w-4" />
+        </button>
+        <h1 className="truncate text-sm font-bold text-white light:text-[#111b31]">{title}</h1>
       </div>
 
-      {/* Right: Search, notifications, action */}
-      <div className="flex items-center gap-3">
-        {/* Search */}
+      <div className="flex items-center gap-2">
         <div className="relative hidden md:block">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 light:text-gray-500" />
-          <input
-            type="text"
-            placeholder="Search..."
-            className="pl-9 pr-4 py-2 text-sm bg-slate-800 light:bg-gray-100 border border-slate-700 light:border-gray-300 rounded-xl w-52
-                       focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500 light:focus:border-violet-400
-                       text-white light:text-gray-900 placeholder:text-slate-500 light:placeholder:text-gray-500"
-          />
+          <form onSubmit={handleSearch}>
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
+            <input
+              value={search}
+              onChange={(event) => {
+                setSearch(event.target.value);
+                setSearchMessage("");
+              }}
+              aria-label="Search dashboard"
+              placeholder="Search..."
+              className="h-8 w-40 rounded-lg border border-slate-700 light:border-[#e3e8f0] bg-slate-900/70 light:bg-[#fbfcfe] pl-8 pr-3 text-[11px] text-white light:text-slate-800 outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-500/10 lg:w-48"
+            />
+          </form>
+          {searchMessage && (
+            <div className="absolute right-0 top-10 w-64 rounded-lg border border-slate-700 light:border-[#e3e8f0] bg-slate-900 light:bg-white px-3 py-2 text-[10px] text-slate-300 light:text-slate-600 shadow-xl">
+              {searchMessage}
+            </div>
+          )}
         </div>
 
-        {/* Notifications */}
-        <button
-          title="Notifications"
-          className="relative p-2 text-slate-400 light:text-gray-600 hover:text-white light:hover:text-gray-900 hover:bg-white/5 light:hover:bg-gray-200 rounded-xl transition-colors"
-        >
-          <Bell className="w-5 h-5" />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
-        </button>
+        <div className="relative">
+          <button
+            onClick={() => setNotificationsOpen((current) => !current)}
+            aria-label="Notifications"
+            title="Notifications"
+            className="relative rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-800 light:hover:bg-slate-100 hover:text-white light:hover:text-slate-900"
+          >
+            <Bell className="h-4 w-4" />
+          </button>
+          {notificationsOpen && (
+            <div className="absolute right-0 top-10 w-64 rounded-xl border border-slate-700 light:border-[#e3e8f0] bg-slate-900 light:bg-white p-4 shadow-xl">
+              <p className="text-xs font-semibold text-white light:text-slate-900">Notifications</p>
+              <p className="mt-2 text-[11px] leading-5 text-slate-400 light:text-slate-500">
+                No new dashboard notifications.
+              </p>
+            </div>
+          )}
+        </div>
 
-        {/* NEW: Theme toggle button in TopBar */}
         <button
-          onClick={() => {
-            // NEW: AGGRESSIVE DEBUG - Verify button click is registered
-            console.log("🎯 TOPBAR BUTTON CLICKED!");
-            console.log("🎯 Current theme before toggle:", theme);
-            toggleTheme();
-            console.log("🎯 toggleTheme() function called");
-          }}
-          className="p-2 rounded-xl text-slate-400 light:text-gray-600 hover:bg-white/10 light:hover:bg-gray-200 hover:text-white light:hover:text-gray-900 transition-colors cursor-pointer"
+          onClick={toggleTheme}
+          className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-800 light:hover:bg-slate-100 hover:text-white light:hover:text-slate-900"
           aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
-          title={`Switch to ${theme === "dark" ? "light" : "dark"} mode (currently ${theme})`}
+          title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
         >
-          {/* NEW: Show Sun icon in dark mode, Moon icon in light mode */}
           {theme === "dark" ? (
-            <Sun className="w-5 h-5 text-yellow-400" />
+            <Sun className="h-4 w-4 text-amber-400" />
           ) : (
-            <Moon className="w-5 h-5 text-slate-700" />
+            <Sun className="h-4 w-4 text-amber-500" />
           )}
         </button>
 
-        {/* Action button */}
+        <div
+          className="ml-1 flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-amber-200 to-violet-300 text-[9px] font-bold text-slate-800 ring-2 ring-white/10 light:ring-slate-100"
+          title={user?.name ?? "Account"}
+        >
+          {user?.avatar || (user?.name ? user.name.split(" ").filter(Boolean).map((part) => part[0]).join("").slice(0, 2).toUpperCase() : "KM")}
+        </div>
+
         {action && (
           <button
             onClick={action.onClick}
-            className="flex items-center gap-1.5 px-4 py-2 bg-violet-600 hover:bg-violet-500 light:bg-violet-600 light:hover:bg-violet-700 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm"
+            className="ml-1 flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-violet-700"
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="h-3.5 w-3.5" />
             {action.label}
           </button>
         )}

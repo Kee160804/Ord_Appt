@@ -74,10 +74,83 @@ export interface ProductRow {
   created_at: string;
 }
 
+export interface ServiceRow {
+  id: string;
+  tenant_id: string;
+  name: string;
+  description: string | null;
+  duration_minutes: number;
+  price: number | string;
+  image_url: string | null;
+  available: boolean;
+  created_at: string;
+  category: string | null;
+  requires_deposit: boolean | null;
+  deposit_amount: number | string | null;
+  deposit_type: "fixed" | "percentage" | null;
+}
+
+export interface AppointmentServiceRow {
+  service_id: string | null;
+  service_name: string;
+  price: number | string;
+  duration_minutes: number;
+}
+
+export interface AppointmentRow {
+  id: string;
+  tenant_id: string;
+  customer_id: string | null;
+  service_id: string | null;
+  appointment_date: string | null;
+  appointment_time: string | null;
+  starts_at: string | null;
+  ends_at: string | null;
+  customer_name: string | null;
+  customer_email: string | null;
+  customer_phone: string | null;
+  status: string;
+  notes: string | null;
+  subtotal: number | string | null;
+  deposit_required: number | string | null;
+  total: number | string | null;
+  created_at: string;
+  appointment_services?: AppointmentServiceRow[] | null;
+}
+
 export interface CategoryRow {
   id: string;
   tenant_id: string;
   name: string;
   sort_order: number;
   is_active: boolean;
+}
+
+export interface OrderProductRow {
+  image_url: string | null;
+}
+
+export interface OrderItemRow {
+  id: string;
+  product_id: string | null;
+  product_name: string;
+  quantity: number;
+  unit_price: number | string;
+  subtotal: number | string;
+  products?: OrderProductRow | OrderProductRow[] | null;
+}
+
+export interface OrderRow {
+  id: string;
+  tenant_id: string;
+  order_number: string;
+  customer_name: string | null;
+  customer_email: string | null;
+  customer_phone: string | null;
+  status: string;
+  payment_status: string;
+  total: number | string;
+  notes: string | null;
+  created_at: string;
+  order_items?: OrderItemRow[] | null;
 }

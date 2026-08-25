@@ -98,15 +98,49 @@ export async function createProduct(
   return mapProduct(data as ProductRow, categoryName);
 }
 
-export async function setProductAvailability(productId: string, available: boolean) {
+export async function updateProduct(
+  tenantId: string,
+  productId: string,
+  input: CreateProductInput,
+  categoryName: string,
+): Promise<Product> {
+  const { data, error } = await client()
+    .from("products")
+    .update({
+      category_id: input.categoryId || null,
+      name: input.name.trim(),
+      description: input.description.trim(),
+      price: input.price,
+      image_url: input.image.trim() || null,
+      stock: input.inventory,
+    })
+    .eq("id", productId)
+    .eq("tenant_id", tenantId)
+    .select("*")
+    .single();
+
+  if (error) throw error;
+  return mapProduct(data as ProductRow, categoryName);
+}
+
+export async function setProductAvailability(
+  tenantId: string,
+  productId: string,
+  available: boolean,
+) {
   const { error } = await client()
     .from("products")
     .update({ available })
-    .eq("id", productId);
+    .eq("id", productId)
+    .eq("tenant_id", tenantId);
   if (error) throw error;
 }
 
-export async function deleteProduct(productId: string) {
-  const { error } = await client().from("products").delete().eq("id", productId);
+export async function deleteProduct(tenantId: string, productId: string) {
+  const { error } = await client()
+    .from("products")
+    .delete()
+    .eq("id", productId)
+    .eq("tenant_id", tenantId);
   if (error) throw error;
 }

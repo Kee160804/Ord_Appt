@@ -1,0 +1,4 @@
+project_id = "ord-appt"
+
+[functions.send-appointment-email]
+verify_jwt = false

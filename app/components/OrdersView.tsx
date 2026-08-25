@@ -1,17 +1,21 @@
 "use client";
 
-import { useState } from "react";
-import { ShoppingBag, RefreshCw, XCircle, ChevronRight } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ShoppingBag, RefreshCw, XCircle, ChevronRight, Trash2 } from "lucide-react";
 import { Card } from "../components/Card";
 import { Button } from "../components/Button";
 import { StatusBadge } from "../components/Badge";
+import { Modal } from "../components/Modal";
 import { getOrdersByTenant } from "../data/mock";
+import { isSupabaseConfigured } from "../lib/supabase/config";
 import { formatCurrency, capitalise, cn } from "../lib/utils";
 // NEW: Import useRealtime for emitting order events
 import { useRealtime } from "../contexts/realtime";
+import { deleteOrder, listOrders, setOrderStatus } from "../services/orderService";
 import type { Order, OrderStatus, Tenant } from "../types/index";
 
 const STATUS_FLOW: OrderStatus[] = ["pending", "confirmed", "preparing", "ready", "delivered"];
+const STATUS_TABS: OrderStatus[] = [...STATUS_FLOW, "cancelled"];
 
 // Status background colors – default dark, light overrides
 const STATUS_BG: Record<string, string> = {
@@ -32,11 +36,43 @@ export function OrdersView({ tenant }: Props) {
   const [orders, setOrders] = useState<Order[]>(getOrdersByTenant(tenant.id));
   const [selected, setSelected] = useState<Order | null>(null);
   const [filter, setFilter] = useState<OrderStatus | "all">("all");
+  const [isLoading, setIsLoading] = useState(isSupabaseConfigured());
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Order | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return;
+    let active = true;
+
+    listOrders(tenant.id)
+      .then((loadedOrders) => {
+        if (!active) return;
+        setOrders(loadedOrders);
+        setSelected((current) =>
+          current ? loadedOrders.find((order) => order.id === current.id) ?? null : null,
+        );
+        setError("");
+      })
+      .catch((loadError: unknown) => {
+        if (!active) return;
+        setError(loadError instanceof Error ? loadError.message : "Unable to load orders.");
+      })
+      .finally(() => {
+        if (active) setIsLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [tenant.id]);
 
   const filtered = filter === "all" ? orders : orders.filter(o => o.status === filter);
 
   // ENHANCED: Emit real-time event when order status changes
-  const advance = (id: string, status: OrderStatus) => {
+  const advance = async (id: string, status: OrderStatus) => {
     const order = orders.find((candidate) => candidate.id === id);
     if (!order) return;
 
@@ -45,15 +81,50 @@ export function OrdersView({ tenant }: Props) {
       previous.map((candidate) => (candidate.id === id ? updatedOrder : candidate)),
     );
     setSelected(prev => prev?.id === id ? { ...prev, status } : prev);
-    realtime.addEvent({
-      type: "order_updated",
-      tenantId: tenant.id,
-      order: updatedOrder,
-    });
+    setUpdatingId(id);
+    setError("");
+    setNotice("");
+
+    try {
+      if (isSupabaseConfigured()) await setOrderStatus(tenant.id, id, status);
+      realtime.addEvent({
+        type: "order_updated",
+        tenantId: tenant.id,
+        order: updatedOrder,
+      });
+      setNotice(`Order ${order.orderNumber} marked ${status}.`);
+    } catch (updateError) {
+      setOrders((previous) =>
+        previous.map((candidate) => (candidate.id === id ? order : candidate)),
+      );
+      setSelected((current) => (current?.id === id ? order : current));
+      setError(updateError instanceof Error ? updateError.message : "Unable to update order.");
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const removeOrder = async () => {
+    if (!deleteTarget) return;
+    const order = deleteTarget;
+    setIsDeleting(true);
+    setError("");
+    setNotice("");
+    try {
+      if (isSupabaseConfigured()) await deleteOrder(tenant.id, order.id);
+      setOrders((current) => current.filter((candidate) => candidate.id !== order.id));
+      setSelected((current) => (current?.id === order.id ? null : current));
+      setDeleteTarget(null);
+      setNotice(`Order ${order.orderNumber} was permanently deleted.`);
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : "Unable to delete order.");
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   return (
-    <div className="p-8 space-y-6 bg-[#0a0f1a] light:bg-white text-white light:text-gray-900 min-h-screen">
+    <div className="min-h-screen space-y-4 bg-[#08111f] light:bg-[#f8fafc] p-4 text-white light:text-[#14213a] md:p-5">
       {/* Status summary */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         {STATUS_FLOW.map(status => (
@@ -61,27 +132,39 @@ export function OrdersView({ tenant }: Props) {
             key={status}
             onClick={() => setFilter(status)}
             className={cn(
-              "p-4 rounded-2xl border text-left transition-all hover:shadow-sm",
+              "rounded-xl border p-3 text-left transition-all hover:shadow-sm",
               STATUS_BG[status],
               filter === status && "ring-2 ring-violet-500 light:ring-violet-400 ring-offset-2 ring-offset-[#0a0f1a] light:ring-offset-white"
             )}
           >
             <p className="text-xs font-medium text-slate-400 light:text-slate-600 capitalize">{status}</p>
-            <p className="text-2xl font-black text-white light:text-gray-900 mt-1">
+            <p className="mt-1 text-xl font-black text-white light:text-[#17223a]">
               {orders.filter(o => o.status === status).length}
             </p>
           </button>
         ))}
       </div>
 
+      {error && (
+        <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-xs text-red-300 light:text-red-700">
+          {error}
+        </div>
+      )}
+      {notice && (
+        <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-xs text-emerald-300 light:text-emerald-700">
+          {notice}
+        </div>
+      )}
+      {isLoading && <p className="text-xs text-slate-400">Loading orders from Supabase...</p>}
+
       {/* Filter strip */}
-      <div className="flex items-center gap-1 bg-slate-800 light:bg-slate-100 p-1 rounded-xl w-fit">
-        {(["all", ...STATUS_FLOW] as (OrderStatus | "all")[]).map(tab => (
+      <div className="flex w-fit max-w-full items-center gap-1 overflow-x-auto rounded-lg border border-slate-700/60 light:border-[#e5e9f1] bg-slate-900/70 light:bg-white p-1">
+        {(["all", ...STATUS_TABS] as (OrderStatus | "all")[]).map(tab => (
           <button
             key={tab}
             onClick={() => setFilter(tab)}
             className={cn(
-              "px-3 py-1.5 rounded-lg text-sm font-medium capitalize transition-all",
+              "rounded-md px-3 py-1.5 text-[10px] font-medium capitalize transition-all",
               filter === tab
                 ? "bg-violet-600 light:bg-white text-white light:text-gray-900 shadow-sm"
                 : "text-slate-400 light:text-slate-600 hover:text-white light:hover:text-gray-900"
@@ -94,7 +177,7 @@ export function OrdersView({ tenant }: Props) {
 
       <div className="grid lg:grid-cols-3 gap-6">
         {/* List */}
-        <Card className="lg:col-span-2 bg-slate-800/50 light:bg-white border-slate-700 light:border-gray-200">
+        <Card className="lg:col-span-2">
           <div className="divide-y divide-slate-700 light:divide-slate-100">
             {filtered.length === 0 && (
               <div className="py-16 text-center text-slate-400 light:text-gray-500">
@@ -107,7 +190,7 @@ export function OrdersView({ tenant }: Props) {
                 key={order.id}
                 onClick={() => setSelected(order)}
                 className={cn(
-                  "w-full px-6 py-4 flex items-center gap-4 hover:bg-slate-700 light:hover:bg-slate-50 transition-colors text-left",
+                  "flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-slate-700 light:hover:bg-[#fafbfe]",
                   selected?.id === order.id && "bg-violet-900/30 light:bg-violet-50"
                 )}
               >
@@ -137,7 +220,7 @@ export function OrdersView({ tenant }: Props) {
         {/* Detail panel */}
         <div>
           {selected ? (
-            <Card className="sticky top-6 bg-slate-800/50 light:bg-white border-slate-700 light:border-gray-200">
+            <Card className="sticky top-6">
               <div className="p-5 space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
@@ -180,16 +263,29 @@ export function OrdersView({ tenant }: Props) {
                     <div className="grid grid-cols-2 gap-2">
                       {STATUS_FLOW.slice(STATUS_FLOW.indexOf(selected.status as OrderStatus) + 1).slice(0, 2).map(next => (
                         <Button key={next} variant="outline" size="sm" className="justify-center border-slate-600 light:border-slate-300 text-white light:text-gray-800 hover:bg-slate-700 light:hover:bg-slate-100"
+                          disabled={updatingId === selected.id}
                           onClick={() => advance(selected.id, next)}>
                           <RefreshCw className="w-3 h-3 mr-1" />{capitalise(next)}
                         </Button>
                       ))}
                     </div>
                     <Button variant="danger" size="sm" className="w-full justify-center bg-red-500/20 light:bg-red-50 text-red-400 light:text-red-700 border-red-500/30 light:border-red-200 hover:bg-red-500/30 light:hover:bg-red-100"
+                      disabled={updatingId === selected.id}
                       onClick={() => advance(selected.id, "cancelled")}>
                       <XCircle className="w-3.5 h-3.5 mr-1" /> Cancel Order
                     </Button>
                   </div>
+                )}
+
+                {(selected.status === "delivered" || selected.status === "cancelled") && (
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    className="w-full justify-center"
+                    onClick={() => setDeleteTarget(selected)}
+                  >
+                    <Trash2 className="mr-1 h-3.5 w-3.5" /> Delete Order
+                  </Button>
                 )}
               </div>
             </Card>
@@ -202,6 +298,31 @@ export function OrdersView({ tenant }: Props) {
           )}
         </div>
       </div>
+
+      <Modal
+        open={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        title="Delete Order"
+        footer={
+          <div className="flex gap-3">
+            <Button variant="outline" className="flex-1" onClick={() => setDeleteTarget(null)}>
+              Keep Order
+            </Button>
+            <Button
+              variant="danger"
+              className="flex-1"
+              disabled={isDeleting}
+              onClick={removeOrder}
+            >
+              {isDeleting ? "Deleting..." : "Delete Order"}
+            </Button>
+          </div>
+        }
+      >
+        <p className="text-sm text-slate-300 light:text-gray-700">
+          This permanently removes <strong>{deleteTarget?.orderNumber}</strong> and its line items.
+        </p>
+      </Modal>
     </div>
   );
 }

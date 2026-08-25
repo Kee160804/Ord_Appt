@@ -12,7 +12,11 @@ import {
   User,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/app/lib/utils";
-import { Service, Tenant } from "@/app/types/index";
+import { createPublicAppointment } from "@/app/services/bookingService";
+import { Button } from "@/app/components/Button";
+import { Input } from "@/app/components/input";
+import { Modal } from "@/app/components/Modal";
+import type { Service, Tenant } from "@/app/types/index";
 
 // Extend Service type locally to include optional fields used in this component
 interface ExtendedService extends Service {
@@ -24,13 +28,18 @@ interface ExtendedService extends Service {
 interface AppointmentBookingProps {
   tenant: Tenant;
   services: Service[];
-  onBook: (serviceId: string, date: string, time: string) => void;
 }
 
 // Helpers
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const UNAVAILABLE_SLOTS = new Set(["11:00", "13:30"]);
 const PLACEHOLDER_IMG = "/fallback-product.png";
+
+function dateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
 
 function buildCalendarDays(currentMonth: Date): (Date | null)[] {
   const year = currentMonth.getFullYear();
@@ -42,11 +51,16 @@ function buildCalendarDays(currentMonth: Date): (Date | null)[] {
   return days;
 }
 
-function buildTimeSlots(): string[] {
+function buildTimeSlots(open: string, close: string, duration: number): string[] {
+  const [openHour, openMinute] = open.split(":").map(Number);
+  const [closeHour, closeMinute] = close.split(":").map(Number);
+  const start = openHour * 60 + openMinute;
+  const end = closeHour * 60 + closeMinute;
   const slots: string[] = [];
-  for (let h = 8; h <= 17; h++) {
-    slots.push(`${h.toString().padStart(2, "0")}:00`);
-    slots.push(`${h.toString().padStart(2, "0")}:30`);
+  for (let minutes = start; minutes + duration <= end; minutes += 30) {
+    const hour = Math.floor(minutes / 60);
+    const minute = minutes % 60;
+    slots.push(`${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`);
   }
   return slots;
 }
@@ -57,7 +71,6 @@ const FAKE_REVIEWS: Record<string, { rating: number; text: string }[]> = {};
 export function AppointmentBooking({
   tenant,
   services,
-  onBook,
 }: AppointmentBookingProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -65,11 +78,23 @@ export function AppointmentBooking({
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [concerns, setConcerns] = useState("");
+  const [bookingOpen, setBookingOpen] = useState(false);
+  const [customer, setCustomer] = useState({ name: "", email: "", phone: "" });
+  const [isBooking, setIsBooking] = useState(false);
+  const [bookingError, setBookingError] = useState("");
+  const [confirmationId, setConfirmationId] = useState("");
 
   const calendarDays = useMemo(() => buildCalendarDays(currentMonth), [currentMonth]);
-  const timeSlots = useMemo(() => (selectedDate ? buildTimeSlots() : []), [selectedDate]);
+  const selectedService = services.find((service) => service.id === selectedServiceId) ?? null;
+  const timeSlots = useMemo(() => {
+    if (!selectedDate) return [];
+    const selectedDay = new Date(`${selectedDate}T12:00:00`).getDay();
+    const hours = tenant.businessHours[selectedDay];
+    if (!hours || hours.closed || !hours.open || !hours.close) return [];
+    return buildTimeSlots(hours.open, hours.close, selectedService?.duration ?? 30);
+  }, [selectedDate, selectedService?.duration, tenant.businessHours]);
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = dateKey(new Date());
 
   const filteredServices = useMemo(
     () =>
@@ -90,18 +115,64 @@ export function AppointmentBooking({
   const nextMonth = () =>
     setCurrentMonth((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1));
 
-  const handleBook = () => {
+  const beginBooking = (serviceId = selectedServiceId) => {
+    if (!serviceId || !selectedDate || !selectedTime) return;
+    setSelectedServiceId(serviceId);
+    setBookingError("");
+    setBookingOpen(true);
+  };
+
+  const submitBooking = async () => {
     if (!selectedServiceId || !selectedDate || !selectedTime) return;
-    onBook(selectedServiceId, selectedDate, selectedTime);
+    if (!customer.name.trim() || !customer.email.trim() || !customer.phone.trim()) {
+      setBookingError("Name, email, and phone are required.");
+      return;
+    }
+
+    setIsBooking(true);
+    setBookingError("");
+    try {
+      const appointmentId = await createPublicAppointment({
+        tenantId: tenant.id,
+        serviceId: selectedServiceId,
+        date: selectedDate,
+        time: selectedTime,
+        customerName: customer.name,
+        customerEmail: customer.email,
+        customerPhone: customer.phone,
+        notes: concerns,
+      });
+      setConfirmationId(appointmentId);
+      setBookingOpen(false);
+      setSelectedServiceId(null);
+      setSelectedDate(null);
+      setSelectedTime(null);
+      setConcerns("");
+    } catch (submitError) {
+      setBookingError(
+        submitError instanceof Error ? submitError.message : "Unable to create the appointment.",
+      );
+    } finally {
+      setIsBooking(false);
+    }
   };
 
   const canBook = !!selectedServiceId && !!selectedDate && !!selectedTime;
 
   return (
-    <div
-      className="grid gap-0 overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm"
-      style={{ gridTemplateColumns: "260px 1fr 300px", minHeight: "calc(100vh - 260px)" }}
-    >
+    <>
+      {confirmationId && (
+        <div className="mb-5 rounded-2xl border border-emerald-300 bg-emerald-50 px-5 py-4 text-emerald-900 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200">
+          <p className="font-bold">Appointment requested successfully.</p>
+          <p className="mt-1 text-sm">
+            Confirmation: {confirmationId.slice(0, 8).toUpperCase()}. The business will review your request.
+          </p>
+        </div>
+      )}
+      <div
+        className="grid gap-0 overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm"
+        style={{ gridTemplateColumns: "260px 1fr 300px", minHeight: "calc(100vh - 260px)" }}
+      >
       {/* Left sidebar: Calendar, Time slots, Notes */}
       <aside className="flex flex-col gap-6 overflow-y-auto border-r border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5">
         <div>
@@ -151,7 +222,7 @@ export function AppointmentBooking({
           <div className="grid grid-cols-7 gap-y-1 text-center">
             {calendarDays.map((day, idx) => {
               if (!day) return <div key={`empty-${idx}`} />;
-              const iso = day.toISOString().split("T")[0];
+              const iso = dateKey(day);
               const dow = day.getDay();
               const isToday = iso === today;
               const isSelected = iso === selectedDate;
@@ -195,18 +266,14 @@ export function AppointmentBooking({
           {timeSlots.length > 0 ? (
             <div className="grid grid-cols-2 gap-1.5">
               {timeSlots.map((slot) => {
-                const unavail = UNAVAILABLE_SLOTS.has(slot);
                 const isSelected = selectedTime === slot;
                 return (
                   <button
                     key={slot}
-                    disabled={unavail}
                     onClick={() => setSelectedTime(slot)}
                     className={`
                       py-2 rounded-lg text-xs font-semibold transition
-                      ${unavail
-                        ? "bg-slate-50 dark:bg-slate-800 text-slate-300 dark:text-slate-600 cursor-not-allowed"
-                        : isSelected
+                      ${isSelected
                         ? "bg-violet-600 text-white"
                         : "border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-violet-400 hover:text-violet-600 dark:hover:text-violet-400"
                       }
@@ -320,7 +387,7 @@ export function AppointmentBooking({
                     <button
                       onClick={() => {
                         setSelectedServiceId(service.id);
-                        if (selectedDate && selectedTime) handleBook();
+                        if (selectedDate && selectedTime) beginBooking(service.id);
                       }}
                       className="flex-1 py-2 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold transition"
                       aria-label={`Book ${service.name}`}
@@ -449,7 +516,7 @@ export function AppointmentBooking({
 
             <div className="p-5 border-t border-slate-100 dark:border-slate-800 flex-shrink-0">
               <button
-                onClick={handleBook}
+                onClick={() => beginBooking()}
                 disabled={!canBook}
                 className="w-full py-3 rounded-xl bg-violet-600 hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold transition"
               >
@@ -478,7 +545,7 @@ export function AppointmentBooking({
             {formatDate(selectedDate!)} at {selectedTime}
           </span>
           <button
-            onClick={handleBook}
+            onClick={() => beginBooking()}
             className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-full text-xs font-bold transition"
             aria-label="Confirm booking"
           >
@@ -486,7 +553,71 @@ export function AppointmentBooking({
           </button>
         </div>
       )}
-    </div>
+      </div>
+
+      <Modal
+        open={bookingOpen}
+        onClose={() => !isBooking && setBookingOpen(false)}
+        title="Complete your booking"
+        footer={
+          <div className="flex gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isBooking}
+              onClick={() => setBookingOpen(false)}
+              className="flex-1"
+            >
+              Cancel
+            </Button>
+            <Button type="button" loading={isBooking} onClick={submitBooking} className="flex-1">
+              {isBooking ? "Booking..." : "Request Appointment"}
+            </Button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <div className="rounded-xl bg-violet-500/10 p-4 text-sm text-violet-200">
+            <p className="font-bold">{selectedService?.name ?? "Selected service"}</p>
+            <p className="mt-1 text-violet-300">
+              {selectedDate ? formatDate(selectedDate) : ""} at {selectedTime} · {selectedService?.duration ?? 0} min
+            </p>
+            <p className="mt-1 font-semibold">{formatCurrency(selectedService?.price ?? 0)}</p>
+          </div>
+          <Input
+            label="Full Name"
+            autoComplete="name"
+            value={customer.name}
+            onChange={(event) =>
+              setCustomer((current) => ({ ...current, name: event.target.value }))
+            }
+          />
+          <Input
+            label="Email Address"
+            type="email"
+            autoComplete="email"
+            value={customer.email}
+            onChange={(event) =>
+              setCustomer((current) => ({ ...current, email: event.target.value }))
+            }
+          />
+          <Input
+            label="Phone Number"
+            type="tel"
+            autoComplete="tel"
+            value={customer.phone}
+            onChange={(event) =>
+              setCustomer((current) => ({ ...current, phone: event.target.value }))
+            }
+          />
+          {bookingError && (
+            <p className="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-300">
+              {bookingError}
+            </p>
+          )}
+        </div>
+      </Modal>
+    </>
   );
 }
 

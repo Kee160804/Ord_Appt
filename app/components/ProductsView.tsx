@@ -19,6 +19,7 @@ import {
   listCategories,
   listProducts,
   setProductAvailability,
+  updateProduct,
 } from "../services/productService";
 import type { Category, Product, Tenant } from "../types/index";
 
@@ -33,8 +34,11 @@ export function ProductsView({ tenant }: Props) {
   const [search, setSearch] = useState("");
   const [cat, setCat] = useState("All");
   const [showAdd, setShowAdd] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
   const [isLoading, setIsLoading] = useState(isSupabaseConfigured());
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -97,7 +101,9 @@ export function ProductsView({ tenant }: Props) {
     setError("");
 
     try {
-      if (isSupabaseConfigured()) await setProductAvailability(id, !current.isActive);
+      if (isSupabaseConfigured()) {
+        await setProductAvailability(tenant.id, id, !current.isActive);
+      }
       else setStoredProducts(tenant.id, updated);
 
       realtime.addEvent({
@@ -116,18 +122,44 @@ export function ProductsView({ tenant }: Props) {
     const updated = products.filter((product) => product.id !== id);
     setProducts(updated);
     setError("");
+    setIsDeleting(true);
 
     try {
-      if (isSupabaseConfigured()) await deleteProduct(id);
+      if (isSupabaseConfigured()) await deleteProduct(tenant.id, id);
       else setStoredProducts(tenant.id, updated);
       realtime.addEvent({ type: "product_deleted", tenantId: tenant.id, productId: id });
+      setDeleteTarget(null);
     } catch (deleteError) {
       setProducts(previous);
       setError(deleteError instanceof Error ? deleteError.message : "Unable to delete product.");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
-  const handleAddProduct = async () => {
+  const openAdd = () => {
+    setEditingProduct(null);
+    setNewProduct({ name: "", price: "", description: "", categoryId: "", inventory: "", image: "", tags: [] });
+    setError("");
+    setShowAdd(true);
+  };
+
+  const openEdit = (product: Product) => {
+    setEditingProduct(product);
+    setNewProduct({
+      name: product.name,
+      price: String(product.price),
+      description: product.description,
+      categoryId: product.categoryId,
+      inventory: product.inventory == null ? "" : String(product.inventory),
+      image: product.image,
+      tags: product.tags,
+    });
+    setError("");
+    setShowAdd(true);
+  };
+
+  const handleSaveProduct = async () => {
     if (!newProduct.name || !newProduct.price) {
       setError("Please fill in at least name and price.");
       return;
@@ -145,22 +177,30 @@ export function ProductsView({ tenant }: Props) {
 
     try {
       let product: Product;
+      const input = {
+        name: newProduct.name,
+        description: newProduct.description,
+        price,
+        image: newProduct.image,
+        categoryId: newProduct.categoryId,
+        inventory: newProduct.inventory ? Number(newProduct.inventory) : 0,
+      };
       if (isSupabaseConfigured()) {
-        product = await createProduct(
-          tenant.id,
-          {
-            name: newProduct.name,
-            description: newProduct.description,
-            price,
-            image: newProduct.image,
-            categoryId: newProduct.categoryId,
-            inventory: newProduct.inventory ? Number(newProduct.inventory) : 0,
-          },
-          category?.name ?? "Uncategorized",
-        );
+        product = editingProduct
+          ? await updateProduct(
+              tenant.id,
+              editingProduct.id,
+              input,
+              category?.name ?? "Uncategorized",
+            )
+          : await createProduct(
+              tenant.id,
+              input,
+              category?.name ?? "Uncategorized",
+            );
       } else {
         product = {
-          id: `p${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+          id: editingProduct?.id ?? `p${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
           tenantId: tenant.id,
           name: newProduct.name,
           description: newProduct.description,
@@ -171,14 +211,26 @@ export function ProductsView({ tenant }: Props) {
           isActive: true,
           inventory: newProduct.inventory ? Number(newProduct.inventory) : 0,
           tags: newProduct.tags,
-          createdAt: new Date().toISOString(),
+          createdAt: editingProduct?.createdAt ?? new Date().toISOString(),
         };
-        setStoredProducts(tenant.id, [...products, product]);
+        const nextProducts = editingProduct
+          ? products.map((candidate) => (candidate.id === product.id ? product : candidate))
+          : [...products, product];
+        setStoredProducts(tenant.id, nextProducts);
       }
 
-      setProducts((current) => [...current, product]);
-      realtime.addEvent({ type: "product_added", tenantId: tenant.id, product });
+      setProducts((current) =>
+        editingProduct
+          ? current.map((candidate) => (candidate.id === product.id ? product : candidate))
+          : [...current, product],
+      );
+      realtime.addEvent({
+        type: editingProduct ? "product_updated" : "product_added",
+        tenantId: tenant.id,
+        product,
+      });
       setNewProduct({ name: "", price: "", description: "", categoryId: "", inventory: "", image: "", tags: [] });
+      setEditingProduct(null);
       setShowAdd(false);
     } catch (createError) {
       setError(createError instanceof Error ? createError.message : "Unable to create product.");
@@ -188,26 +240,26 @@ export function ProductsView({ tenant }: Props) {
   };
 
   return (
-    <div className="p-8 space-y-6 bg-[#0a0f1a] light:bg-white min-h-screen text-white light:text-gray-900">
+    <div className="min-h-screen space-y-4 bg-[#08111f] light:bg-[#f8fafc] p-4 text-white light:text-[#14213a] md:p-5">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-bold text-white light:text-gray-900">Products</h2>
-          <p className="text-sm text-slate-400 light:text-gray-600">
+          <h2 className="text-sm font-bold text-white light:text-[#17223a]">Products</h2>
+          <p className="mt-0.5 text-[10px] text-slate-400 light:text-[#71809a]">
             {products.filter(p => p.isActive).length} active · {products.length} total
           </p>
         </div>
-        <Button onClick={() => setShowAdd(true)} className="bg-violet-600 hover:bg-violet-500 light:bg-violet-600 light:hover:bg-violet-700 text-white">
+        <Button onClick={openAdd} size="sm" className="bg-violet-600 hover:bg-violet-700 text-white">
           <Plus className="w-4 h-4" /> Add Product
         </Button>
       </div>
 
       {error && (
-        <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+        <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-xs text-red-300 light:text-red-700">
           {error}
         </div>
       )}
 
-      {isLoading && <p className="text-sm text-slate-400">Loading products from Supabase...</p>}
+      {isLoading && <p className="text-xs text-slate-400">Loading products from Supabase...</p>}
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
@@ -216,7 +268,7 @@ export function ProductsView({ tenant }: Props) {
           <input
             value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Search products..."
-            className="pl-9 pr-4 py-2 text-sm bg-slate-800 light:bg-white border border-slate-700 light:border-gray-200 rounded-xl w-full
+            className="h-8 w-full rounded-lg border border-slate-700 light:border-[#e3e8f0] bg-slate-800 light:bg-white pl-9 pr-3 text-[10px]
                        focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500
                        text-white light:text-gray-900 placeholder:text-slate-500 light:placeholder:text-gray-400"
           />
@@ -227,7 +279,7 @@ export function ProductsView({ tenant }: Props) {
               key={c}
               onClick={() => setCat(c)}
               className={cn(
-                "px-3 py-1.5 text-sm font-medium rounded-xl transition-colors",
+                "rounded-lg px-3 py-1.5 text-[10px] font-medium transition-colors",
                 cat === c
                   ? "bg-violet-600 text-white"
                   : "bg-slate-800 light:bg-gray-100 text-slate-300 light:text-gray-700 hover:bg-slate-700 light:hover:bg-gray-200"
@@ -248,20 +300,29 @@ export function ProductsView({ tenant }: Props) {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {filtered.map(p => (
-            <ProductCard key={p.id} product={p} onToggle={toggle} onDelete={del} />
+            <ProductCard
+              key={p.id}
+              product={p}
+              onEdit={openEdit}
+              onToggle={toggle}
+              onDelete={setDeleteTarget}
+            />
           ))}
         </div>
       )}
 
       {/* Add modal */}
-      <Modal open={showAdd} onClose={() => setShowAdd(false)} title="Add New Product"
+      <Modal
+        open={showAdd}
+        onClose={() => setShowAdd(false)}
+        title={editingProduct ? "Edit Product" : "Add New Product"}
         footer={
           <div className="flex gap-3">
             <Button variant="outline" onClick={() => setShowAdd(false)} className="flex-1 border-slate-600 light:border-gray-300 text-white light:text-gray-800 hover:bg-slate-700 light:hover:bg-gray-100">
               Cancel
             </Button>
-            <Button disabled={isSaving} className="flex-1 bg-violet-600 hover:bg-violet-500 light:bg-violet-600 light:hover:bg-violet-700 text-white" onClick={handleAddProduct}>
-              {isSaving ? "Saving..." : "Save Product"}
+            <Button disabled={isSaving} className="flex-1 bg-violet-600 hover:bg-violet-500 light:bg-violet-600 light:hover:bg-violet-700 text-white" onClick={handleSaveProduct}>
+              {isSaving ? "Saving..." : editingProduct ? "Update Product" : "Save Product"}
             </Button>
           </div>
         }
@@ -315,22 +376,54 @@ export function ProductsView({ tenant }: Props) {
           </div>
         </div>
       </Modal>
+
+      <Modal
+        open={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        title="Delete Product"
+        footer={
+          <div className="flex gap-3">
+            <Button variant="outline" className="flex-1" onClick={() => setDeleteTarget(null)}>
+              Keep Product
+            </Button>
+            <Button
+              variant="danger"
+              className="flex-1"
+              disabled={isDeleting}
+              onClick={() => deleteTarget && del(deleteTarget.id)}
+            >
+              Delete Product
+            </Button>
+          </div>
+        }
+      >
+        <p className="text-sm text-slate-300 light:text-gray-700">
+          This permanently removes <strong>{deleteTarget?.name}</strong> from the dashboard and storefront.
+        </p>
+      </Modal>
     </div>
   );
 }
 
-function ProductCard({ product, onToggle, onDelete }: {
+function ProductCard({ product, onEdit, onToggle, onDelete }: {
   product: Product;
+  onEdit: (product: Product) => void;
   onToggle: (id: string) => void;
-  onDelete: (id: string) => void;
+  onDelete: (product: Product) => void;
 }) {
   return (
-    <Card className="overflow-hidden group bg-slate-800/50 light:bg-white border-slate-700 light:border-gray-200">
+    <Card className="group overflow-hidden">
       <div className="relative h-40 overflow-hidden bg-slate-700 light:bg-slate-100">
-        <img
-          src={product.image} alt={product.name}
-          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-        />
+        {product.image ? (
+          <img
+            src={product.image} alt={product.name}
+            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+          />
+        ) : (
+          <div className="flex h-full items-center justify-center text-slate-500">
+            <Package className="h-10 w-10" />
+          </div>
+        )}
         <div className="absolute top-3 left-3 flex gap-1.5 flex-wrap">
           {product.tags.map(tag => (
             <span key={tag}
@@ -362,12 +455,12 @@ function ProductCard({ product, onToggle, onDelete }: {
           )}
         </div>
         <div className="flex items-center gap-1 pt-1 border-t border-slate-700 light:border-slate-100">
-          <Button variant="ghost" size="xs" className="flex-1 justify-center text-white light:text-gray-800 hover:bg-slate-700 light:hover:bg-slate-100">
+          <Button variant="ghost" size="xs" className="flex-1 justify-center text-white light:text-gray-800 hover:bg-slate-700 light:hover:bg-slate-100" onClick={() => onEdit(product)}>
             <Edit2 className="w-3.5 h-3.5 mr-1" /> Edit
           </Button>
           <div className="w-px h-5 bg-slate-700 light:bg-slate-200" />
           <Button variant="ghost" size="xs" className="text-red-400 light:text-red-600 hover:text-red-300 light:hover:text-red-800 hover:bg-red-500/10 light:hover:bg-red-50"
-            onClick={() => onDelete(product.id)}>
+            onClick={() => onDelete(product)}>
             <Trash2 className="w-3.5 h-3.5" />
           </Button>
           <div className="w-px h-5 bg-slate-700 light:bg-slate-200" />

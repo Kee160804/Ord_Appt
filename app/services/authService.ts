@@ -28,6 +28,7 @@ interface SignupBusinessMetadata {
 }
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const tenantProvisioningByUser = new Map<string, Promise<string | null>>();
 
 function errorMessage(error: unknown, fallback: string) {
   if (error instanceof Error && error.message) return error.message;
@@ -137,6 +138,7 @@ async function getMembership(supabase: SupabaseClient, profileId: string) {
     .select("id, tenant_id, profile_id, role_id, is_active, roles(name)")
     .eq("profile_id", profileId)
     .eq("is_active", true)
+    .order("joined_at", { ascending: true })
     .limit(1)
     .maybeSingle();
 
@@ -190,7 +192,7 @@ async function createAvailableSlug(supabase: SupabaseClient, requested: string) 
   return `${base}-${suffix}`;
 }
 
-async function provisionTenantFromMetadata(supabase: SupabaseClient, authUser: SupabaseUser) {
+async function createTenantFromMetadata(supabase: SupabaseClient, authUser: SupabaseUser) {
   const metadata = metadataFromUser(authUser);
   if (!metadata) return null;
 
@@ -227,6 +229,20 @@ async function provisionTenantFromMetadata(supabase: SupabaseClient, authUser: S
     .eq("tenant_id", data.id);
 
   return data.id as string;
+}
+
+async function provisionTenantFromMetadata(supabase: SupabaseClient, authUser: SupabaseUser) {
+  const inFlightProvisioning = tenantProvisioningByUser.get(authUser.id);
+  if (inFlightProvisioning) return inFlightProvisioning;
+
+  const provisioning = createTenantFromMetadata(supabase, authUser);
+  tenantProvisioningByUser.set(authUser.id, provisioning);
+
+  try {
+    return await provisioning;
+  } finally {
+    tenantProvisioningByUser.delete(authUser.id);
+  }
 }
 
 export async function loadAuthenticatedAppSession(

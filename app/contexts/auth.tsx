@@ -32,6 +32,7 @@ interface AuthActionResult {
 interface AuthContextType {
   user: User | null;
   tenant: Tenant | null;
+  updateTenant: (updatedTenant: Tenant) => void;
   login: (email: string, password: string) => Promise<AuthActionResult>;
   signup: (
     email: string,
@@ -284,8 +285,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     router.push("/login");
   };
 
+  const updateTenant = (updatedTenant: Tenant) => {
+    setTenant((current) => (current?.id === updatedTenant.id ? updatedTenant : current));
+  };
+
   return (
-    <AuthContext.Provider value={{ user, tenant, login, signup, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, tenant, updateTenant, login, signup, logout, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

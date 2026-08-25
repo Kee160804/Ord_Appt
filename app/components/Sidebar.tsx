@@ -1,18 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard, Calendar, Scissors, ShoppingBag, Package,
-  Users, BarChart3, Settings, LogOut, ExternalLink,
-  ChevronLeft, ChevronRight, Sparkles, ChevronDown, Plus, Moon, Sun,
+  BarChart3,
+  Calendar,
+  ExternalLink,
+  LayoutDashboard,
+  LogOut,
+  Package,
+  Scissors,
+  Settings,
+  ShoppingBag,
+  Sparkles,
+  Users,
 } from "lucide-react";
 import { cn } from "../lib/utils";
 import type { Tenant, User } from "../types/index";
 import { useAuth } from "../contexts/auth";
-// NEW: Import useTheme for dark mode toggle
-import { useTheme } from "../contexts/theme";
 
 interface SidebarProps {
   tenant: Tenant;
@@ -21,25 +27,19 @@ interface SidebarProps {
 
 export function Sidebar({ tenant, user }: SidebarProps) {
   const pathname = usePathname();
-  // COMMENT: Removed unused router variable
   const { logout } = useAuth();
-  // NEW: Get theme toggle function
-  const { theme, toggleTheme } = useTheme();
   const [collapsed, setCollapsed] = useState(false);
-  const [tenantOpen, setTenantOpen] = useState(false);
-
-  const isAppt = tenant.businessType === "appointment";
+  const isAppointmentBusiness = tenant.businessType === "appointment";
   const base = "/dashboard";
-
   const navItems = [
     { href: base, label: "Overview", icon: LayoutDashboard },
-    ...(isAppt
+    ...(isAppointmentBusiness
       ? [
-          { href: `${base}/appointments`, label: "Appointments", icon: Calendar, badge: 3 },
+          { href: `${base}/appointments`, label: "Appointments", icon: Calendar },
           { href: `${base}/services`, label: "Services", icon: Scissors },
         ]
       : [
-          { href: `${base}/orders`, label: "Orders", icon: ShoppingBag, badge: 2 },
+          { href: `${base}/orders`, label: "Orders", icon: ShoppingBag },
           { href: `${base}/products`, label: "Products", icon: Package },
         ]),
     { href: `${base}/customers`, label: "Customers", icon: Users },
@@ -47,177 +47,113 @@ export function Sidebar({ tenant, user }: SidebarProps) {
     { href: `${base}/settings`, label: "Settings", icon: Settings },
   ];
 
-  const handleLogout = () => {
-    logout();
-  };
+  useEffect(() => {
+    const toggle = () => setCollapsed((current) => !current);
+    window.addEventListener("dashboard-sidebar-toggle", toggle);
+    return () => window.removeEventListener("dashboard-sidebar-toggle", toggle);
+  }, []);
 
   return (
     <aside
       className={cn(
-        "relative flex flex-col h-screen bg-slate-950 light:bg-white text-white light:text-gray-900 transition-all duration-300 ease-in-out flex-shrink-0",
-        collapsed ? "w-[68px]" : "w-64",
+        "relative z-30 flex h-screen flex-shrink-0 flex-col overflow-hidden bg-[#111a35] text-white shadow-[6px_0_28px_rgba(8,20,44,0.08)] transition-[width] duration-300",
+        collapsed ? "w-[72px]" : "w-[216px]",
       )}
     >
-      {/* Collapse toggle */}
-      <button
-        onClick={() => setCollapsed(!collapsed)}
-        className="absolute -right-3 top-8 z-10 w-6 h-6 bg-white light:bg-gray-200 border border-slate-200 light:border-gray-300 rounded-full shadow-md flex items-center justify-center text-slate-500 light:text-gray-600 hover:text-slate-800 light:hover:text-gray-900 transition-colors"
-      >
-        {collapsed ? <ChevronRight className="w-3 h-3" /> : <ChevronLeft className="w-3 h-3" />}
-      </button>
-
-      {/* Brand */}
-      <div className="flex items-center gap-3 px-4 py-5 border-b border-slate-800 light:border-gray-200">
-        <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center flex-shrink-0 shadow-lg">
-          <Sparkles className="w-4 h-4 text-white" />
+      <div className={cn("flex h-[66px] items-center gap-3 border-b border-white/[0.06] px-5", collapsed && "justify-center px-3")}>
+        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-purple-700 shadow-lg shadow-violet-950/30">
+          <Sparkles className="h-4 w-4 text-white" />
         </div>
         {!collapsed && (
-          <div>
-            <p className="font-bold text-white light:text-gray-900 text-sm tracking-tight">LocalSpace</p>
-            <p className="text-[10px] text-slate-400 light:text-gray-600 uppercase tracking-widest font-medium">Platform</p>
+          <div className="leading-none">
+            <p className="text-[13px] font-bold tracking-tight text-white">LocalSpace</p>
+            <p className="mt-1 text-[7px] font-semibold uppercase tracking-[0.2em] text-slate-400">Platform</p>
           </div>
         )}
       </div>
 
-      {/* Tenant switcher */}
-      <div className={cn("relative border-b border-slate-800 light:border-gray-200", collapsed ? "px-2 py-3" : "px-3 py-3")}>
-        <button
-          onClick={() => !collapsed && setTenantOpen(!tenantOpen)}
-          className="w-full flex items-center gap-2.5 p-2 rounded-xl hover:bg-slate-800 light:hover:bg-gray-100 transition-colors"
-        >
+      <div className={cn("border-b border-white/[0.06] px-4 py-4", collapsed && "px-3")}>
+        <div className={cn("flex items-center gap-3 rounded-xl px-1 py-1", collapsed && "justify-center")}>
           <div
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-xs flex-shrink-0"
+            className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg text-xs font-bold text-white shadow-sm"
             style={{ backgroundColor: tenant.logoBg }}
+            title={tenant.name}
           >
             {tenant.logo}
           </div>
           {!collapsed && (
-            <>
-              <div className="flex-1 text-left min-w-0">
-                <p className="text-sm font-semibold text-white light:text-gray-900 truncate">{tenant.name}</p>
-                <span className={cn(
-                  "text-[10px] font-semibold px-1.5 py-0.5 rounded-full",
-                  isAppt
-                    ? "bg-violet-900 light:bg-violet-100 text-violet-300 light:text-violet-700"
-                    : "bg-orange-900 light:bg-orange-100 text-orange-300 light:text-orange-700",
-                )}>
-                  {isAppt ? "Bookings" : "Orders"}
-                </span>
-              </div>
-              <ChevronDown className={cn("w-3.5 h-3.5 text-slate-400 light:text-gray-500 transition-transform", tenantOpen && "rotate-180")} />
-            </>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-semibold text-white">{tenant.name}</p>
+              <span className="mt-1 inline-flex rounded-full bg-violet-600 px-2 py-0.5 text-[7px] font-bold uppercase tracking-wide text-white">
+                {isAppointmentBusiness ? "Business" : "Ordering"}
+              </span>
+            </div>
           )}
-        </button>
-
-        {/* Dropdown – "Add another business" */}
-        {tenantOpen && !collapsed && (
-          <div className="absolute left-3 right-3 top-full mt-1 bg-slate-900 light:bg-white border border-slate-700 light:border-gray-200 rounded-xl shadow-xl z-20 overflow-hidden">
-            <Link
-              href="/"
-              className="flex items-center gap-2.5 px-3 py-2.5 hover:bg-slate-800 light:hover:bg-gray-100 transition-colors text-left"
-              onClick={() => setTenantOpen(false)}
-            >
-              <div className="w-7 h-7 rounded-lg bg-violet-600/20 light:bg-violet-100 flex items-center justify-center flex-shrink-0">
-                <Plus className="w-3.5 h-3.5 text-violet-400 light:text-violet-600" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs font-semibold text-white light:text-gray-900 truncate">Add another business</p>
-                <p className="text-[10px] text-slate-400 light:text-gray-600">New subscription</p>
-              </div>
-            </Link>
-          </div>
-        )}
+        </div>
       </div>
 
-      {/* Nav */}
-      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-        {navItems.map(item => {
+      <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
+        {navItems.map((item) => {
           const Icon = item.icon;
           const active = pathname === item.href || (item.href !== base && pathname.startsWith(item.href));
           return (
             <Link
               key={item.href}
               href={item.href}
+              title={collapsed ? item.label : undefined}
               className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150",
+                "group flex h-10 items-center gap-3 rounded-lg px-3 text-[12px] font-medium transition-colors",
                 active
-                  ? "bg-white light:bg-violet-100 text-slate-900 light:text-violet-900 shadow-sm"
-                  : "text-slate-400 light:text-gray-600 hover:text-white light:hover:text-gray-900 hover:bg-slate-800 light:hover:bg-gray-100",
+                  ? "bg-violet-500/20 text-white"
+                  : "text-slate-300 hover:bg-white/[0.06] hover:text-white",
                 collapsed && "justify-center px-2",
               )}
             >
-              <Icon className="w-4 h-4 flex-shrink-0" />
-              {!collapsed && (
-                <>
-                  <span className="flex-1">{item.label}</span>
-                  {"badge" in item && item.badge ? (
-                    <span className={cn(
-                      "text-[10px] font-bold px-1.5 py-0.5 rounded-full",
-                      active
-                        ? "bg-slate-900 light:bg-violet-200 text-white light:text-violet-900"
-                        : "bg-violet-600 light:bg-violet-500 text-white",
-                    )}>
-                      {item.badge}
-                    </span>
-                  ) : null}
-                </>
-              )}
+              <Icon className={cn("h-[15px] w-[15px] flex-shrink-0", active ? "text-violet-300" : "text-slate-400 group-hover:text-white")} />
+              {!collapsed && <span className="flex-1">{item.label}</span>}
             </Link>
           );
         })}
       </nav>
 
-      {/* Storefront link – corrected route and opens in new tab */}
-      {!collapsed && (
-        <div className="px-3 pb-2 border-t border-slate-800 light:border-gray-200 pt-2">
-          <Link
-            href={`/store-front/${tenant.slug}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm text-slate-400 light:text-gray-600 hover:text-white light:hover:text-gray-900 hover:bg-slate-800 light:hover:bg-gray-100 transition-colors"
-          >
-            <ExternalLink className="w-4 h-4" />
-            View Storefront
-          </Link>
-          {/* NEW: Dark mode toggle button */}
-          <button
-            onClick={toggleTheme}
-            className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm text-slate-400 light:text-gray-600 hover:text-white light:hover:text-gray-900 hover:bg-slate-800 light:hover:bg-gray-100 transition-colors mt-1"
-            title="Toggle dark/light mode"
-          >
-            {theme === "dark" ? (
-              <>
-                <Sun className="w-4 h-4" />
-                Light Mode
-              </>
-            ) : (
-              <>
-                <Moon className="w-4 h-4" />
-                Dark Mode
-              </>
-            )}
-          </button>
-        </div>
-      )}
-
-      {/* User & Logout */}
-      <div className={cn("border-t border-slate-800 light:border-gray-200 p-3", collapsed && "px-2")}>
-        <button
-          onClick={handleLogout}
-          className="w-full flex items-center gap-2.5 p-2 rounded-xl hover:bg-slate-800 light:hover:bg-gray-100 transition-colors group"
+      <div className="border-t border-white/[0.06] px-3 py-2">
+        <Link
+          href={`/store-front/${tenant.slug}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          title={collapsed ? "View Storefront" : undefined}
+          className={cn(
+            "flex h-9 items-center gap-3 rounded-lg px-3 text-[11px] font-medium text-slate-400 transition-colors hover:bg-white/[0.06] hover:text-white",
+            collapsed && "justify-center px-2",
+          )}
         >
-          <div className="w-8 h-8 rounded-full bg-violet-600 light:bg-violet-300 flex items-center justify-center text-white light:text-violet-900 text-xs font-bold flex-shrink-0">
+          <ExternalLink className="h-3.5 w-3.5" />
+          {!collapsed && "View Storefront"}
+        </Link>
+      </div>
+
+      <div className={cn("flex items-center gap-2 border-t border-white/[0.06] p-4", collapsed && "justify-center px-3")}>
+        {!collapsed && (
+          <div
+            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border border-violet-400/30 bg-violet-500/15 text-[10px] font-bold text-violet-100"
+            title={user.name}
+          >
             {user.avatar}
           </div>
-          {!collapsed && (
-            <>
-              <div className="flex-1 min-w-0 text-left">
-                <p className="text-sm font-semibold text-white light:text-gray-900 truncate">{user.name}</p>
-                <p className="text-xs text-slate-400 light:text-gray-600 capitalize">{user.role}</p>
-              </div>
-              <LogOut className="w-4 h-4 text-slate-500 light:text-gray-500 group-hover:text-white light:group-hover:text-gray-900 transition-colors" />
-            </>
-          )}
+        )}
+        {!collapsed && (
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[11px] font-semibold text-white">{user.name}</p>
+            <p className="mt-0.5 text-[9px] capitalize text-slate-400">{user.role}</p>
+          </div>
+        )}
+        <button
+          onClick={() => void logout()}
+          aria-label="Sign out"
+          title="Sign out"
+          className="rounded-lg p-2 text-slate-500 transition-colors hover:bg-white/[0.06] hover:text-white"
+        >
+          <LogOut className="h-3.5 w-3.5" />
         </button>
       </div>
     </aside>

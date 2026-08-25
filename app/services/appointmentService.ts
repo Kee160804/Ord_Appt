@@ -1,0 +1,147 @@
+import { getSupabaseBrowserClient } from "@/app/lib/supabase/client";
+import type { Appointment, AppointmentStatus } from "@/app/types/index";
+import type { AppointmentRow, AppointmentServiceRow } from "@/app/types/supabase";
+
+export interface AppointmentEmailDelivery {
+  status: "PENDING" | "PROCESSING" | "SENT" | "FAILED";
+  providerMessageId: string | null;
+  lastError: string | null;
+  sentAt: string | null;
+}
+
+function client() {
+  const supabase = getSupabaseBrowserClient();
+  if (!supabase) throw new Error("Supabase is not configured.");
+  return supabase;
+}
+
+function normalizeStatus(value: string): AppointmentStatus {
+  switch (value.toUpperCase()) {
+    case "CONFIRMED":
+      return "confirmed";
+    case "CANCELLED":
+      return "cancelled";
+    case "COMPLETED":
+      return "completed";
+    case "NO_SHOW":
+      return "no_show";
+    default:
+      return "pending";
+  }
+}
+
+function firstService(row: AppointmentRow): AppointmentServiceRow | null {
+  return Array.isArray(row.appointment_services) ? row.appointment_services[0] ?? null : null;
+}
+
+function durationFromTimes(row: AppointmentRow) {
+  if (!row.starts_at || !row.ends_at) return 30;
+  const duration = Math.round(
+    (new Date(row.ends_at).getTime() - new Date(row.starts_at).getTime()) / 60_000,
+  );
+  return duration > 0 ? duration : 30;
+}
+
+function mapAppointment(row: AppointmentRow): Appointment {
+  const service = firstService(row);
+  const date = row.appointment_date ?? row.starts_at?.slice(0, 10) ?? "";
+  const time = row.appointment_time?.slice(0, 5) ?? row.starts_at?.slice(11, 16) ?? "";
+
+  return {
+    id: row.id,
+    tenantId: row.tenant_id,
+    serviceId: service?.service_id ?? row.service_id ?? "",
+    serviceName: service?.service_name ?? "Service",
+    servicePrice: Number(service?.price ?? row.total ?? row.subtotal ?? 0),
+    customerName: row.customer_name ?? "Customer",
+    customerEmail: row.customer_email ?? "",
+    customerPhone: row.customer_phone ?? "",
+    date,
+    time,
+    duration: service?.duration_minutes ?? durationFromTimes(row),
+    status: normalizeStatus(row.status),
+    paymentStatus: "unpaid",
+    notes: row.notes ?? undefined,
+    createdAt: row.created_at,
+  };
+}
+
+export async function listAppointments(tenantId: string): Promise<Appointment[]> {
+  const { data, error } = await client()
+    .from("appointments")
+    .select("*, appointment_services(service_id, service_name, price, duration_minutes)")
+    .eq("tenant_id", tenantId)
+    .order("starts_at", { ascending: true });
+
+  if (error) throw error;
+  return ((data ?? []) as AppointmentRow[]).map(mapAppointment);
+}
+
+export async function setAppointmentStatus(
+  tenantId: string,
+  appointmentId: string,
+  status: AppointmentStatus,
+) {
+  const now = new Date().toISOString();
+  const { error } = await client()
+    .from("appointments")
+    .update({
+      status: status.toUpperCase(),
+      cancelled_at: status === "cancelled" ? now : null,
+      completed_at: status === "completed" ? now : null,
+    })
+    .eq("id", appointmentId)
+    .eq("tenant_id", tenantId)
+    .select("id")
+    .single();
+
+  if (error) throw error;
+}
+
+export async function deleteAppointment(tenantId: string, appointmentId: string) {
+  const { error } = await client()
+    .from("appointments")
+    .delete()
+    .eq("id", appointmentId)
+    .eq("tenant_id", tenantId)
+    .select("id")
+    .single();
+
+  if (error) throw error;
+}
+
+export async function getAppointmentEmailDelivery(
+  appointmentId: string,
+): Promise<AppointmentEmailDelivery | null> {
+  const { data, error } = await client()
+    .from("appointment_email_deliveries")
+    .select("status, provider_message_id, last_error, sent_at")
+    .eq("appointment_id", appointmentId)
+    .eq("event_type", "APPOINTMENT_CONFIRMED")
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) return null;
+
+  return {
+    status: data.status as AppointmentEmailDelivery["status"],
+    providerMessageId: data.provider_message_id as string | null,
+    lastError: data.last_error as string | null,
+    sentAt: data.sent_at as string | null,
+  };
+}
+
+export async function waitForAppointmentEmailDelivery(
+  appointmentId: string,
+  attempts = 8,
+): Promise<AppointmentEmailDelivery | null> {
+  let latest: AppointmentEmailDelivery | null = null;
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    latest = await getAppointmentEmailDelivery(appointmentId);
+    if (latest?.status === "SENT" || latest?.status === "FAILED") return latest;
+    await new Promise((resolve) => window.setTimeout(resolve, 1000));
+  }
+
+  return latest;
+}

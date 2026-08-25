@@ -1,13 +1,22 @@
 @import "tailwindcss";
 
+@source "..";
+@source "../**/*.{js,ts,jsx,tsx}";
+
+@custom-variant light (&:where(.light, .light *));
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
-  --background: #0a0f1a;
-  --foreground: #f1f5f9;
-  /* COMMENT: CSS variables for theme colors */
-  --bg-color: #070b14;
-  --text-color: white;
-  /* NEW: Added explicit color scheme variable for dark mode */
-  --color-scheme: dark;
+  --background: #ffffff;
+  --foreground: #15213b;
+  --bg-color: #ffffff;
+  --text-color: #15213b;
+  --color-scheme: light;
+  --dashboard-navy: #111a35;
+  --dashboard-navy-soft: #0d2142;
+  --dashboard-violet: #7c3aed;
+  --dashboard-border: #e5eaf2;
+  --dashboard-muted: #71809a;
 }
 
 * {
@@ -19,16 +28,14 @@ body {
   color: var(--foreground);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  /* NEW: Smooth transition between themes */
   transition:
-    background-color 0.3s ease,
-    color 0.3s ease,
-    border-color 0.3s ease;
+    background-color 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease;
 }
 
 html {
-  /* NEW: Explicitly set dark mode as default */
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 /* NEW: Light mode CSS variables override - this is the key section */
@@ -43,19 +50,36 @@ body {
 
 html.light,
 body.light {
-  --bg-color: white;
-  --text-color: #111827;
+  --background: #ffffff;
+  --foreground: #15213b;
+  --bg-color: #ffffff;
+  --text-color: #15213b;
 }
 
 html.dark,
 body.dark {
-  --bg-color: #070b14;
-  --text-color: white;
+  --background: #08111f;
+  --foreground: #f8fafc;
+  --bg-color: #08111f;
+  --text-color: #f8fafc;
 }
 
 html,
 body {
   transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+  min-height: 100%;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
 }
 
 html.light ::selection,

@@ -17,15 +17,22 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 const THEME_KEY = "theme";
 const DEMO_THEME_KEY = "theme-demo";
+const DASHBOARD_THEME_VERSION_KEY = "dashboard-theme-version";
+const DASHBOARD_THEME_VERSION = "reference-light-v1";
 
 function getBrowserTheme(): Theme {
+  if (localStorage.getItem(DASHBOARD_THEME_VERSION_KEY) !== DASHBOARD_THEME_VERSION) {
+    localStorage.setItem(DASHBOARD_THEME_VERSION_KEY, DASHBOARD_THEME_VERSION);
+    localStorage.setItem(THEME_KEY, "light");
+    return "light";
+  }
   const savedTheme = localStorage.getItem(THEME_KEY) as Theme | null;
   if (savedTheme === "light" || savedTheme === "dark") return savedTheme;
-  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  return "light";
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>("dark");
+  const [theme, setThemeState] = useState<Theme>("light");
   const [demoTheme, setDemoThemeState] = useState<Theme>("dark");
 
   useEffect(() => {

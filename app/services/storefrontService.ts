@@ -6,24 +6,9 @@ import type {
   BusinessHourRow,
   CategoryRow,
   ProductRow,
+  ServiceRow,
   TenantRow,
 } from "@/app/types/supabase";
-
-interface ServiceRow {
-  id: string;
-  tenant_id: string;
-  name: string;
-  description: string | null;
-  duration_minutes: number;
-  price: number | string;
-  image_url: string | null;
-  available: boolean;
-  created_at: string;
-  category?: string | null;
-  requires_deposit?: boolean | null;
-  deposit_amount?: number | string | null;
-  deposit_type?: "fixed" | "percentage" | null;
-}
 
 export interface PublicStorefrontData {
   tenant: Tenant;

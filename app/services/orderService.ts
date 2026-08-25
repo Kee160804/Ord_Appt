@@ -1,0 +1,115 @@
+import { getSupabaseBrowserClient } from "@/app/lib/supabase/client";
+import type { Order, OrderItem, OrderStatus, PaymentStatus } from "@/app/types/index";
+import type { OrderItemRow, OrderProductRow, OrderRow } from "@/app/types/supabase";
+
+function client() {
+  const supabase = getSupabaseBrowserClient();
+  if (!supabase) throw new Error("Supabase is not configured.");
+  return supabase;
+}
+
+function normalizeOrderStatus(value: string): OrderStatus {
+  switch (value.toUpperCase()) {
+    case "CONFIRMED":
+      return "confirmed";
+    case "PREPARING":
+      return "preparing";
+    case "READY":
+      return "ready";
+    case "DELIVERED":
+    case "COMPLETED":
+      return "delivered";
+    case "CANCELLED":
+      return "cancelled";
+    default:
+      return "pending";
+  }
+}
+
+function normalizePaymentStatus(value: string): PaymentStatus {
+  switch (value.toUpperCase()) {
+    case "PAID":
+    case "COMPLETED":
+      return "paid";
+    case "PARTIAL":
+      return "partial";
+    case "REFUNDED":
+      return "refunded";
+    default:
+      return "unpaid";
+  }
+}
+
+function firstProduct(value: OrderItemRow["products"]): OrderProductRow | null {
+  if (Array.isArray(value)) return value[0] ?? null;
+  return value ?? null;
+}
+
+function mapItem(row: OrderItemRow): OrderItem {
+  return {
+    id: row.id,
+    productId: row.product_id ?? "",
+    productName: row.product_name,
+    productImage: firstProduct(row.products)?.image_url ?? "",
+    quantity: Number(row.quantity),
+    price: Number(row.unit_price),
+  };
+}
+
+function mapOrder(row: OrderRow): Order {
+  return {
+    id: row.id,
+    tenantId: row.tenant_id,
+    orderNumber: row.order_number,
+    customerName: row.customer_name?.trim() || "Customer",
+    customerEmail: row.customer_email ?? "",
+    customerPhone: row.customer_phone ?? "",
+    items: (row.order_items ?? []).map(mapItem),
+    status: normalizeOrderStatus(row.status),
+    paymentStatus: normalizePaymentStatus(row.payment_status),
+    totalAmount: Number(row.total),
+    notes: row.notes ?? undefined,
+    createdAt: row.created_at,
+  };
+}
+
+export async function listOrders(tenantId: string): Promise<Order[]> {
+  const { data, error } = await client()
+    .from("orders")
+    .select(
+      "id, tenant_id, order_number, customer_name, customer_email, customer_phone, status, payment_status, total, notes, created_at, order_items(id, product_id, product_name, quantity, unit_price, subtotal, products(image_url))",
+    )
+    .eq("tenant_id", tenantId)
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+  return ((data ?? []) as unknown as OrderRow[]).map(mapOrder);
+}
+
+export async function setOrderStatus(
+  tenantId: string,
+  orderId: string,
+  status: OrderStatus,
+) {
+  const { error } = await client()
+    .from("orders")
+    .update({ status: status.toUpperCase() })
+    .eq("id", orderId)
+    .eq("tenant_id", tenantId)
+    .select("id")
+    .single();
+
+  if (error) throw error;
+}
+
+export async function deleteOrder(tenantId: string, orderId: string) {
+  const { error } = await client()
+    .from("orders")
+    .delete()
+    .eq("id", orderId)
+    .eq("tenant_id", tenantId)
+    .select("id")
+    .single();
+
+  if (error) throw error;
+}

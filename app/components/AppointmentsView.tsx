@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Calendar,
   Clock,
@@ -10,12 +10,20 @@ import {
   CheckCircle,
   XCircle,
   ChevronRight,
+  Trash2,
 } from "lucide-react";
 import { Card } from "./Card";
 import { Button } from "./Button";
 import { StatusBadge } from "./Badge";
 import { Modal } from "./Modal";
 import { getAppointmentsByTenant } from "../data/mock";
+import { getSupabaseBrowserClient } from "../lib/supabase/client";
+import { isSupabaseConfigured } from "../lib/supabase/config";
+import {
+  deleteAppointment,
+  listAppointments,
+  setAppointmentStatus,
+} from "../services/appointmentService";
 import {
   formatCurrency,
   formatDate,
@@ -42,6 +50,59 @@ export function AppointmentsView({ tenant }: Props) {
   );
   const [filter, setFilter] = useState<Filter>("all");
   const [selected, setSelected] = useState<Appointment | null>(null);
+  const [isLoading, setIsLoading] = useState(isSupabaseConfigured());
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<Appointment | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return;
+    let active = true;
+    const supabase = getSupabaseBrowserClient();
+
+    const load = async () => {
+      try {
+        const loaded = await listAppointments(tenant.id);
+        if (!active) return;
+        setApts(loaded);
+        setSelected((current) =>
+          current ? loaded.find((appointment) => appointment.id === current.id) ?? null : null,
+        );
+        setError("");
+      } catch (loadError) {
+        if (!active) return;
+        setError(loadError instanceof Error ? loadError.message : "Unable to load appointments.");
+      } finally {
+        if (active) setIsLoading(false);
+      }
+    };
+
+    void load();
+    const channel = supabase
+      ?.channel(`appointments:${tenant.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "appointments",
+          filter: `tenant_id=eq.${tenant.id}`,
+        },
+        () => void load(),
+      )
+      .subscribe();
+
+    const handleFocus = () => void load();
+    window.addEventListener("focus", handleFocus);
+
+    return () => {
+      active = false;
+      window.removeEventListener("focus", handleFocus);
+      if (channel && supabase) void supabase.removeChannel(channel);
+    };
+  }, [tenant.id]);
 
   const tabs: Filter[] = [
     "all",
@@ -49,6 +110,7 @@ export function AppointmentsView({ tenant }: Props) {
     "confirmed",
     "completed",
     "cancelled",
+    "no_show",
   ];
 
   const counts = tabs.reduce<Record<string, number>>((acc, t) => {
@@ -61,7 +123,7 @@ export function AppointmentsView({ tenant }: Props) {
     filter === "all" ? apts : apts.filter((a) => a.status === filter);
 
   // ENHANCED: Emit real-time event when appointment status changes
-  const updateStatus = (id: string, status: AppointmentStatus) => {
+  const updateStatus = async (id: string, status: AppointmentStatus) => {
     const appointment = apts.find((candidate) => candidate.id === id);
     if (!appointment) return;
 
@@ -70,63 +132,117 @@ export function AppointmentsView({ tenant }: Props) {
       previous.map((candidate) => (candidate.id === id ? updatedAppointment : candidate)),
     );
     setSelected((prev) => (prev?.id === id ? { ...prev, status } : prev));
-    realtime.addEvent({
-      type: "appointment_updated",
-      tenantId: tenant.id,
-      appointment: updatedAppointment,
-    });
+    setUpdatingId(id);
+    setError("");
+    setNotice("");
+
+    try {
+      if (isSupabaseConfigured()) await setAppointmentStatus(tenant.id, id, status);
+      realtime.addEvent({
+        type: "appointment_updated",
+        tenantId: tenant.id,
+        appointment: updatedAppointment,
+      });
+      setNotice(`Appointment marked ${status.replace("_", "-")}.`);
+    } catch (updateError) {
+      setApts((previous) =>
+        previous.map((candidate) => (candidate.id === id ? appointment : candidate)),
+      );
+      setSelected((current) => (current?.id === id ? appointment : current));
+      setError(updateError instanceof Error ? updateError.message : "Unable to update appointment.");
+    } finally {
+      setUpdatingId(null);
+    }
   };
 
+  const removeAppointment = async () => {
+    if (!deleteTarget) return;
+    const appointment = deleteTarget;
+    setIsDeleting(true);
+    setError("");
+    setNotice("");
+
+    try {
+      if (isSupabaseConfigured()) {
+        await deleteAppointment(tenant.id, appointment.id);
+      }
+      setApts((current) => current.filter((candidate) => candidate.id !== appointment.id));
+      setSelected((current) => (current?.id === appointment.id ? null : current));
+      setDeleteTarget(null);
+      setNotice(`Appointment for ${appointment.customerName} was permanently deleted.`);
+    } catch (deleteError) {
+      setError(
+        deleteError instanceof Error ? deleteError.message : "Unable to delete the appointment.",
+      );
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const today = new Date().toLocaleDateString("en-CA");
+
   return (
-    <div className="p-8 space-y-6 bg-[#0a0f1a] light:bg-white text-white light:text-gray-900 min-h-screen">
+    <div className="min-h-screen space-y-4 bg-[#08111f] light:bg-[#f8fafc] p-4 text-white light:text-[#14213a] md:p-5">
       {/* Summary chips */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
           {
             label: "Today",
-            value: apts.filter((a) => a.date === "2025-01-13").length,
-            bg: "bg-blue-500/20 light:bg-blue-100",
+            value: apts.filter((a) => a.date === today).length,
+            bg: "bg-blue-500/10 light:bg-blue-50 border-blue-400/20 light:border-blue-100",
             text: "text-blue-400 light:text-blue-700",
           },
           {
             label: "Pending",
             value: counts.pending,
-            bg: "bg-amber-500/20 light:bg-amber-100",
+            bg: "bg-amber-500/10 light:bg-amber-50 border-amber-400/20 light:border-amber-100",
             text: "text-amber-400 light:text-amber-700",
           },
           {
             label: "Confirmed",
             value: counts.confirmed,
-            bg: "bg-green-500/20 light:bg-green-100",
+            bg: "bg-green-500/10 light:bg-emerald-50 border-green-400/20 light:border-emerald-100",
             text: "text-green-400 light:text-green-700",
           },
           {
             label: "Completed",
             value: counts.completed,
-            bg: "bg-slate-700/50 light:bg-slate-100",
+            bg: "bg-slate-700/40 light:bg-slate-50 border-slate-600/40 light:border-slate-200",
             text: "text-slate-300 light:text-slate-700",
           },
         ].map((s) => (
           <div
             key={s.label}
-            className={cn("rounded-2xl p-4", s.bg)}
+            className={cn("rounded-xl border p-3.5", s.bg)}
           >
-            <p className="text-xs font-medium text-slate-400 light:text-gray-600">{s.label}</p>
-            <p className={cn("text-3xl font-black mt-1", s.text)}>
+            <p className="text-[10px] font-medium text-slate-400 light:text-[#61708a]">{s.label}</p>
+            <p className={cn("mt-1 text-xl font-black", s.text)}>
               {s.value}
             </p>
           </div>
         ))}
       </div>
 
+      {error && (
+        <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-xs text-red-300 light:text-red-700">
+          {error}
+        </div>
+      )}
+      {notice && (
+        <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-xs text-emerald-300 light:text-emerald-700">
+          {notice}
+        </div>
+      )}
+      {isLoading && <p className="text-xs text-slate-400 light:text-slate-500">Loading appointments from Supabase...</p>}
+
       {/* Filter tabs */}
-      <div className="flex items-center gap-1 bg-slate-800 light:bg-gray-100 p-1 rounded-xl w-fit">
+      <div className="flex w-fit max-w-full items-center gap-1 overflow-x-auto rounded-lg border border-slate-700/60 light:border-[#e5e9f1] bg-slate-900/70 light:bg-white p-1">
         {tabs.map((tab) => (
           <button
             key={tab}
             onClick={() => setFilter(tab)}
             className={cn(
-              "px-4 py-1.5 rounded-lg text-sm font-medium capitalize transition-all",
+              "whitespace-nowrap rounded-md px-3 py-1.5 text-[10px] font-medium capitalize transition-all",
               filter === tab
                 ? "bg-violet-600 light:bg-white text-white light:text-gray-900 shadow-sm"
                 : "text-slate-400 light:text-gray-600 hover:text-white light:hover:text-gray-900",
@@ -141,46 +257,48 @@ export function AppointmentsView({ tenant }: Props) {
       </div>
 
       {/* List */}
-      <Card className="bg-slate-800/50 light:bg-white border-slate-700 light:border-gray-200">
+      <Card>
         <div className="divide-y divide-slate-700 light:divide-slate-100">
           {filtered.length === 0 && (
-            <div className="py-16 text-center text-slate-400 light:text-gray-500">
-              <Calendar className="w-10 h-10 mx-auto mb-3 opacity-40" />
-              <p className="text-sm">No appointments found</p>
+              <div className="py-20 text-center text-slate-400 light:text-gray-500">
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-violet-500/15 text-violet-400 light:bg-violet-50 light:text-violet-600">
+                <Calendar className="h-5 w-5" />
+              </div>
+              <p className="text-xs font-semibold text-white light:text-[#17223a]">No appointments found</p>
             </div>
           )}
           {filtered.map((apt) => (
             <button
               key={apt.id}
               onClick={() => setSelected(apt)}
-              className="w-full px-6 py-4 flex items-center gap-4 hover:bg-slate-700 light:hover:bg-gray-50 transition-colors text-left"
+              className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-slate-800/70 light:hover:bg-[#fafbfe]"
             >
               {/* Date badge */}
-              <div className="w-11 h-11 rounded-xl bg-violet-500/20 light:bg-violet-100 flex flex-col items-center justify-center flex-shrink-0">
+              <div className="flex h-10 w-10 flex-shrink-0 flex-col items-center justify-center rounded-lg bg-violet-500/20 light:bg-violet-50">
                 <span className="text-xs font-bold text-violet-400 light:text-violet-700 leading-none">
                   {apt.date.split("-")[2]}
                 </span>
                 <span className="text-[10px] text-violet-400 light:text-violet-500 uppercase">
-                  {new Date(apt.date).toLocaleDateString("en-US", {
+                  {new Date(`${apt.date}T12:00:00`).toLocaleDateString("en-US", {
                     month: "short",
                   })}
                 </span>
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <p className="text-sm font-semibold text-white light:text-gray-900">
+                  <p className="text-xs font-semibold text-white light:text-[#17223a]">
                     {apt.customerName}
                   </p>
                   <StatusBadge status={apt.status} />
                 </div>
-                <p className="text-xs text-slate-400 light:text-gray-600 mt-0.5 truncate">
+                <p className="mt-1 truncate text-[10px] text-slate-400 light:text-[#71809a]">
                   {apt.serviceName} · {formatTime(apt.time)} ·{" "}
                   {formatDuration(apt.duration)}
                 </p>
               </div>
               <div className="hidden sm:flex items-center gap-3 flex-shrink-0">
                 <div className="text-right">
-                  <p className="text-sm font-bold text-white light:text-gray-900">
+                  <p className="text-xs font-bold text-white light:text-[#17223a]">
                     {formatCurrency(apt.servicePrice)}
                   </p>
                   <StatusBadge status={apt.paymentStatus} />
@@ -203,6 +321,7 @@ export function AppointmentsView({ tenant }: Props) {
               <Button
                 variant="danger"
                 className="flex-1"
+                disabled={updatingId === selected.id}
                 onClick={() => updateStatus(selected!.id, "cancelled")}
               >
                 <XCircle className="w-4 h-4" /> Cancel
@@ -210,11 +329,44 @@ export function AppointmentsView({ tenant }: Props) {
               <Button
                 variant="success"
                 className="flex-1"
+                disabled={updatingId === selected.id}
                 onClick={() => updateStatus(selected!.id, "confirmed")}
               >
                 <CheckCircle className="w-4 h-4" /> Confirm
               </Button>
             </div>
+          ) : selected?.status === "confirmed" ? (
+            <div className="grid grid-cols-3 gap-2">
+              <Button
+                variant="danger"
+                disabled={updatingId === selected.id}
+                onClick={() => updateStatus(selected.id, "cancelled")}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="outline"
+                disabled={updatingId === selected.id}
+                onClick={() => updateStatus(selected.id, "no_show")}
+              >
+                No-show
+              </Button>
+              <Button
+                variant="success"
+                disabled={updatingId === selected.id}
+                onClick={() => updateStatus(selected.id, "completed")}
+              >
+                Complete
+              </Button>
+            </div>
+          ) : selected && ["completed", "cancelled", "no_show"].includes(selected.status) ? (
+            <Button
+              variant="danger"
+              className="w-full"
+              onClick={() => setDeleteTarget(selected)}
+            >
+              <Trash2 className="h-4 w-4" /> Delete Appointment
+            </Button>
           ) : undefined
         }
       >
@@ -298,6 +450,37 @@ export function AppointmentsView({ tenant }: Props) {
             )}
           </div>
         )}
+      </Modal>
+
+      <Modal
+        open={!!deleteTarget}
+        onClose={() => !isDeleting && setDeleteTarget(null)}
+        title="Delete appointment?"
+        footer={
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              className="flex-1"
+              disabled={isDeleting}
+              onClick={() => setDeleteTarget(null)}
+            >
+              Keep Appointment
+            </Button>
+            <Button
+              variant="danger"
+              className="flex-1"
+              loading={isDeleting}
+              onClick={removeAppointment}
+            >
+              Delete Permanently
+            </Button>
+          </div>
+        }
+      >
+        <p className="text-sm leading-6 text-slate-300 light:text-slate-700">
+          This permanently removes the appointment for {deleteTarget?.customerName}, including its
+          service and email-delivery records. This action cannot be undone.
+        </p>
       </Modal>
     </div>
   );
