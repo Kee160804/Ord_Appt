@@ -21,7 +21,7 @@ import {
   setProductAvailability,
   updateProduct,
 } from "../services/productService";
-import type { Category, Product, Tenant } from "../types/index";
+import type { Category, Product, ProductAddon, Tenant } from "../types/index";
 
 interface Props { tenant: Tenant }
 
@@ -82,6 +82,7 @@ export function ProductsView({ tenant }: Props) {
     inventory: "",
     image: "",
     tags: [] as string[],
+    addons: [] as ProductAddon[],
   });
 
   const filtered = products.filter(p => {
@@ -139,7 +140,7 @@ export function ProductsView({ tenant }: Props) {
 
   const openAdd = () => {
     setEditingProduct(null);
-    setNewProduct({ name: "", price: "", description: "", categoryId: "", inventory: "", image: "", tags: [] });
+    setNewProduct({ name: "", price: "", description: "", categoryId: "", inventory: "", image: "", tags: [], addons: [] });
     setError("");
     setShowAdd(true);
   };
@@ -154,6 +155,7 @@ export function ProductsView({ tenant }: Props) {
       inventory: product.inventory == null ? "" : String(product.inventory),
       image: product.image,
       tags: product.tags,
+      addons: product.addons ?? [],
     });
     setError("");
     setShowAdd(true);
@@ -171,6 +173,11 @@ export function ProductsView({ tenant }: Props) {
       return;
     }
 
+    if (newProduct.addons.some((addon) => !addon.name.trim() || !Number.isFinite(addon.price) || addon.price < 0)) {
+      setError("Enter a name and valid price for each add-on.");
+      return;
+    }
+
     setIsSaving(true);
     setError("");
     const category = categories.find((candidate) => candidate.id === newProduct.categoryId);
@@ -184,6 +191,7 @@ export function ProductsView({ tenant }: Props) {
         image: newProduct.image,
         categoryId: newProduct.categoryId,
         inventory: newProduct.inventory ? Number(newProduct.inventory) : 0,
+        addons: newProduct.addons.map((addon) => ({ ...addon, name: addon.name.trim() })),
       };
       if (isSupabaseConfigured()) {
         product = editingProduct
@@ -211,6 +219,7 @@ export function ProductsView({ tenant }: Props) {
           isActive: true,
           inventory: newProduct.inventory ? Number(newProduct.inventory) : 0,
           tags: newProduct.tags,
+          addons: newProduct.addons,
           createdAt: editingProduct?.createdAt ?? new Date().toISOString(),
         };
         const nextProducts = editingProduct
@@ -229,11 +238,16 @@ export function ProductsView({ tenant }: Props) {
         tenantId: tenant.id,
         product,
       });
-      setNewProduct({ name: "", price: "", description: "", categoryId: "", inventory: "", image: "", tags: [] });
+      setNewProduct({ name: "", price: "", description: "", categoryId: "", inventory: "", image: "", tags: [], addons: [] });
       setEditingProduct(null);
       setShowAdd(false);
     } catch (createError) {
-      setError(createError instanceof Error ? createError.message : "Unable to create product.");
+      const message = createError instanceof Error ? createError.message : "Unable to save product.";
+      setError(
+        message.toLowerCase().includes("addons") && message.toLowerCase().includes("column")
+          ? `${message} Apply supabase/migrations/202608250001_product_addons.sql to your Supabase project, then try again.`
+          : message,
+      );
     } finally {
       setIsSaving(false);
     }
@@ -373,6 +387,59 @@ export function ProductsView({ tenant }: Props) {
               value={newProduct.image}
               onChange={e => setNewProduct({ ...newProduct, image: e.target.value })}
             />
+          </div>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-semibold">Add-ons</label>
+              <Button
+                type="button"
+                variant="outline"
+                size="xs"
+                onClick={() => setNewProduct({
+                  ...newProduct,
+                  addons: [...newProduct.addons, { id: `addon-${Date.now()}`, name: "", price: 0 }],
+                })}
+              >
+                <Plus className="h-3.5 w-3.5" /> Add add-on
+              </Button>
+            </div>
+            {newProduct.addons.length === 0 && (
+              <p className="text-xs text-slate-400">No add-ons configured for this product.</p>
+            )}
+            {newProduct.addons.map((addon, index) => (
+              <div key={addon.id} className="flex items-end gap-2">
+                <Input
+                  label={index === 0 ? "Name" : undefined}
+                  placeholder="e.g. Extra cheese"
+                  value={addon.name}
+                  onChange={(event) => setNewProduct({
+                    ...newProduct,
+                    addons: newProduct.addons.map((item) => item.id === addon.id ? { ...item, name: event.target.value } : item),
+                  })}
+                />
+                <Input
+                  label={index === 0 ? "Price ($)" : undefined}
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={addon.price}
+                  onChange={(event) => setNewProduct({
+                    ...newProduct,
+                    addons: newProduct.addons.map((item) => item.id === addon.id ? { ...item, price: Number(event.target.value) || 0 } : item),
+                  })}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="xs"
+                  aria-label={`Remove ${addon.name || "add-on"}`}
+                  onClick={() => setNewProduct({ ...newProduct, addons: newProduct.addons.filter((item) => item.id !== addon.id) })}
+                >
+                  <Trash2 className="h-4 w-4 text-red-400" />
+                </Button>
+              </div>
+            ))}
           </div>
         </div>
       </Modal>

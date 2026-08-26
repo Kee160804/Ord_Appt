@@ -1,5 +1,5 @@
 import { getSupabaseBrowserClient } from "@/app/lib/supabase/client";
-import type { Category, Product } from "@/app/types/index";
+import type { Category, Product, ProductAddon } from "@/app/types/index";
 import type { CategoryRow, ProductRow } from "@/app/types/supabase";
 
 export interface CreateProductInput {
@@ -9,6 +9,7 @@ export interface CreateProductInput {
   image: string;
   categoryId: string;
   inventory: number;
+  addons: ProductAddon[];
 }
 
 function client() {
@@ -39,6 +40,7 @@ function mapProduct(row: ProductRow, categoryName = "Uncategorized"): Product {
     isActive: row.available,
     inventory: row.stock,
     tags: [],
+    addons: (row.addons ?? []).map((addon) => ({ ...addon, price: Number(addon.price) })),
     createdAt: row.created_at,
   };
 }
@@ -90,6 +92,7 @@ export async function createProduct(
       image_url: input.image.trim() || null,
       stock: input.inventory,
       available: true,
+      addons: input.addons,
     })
     .select("*")
     .single();
@@ -113,6 +116,7 @@ export async function updateProduct(
       price: input.price,
       image_url: input.image.trim() || null,
       stock: input.inventory,
+      addons: input.addons,
     })
     .eq("id", productId)
     .eq("tenant_id", tenantId)

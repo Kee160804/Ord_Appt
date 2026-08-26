@@ -132,6 +132,7 @@ export async function getPublicStorefront(slug: string): Promise<PublicStorefron
       isActive: row.available,
       inventory: row.stock,
       tags: [],
+      addons: (row.addons ?? []).map((addon) => ({ ...addon, price: Number(addon.price) })),
       createdAt: row.created_at,
     })),
     services: ((servicesResult.data ?? []) as ServiceRow[]).map((row) => ({

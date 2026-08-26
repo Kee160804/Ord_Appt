@@ -127,7 +127,13 @@ export interface Product {
   isActive: boolean;
   inventory?: number;
   tags: string[];
+  addons?: ProductAddon[];
   createdAt: string;
+}
+export interface ProductAddon {
+  id: string;
+  name: string;
+  price: number;
 }
 export interface Appointment {
   id: string;

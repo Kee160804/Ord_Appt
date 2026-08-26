@@ -33,12 +33,6 @@ interface OrderingMenuProps {
   updateCart: (items: CartItem[]) => void;
 }
 
-const AVAILABLE_ADDONS: AddonOption[] = [
-  { id: "extra_chili", name: "Extra Chili", price: 0.5 },
-  { id: "add_egg", name: "Add Egg", price: 1.0 },
-  { id: "extra_cheese", name: "Extra Cheese", price: 1.5 },
-];
-
 const PLACEHOLDER_IMG = "/fallback-product.png";
 
 export function OrderingMenu({
@@ -56,7 +50,7 @@ export function OrderingMenu({
   const [quantity, setQuantity] = useState(1);
   const [selectedAddons, setSelectedAddons] = useState<AddonOption[]>([]);
   const [customerName, setCustomerName] = useState("");
-  const [tableLocation, setTableLocation] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [orderType, setOrderType] = useState("dine_in");
 
   const filteredProducts = useMemo(() => {
@@ -268,16 +262,16 @@ export function OrderingMenu({
                 placeholder="Enter Name"
               />
               <Input
-                label="Table Location"
-                value={tableLocation}
-                onChange={(e) => setTableLocation(e.target.value)}
-                placeholder="Select Table"
+                label="Phone Number"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
+                placeholder="Enter Phone Number"
               />
               <Select
                 label="Order Type"
                 options={[
                   { value: "dine_in", label: "Dine In" },
-                  { value: "takeaway", label: "Takeaway" },
+                  { value: "pickup", label: "Pickup" },
                   { value: "delivery", label: "Delivery" },
                 ]}
                 value={orderType}
@@ -480,7 +474,7 @@ export function OrderingMenu({
                 Add-ons
               </label>
               <div className="space-y-2">
-                {AVAILABLE_ADDONS.map((addon) => (
+                {(currentProduct.addons ?? []).map((addon) => (
                   <label key={addon.id} className="flex items-center gap-2.5 text-sm cursor-pointer">
                     <input
                       type="checkbox"

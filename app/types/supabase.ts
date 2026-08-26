@@ -71,6 +71,7 @@ export interface ProductRow {
   sku: string | null;
   stock: number;
   available: boolean;
+  addons: { id: string; name: string; price: number | string }[] | null;
   created_at: string;
 }
 
