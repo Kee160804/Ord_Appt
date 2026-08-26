@@ -41,7 +41,7 @@ function mapProduct(row: ProductRow, categoryName = "Uncategorized"): Product {
     categoryName,
     isActive: row.available,
     inventory: row.stock ?? undefined,
-    trackInventory: row.track_inventory ?? row.stock !== null,
+    trackInventory: row.track_inventory ?? (row.stock !== null),
     tags: [],
     addons: (row.addons ?? []).map((addon) => ({ ...addon, price: Number(addon.price) })),
     createdAt: row.created_at,
@@ -60,7 +60,7 @@ export async function listCategories(
   if (!includeInactive) query = query.eq("is_active", true);
   const { data, error } = await query;
 
-  if (error) throw error;
+  if (error) throw new Error(error.message);
   return ((data ?? []) as CategoryRow[]).map(mapCategory);
 }
 
@@ -75,7 +75,7 @@ export async function createCategory(tenantId: string, name: string, sortOrder: 
     })
     .select("*")
     .single();
-  if (error) throw error;
+  if (error) throw new Error(error.message);
   return mapCategory(data as CategoryRow);
 }
 
@@ -92,7 +92,7 @@ export async function updateCategory(
     .eq("id", categoryId)
     .select("*")
     .single();
-  if (error) throw error;
+  if (error) throw new Error(error.message);
   return mapCategory(data as CategoryRow);
 }
 
@@ -108,7 +108,7 @@ export async function setCategoryActive(
     .eq("id", categoryId)
     .select("*")
     .single();
-  if (error) throw error;
+  if (error) throw new Error(error.message);
   return mapCategory(data as CategoryRow);
 }
 
@@ -120,8 +120,8 @@ export async function listProducts(tenantId: string): Promise<Product[]> {
       supabase.from("categories").select("*").eq("tenant_id", tenantId),
     ]);
 
-  if (productsError) throw productsError;
-  if (categoriesError) throw categoriesError;
+  if (productsError) throw new Error(productsError.message);
+  if (categoriesError) throw new Error(categoriesError.message);
 
   const categoryNames = new Map(
     ((categories ?? []) as CategoryRow[]).map((category) => [category.id, category.name]),
@@ -153,7 +153,7 @@ export async function createProduct(
     .select("*")
     .single();
 
-  if (error) throw error;
+  if (error) throw new Error(error.message);
   return mapProduct(data as ProductRow, categoryName);
 }
 
@@ -180,7 +180,7 @@ export async function updateProduct(
     .select("*")
     .single();
 
-  if (error) throw error;
+  if (error) throw new Error(error.message);
   return mapProduct(data as ProductRow, categoryName);
 }
 
@@ -196,7 +196,7 @@ export async function setProductAvailability(
     .eq("tenant_id", tenantId)
     .select("id")
     .single();
-  if (error) throw error;
+  if (error) throw new Error(error.message);
 }
 
 export async function deleteProduct(tenantId: string, productId: string) {
@@ -205,5 +205,5 @@ export async function deleteProduct(tenantId: string, productId: string) {
     .delete()
     .eq("id", productId)
     .eq("tenant_id", tenantId);
-  if (error) throw error;
+  if (error) throw new Error(error.message);
 }

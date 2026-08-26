@@ -25,6 +25,11 @@ migration. Existing zero-stock products remain published but cannot be added to
 the cart until restocked; owners may separately pause a listing with its
 availability toggle.
 
+For projects that already applied the first owner-onboarding migration, apply
+`202608260002_owner_onboarding_idempotency.sql`. It makes signup/login retries
+cooperate with foundational `trg_initialize_new_tenant` installations and
+prevents duplicate OWNER membership inserts.
+
 ## Cross-tenant RLS verification
 
 Seed two test owner accounts in different tenants. Business B must have at

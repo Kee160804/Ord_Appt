@@ -97,6 +97,23 @@ export const metadata: Metadata = {
     "Platform for local businesses to manage appointments and orders.",
 };
 
+const themeBootstrapScript = `
+  (() => {
+    try {
+      const savedTheme = window.localStorage.getItem("theme");
+      const theme = savedTheme === "dark" ? "dark" : "light";
+      const root = document.documentElement;
+      root.classList.remove("light", "dark");
+      root.classList.add(theme);
+      root.style.colorScheme = theme;
+      root.style.backgroundColor = theme === "dark" ? "#070b14" : "white";
+      root.style.color = theme === "dark" ? "white" : "#111827";
+    } catch {
+      // Keep the server-rendered light theme if storage is unavailable.
+    }
+  })();
+`;
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -104,6 +121,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="light" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeBootstrapScript }} />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >

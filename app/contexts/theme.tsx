@@ -17,15 +17,8 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 const THEME_KEY = "theme";
 const DEMO_THEME_KEY = "theme-demo";
-const DASHBOARD_THEME_VERSION_KEY = "dashboard-theme-version";
-const DASHBOARD_THEME_VERSION = "reference-light-v1";
 
 function getBrowserTheme(): Theme {
-  if (localStorage.getItem(DASHBOARD_THEME_VERSION_KEY) !== DASHBOARD_THEME_VERSION) {
-    localStorage.setItem(DASHBOARD_THEME_VERSION_KEY, DASHBOARD_THEME_VERSION);
-    localStorage.setItem(THEME_KEY, "light");
-    return "light";
-  }
   const savedTheme = localStorage.getItem(THEME_KEY) as Theme | null;
   if (savedTheme === "light" || savedTheme === "dark") return savedTheme;
   return "light";
@@ -34,6 +27,7 @@ function getBrowserTheme(): Theme {
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<Theme>("light");
   const [demoTheme, setDemoThemeState] = useState<Theme>("dark");
+  const [hasHydrated, setHasHydrated] = useState(false);
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
@@ -43,12 +37,15 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       setDemoThemeState(
         savedDemoTheme === "light" || savedDemoTheme === "dark" ? savedDemoTheme : "dark",
       );
+      setHasHydrated(true);
     });
 
     return () => window.cancelAnimationFrame(frame);
   }, []);
 
   useEffect(() => {
+    if (!hasHydrated) return;
+
     const root = document.documentElement;
     const body = document.body;
 
@@ -71,11 +68,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
 
     localStorage.setItem(THEME_KEY, theme);
-  }, [theme]);
+  }, [hasHydrated, theme]);
 
   useEffect(() => {
+    if (!hasHydrated) return;
     localStorage.setItem(DEMO_THEME_KEY, demoTheme);
-  }, [demoTheme]);
+  }, [demoTheme, hasHydrated]);
 
   const toggleTheme = () => setThemeState((prev) => (prev === "dark" ? "light" : "dark"));
   const toggleDemoTheme = () => setDemoThemeState((prev) => (prev === "dark" ? "light" : "dark"));

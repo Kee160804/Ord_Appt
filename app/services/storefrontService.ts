@@ -135,7 +135,7 @@ export async function getPublicStorefront(slug: string): Promise<PublicStorefron
       categoryName: categoryNames.get(row.category_id ?? "") ?? "Uncategorized",
       isActive: row.available,
       inventory: row.stock ?? undefined,
-      trackInventory: row.track_inventory ?? row.stock !== null,
+      trackInventory: row.track_inventory ?? (row.stock !== null),
       tags: [],
       addons: (row.addons ?? []).map((addon) => ({ ...addon, price: Number(addon.price) })),
       createdAt: row.created_at,
