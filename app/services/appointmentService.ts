@@ -50,6 +50,7 @@ function mapAppointment(row: AppointmentRow): Appointment {
   return {
     id: row.id,
     tenantId: row.tenant_id,
+    customerId: row.customer_id ?? undefined,
     serviceId: service?.service_id ?? row.service_id ?? "",
     serviceName: service?.service_name ?? "Service",
     servicePrice: Number(service?.price ?? row.total ?? row.subtotal ?? 0),
@@ -75,6 +76,45 @@ export async function listAppointments(tenantId: string): Promise<Appointment[]>
 
   if (error) throw error;
   return ((data ?? []) as AppointmentRow[]).map(mapAppointment);
+}
+
+function availabilityError(error: unknown) {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    error.code === "PGRST202"
+  ) {
+    return new Error(
+      "Online booking availability is not enabled for this store yet. Apply the public appointment availability migration in Supabase, then try again.",
+    );
+  }
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "message" in error &&
+    typeof error.message === "string" &&
+    error.message
+  ) {
+    return new Error(error.message);
+  }
+  return error instanceof Error ? error : new Error("Unable to load available times.");
+}
+
+export async function listPublicAppointmentAvailability(
+  tenantId: string,
+  serviceId: string,
+  date: string,
+): Promise<string[]> {
+  const { data, error } = await client().rpc("get_public_appointment_availability", {
+    p_tenant_id: tenantId,
+    p_service_id: serviceId,
+    p_appointment_date: date,
+  });
+  if (error) throw availabilityError(error);
+  return ((data ?? []) as { appointment_time: string }[]).map((slot) =>
+    slot.appointment_time.slice(0, 5),
+  );
 }
 
 export async function setAppointmentStatus(

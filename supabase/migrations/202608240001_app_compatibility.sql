@@ -48,76 +48,15 @@ ALTER TABLE public.services
   ADD COLUMN IF NOT EXISTS deposit_amount NUMERIC(12,2),
   ADD COLUMN IF NOT EXISTS deposit_type TEXT;
 
--- The baseline policies grant storefront reads to anon. Supabase sends the
--- authenticated role once a visitor is signed in, so equivalent policies are
--- required or a signed-in customer cannot browse another public storefront.
+-- Public storefront server reads use an anonymous Supabase client. Do not add
+-- equivalent authenticated policies: those would let one tenant read another
+-- tenant's active catalog directly through the Data API.
 DROP POLICY IF EXISTS public_tenants_select_authenticated_policy ON public.tenants;
-CREATE POLICY public_tenants_select_authenticated_policy
-ON public.tenants FOR SELECT TO authenticated
-USING (is_active = TRUE AND status = 'ACTIVE');
-
 DROP POLICY IF EXISTS public_settings_select_authenticated_policy ON public.business_settings;
-CREATE POLICY public_settings_select_authenticated_policy
-ON public.business_settings FOR SELECT TO authenticated
-USING (
-  EXISTS (
-    SELECT 1 FROM public.tenants t
-    WHERE t.id = business_settings.tenant_id
-      AND t.is_active = TRUE
-      AND t.status = 'ACTIVE'
-  )
-);
-
 DROP POLICY IF EXISTS public_hours_select_authenticated_policy ON public.business_hours;
-CREATE POLICY public_hours_select_authenticated_policy
-ON public.business_hours FOR SELECT TO authenticated
-USING (
-  EXISTS (
-    SELECT 1 FROM public.tenants t
-    WHERE t.id = business_hours.tenant_id
-      AND t.is_active = TRUE
-      AND t.status = 'ACTIVE'
-  )
-);
-
 DROP POLICY IF EXISTS public_categories_select_authenticated_policy ON public.categories;
-CREATE POLICY public_categories_select_authenticated_policy
-ON public.categories FOR SELECT TO authenticated
-USING (
-  is_active = TRUE
-  AND EXISTS (
-    SELECT 1 FROM public.tenants t
-    WHERE t.id = categories.tenant_id
-      AND t.is_active = TRUE
-      AND t.status = 'ACTIVE'
-  )
-);
-
 DROP POLICY IF EXISTS public_products_select_authenticated_policy ON public.products;
-CREATE POLICY public_products_select_authenticated_policy
-ON public.products FOR SELECT TO authenticated
-USING (
-  available = TRUE
-  AND EXISTS (
-    SELECT 1 FROM public.tenants t
-    WHERE t.id = products.tenant_id
-      AND t.is_active = TRUE
-      AND t.status = 'ACTIVE'
-  )
-);
-
 DROP POLICY IF EXISTS public_services_select_authenticated_policy ON public.services;
-CREATE POLICY public_services_select_authenticated_policy
-ON public.services FOR SELECT TO authenticated
-USING (
-  available = TRUE
-  AND EXISTS (
-    SELECT 1 FROM public.tenants t
-    WHERE t.id = services.tenant_id
-      AND t.is_active = TRUE
-      AND t.status = 'ACTIVE'
-  )
-);
 
 GRANT SELECT ON public.tenants, public.business_settings, public.business_modules,
   public.business_hours, public.categories, public.products, public.services,

@@ -2,10 +2,53 @@ import { getSupabaseBrowserClient } from "@/app/lib/supabase/client";
 import type { Order, OrderItem, OrderStatus, PaymentStatus } from "@/app/types/index";
 import type { OrderItemRow, OrderProductRow, OrderRow } from "@/app/types/supabase";
 
+export interface PublicOrderItemInput {
+  productId: string;
+  quantity: number;
+  addons: { id: string; name: string; price: number }[];
+}
+
+export interface PublicOrderInput {
+  tenantId: string;
+  customerName: string;
+  customerPhone: string;
+  orderType: "dine_in" | "pickup" | "delivery";
+  items: PublicOrderItemInput[];
+}
+
+export interface PublicOrderResult {
+  orderId: string;
+  orderNumber: string;
+  total: number;
+}
+
 function client() {
   const supabase = getSupabaseBrowserClient();
   if (!supabase) throw new Error("Supabase is not configured.");
   return supabase;
+}
+
+function orderCreationError(error: unknown) {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    error.code === "PGRST202"
+  ) {
+    return new Error(
+      "Online ordering is not enabled for this store yet. Apply the public order checkout migration in Supabase, then try again.",
+    );
+  }
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "message" in error &&
+    typeof error.message === "string" &&
+    error.message
+  ) {
+    return new Error(error.message);
+  }
+  return error instanceof Error ? error : new Error("Unable to place order.");
 }
 
 function normalizeOrderStatus(value: string): OrderStatus {
@@ -60,6 +103,7 @@ function mapOrder(row: OrderRow): Order {
   return {
     id: row.id,
     tenantId: row.tenant_id,
+    customerId: row.customer_id ?? undefined,
     orderNumber: row.order_number,
     customerName: row.customer_name?.trim() || "Customer",
     customerEmail: row.customer_email ?? "",
@@ -77,13 +121,39 @@ export async function listOrders(tenantId: string): Promise<Order[]> {
   const { data, error } = await client()
     .from("orders")
     .select(
-      "id, tenant_id, order_number, customer_name, customer_email, customer_phone, status, payment_status, total, notes, created_at, order_items(id, product_id, product_name, quantity, unit_price, subtotal, products(image_url))",
+      "id, tenant_id, customer_id, order_number, customer_name, customer_email, customer_phone, status, payment_status, total, notes, created_at, order_items(id, product_id, product_name, quantity, unit_price, subtotal, products(image_url))",
     )
     .eq("tenant_id", tenantId)
     .order("created_at", { ascending: false });
 
   if (error) throw error;
   return ((data ?? []) as unknown as OrderRow[]).map(mapOrder);
+}
+
+export async function createPublicOrder(input: PublicOrderInput): Promise<PublicOrderResult> {
+  const { data, error } = await client().rpc("create_public_order", {
+    p_tenant_id: input.tenantId,
+    p_customer_name: input.customerName.trim(),
+    p_customer_phone: input.customerPhone.trim(),
+    p_order_type: input.orderType,
+    p_notes: null,
+    p_items: input.items.map((item) => ({
+      product_id: item.productId,
+      quantity: item.quantity,
+      addons: item.addons.map(({ id }) => ({ id })),
+    })),
+  });
+
+  if (error) throw orderCreationError(error);
+  const result = Array.isArray(data) ? data[0] : data;
+  if (!result?.order_id || !result.order_number) {
+    throw new Error("The order was created without a confirmation number.");
+  }
+  return {
+    orderId: result.order_id as string,
+    orderNumber: result.order_number as string,
+    total: Number(result.total),
+  };
 }
 
 export async function setOrderStatus(

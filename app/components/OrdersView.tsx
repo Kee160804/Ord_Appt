@@ -33,7 +33,9 @@ export function OrdersView({ tenant }: Props) {
   // NEW: Get realtime context to emit order events
   const realtime = useRealtime();
   
-  const [orders, setOrders] = useState<Order[]>(getOrdersByTenant(tenant.id));
+  const [orders, setOrders] = useState<Order[]>(
+    isSupabaseConfigured() ? [] : getOrdersByTenant(tenant.id),
+  );
   const [selected, setSelected] = useState<Order | null>(null);
   const [filter, setFilter] = useState<OrderStatus | "all">("all");
   const [isLoading, setIsLoading] = useState(isSupabaseConfigured());

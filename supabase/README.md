@@ -19,6 +19,35 @@ npx supabase gen types typescript --project-id YOUR_PROJECT_REF --schema public 
 Do not put the service-role key in a `NEXT_PUBLIC_` variable. The browser uses
 only the publishable (or legacy anon) key and relies on RLS for authorization.
 
+For inventory tracking, category management, and storefront Sold Out states,
+apply `202608260001_product_inventory_management.sql` after the public checkout
+migration. Existing zero-stock products remain published but cannot be added to
+the cart until restocked; owners may separately pause a listing with its
+availability toggle.
+
+## Cross-tenant RLS verification
+
+Seed two test owner accounts in different tenants. Business B must have at
+least one product, service, order, customer, and appointment. Also create an
+inactive tenant, then provide its ID without exposing any service-role key:
+
+```text
+RLS_TEST_A_EMAIL=
+RLS_TEST_A_PASSWORD=
+RLS_TEST_B_EMAIL=
+RLS_TEST_B_PASSWORD=
+RLS_TEST_INACTIVE_TENANT_ID=
+```
+
+Run `npm run test:rls`. The live test verifies cross-tenant product/customer/
+appointment reads, order updates, anonymous active-only reads, inactive-tenant
+booking rejection, and cross-tenant service booking rejection.
+
+For a real fresh-account check, register a new account through the application,
+confirm its email, set `ONBOARDING_TEST_EMAIL` and `ONBOARDING_TEST_PASSWORD`,
+then run `npm run test:onboarding`. It verifies the auth user, profile, tenant,
+membership, and OWNER role chain using that user's JWT.
+
 ## Appointment confirmation emails
 
 The confirmation-email pipeline consists of:

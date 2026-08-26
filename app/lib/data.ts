@@ -7,7 +7,6 @@ const STORED_TENANTS_KEY = "custom_tenants";
 export interface StoredUserRecord {
   id: string;
   email: string;
-  password: string;
   name: string;
   role: UserRole;
   tenantId: string | null;
@@ -33,7 +32,16 @@ function parseStoredData<T>(key: string): T | null {
 }
 
 export function getStoredUserRecords(): StoredUserRecord[] {
-  return parseStoredData<StoredUserRecord[]>(STORED_USERS_KEY) ?? [];
+  const stored = parseStoredData<(StoredUserRecord & { password?: string })[]>(STORED_USERS_KEY) ?? [];
+  const sanitized = stored.map((user) => {
+    const sanitizedUser = { ...user };
+    delete sanitizedUser.password;
+    return sanitizedUser;
+  });
+  if (isBrowser() && stored.some((user) => "password" in user)) {
+    window.localStorage.setItem(STORED_USERS_KEY, JSON.stringify(sanitized));
+  }
+  return sanitized;
 }
 
 export function getStoredTenants(): Tenant[] {

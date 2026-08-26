@@ -69,7 +69,8 @@ export interface ProductRow {
   price: number | string;
   image_url: string | null;
   sku: string | null;
-  stock: number;
+  stock: number | null;
+  track_inventory?: boolean | null;
   available: boolean;
   addons: { id: string; name: string; price: number | string }[] | null;
   created_at: string;
@@ -144,6 +145,7 @@ export interface OrderItemRow {
 export interface OrderRow {
   id: string;
   tenant_id: string;
+  customer_id: string | null;
   order_number: string;
   customer_name: string | null;
   customer_email: string | null;

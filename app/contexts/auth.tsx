@@ -149,18 +149,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { success: false, error: "Authentication is not configured for this deployment." };
     }
 
-    const storedUser = findUserRecordByEmail(normalizedEmail);
-    if (storedUser && storedUser.password === password) {
-      const userData = getUserByEmail(storedUser.email);
-      if (userData) {
-        setUser(userData);
-        setTenant(userData.tenantId ? getTenantById(userData.tenantId) ?? null : null);
-        saveDemoSession(userData);
-        setIsLoading(false);
-        return { success: true, user: userData };
-      }
-    }
-
     const account = demoAccounts.find(
       (candidate) =>
         candidate.email.toLowerCase() === normalizedEmail && candidate.password === password,
@@ -168,7 +156,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const demoUser = account ? getUserByEmail(account.email) : null;
     if (!demoUser) {
       setIsLoading(false);
-      return { success: false, error: "Invalid email or password." };
+      return {
+        success: false,
+        error: findUserRecordByEmail(normalizedEmail)
+          ? "Local demo signups do not store passwords. Use Supabase or a built-in demo account to sign in again."
+          : "Invalid email or password.",
+      };
     }
 
     setUser(demoUser);
@@ -267,7 +260,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     saveStoredTenant(newTenant);
-    saveStoredUserRecord({ ...newUser, password });
+    saveStoredUserRecord(newUser);
     saveDemoSession(newUser);
     setUser(newUser);
     setTenant(newTenant);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Image from "next/image";
 import {
   ChevronLeft,
@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/app/lib/utils";
 import { createPublicAppointment } from "@/app/services/bookingService";
+import { listPublicAppointmentAvailability } from "@/app/services/appointmentService";
+import { isSupabaseConfigured } from "@/app/lib/supabase/config";
 import { Button } from "@/app/components/Button";
 import { Input } from "@/app/components/input";
 import { Modal } from "@/app/components/Modal";
@@ -83,16 +85,57 @@ export function AppointmentBooking({
   const [isBooking, setIsBooking] = useState(false);
   const [bookingError, setBookingError] = useState("");
   const [confirmationId, setConfirmationId] = useState("");
+  const [availableSlots, setAvailableSlots] = useState<string[]>([]);
+  const [isLoadingAvailability, setIsLoadingAvailability] = useState(false);
+  const [availabilityError, setAvailabilityError] = useState("");
 
   const calendarDays = useMemo(() => buildCalendarDays(currentMonth), [currentMonth]);
   const selectedService = services.find((service) => service.id === selectedServiceId) ?? null;
+  useEffect(() => {
+    if (!selectedDate || !selectedServiceId || !isSupabaseConfigured()) {
+      setAvailableSlots([]);
+      setIsLoadingAvailability(false);
+      setAvailabilityError("");
+      return;
+    }
+    let active = true;
+    setIsLoadingAvailability(true);
+    setAvailableSlots([]);
+    setAvailabilityError("");
+    listPublicAppointmentAvailability(tenant.id, selectedServiceId, selectedDate)
+      .then((slots) => {
+        if (active) setAvailableSlots(slots);
+      })
+      .catch((err) => {
+        if (active) {
+          const message =
+            err instanceof Error && err.message
+              ? err.message
+              : typeof err === "object" &&
+                  err !== null &&
+                  "message" in err &&
+                  typeof err.message === "string"
+                ? err.message
+                : "Unable to load available times. Please try again.";
+          setAvailabilityError(message);
+        }
+      })
+      .finally(() => {
+        if (active) setIsLoadingAvailability(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [selectedDate, selectedServiceId, tenant.id]);
+
   const timeSlots = useMemo(() => {
     if (!selectedDate) return [];
     const selectedDay = new Date(`${selectedDate}T12:00:00`).getDay();
     const hours = tenant.businessHours[selectedDay];
     if (!hours || hours.closed || !hours.open || !hours.close) return [];
+    if (isSupabaseConfigured()) return availableSlots;
     return buildTimeSlots(hours.open, hours.close, selectedService?.duration ?? 30);
-  }, [selectedDate, selectedService?.duration, tenant.businessHours]);
+  }, [availableSlots, selectedDate, selectedService?.duration, tenant.businessHours]);
 
   const today = dateKey(new Date());
 
@@ -263,7 +306,13 @@ export function AppointmentBooking({
           <p className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">
             {selectedDate ? formatDate(selectedDate) : "Select a date"}
           </p>
-          {timeSlots.length > 0 ? (
+          {isLoadingAvailability ? (
+            <p className="text-xs text-slate-400 dark:text-slate-500 text-center py-4">
+              Checking available times...
+            </p>
+          ) : availabilityError ? (
+            <p className="text-xs text-red-500 text-center py-4">{availabilityError}</p>
+          ) : timeSlots.length > 0 ? (
             <div className="grid grid-cols-2 gap-1.5">
               {timeSlots.map((slot) => {
                 const isSelected = selectedTime === slot;
@@ -287,7 +336,11 @@ export function AppointmentBooking({
             </div>
           ) : (
             <p className="text-xs text-slate-400 dark:text-slate-500 text-center py-4">
-              Pick a date to see available times.
+              {!selectedDate
+                ? "Pick a date to see available times."
+                : !selectedServiceId
+                  ? "Select a service to see available times."
+                  : "No times are available on this date."}
             </p>
           )}
         </div>
@@ -387,7 +440,7 @@ export function AppointmentBooking({
                     <button
                       onClick={() => {
                         setSelectedServiceId(service.id);
-                        if (selectedDate && selectedTime) beginBooking(service.id);
+                        setSelectedTime(null);
                       }}
                       className="flex-1 py-2 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold transition"
                       aria-label={`Book ${service.name}`}

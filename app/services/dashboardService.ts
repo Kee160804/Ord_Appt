@@ -1,5 +1,6 @@
 import { listAppointments } from "@/app/services/appointmentService";
 import { listOrders } from "@/app/services/orderService";
+import { listCustomers, type CustomerRecord } from "@/app/services/customerService";
 import type {
   AnalyticsSummary,
   Appointment,
@@ -10,6 +11,8 @@ import type {
 } from "@/app/types/index";
 
 export interface CustomerSummary {
+  id?: string;
+  isActive?: boolean;
   key: string;
   name: string;
   email: string;
@@ -46,10 +49,39 @@ function customerKey(email: string, phone: string, name: string) {
   return email.trim().toLowerCase() || phone.replace(/\D/g, "") || name.trim().toLowerCase();
 }
 
+function mergePersistedCustomers(
+  records: CustomerRecord[],
+  activity: CustomerSummary[],
+): CustomerSummary[] {
+  const activityByContact = new Map(
+    activity.map((customer) => [
+      customer.id ?? customerKey(customer.email, customer.phone, customer.name),
+      customer,
+    ]),
+  );
+
+  return records
+    .map((record) => {
+      const match = activityByContact.get(customerKey(record.email, record.phone, record.name));
+      return {
+        id: record.id,
+        isActive: record.isActive,
+        key: record.id,
+        name: record.name,
+        email: record.email,
+        phone: record.phone,
+        lastActivity: match?.lastActivity ?? dateKey(record.createdAt),
+        activityCount: match?.activityCount ?? 0,
+        totalValue: match?.totalValue ?? 0,
+      };
+    })
+    .sort((a, b) => b.lastActivity.localeCompare(a.lastActivity));
+}
+
 function buildAppointmentCustomers(appointments: Appointment[]) {
   const customers = new Map<string, CustomerSummary>();
   for (const appointment of appointments) {
-    const key = customerKey(
+    const key = appointment.customerId ?? customerKey(
       appointment.customerEmail,
       appointment.customerPhone,
       appointment.customerName,
@@ -58,6 +90,7 @@ function buildAppointmentCustomers(appointments: Appointment[]) {
     const activityDate = appointment.date || dateKey(appointment.createdAt);
     const value = appointment.status === "cancelled" ? 0 : appointment.servicePrice;
     customers.set(key, {
+      id: appointment.customerId,
       key,
       name: appointment.customerName,
       email: appointment.customerEmail,
@@ -74,11 +107,12 @@ function buildAppointmentCustomers(appointments: Appointment[]) {
 function buildOrderCustomers(orders: Order[]) {
   const customers = new Map<string, CustomerSummary>();
   for (const order of orders) {
-    const key = customerKey(order.customerEmail, order.customerPhone, order.customerName);
+    const key = order.customerId ?? customerKey(order.customerEmail, order.customerPhone, order.customerName);
     const current = customers.get(key);
     const activityDate = dateKey(order.createdAt);
     const value = order.status === "cancelled" ? 0 : order.totalAmount;
     customers.set(key, {
+      id: order.customerId,
       key,
       name: order.customerName,
       email: order.customerEmail,
@@ -176,8 +210,14 @@ function aggregateOrders(orders: Order[], customers: CustomerSummary[]) {
 
 export async function loadDashboardData(tenant: Tenant): Promise<DashboardData> {
   if (tenant.businessType === "appointment") {
-    const appointments = await listAppointments(tenant.id);
-    const customers = buildAppointmentCustomers(appointments);
+    const [appointments, customerRecords] = await Promise.all([
+      listAppointments(tenant.id),
+      listCustomers(tenant.id),
+    ]);
+    const customers = mergePersistedCustomers(
+      customerRecords,
+      buildAppointmentCustomers(appointments),
+    );
     return {
       appointments,
       orders: [],
@@ -186,8 +226,11 @@ export async function loadDashboardData(tenant: Tenant): Promise<DashboardData> 
     };
   }
 
-  const orders = await listOrders(tenant.id);
-  const customers = buildOrderCustomers(orders);
+  const [orders, customerRecords] = await Promise.all([
+    listOrders(tenant.id),
+    listCustomers(tenant.id),
+  ]);
+  const customers = mergePersistedCustomers(customerRecords, buildOrderCustomers(orders));
   return {
     appointments: [],
     orders,

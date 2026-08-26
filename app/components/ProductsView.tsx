@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, Edit2, Trash2, Search, Package, ToggleLeft, ToggleRight } from "lucide-react";
+import { Plus, Edit2, Trash2, Search, Package, ToggleLeft, ToggleRight, FolderTree } from "lucide-react";
 import { Card } from "../components/Card";
 import { Button } from "../components/Button";
 import { Badge } from "../components/Badge";
@@ -14,11 +14,14 @@ import { getStoredProducts, setStoredProducts } from "../lib/storage";
 import { useRealtime } from "../contexts/realtime";
 import { isSupabaseConfigured } from "../lib/supabase/config";
 import {
+  createCategory,
   createProduct,
   deleteProduct,
   listCategories,
   listProducts,
+  setCategoryActive,
   setProductAvailability,
+  updateCategory,
   updateProduct,
 } from "../services/productService";
 import type { Category, Product, ProductAddon, Tenant } from "../types/index";
@@ -29,8 +32,12 @@ export function ProductsView({ tenant }: Props) {
   // NEW: Get realtime context to emit events
   const realtime = useRealtime();
   
-  const [products, setProducts] = useState<Product[]>(getProductsByTenant(tenant.id));
-  const [categories, setCategories] = useState<Category[]>(getCategoriesByTenant(tenant.id));
+  const [products, setProducts] = useState<Product[]>(
+    isSupabaseConfigured() ? [] : getProductsByTenant(tenant.id),
+  );
+  const [categories, setCategories] = useState<Category[]>(
+    isSupabaseConfigured() ? [] : getCategoriesByTenant(tenant.id),
+  );
   const [search, setSearch] = useState("");
   const [cat, setCat] = useState("All");
   const [showAdd, setShowAdd] = useState(false);
@@ -40,6 +47,11 @@ export function ProductsView({ tenant }: Props) {
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState("");
+  const [showCategories, setShowCategories] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [categoryName, setCategoryName] = useState("");
+  const [categorySortOrder, setCategorySortOrder] = useState("");
+  const [isSavingCategory, setIsSavingCategory] = useState(false);
 
   useEffect(() => {
     if (!isSupabaseConfigured()) {
@@ -53,7 +65,7 @@ export function ProductsView({ tenant }: Props) {
     }
     let active = true;
 
-    Promise.all([listProducts(tenant.id), listCategories(tenant.id)])
+    Promise.all([listProducts(tenant.id), listCategories(tenant.id, true)])
       .then(([loadedProducts, loadedCategories]) => {
         if (!active) return;
         setProducts(loadedProducts);
@@ -80,10 +92,13 @@ export function ProductsView({ tenant }: Props) {
     description: "",
     categoryId: "",
     inventory: "",
+    trackInventory: true,
     image: "",
     tags: [] as string[],
     addons: [] as ProductAddon[],
   });
+
+  const activeCategories = categories.filter((category) => category.isActive !== false);
 
   const filtered = products.filter(p => {
     const matchSearch = search === "" || p.name.toLowerCase().includes(search.toLowerCase());
@@ -140,7 +155,7 @@ export function ProductsView({ tenant }: Props) {
 
   const openAdd = () => {
     setEditingProduct(null);
-    setNewProduct({ name: "", price: "", description: "", categoryId: "", inventory: "", image: "", tags: [], addons: [] });
+    setNewProduct({ name: "", price: "", description: "", categoryId: "", inventory: "", trackInventory: true, image: "", tags: [], addons: [] });
     setError("");
     setShowAdd(true);
   };
@@ -153,6 +168,7 @@ export function ProductsView({ tenant }: Props) {
       description: product.description,
       categoryId: product.categoryId,
       inventory: product.inventory == null ? "" : String(product.inventory),
+      trackInventory: product.trackInventory !== false,
       image: product.image,
       tags: product.tags,
       addons: product.addons ?? [],
@@ -173,6 +189,18 @@ export function ProductsView({ tenant }: Props) {
       return;
     }
 
+    const inventory = newProduct.trackInventory ? Number(newProduct.inventory) : null;
+    if (
+      newProduct.trackInventory &&
+      (newProduct.inventory.trim() === "" ||
+        !Number.isInteger(inventory) ||
+        inventory === null ||
+        inventory < 0)
+    ) {
+      setError("Enter a whole-number inventory of zero or more, or turn off inventory tracking.");
+      return;
+    }
+
     if (newProduct.addons.some((addon) => !addon.name.trim() || !Number.isFinite(addon.price) || addon.price < 0)) {
       setError("Enter a name and valid price for each add-on.");
       return;
@@ -190,7 +218,8 @@ export function ProductsView({ tenant }: Props) {
         price,
         image: newProduct.image,
         categoryId: newProduct.categoryId,
-        inventory: newProduct.inventory ? Number(newProduct.inventory) : 0,
+        inventory,
+        trackInventory: newProduct.trackInventory,
         addons: newProduct.addons.map((addon) => ({ ...addon, name: addon.name.trim() })),
       };
       if (isSupabaseConfigured()) {
@@ -217,7 +246,8 @@ export function ProductsView({ tenant }: Props) {
           categoryId: newProduct.categoryId,
           categoryName: category?.name ?? "Uncategorized",
           isActive: true,
-          inventory: newProduct.inventory ? Number(newProduct.inventory) : 0,
+          inventory: inventory ?? undefined,
+          trackInventory: newProduct.trackInventory,
           tags: newProduct.tags,
           addons: newProduct.addons,
           createdAt: editingProduct?.createdAt ?? new Date().toISOString(),
@@ -238,18 +268,105 @@ export function ProductsView({ tenant }: Props) {
         tenantId: tenant.id,
         product,
       });
-      setNewProduct({ name: "", price: "", description: "", categoryId: "", inventory: "", image: "", tags: [], addons: [] });
+      setNewProduct({ name: "", price: "", description: "", categoryId: "", inventory: "", trackInventory: true, image: "", tags: [], addons: [] });
       setEditingProduct(null);
       setShowAdd(false);
     } catch (createError) {
       const message = createError instanceof Error ? createError.message : "Unable to save product.";
       setError(
-        message.toLowerCase().includes("addons") && message.toLowerCase().includes("column")
-          ? `${message} Apply supabase/migrations/202608250001_product_addons.sql to your Supabase project, then try again.`
+        message.toLowerCase().includes("track_inventory") && message.toLowerCase().includes("column")
+          ? `${message} Apply supabase/migrations/202608260001_product_inventory_management.sql, then try again.`
+          : message.toLowerCase().includes("addons") && message.toLowerCase().includes("column")
+            ? `${message} Apply supabase/migrations/202608250001_product_addons.sql to your Supabase project, then try again.`
           : message,
       );
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const openCategoryManager = () => {
+    setEditingCategory(null);
+    setCategoryName("");
+    setCategorySortOrder(String(Math.max(0, ...categories.map((category) => category.sortOrder)) + 1));
+    setShowCategories(true);
+    setError("");
+  };
+
+  const beginCategoryEdit = (category: Category) => {
+    setEditingCategory(category);
+    setCategoryName(category.name);
+    setCategorySortOrder(String(category.sortOrder));
+  };
+
+  const resetCategoryForm = () => {
+    setEditingCategory(null);
+    setCategoryName("");
+    setCategorySortOrder(String(Math.max(0, ...categories.map((category) => category.sortOrder)) + 1));
+  };
+
+  const saveCategory = async () => {
+    const name = categoryName.trim();
+    const sortOrder = Number(categorySortOrder);
+    if (!name) {
+      setError("Category name is required.");
+      return;
+    }
+    if (!Number.isInteger(sortOrder) || sortOrder < 0) {
+      setError("Category position must be a whole number of zero or more.");
+      return;
+    }
+    if (categories.some((category) =>
+      category.id !== editingCategory?.id && category.name.toLowerCase() === name.toLowerCase()
+    )) {
+      setError("A category with that name already exists.");
+      return;
+    }
+
+    setIsSavingCategory(true);
+    setError("");
+    try {
+      const saved = isSupabaseConfigured()
+        ? editingCategory
+          ? await updateCategory(tenant.id, editingCategory.id, name, sortOrder)
+          : await createCategory(tenant.id, name, sortOrder)
+        : {
+            id: editingCategory?.id ?? `category-${Date.now()}`,
+            tenantId: tenant.id,
+            name,
+            sortOrder,
+            isActive: editingCategory?.isActive ?? true,
+          };
+      setCategories((current) => {
+        const next = editingCategory
+          ? current.map((category) => category.id === saved.id ? saved : category)
+          : [...current, saved];
+        return next.sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
+      });
+      if (editingCategory) {
+        setProducts((current) => current.map((product) => product.categoryId === saved.id
+          ? { ...product, categoryName: saved.name }
+          : product));
+        if (cat === editingCategory.name) setCat(saved.name);
+      }
+      resetCategoryForm();
+    } catch (categoryError) {
+      setError(categoryError instanceof Error ? categoryError.message : "Unable to save category.");
+    } finally {
+      setIsSavingCategory(false);
+    }
+  };
+
+  const toggleCategory = async (category: Category) => {
+    setError("");
+    try {
+      const saved = isSupabaseConfigured()
+        ? await setCategoryActive(tenant.id, category.id, category.isActive === false)
+        : { ...category, isActive: category.isActive === false };
+      setCategories((current) => current.map((candidate) => candidate.id === saved.id ? saved : candidate));
+      if (saved.isActive === false && cat === saved.name) setCat("All");
+    } catch (categoryError) {
+      setError(categoryError instanceof Error ? categoryError.message : "Unable to update category.");
     }
   };
 
@@ -262,9 +379,14 @@ export function ProductsView({ tenant }: Props) {
             {products.filter(p => p.isActive).length} active · {products.length} total
           </p>
         </div>
-        <Button onClick={openAdd} size="sm" className="bg-violet-600 hover:bg-violet-700 text-white">
-          <Plus className="w-4 h-4" /> Add Product
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button onClick={openCategoryManager} size="sm" variant="outline">
+            <FolderTree className="w-4 h-4" /> Manage Categories
+          </Button>
+          <Button onClick={openAdd} size="sm" className="bg-violet-600 hover:bg-violet-700 text-white">
+            <Plus className="w-4 h-4" /> Add Product
+          </Button>
+        </div>
       </div>
 
       {error && (
@@ -288,7 +410,7 @@ export function ProductsView({ tenant }: Props) {
           />
         </div>
         <div className="flex gap-1.5 flex-wrap">
-          {["All", ...categories.map(c => c.name)].map(c => (
+          {["All", ...activeCategories.map(c => c.name)].map(c => (
             <button
               key={c}
               onClick={() => setCat(c)}
@@ -360,7 +482,12 @@ export function ProductsView({ tenant }: Props) {
               label="Category"
               options={[
                 { value: "", label: "Select category..." },
-                ...categories.map(c => ({ value: c.id, label: c.name })),
+                ...categories
+                  .filter((category) => category.isActive !== false || category.id === newProduct.categoryId)
+                  .map((category) => ({
+                    value: category.id,
+                    label: category.isActive === false ? `${category.name} (hidden)` : category.name,
+                  })),
               ]}
               value={newProduct.categoryId}
               onChange={e => setNewProduct({ ...newProduct, categoryId: e.target.value })}
@@ -373,14 +500,43 @@ export function ProductsView({ tenant }: Props) {
             value={newProduct.description}
             onChange={e => setNewProduct({ ...newProduct, description: e.target.value })}
           />
-          <div className="grid grid-cols-2 gap-4">
-            <Input
-              label="Inventory"
-              type="number"
-              placeholder="Optional"
-              value={newProduct.inventory}
-              onChange={e => setNewProduct({ ...newProduct, inventory: e.target.value })}
-            />
+          <div className="rounded-lg border border-slate-700 light:border-slate-200 p-3 space-y-3">
+            <label className="flex cursor-pointer items-start gap-3">
+              <input
+                type="checkbox"
+                checked={newProduct.trackInventory}
+                onChange={(event) => setNewProduct({
+                  ...newProduct,
+                  trackInventory: event.target.checked,
+                  inventory: event.target.checked ? newProduct.inventory : "",
+                })}
+                className="mt-0.5 h-4 w-4 accent-violet-600"
+              />
+              <span>
+                <span className="block text-xs font-semibold">Track inventory</span>
+                <span className="block text-[10px] text-slate-400 light:text-slate-500">
+                  Checkout subtracts stock and the storefront shows Sold Out at zero.
+                </span>
+              </span>
+            </label>
+            {newProduct.trackInventory && (
+              <Input
+                label="Units currently in stock"
+                type="number"
+                min="0"
+                step="1"
+                placeholder="e.g. 20"
+                value={newProduct.inventory}
+                onChange={e => setNewProduct({ ...newProduct, inventory: e.target.value })}
+              />
+            )}
+            {!newProduct.trackInventory && (
+              <p className="text-xs text-emerald-400 light:text-emerald-700">
+                Unlimited inventory — orders will not reduce a stock count.
+              </p>
+            )}
+          </div>
+          <div>
             <Input
               label="Image URL"
               placeholder="https://..."
@@ -445,6 +601,82 @@ export function ProductsView({ tenant }: Props) {
       </Modal>
 
       <Modal
+        open={showCategories}
+        onClose={() => setShowCategories(false)}
+        title="Manage Categories"
+        maxWidth="max-w-2xl"
+      >
+        <div className="space-y-5 text-white light:text-slate-900">
+          {error && (
+            <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-xs text-red-300 light:text-red-700">
+              {error}
+            </div>
+          )}
+          <div className="rounded-lg border border-slate-700 light:border-slate-200 p-4">
+            <h3 className="mb-3 text-sm font-semibold">
+              {editingCategory ? `Edit ${editingCategory.name}` : "Create a category"}
+            </h3>
+            <div className="grid gap-3 sm:grid-cols-[1fr_120px_auto] sm:items-end">
+              <Input
+                label="Category name"
+                placeholder="e.g. Appetizers"
+                value={categoryName}
+                onChange={(event) => setCategoryName(event.target.value)}
+              />
+              <Input
+                label="Position"
+                type="number"
+                min="0"
+                step="1"
+                value={categorySortOrder}
+                onChange={(event) => setCategorySortOrder(event.target.value)}
+              />
+              <div className="flex gap-2">
+                {editingCategory && (
+                  <Button variant="outline" onClick={resetCategoryForm}>Cancel</Button>
+                )}
+                <Button disabled={isSavingCategory} onClick={saveCategory}>
+                  {isSavingCategory ? "Saving..." : editingCategory ? "Update" : "Add"}
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            {categories.length === 0 && (
+              <p className="py-6 text-center text-xs text-slate-400">No categories yet.</p>
+            )}
+            {categories.map((category) => (
+              <div
+                key={category.id}
+                className="flex items-center justify-between gap-3 rounded-lg border border-slate-700 light:border-slate-200 px-4 py-3"
+              >
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-semibold">{category.name}</p>
+                    <Badge variant={category.isActive === false ? "default" : "success"}>
+                      {category.isActive === false ? "Hidden" : "Visible"}
+                    </Badge>
+                  </div>
+                  <p className="mt-1 text-[10px] text-slate-400">
+                    Position {category.sortOrder} · {products.filter((product) => product.categoryId === category.id).length} products
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button size="xs" variant="ghost" onClick={() => beginCategoryEdit(category)}>
+                    <Edit2 className="h-3.5 w-3.5" /> Edit
+                  </Button>
+                  <Button size="xs" variant="outline" onClick={() => void toggleCategory(category)}>
+                    {category.isActive === false ? "Show" : "Hide"}
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
         open={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
         title="Delete Product"
@@ -478,6 +710,11 @@ function ProductCard({ product, onEdit, onToggle, onDelete }: {
   onToggle: (id: string) => void;
   onDelete: (product: Product) => void;
 }) {
+  const tracksInventory = product.trackInventory !== false;
+  const stock = product.inventory ?? 0;
+  const isSoldOut = tracksInventory && stock === 0;
+  const isLowStock = tracksInventory && stock > 0 && stock <= 5;
+
   return (
     <Card className="group overflow-hidden">
       <div className="relative h-40 overflow-hidden bg-slate-700 light:bg-slate-100">
@@ -500,8 +737,8 @@ function ProductCard({ product, onEdit, onToggle, onDelete }: {
           ))}
         </div>
         <div className="absolute top-3 right-3">
-          <Badge variant={product.isActive ? "success" : "default"}>
-            {product.isActive ? "Live" : "Off"}
+          <Badge variant={!product.isActive ? "default" : isSoldOut ? "danger" : "success"}>
+            {!product.isActive ? "Paused" : isSoldOut ? "Sold Out" : "Live"}
           </Badge>
         </div>
       </div>
@@ -515,15 +752,24 @@ function ProductCard({ product, onEdit, onToggle, onDelete }: {
         </div>
         <div className="flex items-center justify-between">
           <span className="text-xs text-slate-400 light:text-gray-500 bg-slate-700 light:bg-gray-100 px-2 py-1 rounded-lg">{product.categoryName}</span>
-          {product.inventory !== undefined && (
-            <span className={cn("text-xs font-semibold", product.inventory < 10 ? "text-red-400 light:text-red-600" : "text-slate-400 light:text-gray-500")}>
-              {product.inventory} left
-            </span>
-          )}
+          <span className={cn(
+            "text-xs font-semibold",
+            isSoldOut || isLowStock
+              ? "text-red-400 light:text-red-600"
+              : "text-slate-400 light:text-gray-500",
+          )}>
+            {!tracksInventory
+              ? "Unlimited"
+              : isSoldOut
+                ? "Sold out"
+                : isLowStock
+                  ? `Low stock: ${stock}`
+                  : `${stock} left`}
+          </span>
         </div>
         <div className="flex items-center gap-1 pt-1 border-t border-slate-700 light:border-slate-100">
           <Button variant="ghost" size="xs" className="flex-1 justify-center text-white light:text-gray-800 hover:bg-slate-700 light:hover:bg-slate-100" onClick={() => onEdit(product)}>
-            <Edit2 className="w-3.5 h-3.5 mr-1" /> Edit
+            <Edit2 className="w-3.5 h-3.5 mr-1" /> {tracksInventory && stock <= 5 ? "Restock" : "Edit"}
           </Button>
           <div className="w-px h-5 bg-slate-700 light:bg-slate-200" />
           <Button variant="ghost" size="xs" className="text-red-400 light:text-red-600 hover:text-red-300 light:hover:text-red-800 hover:bg-red-500/10 light:hover:bg-red-50"
@@ -531,7 +777,12 @@ function ProductCard({ product, onEdit, onToggle, onDelete }: {
             <Trash2 className="w-3.5 h-3.5" />
           </Button>
           <div className="w-px h-5 bg-slate-700 light:bg-slate-200" />
-          <button onClick={() => onToggle(product.id)} className="text-slate-400 light:text-gray-500 hover:text-white light:hover:text-gray-900 transition-colors">
+          <button
+            onClick={() => onToggle(product.id)}
+            className="text-slate-400 light:text-gray-500 hover:text-white light:hover:text-gray-900 transition-colors"
+            aria-label={product.isActive ? `Pause ${product.name}` : `Publish ${product.name}`}
+            title={product.isActive ? "Pause storefront listing" : "Publish storefront listing"}
+          >
             {product.isActive
               ? <ToggleRight className="w-5 h-5 text-emerald-400 light:text-emerald-600" />
               : <ToggleLeft className="w-5 h-5" />}

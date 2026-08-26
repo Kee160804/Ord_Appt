@@ -1,6 +1,6 @@
 import "server-only";
 
-import { getSupabaseServerClient } from "@/app/lib/supabase/server";
+import { getSupabasePublicClient } from "@/app/lib/supabase/server";
 import type { Category, Product, Service, Tenant } from "@/app/types/index";
 import type {
   BusinessHourRow,
@@ -62,7 +62,10 @@ function mapTenant(row: TenantRow, hours: BusinessHourRow[]): Tenant {
 }
 
 export async function getPublicStorefront(slug: string): Promise<PublicStorefrontData | null> {
-  const supabase = await getSupabaseServerClient();
+  // Storefront reads intentionally use an anonymous client even when the
+  // browser also has an owner session. Dashboard identities therefore never
+  // need cross-tenant table policies just to view a public storefront.
+  const supabase = getSupabasePublicClient();
   if (!supabase) return null;
 
   const { data: tenantData, error: tenantError } = await supabase
@@ -119,6 +122,7 @@ export async function getPublicStorefront(slug: string): Promise<PublicStorefron
       tenantId: row.tenant_id,
       name: row.name,
       sortOrder: row.sort_order,
+      isActive: row.is_active,
     })),
     products: ((productsResult.data ?? []) as ProductRow[]).map((row) => ({
       id: row.id,
@@ -130,7 +134,8 @@ export async function getPublicStorefront(slug: string): Promise<PublicStorefron
       categoryId: row.category_id ?? "",
       categoryName: categoryNames.get(row.category_id ?? "") ?? "Uncategorized",
       isActive: row.available,
-      inventory: row.stock,
+      inventory: row.stock ?? undefined,
+      trackInventory: row.track_inventory ?? row.stock !== null,
       tags: [],
       addons: (row.addons ?? []).map((addon) => ({ ...addon, price: Number(addon.price) })),
       createdAt: row.created_at,

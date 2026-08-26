@@ -170,65 +170,28 @@ function slugify(value: string) {
     .replace(/^-|-$/g, "");
 }
 
-async function createAvailableSlug(supabase: SupabaseClient, requested: string) {
-  const base = slugify(requested) || `business-${Date.now()}`;
-  const { data, error } = await supabase
-    .from("tenants")
-    .select("slug, subdomain")
-    .or(`slug.like.${base}%,subdomain.like.${base}%`);
-  if (error) throw error;
-
-  const existing = new Set(
-    (data ?? []).flatMap((tenant) =>
-      [tenant.slug, tenant.subdomain]
-        .filter((value): value is string => typeof value === "string")
-        .map((value) => value.toLowerCase()),
-    ),
-  );
-  if (!existing.has(base)) return base;
-
-  let suffix = 2;
-  while (existing.has(`${base}-${suffix}`)) suffix += 1;
-  return `${base}-${suffix}`;
-}
-
 async function createTenantFromMetadata(supabase: SupabaseClient, authUser: SupabaseUser) {
   const metadata = metadataFromUser(authUser);
   if (!metadata) return null;
 
-  const slug = await createAvailableSlug(
-    supabase,
-    metadata.business_slug || metadata.business_name,
-  );
-  const { data, error } = await supabase
-    .from("tenants")
-    .insert({
-      business_name: metadata.business_name.trim(),
-      slug,
-      subdomain: slug,
-      business_type: metadata.business_type,
-      city: metadata.business_city.trim(),
-      phone: metadata.business_phone.trim(),
-      email: authUser.email ?? "",
-      created_by: authUser.id,
-      status: "ACTIVE",
-      is_active: true,
-    })
-    .select("id")
-    .single();
+  const { data, error } = await supabase.rpc("provision_owner_business", {
+    p_business_name: metadata.business_name,
+    p_business_type: metadata.business_type,
+    p_city: metadata.business_city,
+    p_phone: metadata.business_phone,
+    p_slug: metadata.business_slug || metadata.business_name,
+    p_full_name: metadata.full_name,
+  });
 
-  if (error) throw error;
-
-  await supabase
-    .from("business_modules")
-    .update({
-      appointments: metadata.business_type === "appointment",
-      ordering: metadata.business_type === "ordering",
-      inventory: metadata.business_type === "ordering",
-    })
-    .eq("tenant_id", data.id);
-
-  return data.id as string;
+  if (error) {
+    if (error.code === "PGRST202") {
+      throw new Error(
+        "Account provisioning is not installed. Apply the owner onboarding migration in Supabase, then sign in again.",
+      );
+    }
+    throw error;
+  }
+  return data as string;
 }
 
 async function provisionTenantFromMetadata(supabase: SupabaseClient, authUser: SupabaseUser) {
@@ -259,11 +222,25 @@ export async function loadAuthenticatedAppSession(
       authUser = data.user;
     }
 
-    const { data: profileData, error: profileError } = await supabase
+    let { data: profileData, error: profileError } = await supabase
       .from("profiles")
       .select("*")
       .eq("id", authUser.id)
       .single();
+
+    // A fresh Supabase project may not have an auth.users trigger. In that
+    // case the authenticated provisioning RPC creates the profile, tenant,
+    // OWNER role, and membership atomically before session hydration resumes.
+    if (!profileData && metadataFromUser(authUser)) {
+      await provisionTenantFromMetadata(supabase, authUser);
+      const profileResult = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", authUser.id)
+        .single();
+      profileData = profileResult.data;
+      profileError = profileResult.error;
+    }
 
     if (profileError || !profileData) {
       return { error: profileError?.message ?? "Your application profile was not found." };

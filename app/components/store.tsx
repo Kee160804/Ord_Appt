@@ -37,7 +37,7 @@ interface CartItem {
   name: string;
   price: number;
   quantity: number;
-  addons: { name: string; price: number }[];
+  addons: { id: string; name: string; price: number }[];
   image?: string;
 }
 
@@ -98,6 +98,18 @@ export default function StorefrontClient({
       }
       return [...prev, item];
     });
+  };
+
+  const handleOrderPlaced = (orderedItems: { productId: string; quantity: number }[]) => {
+    const quantities = new Map(orderedItems.map((item) => [item.productId, item.quantity]));
+    setProducts((current) => current.map((product) => {
+      const orderedQuantity = quantities.get(product.id);
+      if (!orderedQuantity || product.trackInventory === false) return product;
+      return {
+        ...product,
+        inventory: Math.max(0, (product.inventory ?? 0) - orderedQuantity),
+      };
+    }));
   };
 
   // Storage event listener
@@ -263,6 +275,7 @@ export default function StorefrontClient({
               onAddToCart={handleAddToCart}
               cart={cart}
               updateCart={setCart}
+              onOrderPlaced={handleOrderPlaced}
             />
           )
         ) : (

@@ -35,7 +35,9 @@ const EMPTY_FORM = {
 };
 
 export function ServicesView({ tenant }: Props) {
-  const [services, setServices] = useState<Service[]>(getServicesByTenant(tenant.id));
+  const [services, setServices] = useState<Service[]>(
+    isSupabaseConfigured() ? [] : getServicesByTenant(tenant.id),
+  );
   const [showAdd, setShowAdd] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);

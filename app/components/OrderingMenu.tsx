@@ -7,6 +7,8 @@ import { Button } from "@/app/components/Button";
 import { Modal } from "@/app/components/Modal";
 import { Input, Select } from "@/app/components/input";
 import { formatCurrency } from "@/app/lib/utils";
+import { isSupabaseConfigured } from "@/app/lib/supabase/config";
+import { createPublicOrder } from "@/app/services/orderService";
 import { Product, Tenant } from "@/app/types/index";
 
 interface CartItem {
@@ -14,7 +16,7 @@ interface CartItem {
   name: string;
   price: number;
   quantity: number;
-  addons: { name: string; price: number }[];
+  addons: { id: string; name: string; price: number }[];
   image?: string;
 }
 
@@ -31,6 +33,7 @@ interface OrderingMenuProps {
   onAddToCart: (item: CartItem) => void;
   cart: CartItem[];
   updateCart: (items: CartItem[]) => void;
+  onOrderPlaced?: (items: { productId: string; quantity: number }[]) => void;
 }
 
 const PLACEHOLDER_IMG = "/fallback-product.png";
@@ -42,6 +45,7 @@ export function OrderingMenu({
   onAddToCart,
   cart,
   updateCart,
+  onOrderPlaced,
 }: OrderingMenuProps) {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -52,6 +56,9 @@ export function OrderingMenu({
   const [customerName, setCustomerName] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [orderType, setOrderType] = useState("dine_in");
+  const [isPlacingOrder, setIsPlacingOrder] = useState(false);
+  const [orderError, setOrderError] = useState("");
+  const [orderConfirmation, setOrderConfirmation] = useState("");
 
   const filteredProducts = useMemo(() => {
     return products.filter((p) => {
@@ -63,6 +70,35 @@ export function OrderingMenu({
     });
   }, [products, selectedCategory, searchQuery]);
 
+  const productGroups = useMemo(() => {
+    if (filteredProducts.length === 0) return [];
+    if (selectedCategory) {
+      const category = categories.find((candidate) => candidate.id === selectedCategory);
+      return [{ id: selectedCategory, name: category?.name ?? "Items", products: filteredProducts }];
+    }
+
+    const groups = categories
+      .map((category) => ({
+        id: category.id,
+        name: category.name,
+        products: filteredProducts.filter((product) => product.categoryId === category.id),
+      }))
+      .filter((group) => group.products.length > 0);
+    const uncategorized = filteredProducts.filter((product) =>
+      !categories.some((category) => category.id === product.categoryId)
+    );
+    if (uncategorized.length > 0) {
+      groups.push({ id: "uncategorized", name: "Other Items", products: uncategorized });
+    }
+    return groups;
+  }, [categories, filteredProducts, selectedCategory]);
+
+  const isSoldOut = (product: Product) =>
+    product.trackInventory !== false && (product.inventory ?? 0) <= 0;
+
+  const reachedStockLimit = (product: Product, cartQuantity: number) =>
+    product.trackInventory !== false && cartQuantity >= (product.inventory ?? 0);
+
   const subtotal = cart.reduce((sum, i) => {
     return sum + i.price * i.quantity + i.addons.reduce((a, ad) => a + ad.price * i.quantity, 0);
   }, 0);
@@ -71,6 +107,7 @@ export function OrderingMenu({
   const grandTotal = subtotal + tax - discount;
 
   const openAddModal = (product: Product) => {
+    if (isSoldOut(product)) return;
     setCurrentProduct(product);
     setQuantity(1);
     setSelectedAddons([]);
@@ -79,21 +116,35 @@ export function OrderingMenu({
 
   const handleAddToCart = () => {
     if (!currentProduct) return;
+    const existingQuantity = cart.find((item) => item.id === currentProduct.id)?.quantity ?? 0;
+    if (
+      currentProduct.trackInventory !== false &&
+      existingQuantity + quantity > (currentProduct.inventory ?? 0)
+    ) {
+      setOrderError(`Only ${currentProduct.inventory ?? 0} ${currentProduct.name} available.`);
+      return;
+    }
     onAddToCart({
       id: currentProduct.id,
       name: currentProduct.name,
       price: currentProduct.price,
       quantity,
-      addons: selectedAddons.map(({ name, price }) => ({ name, price })),
+      addons: selectedAddons.map(({ id, name, price }) => ({ id, name, price })),
       image: currentProduct.image,
     });
     setModalOpen(false);
   };
 
   const updateQty = (id: string, delta: number) => {
+    const product = products.find((candidate) => candidate.id === id);
     updateCart(
       cart
-        .map((i) => (i.id === id ? { ...i, quantity: Math.max(0, i.quantity + delta) } : i))
+        .map((i) => {
+          if (i.id !== id) return i;
+          const requested = Math.max(0, i.quantity + delta);
+          const maximum = product && product.trackInventory !== false ? product.inventory ?? 0 : 99;
+          return { ...i, quantity: Math.min(requested, maximum) };
+        })
         .filter((i) => i.quantity > 0)
     );
   };
@@ -104,6 +155,48 @@ export function OrderingMenu({
   const clearCart = () => {
     if (window.confirm("Are you sure you want to clear your entire order?")) {
       updateCart([]);
+    }
+  };
+
+  const placeOrder = async () => {
+    if (cart.length === 0) {
+      setOrderError("Your cart is empty.");
+      return;
+    }
+    if (!customerName.trim() || !phoneNumber.trim()) {
+      setOrderError("Name and phone number are required.");
+      return;
+    }
+    if (!isSupabaseConfigured()) {
+      setOrderError("Online ordering is not configured.");
+      return;
+    }
+
+    setIsPlacingOrder(true);
+    setOrderError("");
+    setOrderConfirmation("");
+    try {
+      const result = await createPublicOrder({
+        tenantId: tenant.id,
+        customerName,
+        customerPhone: phoneNumber,
+        orderType: orderType as "dine_in" | "pickup" | "delivery",
+        items: cart.map((item) => ({
+          productId: item.id,
+          quantity: item.quantity,
+          addons: item.addons,
+        })),
+      });
+      setOrderConfirmation(`Order ${result.orderNumber} was placed successfully.`);
+      onOrderPlaced?.(cart.map((item) => ({ productId: item.id, quantity: item.quantity })));
+      updateCart([]);
+      setCustomerName("");
+      setPhoneNumber("");
+      setOrderType("dine_in");
+    } catch (placeError) {
+      setOrderError(placeError instanceof Error ? placeError.message : "Unable to place order.");
+    } finally {
+      setIsPlacingOrder(false);
     }
   };
 
@@ -160,19 +253,31 @@ export function OrderingMenu({
             ))}
           </div>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div className="space-y-8">
             {filteredProducts.length === 0 && (
-              <div className="col-span-full py-16 text-center text-slate-400 dark:text-slate-500">
+              <div className="py-16 text-center text-slate-400 dark:text-slate-500">
                 <ShoppingBag className="w-10 h-10 mx-auto mb-2 opacity-30" />
                 <p className="text-sm">No items found.</p>
               </div>
             )}
-            {filteredProducts.map((product) => {
-              const cartItem = cart.find((i) => i.id === product.id);
-              return (
+            {productGroups.map((group) => (
+              <section key={group.id}>
+                <div className="mb-3 flex items-center gap-3">
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">{group.name}</h3>
+                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                    {group.products.length}
+                  </span>
+                  <div className="h-px flex-1 bg-slate-100 dark:bg-slate-800" />
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {group.products.map((product) => {
+                    const cartItem = cart.find((i) => i.id === product.id);
+                    const soldOut = isSoldOut(product);
+                    const stockLimitReached = reachedStockLimit(product, cartItem?.quantity ?? 0);
+                    return (
                 <div
                   key={product.id}
-                  className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden hover:shadow-md transition group"
+                  className={`bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden transition group ${soldOut ? "opacity-75" : "hover:shadow-md"}`}
                 >
                   <div className="relative h-36 w-full overflow-hidden bg-slate-100 dark:bg-slate-700">
                     <Image
@@ -189,6 +294,11 @@ export function OrderingMenu({
                     <span className="absolute top-2 left-2 bg-white/90 dark:bg-slate-900/90 text-violet-600 dark:text-violet-400 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">
                       {categories.find((c) => c.id === product.categoryId)?.name ?? "Item"}
                     </span>
+                    {soldOut && (
+                      <span className="absolute inset-0 flex items-center justify-center bg-slate-950/55 text-sm font-bold uppercase tracking-wider text-white">
+                        Sold Out
+                      </span>
+                    )}
                   </div>
                   <div className="p-3">
                     <h3 className="font-bold text-slate-900 dark:text-white text-sm leading-tight">
@@ -221,7 +331,8 @@ export function OrderingMenu({
                           onClick={() =>
                             cartItem ? updateQty(product.id, 1) : openAddModal(product)
                           }
-                          className="w-5 h-5 rounded-full border border-slate-200 dark:border-slate-600 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+                          disabled={soldOut || stockLimitReached}
+                          className="w-5 h-5 rounded-full border border-slate-200 dark:border-slate-600 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-30 transition"
                           aria-label="Increase quantity"
                         >
                           <Plus className="w-2.5 h-2.5" />
@@ -230,14 +341,18 @@ export function OrderingMenu({
                     </div>
                     <button
                       onClick={() => openAddModal(product)}
-                      className="mt-2.5 w-full py-2 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-violet-600 hover:text-white text-slate-700 dark:text-slate-300 text-xs font-semibold transition"
+                      disabled={soldOut || stockLimitReached}
+                      className="mt-2.5 w-full py-2 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-violet-600 hover:text-white disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 dark:disabled:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold transition"
                     >
-                      Add to cart
+                      {soldOut ? "Sold Out" : stockLimitReached ? "Stock limit reached" : "Add to cart"}
                     </button>
                   </div>
                 </div>
-              );
-            })}
+                    );
+                  })}
+                </div>
+              </section>
+            ))}
           </div>
         </div>
 
@@ -278,6 +393,9 @@ export function OrderingMenu({
                 onChange={(e) => setOrderType(e.target.value)}
               />
             </div>
+
+            {orderError && <p className="text-xs text-red-500">{orderError}</p>}
+            {orderConfirmation && <p className="text-xs text-emerald-600">{orderConfirmation}</p>}
 
             <div className="h-px bg-slate-100 dark:bg-slate-800" />
 
@@ -406,10 +524,11 @@ export function OrderingMenu({
                   Clear
                 </Button>
                 <Button
-                  onClick={() => alert("Order placed! (Demo)")}
+                  onClick={placeOrder}
+                  disabled={isPlacingOrder}
                   className="flex-1 bg-violet-600 hover:bg-violet-700 text-white text-sm"
                 >
-                  Place Order
+                  {isPlacingOrder ? "Placing..." : "Place Order"}
                 </Button>
               </div>
             </div>
@@ -462,7 +581,12 @@ export function OrderingMenu({
                 </span>
                 <button
                   onClick={() => setQuantity(quantity + 1)}
-                  className="w-8 h-8 rounded-lg border border-slate-200 dark:border-slate-600 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+                  disabled={
+                    currentProduct.trackInventory !== false &&
+                    quantity + (cart.find((item) => item.id === currentProduct.id)?.quantity ?? 0)
+                      >= (currentProduct.inventory ?? 0)
+                  }
+                  className="w-8 h-8 rounded-lg border border-slate-200 dark:border-slate-600 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-30 transition"
                   aria-label="Increase quantity"
                 >
                   <Plus className="w-4 h-4" />

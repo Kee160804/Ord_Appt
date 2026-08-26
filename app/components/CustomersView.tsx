@@ -3,10 +3,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { Search, Users } from "lucide-react";
 import { Card } from "../components/Card";
+import { Button } from "../components/Button";
+import { Input, Textarea } from "../components/input";
+import { Modal } from "../components/Modal";
 import { getAppointmentsByTenant, getOrdersByTenant } from "../data/mock";
 import { isSupabaseConfigured } from "../lib/supabase/config";
 import { formatCurrency, formatDate } from "../lib/utils";
 import { loadDashboardData, type CustomerSummary } from "../services/dashboardService";
+import { createCustomer, listCustomers, setCustomerActive, updateCustomer, type CustomerRecord } from "../services/customerService";
 import type { Tenant } from "../types/index";
 
 interface Props { tenant: Tenant }
@@ -51,14 +55,35 @@ export function CustomersView({ tenant }: Props) {
   const [search, setSearch] = useState("");
   const [isLoading, setIsLoading] = useState(isSupabaseConfigured());
   const [error, setError] = useState("");
+  const [records, setRecords] = useState<CustomerRecord[]>([]);
+  const [editing, setEditing] = useState<CustomerRecord | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (!isSupabaseConfigured()) return;
     let active = true;
-    loadDashboardData(tenant)
-      .then((data) => {
+    Promise.all([loadDashboardData(tenant), listCustomers(tenant.id)])
+      .then(([data, loadedCustomers]) => {
         if (!active) return;
-        setCustomers(data.customers);
+        setRecords(loadedCustomers);
+        const activityByContact = new Map(data.customers.map((customer) => [
+          customer.email.toLowerCase() || customer.phone,
+          customer,
+        ]));
+        setCustomers(loadedCustomers.map((customer) => {
+          const activity = activityByContact.get(customer.email.toLowerCase() || customer.phone);
+          return {
+            id: customer.id,
+            isActive: customer.isActive,
+            key: customer.id,
+            name: customer.name,
+            email: customer.email,
+            phone: customer.phone,
+            lastActivity: activity?.lastActivity ?? customer.createdAt.slice(0, 10),
+            activityCount: activity?.activityCount ?? 0,
+            totalValue: activity?.totalValue ?? 0,
+          };
+        }));
         setError("");
       })
       .catch((loadError: unknown) => {
@@ -72,6 +97,58 @@ export function CustomersView({ tenant }: Props) {
       active = false;
     };
   }, [tenant]);
+
+  const saveCustomer = async () => {
+    if (!editing) return;
+    setIsSaving(true);
+    setError("");
+    try {
+      const updated = editing.id
+        ? await updateCustomer(tenant.id, editing.id, editing)
+        : await createCustomer(tenant.id, editing);
+      setRecords((current) => editing.id
+        ? current.map((customer) => customer.id === updated.id ? updated : customer)
+        : [updated, ...current]);
+      setCustomers((current) => editing.id
+        ? current.map((customer) => customer.id === updated.id
+          ? { ...customer, name: updated.name, email: updated.email, phone: updated.phone }
+          : customer)
+        : [{
+            id: updated.id,
+            isActive: true,
+            key: updated.id,
+            name: updated.name,
+            email: updated.email,
+            phone: updated.phone,
+            lastActivity: updated.createdAt.slice(0, 10),
+            activityCount: 0,
+            totalValue: 0,
+          }, ...current]);
+      setEditing(null);
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Unable to update customer.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const toggleCustomer = async (customer: CustomerSummary) => {
+    if (!customer.id) return;
+    const record = records.find((candidate) => candidate.id === customer.id);
+    if (!record) return;
+    try {
+      await setCustomerActive(tenant.id, record.id, !record.isActive);
+      setRecords((current) => current.map((candidate) => candidate.id === record.id ? { ...candidate, isActive: !candidate.isActive } : candidate));
+      setCustomers((current) => current.map((candidate) => candidate.id === record.id
+        ? { ...candidate, isActive: !record.isActive }
+        : candidate));
+      setEditing((current) => current?.id === record.id
+        ? { ...current, isActive: !record.isActive }
+        : current);
+    } catch (toggleError) {
+      setError(toggleError instanceof Error ? toggleError.message : "Unable to update customer.");
+    }
+  };
 
   const filtered = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -92,7 +169,21 @@ export function CustomersView({ tenant }: Props) {
             {customers.length} unique customer{customers.length === 1 ? "" : "s"}
           </p>
         </div>
-        <div className="relative">
+        <div className="flex items-center gap-2">
+          {isSupabaseConfigured() && (
+            <Button className="bg-violet-600 text-white" onClick={() => setEditing({
+              id: "",
+              name: "",
+              email: "",
+              phone: "",
+              notes: "",
+              isActive: true,
+              createdAt: new Date().toISOString(),
+            })}>
+              Add Customer
+            </Button>
+          )}
+          <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 light:text-gray-500" />
           <input
             value={search}
@@ -101,6 +192,7 @@ export function CustomersView({ tenant }: Props) {
             aria-label="Search customers"
             className="h-8 w-52 rounded-lg border border-slate-700 light:border-[#e3e8f0] bg-slate-900/70 light:bg-white pl-9 pr-3 text-[10px] text-white light:text-[#17223a] outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/10 placeholder:text-slate-500"
           />
+          </div>
         </div>
       </div>
 
@@ -134,16 +226,48 @@ export function CustomersView({ tenant }: Props) {
                   {customer.name.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase()}
                 </div>
                 <div className="min-w-0">
-                  <p className="truncate text-xs font-semibold text-white light:text-[#17223a]">{customer.name}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="truncate text-xs font-semibold text-white light:text-[#17223a]">{customer.name}</p>
+                    {customer.isActive === false && (
+                      <span className="rounded-full bg-slate-700 px-2 py-0.5 text-[9px] text-slate-300 light:bg-slate-100 light:text-slate-500">
+                        Inactive
+                      </span>
+                    )}
+                  </div>
                   <p className="truncate text-[10px] text-slate-400 light:text-[#71809a]">{customer.email || customer.phone || "No contact details"} · {customer.activityCount} {tenant.businessType === "appointment" ? "booking" : "order"}{customer.activityCount === 1 ? "" : "s"}</p>
                 </div>
               </div>
               <p className="text-xs text-slate-300 light:text-[#566681]">{formatDate(customer.lastActivity)}</p>
-              <p className="text-right text-xs font-bold text-white light:text-[#17223a]">{formatCurrency(customer.totalValue)}</p>
+              <div className="flex items-center justify-end gap-2">
+                <p className="text-right text-xs font-bold text-white light:text-[#17223a]">{formatCurrency(customer.totalValue)}</p>
+                {customer.id && <button className="text-[10px] text-violet-400" onClick={() => {
+                  const record = records.find((candidate) => candidate.id === customer.id);
+                  if (record) setEditing(record);
+                }}>Edit</button>}
+              </div>
             </div>
           ))}
         </div>
       </Card>
+
+      <Modal open={!!editing} onClose={() => setEditing(null)} title={editing?.id ? "Edit Customer" : "Add Customer"} footer={
+        <div className="flex gap-3">
+          <Button variant="outline" className="flex-1" onClick={() => setEditing(null)}>Cancel</Button>
+          <Button className="flex-1 bg-violet-600 text-white" disabled={isSaving} onClick={saveCustomer}>{isSaving ? "Saving..." : "Save Customer"}</Button>
+        </div>
+      }>
+        {editing && <div className="space-y-3">
+          <Input label="Name" value={editing.name} onChange={(event) => setEditing({ ...editing, name: event.target.value })} />
+          <Input label="Email" type="email" value={editing.email} onChange={(event) => setEditing({ ...editing, email: event.target.value })} />
+          <Input label="Phone" value={editing.phone} onChange={(event) => setEditing({ ...editing, phone: event.target.value })} />
+          <Textarea label="Notes" value={editing.notes} onChange={(event) => setEditing({ ...editing, notes: event.target.value })} />
+          {editing.id && (
+            <Button variant="outline" onClick={() => void toggleCustomer({ id: editing.id, key: editing.id, name: editing.name, email: editing.email, phone: editing.phone, lastActivity: editing.createdAt, activityCount: 0, totalValue: 0 })}>
+              {editing.isActive ? "Deactivate Customer" : "Reactivate Customer"}
+            </Button>
+          )}
+        </div>}
+      </Modal>
     </div>
   );
 }

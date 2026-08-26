@@ -89,11 +89,11 @@ BEGIN
   WHERE tenant_id = p_tenant_id;
   v_timezone := COALESCE(v_timezone, 'America/Belize');
 
-  v_starts_at := (p_appointment_date::TIMESTAMP + p_appointment_time) AT TIME ZONE v_timezone;
+  v_starts_at := (p_appointment_date + p_appointment_time) AT TIME ZONE v_timezone;
   v_ends_at := v_starts_at + MAKE_INTERVAL(mins => v_service.duration_minutes);
   v_local_now := NOW() AT TIME ZONE v_timezone;
 
-  IF (p_appointment_date::TIMESTAMP + p_appointment_time) <= v_local_now THEN
+  IF (p_appointment_date + p_appointment_time) <= v_local_now THEN
     RAISE EXCEPTION 'Choose a future appointment time.' USING ERRCODE = '22023';
   END IF;
 

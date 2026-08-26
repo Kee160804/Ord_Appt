@@ -30,9 +30,10 @@ unless `NEXT_PUBLIC_ENABLE_DEMO_MODE=true` is explicitly set.
 - Cookie-based Supabase authentication for browser and server rendering.
 - Session refresh and protected-route redirects through Next.js `proxy.ts`.
 - Profile, tenant-membership, role, tenant, and business-hours hydration.
-- New-business provisioning after signup/email confirmation.
+- Atomic profile, tenant, membership, and OWNER-role provisioning after signup/email confirmation.
 - Product and category reads plus product create, availability, and delete.
 - Public storefront tenant, category, product, and service reads through RLS.
+- Transactional public appointment booking and ordering checkout.
+- Database-backed dashboard appointments, orders, customers, products, services, and analytics.
 
-Appointments, orders, payments, analytics, settings, and staff management still
-need to be migrated from their mock UI state to database-backed services.
+Payments, storage uploads, and staff management remain future integrations.

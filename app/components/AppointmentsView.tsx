@@ -46,7 +46,7 @@ export function AppointmentsView({ tenant }: Props) {
   const realtime = useRealtime();
   
   const [apts, setApts] = useState<Appointment[]>(
-    getAppointmentsByTenant(tenant.id),
+    isSupabaseConfigured() ? [] : getAppointmentsByTenant(tenant.id),
   );
   const [filter, setFilter] = useState<Filter>("all");
   const [selected, setSelected] = useState<Appointment | null>(null);

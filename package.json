@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:rls": "node scripts/verify-rls.mjs",
+    "test:onboarding": "node scripts/verify-onboarding.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "0.10.3",

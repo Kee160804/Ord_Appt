@@ -8,7 +8,8 @@ export interface CreateProductInput {
   price: number;
   image: string;
   categoryId: string;
-  inventory: number;
+  inventory: number | null;
+  trackInventory: boolean;
   addons: ProductAddon[];
 }
 
@@ -24,6 +25,7 @@ function mapCategory(row: CategoryRow): Category {
     tenantId: row.tenant_id,
     name: row.name,
     sortOrder: row.sort_order,
+    isActive: row.is_active,
   };
 }
 
@@ -38,23 +40,76 @@ function mapProduct(row: ProductRow, categoryName = "Uncategorized"): Product {
     categoryId: row.category_id ?? "",
     categoryName,
     isActive: row.available,
-    inventory: row.stock,
+    inventory: row.stock ?? undefined,
+    trackInventory: row.track_inventory ?? row.stock !== null,
     tags: [],
     addons: (row.addons ?? []).map((addon) => ({ ...addon, price: Number(addon.price) })),
     createdAt: row.created_at,
   };
 }
 
-export async function listCategories(tenantId: string): Promise<Category[]> {
-  const { data, error } = await client()
+export async function listCategories(
+  tenantId: string,
+  includeInactive = false,
+): Promise<Category[]> {
+  let query = client()
     .from("categories")
     .select("*")
     .eq("tenant_id", tenantId)
-    .eq("is_active", true)
     .order("sort_order");
+  if (!includeInactive) query = query.eq("is_active", true);
+  const { data, error } = await query;
 
   if (error) throw error;
   return ((data ?? []) as CategoryRow[]).map(mapCategory);
+}
+
+export async function createCategory(tenantId: string, name: string, sortOrder: number) {
+  const { data, error } = await client()
+    .from("categories")
+    .insert({
+      tenant_id: tenantId,
+      name: name.trim(),
+      sort_order: sortOrder,
+      is_active: true,
+    })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return mapCategory(data as CategoryRow);
+}
+
+export async function updateCategory(
+  tenantId: string,
+  categoryId: string,
+  name: string,
+  sortOrder: number,
+) {
+  const { data, error } = await client()
+    .from("categories")
+    .update({ name: name.trim(), sort_order: sortOrder })
+    .eq("tenant_id", tenantId)
+    .eq("id", categoryId)
+    .select("*")
+    .single();
+  if (error) throw error;
+  return mapCategory(data as CategoryRow);
+}
+
+export async function setCategoryActive(
+  tenantId: string,
+  categoryId: string,
+  isActive: boolean,
+) {
+  const { data, error } = await client()
+    .from("categories")
+    .update({ is_active: isActive })
+    .eq("tenant_id", tenantId)
+    .eq("id", categoryId)
+    .select("*")
+    .single();
+  if (error) throw error;
+  return mapCategory(data as CategoryRow);
 }
 
 export async function listProducts(tenantId: string): Promise<Product[]> {
@@ -90,7 +145,8 @@ export async function createProduct(
       description: input.description.trim(),
       price: input.price,
       image_url: input.image.trim() || null,
-      stock: input.inventory,
+      stock: input.trackInventory ? input.inventory : null,
+      track_inventory: input.trackInventory,
       available: true,
       addons: input.addons,
     })
@@ -115,7 +171,8 @@ export async function updateProduct(
       description: input.description.trim(),
       price: input.price,
       image_url: input.image.trim() || null,
-      stock: input.inventory,
+      stock: input.trackInventory ? input.inventory : null,
+      track_inventory: input.trackInventory,
       addons: input.addons,
     })
     .eq("id", productId)
@@ -136,7 +193,9 @@ export async function setProductAvailability(
     .from("products")
     .update({ available })
     .eq("id", productId)
-    .eq("tenant_id", tenantId);
+    .eq("tenant_id", tenantId)
+    .select("id")
+    .single();
   if (error) throw error;
 }
 

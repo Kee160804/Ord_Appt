@@ -114,6 +114,7 @@ export interface Category {
   tenantId: string;
   name: string;
   sortOrder: number;
+  isActive?: boolean;
 }
 export interface Product {
   id: string;
@@ -126,6 +127,7 @@ export interface Product {
   categoryName: string;
   isActive: boolean;
   inventory?: number;
+  trackInventory?: boolean;
   tags: string[];
   addons?: ProductAddon[];
   createdAt: string;
@@ -138,6 +140,7 @@ export interface ProductAddon {
 export interface Appointment {
   id: string;
   tenantId: string;
+  customerId?: string;
   serviceId: string;
   serviceName: string;
   servicePrice: number;
@@ -164,6 +167,7 @@ export interface OrderItem {
 export interface Order {
   id: string;
   tenantId: string;
+  customerId?: string;
   orderNumber: string;
   customerName: string;
   customerEmail: string;
