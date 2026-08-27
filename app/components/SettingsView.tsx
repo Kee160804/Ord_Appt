@@ -537,6 +537,8 @@ import { Card, CardHeader, CardBody } from "../components/Card";
 import { Button } from "../components/Button";
 import { Input, Textarea } from "../components/input";
 import { cn } from "../lib/utils";
+import { tenantHasFeature } from "../lib/plans";
+import { PlanFeatureRequired } from "./PlanFeatureRequired";
 import {
   updateBusinessDetails,
   updateBusinessHours,
@@ -618,7 +620,13 @@ export function SettingsView({ tenant, onTenantUpdated }: Props) {
             />
           )}
           {active === "storefront" && (
-            <StorefrontTab tenant={tenant} onTenantUpdated={onTenantUpdated} />
+            tenantHasFeature(tenant, "storefront_branding")
+              ? <StorefrontTab tenant={tenant} onTenantUpdated={onTenantUpdated} />
+              : <PlanFeatureRequired
+                  feature="storefront_branding"
+                  title="Storefront branding controls are a Pro feature"
+                  description="Your storefront remains published on Beginner with its current design. Upgrade to change its URL, cover image, and brand colours."
+                />
           )}
         </div>
       </div>

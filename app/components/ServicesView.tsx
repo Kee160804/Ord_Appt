@@ -18,6 +18,7 @@ import {
   updateService,
 } from "../services/serviceService";
 import { formatCurrency, formatDuration } from "../lib/utils";
+import { tenantHasFeature } from "../lib/plans";
 import type { Service, Tenant } from "../types/index";
 
 interface Props { tenant: Tenant }
@@ -35,6 +36,7 @@ const EMPTY_FORM = {
 };
 
 export function ServicesView({ tenant }: Props) {
+  const canUseBookingDeposits = tenantHasFeature(tenant, "booking_deposits");
   const [services, setServices] = useState<Service[]>(
     isSupabaseConfigured() ? [] : getServicesByTenant(tenant.id),
   );
@@ -80,7 +82,7 @@ export function ServicesView({ tenant }: Props) {
 
   const openAdd = () => {
     setEditingId(null);
-    setForm(EMPTY_FORM);
+    setForm({ ...EMPTY_FORM, requiresDeposit: false });
     setError("");
     setSuccess("");
     setShowAdd(true);
@@ -286,6 +288,7 @@ export function ServicesView({ tenant }: Props) {
             onChange={(event) => setForm((current) => ({ ...current, category: event.target.value }))} />
           <Input label="Image URL" placeholder="https://..." value={form.image}
             onChange={(event) => setForm((current) => ({ ...current, image: event.target.value }))} />
+          {canUseBookingDeposits ? <>
           <div className="flex items-center gap-3 p-3 bg-violet-50 rounded-xl">
             <input type="checkbox" id="deposit" checked={form.requiresDeposit}
               onChange={(event) => setForm((current) => ({ ...current, requiresDeposit: event.target.checked }))}
@@ -307,6 +310,11 @@ export function ServicesView({ tenant }: Props) {
             <Input label="Amount" type="number" min="0" placeholder="25" value={form.depositAmount}
               onChange={(event) => setForm((current) => ({ ...current, depositAmount: event.target.value }))} />
           </div>
+          </> : (
+            <div className="rounded-xl border border-violet-500/25 bg-violet-500/10 p-3 text-xs text-violet-200 light:border-violet-200 light:bg-violet-50 light:text-violet-800">
+              Appointment deposit settings are available on the Pro plan. You can continue creating and editing basic services on Beginner.
+            </div>
+          )}
         </div>
       </Modal>
     </div>

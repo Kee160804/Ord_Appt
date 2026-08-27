@@ -36,6 +36,48 @@ role check, prevents browser self-promotion, and adds cross-tenant policies for
 the application tables. Assign individual super admins separately by updating
 `profiles.platform_role` from a trusted SQL/admin environment.
 
+## Phase One plan entitlements
+
+Apply `202608270002_plan_activity_entitlements.sql` after the tenant trial
+migration. It adds the Beginner 50 / Pro 150 / Enterprise unlimited monthly
+activity rules, the owner usage RPC, transaction-safe order and appointment
+quota triggers, and database guards for Pro-only feature fields. It does not
+rewrite or delete existing tenant, order, appointment, product, or service
+data.
+
+Run `npm run test:entitlements` only against a staging project with dedicated
+fixtures. The script intentionally requires explicit test credentials and IDs:
+
+```text
+ENTITLEMENT_TEST_OWNER_EMAIL=
+ENTITLEMENT_TEST_OWNER_PASSWORD=
+ENTITLEMENT_TEST_EXPIRED_EMAIL=
+ENTITLEMENT_TEST_EXPIRED_PASSWORD=
+ENTITLEMENT_TEST_EXPIRED_PRODUCT_ID=
+ENTITLEMENT_TEST_EXPIRED_SERVICE_ID=
+ENTITLEMENT_TEST_APPOINTMENT_DATE=2027-01-15
+ENTITLEMENT_TEST_APPOINTMENT_TIME=10:00
+ENTITLEMENT_TEST_SUPER_ADMIN_EMAIL=
+ENTITLEMENT_TEST_SUPER_ADMIN_PASSWORD=
+```
+
+The expired appointment date/time must be a future, open, conflict-free slot
+for the fixture tenant so the request reaches the subscription write guard.
+
+## Authentication redirect configuration
+
+Password recovery and email confirmation return through `/auth/confirm`.
+Add the local and deployed URLs to **Authentication > URL Configuration >
+Redirect URLs** in Supabase, for example:
+
+```text
+http://localhost:3000/auth/confirm**
+https://YOUR_DEPLOYED_DOMAIN/auth/confirm**
+```
+
+Keep the production Site URL set to the deployed HTTPS origin. The application
+accepts both Supabase PKCE `code` redirects and token-hash email templates.
+
 ## Cross-tenant RLS verification
 
 Seed two test owner accounts in different tenants. Business B must have at
@@ -50,14 +92,15 @@ RLS_TEST_B_PASSWORD=
 RLS_TEST_INACTIVE_TENANT_ID=
 ```
 
-Run `npm run test:rls`. The live test verifies cross-tenant product/customer/
-appointment reads, order updates, anonymous active-only reads, inactive-tenant
-booking rejection, and cross-tenant service booking rejection.
+Run `npm run test:rls`. The live test verifies tenant-scoped table reads, order
+updates, anonymous active-only reads, inactive-tenant booking rejection,
+cross-tenant public RPC inputs, and transaction rollback safety.
 
 For a real fresh-account check, register a new account through the application,
 confirm its email, set `ONBOARDING_TEST_EMAIL` and `ONBOARDING_TEST_PASSWORD`,
 then run `npm run test:onboarding`. It verifies the auth user, profile, tenant,
-membership, and OWNER role chain using that user's JWT.
+membership, OWNER role, fourteen-day trial, and Beginner entitlement using
+that user's JWT.
 
 ## Appointment confirmation emails
 

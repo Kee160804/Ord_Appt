@@ -33,7 +33,7 @@ interface AuthContextType {
   user: User | null;
   tenant: Tenant | null;
   updateTenant: (updatedTenant: Tenant) => void;
-  login: (email: string, password: string) => Promise<AuthActionResult>;
+  login: (email: string, password: string, rememberMe?: boolean) => Promise<AuthActionResult>;
   signup: (
     email: string,
     password: string,
@@ -50,15 +50,27 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const DEMO_SESSION_KEY = "ls_demo_session";
+const SESSION_PREFERENCE_KEY = "ls_session_preference";
+const SESSION_TAB_KEY = "ls_session_tab_active";
 
 function getDemoSessionUser() {
   if (!isDemoModeEnabled()) return null;
-  const userId = window.localStorage.getItem(DEMO_SESSION_KEY);
+  const userId = window.sessionStorage.getItem(DEMO_SESSION_KEY)
+    ?? window.localStorage.getItem(DEMO_SESSION_KEY);
   return userId ? getUserById(userId) : null;
 }
 
-function saveDemoSession(user: User) {
-  window.localStorage.setItem(DEMO_SESSION_KEY, user.id);
+function saveSessionPreference(rememberMe: boolean) {
+  window.localStorage.setItem(SESSION_PREFERENCE_KEY, rememberMe ? "persistent" : "session");
+  if (rememberMe) window.sessionStorage.removeItem(SESSION_TAB_KEY);
+  else window.sessionStorage.setItem(SESSION_TAB_KEY, "true");
+}
+
+function saveDemoSession(user: User, rememberMe = true) {
+  window.localStorage.removeItem(DEMO_SESSION_KEY);
+  window.sessionStorage.removeItem(DEMO_SESSION_KEY);
+  const storage = rememberMe ? window.localStorage : window.sessionStorage;
+  storage.setItem(DEMO_SESSION_KEY, user.id);
 }
 
 function createUniqueSlug(initial: string) {
@@ -103,6 +115,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let active = true;
 
     const hydrate = async () => {
+      const sessionOnly = window.localStorage.getItem(SESSION_PREFERENCE_KEY) === "session";
+      const sameTabSession = window.sessionStorage.getItem(SESSION_TAB_KEY) === "true";
+      if (sessionOnly && !sameTabSession) {
+        await supabase.auth.signOut({ scope: "local" });
+        if (!active) return;
+        setUser(null);
+        setTenant(null);
+        setIsLoading(false);
+        return;
+      }
       const result = await loadAuthenticatedAppSession();
       if (!active) return;
       setUser(result.user ?? null);
@@ -130,7 +152,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const login = async (email: string, password: string): Promise<AuthActionResult> => {
+  const login = async (email: string, password: string, rememberMe = true): Promise<AuthActionResult> => {
     setIsLoading(true);
     const normalizedEmail = email.trim().toLowerCase();
 
@@ -139,6 +161,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsLoading(false);
       if (!result.user) return { success: false, error: result.error ?? "Unable to sign in." };
 
+      saveSessionPreference(rememberMe);
       setUser(result.user);
       setTenant(result.tenant ?? null);
       return { success: true, user: result.user };
@@ -166,7 +189,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     setUser(demoUser);
     setTenant(demoUser.tenantId ? getTenantById(demoUser.tenantId) ?? null : null);
-    saveDemoSession(demoUser);
+    saveDemoSession(demoUser, rememberMe);
     setIsLoading(false);
     return { success: true, user: demoUser };
   };
@@ -271,7 +294,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     setIsLoading(true);
     if (isSupabaseConfigured()) await supabaseLogout();
-    if (typeof window !== "undefined") window.localStorage.removeItem(DEMO_SESSION_KEY);
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem(DEMO_SESSION_KEY);
+      window.sessionStorage.removeItem(DEMO_SESSION_KEY);
+      window.localStorage.removeItem(SESSION_PREFERENCE_KEY);
+      window.sessionStorage.removeItem(SESSION_TAB_KEY);
+    }
     setUser(null);
     setTenant(null);
     setIsLoading(false);

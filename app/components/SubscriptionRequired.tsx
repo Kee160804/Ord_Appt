@@ -2,35 +2,21 @@
 
 import Link from "next/link";
 import { ArrowRight, Check, CreditCard, LogOut, ShieldCheck, Sparkles } from "lucide-react";
+import { PLAN_DEFINITIONS, PLAN_ORDER } from "@/app/lib/plans";
 import type { Tenant, User } from "@/app/types";
 
-const plans = [
-  {
-    id: "beginner",
-    name: "Beginner",
-    price: 9,
-    description: "The essentials for getting your business online.",
-    checkoutUrl: process.env.NEXT_PUBLIC_BEGINNER_CHECKOUT_URL,
-    features: ["Branded storefront", "Up to 50 monthly orders or bookings"],
-  },
-  {
-    id: "pro",
-    name: "Pro",
-    price: 12,
-    description: "Growth tools, analytics, inventory, and booking controls.",
-    checkoutUrl: process.env.NEXT_PUBLIC_PRO_CHECKOUT_URL,
-    features: ["Up to 250 monthly activities", "Analytics and advanced controls"],
-    popular: true,
-  },
-  {
-    id: "enterprise",
-    name: "Enterprise",
-    price: 16,
-    description: "Unlimited activity and priority platform support.",
-    checkoutUrl: process.env.NEXT_PUBLIC_ENTERPRISE_CHECKOUT_URL,
-    features: ["Unlimited orders or appointments", "Priority onboarding and support"],
-  },
-];
+const checkoutUrls = {
+  starter: process.env.NEXT_PUBLIC_BEGINNER_CHECKOUT_URL,
+  pro: process.env.NEXT_PUBLIC_PRO_CHECKOUT_URL,
+  enterprise: process.env.NEXT_PUBLIC_ENTERPRISE_CHECKOUT_URL,
+};
+
+const plans = PLAN_ORDER.map((planId) => ({
+  ...PLAN_DEFINITIONS[planId],
+  checkoutUrl: checkoutUrls[planId],
+  features: PLAN_DEFINITIONS[planId].shortFeatures,
+  popular: planId === "pro",
+}));
 
 export function SubscriptionRequired({
   tenant,
@@ -97,4 +83,3 @@ export function SubscriptionRequired({
     </div>
   );
 }
-

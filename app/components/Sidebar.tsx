@@ -15,8 +15,10 @@ import {
   ShoppingBag,
   Sparkles,
   Users,
+  LockKeyhole,
 } from "lucide-react";
 import { cn } from "../lib/utils";
+import { tenantHasFeature } from "../lib/plans";
 import type { Tenant, User } from "../types/index";
 import { useAuth } from "../contexts/auth";
 
@@ -43,7 +45,12 @@ export function Sidebar({ tenant, user }: SidebarProps) {
           { href: `${base}/products`, label: "Products", icon: Package },
         ]),
     { href: `${base}/customers`, label: "Customers", icon: Users },
-    { href: `${base}/analytics`, label: "Analytics", icon: BarChart3 },
+    {
+      href: `${base}/analytics`,
+      label: "Analytics",
+      icon: BarChart3,
+      locked: !tenantHasFeature(tenant, "detailed_analytics"),
+    },
     { href: `${base}/settings`, label: "Settings", icon: Settings },
   ];
 
@@ -111,6 +118,7 @@ export function Sidebar({ tenant, user }: SidebarProps) {
             >
               <Icon className={cn("h-[15px] w-[15px] flex-shrink-0", active ? "text-violet-300" : "text-slate-400 group-hover:text-white")} />
               {!collapsed && <span className="flex-1">{item.label}</span>}
+              {!collapsed && item.locked && <LockKeyhole className="h-3 w-3 text-violet-300" />}
             </Link>
           );
         })}

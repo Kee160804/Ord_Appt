@@ -76,7 +76,7 @@ const tenantB = await signIn(
 if (tenantA === tenantB) throw new Error("RLS test accounts must belong to different tenants.");
 
 const [productB, orderB, customerB, appointmentB, serviceB] = await Promise.all([
-  fixture(businessB, "products", tenantB, "id"),
+  fixture(businessB, "products", tenantB, "id,stock,available"),
   fixture(businessB, "orders", tenantB, "id,status"),
   fixture(businessB, "customers", tenantB, "id"),
   fixture(businessB, "appointments", tenantB, "id"),
@@ -85,9 +85,39 @@ const [productB, orderB, customerB, appointmentB, serviceB] = await Promise.all(
 
 await Promise.all([
   expectHidden(businessA, "products", productB.id),
+  expectHidden(businessA, "orders", orderB.id),
   expectHidden(businessA, "customers", customerB.id),
   expectHidden(businessA, "appointments", appointmentB.id),
 ]);
+
+const tenantScopedTables = [
+  "business_settings",
+  "business_modules",
+  "business_hours",
+  "categories",
+  "products",
+  "services",
+  "staff",
+  "staff_services",
+  "customers",
+  "orders",
+  "order_items",
+  "appointments",
+  "appointment_services",
+  "appointment_email_deliveries",
+  "business_reviews",
+];
+for (const table of tenantScopedTables) {
+  const { data, error } = await businessA
+    .from(table)
+    .select("tenant_id")
+    .eq("tenant_id", tenantB)
+    .limit(1);
+  if (error) throw new Error(`Unable to verify ${table} RLS: ${error.message}`);
+  if (data.length !== 0) {
+    throw new Error(`RLS failure: Business A can read Business B ${table}.`);
+  }
+}
 
 const { data: updatedOrders, error: updateError } = await businessA
   .from("orders")
@@ -142,6 +172,60 @@ await expectRpcRejected(
     p_service_id: serviceB.id,
   }),
 );
+
+const [{ data: tenantARecord, error: tenantAError }, { data: tenantBRecord, error: tenantBError }] = await Promise.all([
+  businessA.from("tenants").select("business_type").eq("id", tenantA).single(),
+  businessB.from("tenants").select("business_type").eq("id", tenantB).single(),
+]);
+if (tenantAError) throw tenantAError;
+if (tenantBError) throw tenantBError;
+
+if (tenantARecord.business_type?.toLowerCase() === "ordering") {
+  await expectRpcRejected(
+    "public ordering accepted another tenant's product",
+    anonymous.rpc("create_public_order", {
+      p_tenant_id: tenantA,
+      p_customer_name: "RLS Verification",
+      p_customer_phone: "+15555550123",
+      p_order_type: "pickup",
+      p_items: [{ product_id: productB.id, quantity: 1, addons: [] }],
+      p_notes: "Cross-tenant verification",
+    }),
+  );
+
+}
+
+if (
+  tenantBRecord.business_type?.toLowerCase() === "ordering"
+  && productB.available
+  && (productB.stock == null || productB.stock > 0)
+) {
+  const invalidProductId = crypto.randomUUID();
+  await expectRpcRejected(
+    "failed public order did not roll back",
+    anonymous.rpc("create_public_order", {
+      p_tenant_id: tenantB,
+      p_customer_name: "Rollback Verification",
+      p_customer_phone: "+15555550124",
+      p_order_type: "pickup",
+      p_items: [
+        { product_id: productB.id, quantity: 1, addons: [] },
+        { product_id: invalidProductId, quantity: 1, addons: [] },
+      ],
+      p_notes: "Inventory rollback verification",
+    }),
+  );
+
+  const { data: productAfter, error: productAfterError } = await businessB
+    .from("products")
+    .select("stock")
+    .eq("id", productB.id)
+    .single();
+  if (productAfterError) throw productAfterError;
+  if (productAfter.stock !== productB.stock) {
+    throw new Error("Transaction failure: inventory changed after a rejected public order.");
+  }
+}
 await expectRpcRejected(
   "public booking accepted an inactive tenant",
   anonymous.rpc("create_public_appointment", {
@@ -151,4 +235,4 @@ await expectRpcRejected(
   }),
 );
 
-console.log("RLS verification passed for cross-tenant reads/writes and public storefront access.");
+console.log("RLS verification passed for tenant tables, public RPC isolation, and order rollback safety.");

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Sidebar } from "@/app/components/Sidebar";
 import { SubscriptionRequired } from "@/app/components/SubscriptionRequired";
 import { TrialStatusBanner } from "@/app/components/TrialStatusBanner";
+import { PlanUsageBanner } from "@/app/components/PlanUsageBanner";
 import { useAuth } from "@/app/contexts/auth";
 import { getTenantEntitlement } from "@/app/lib/subscription";
 
@@ -37,6 +38,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <Sidebar tenant={tenant} user={user} />
       <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-[#f8fafc] text-[#14213a] dark:bg-[#08111f] dark:text-white">
         <TrialStatusBanner tenant={tenant} />
+        <PlanUsageBanner tenant={tenant} />
         <div className="min-h-0 flex-1 overflow-y-auto">
           {children}
         </div>

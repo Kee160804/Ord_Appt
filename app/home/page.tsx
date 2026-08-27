@@ -17,6 +17,7 @@ import {
   Moon,
 } from "lucide-react";
 import { useTheme } from "@/app/contexts/theme";
+import { PLAN_DEFINITIONS } from "@/app/lib/plans";
 
 export default function HomePage() {
   const { theme, toggleTheme } = useTheme();
@@ -56,8 +57,8 @@ export default function HomePage() {
 
   const plans = [
     {
-      name: "Beginner",
-      price: "9",
+      name: PLAN_DEFINITIONS.starter.name,
+      price: String(PLAN_DEFINITIONS.starter.price),
       audience: "For new and side businesses",
       description: "Launch your storefront and start serving customers online.",
       dailyPrice: "About $0.30 a day",
@@ -69,14 +70,14 @@ export default function HomePage() {
       features: [
         "1 branded business storefront",
         "Online ordering or appointment booking",
-        "Up to 50 orders or bookings per month",
+        `Up to ${PLAN_DEFINITIONS.starter.monthlyActivityLimit} orders or bookings per month`,
         "Product or service management",
         "Customer records and business settings",
       ],
     },
     {
-      name: "Pro",
-      price: "12",
+      name: PLAN_DEFINITIONS.pro.name,
+      price: String(PLAN_DEFINITIONS.pro.price),
       audience: "For growing local businesses",
       description: "Unlock the controls and insights that help you grow faster.",
       dailyPrice: "Less than $0.40 a day",
@@ -87,7 +88,7 @@ export default function HomePage() {
       cta: "Choose Pro",
       features: [
         "Everything in Beginner",
-        "Up to 150 orders or bookings per month",
+        `Up to ${PLAN_DEFINITIONS.pro.monthlyActivityLimit} orders or bookings per month`,
         "Live revenue and customer analytics",
         "Inventory, categories and product add-ons",
         "Availability and appointment deposit settings",
@@ -95,8 +96,8 @@ export default function HomePage() {
       ],
     },
     {
-      name: "Enterprise",
-      price: "16",
+      name: PLAN_DEFINITIONS.enterprise.name,
+      price: String(PLAN_DEFINITIONS.enterprise.price),
       audience: "For established, high-volume businesses",
       description: "Remove the limits and get extra help as demand increases.",
       dailyPrice: "About $0.53 a day",

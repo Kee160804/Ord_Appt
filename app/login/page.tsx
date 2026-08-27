@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Sparkles, Eye, EyeOff, AlertCircle, Sun, Moon } from "lucide-react";
@@ -15,12 +15,29 @@ export default function LoginPage() {
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [rememberMe, setRememberMe] = useState(true);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      const params = new URLSearchParams(window.location.search);
+      const queryError = params.get("error");
+      if (queryError) setError(queryError);
+      if (params.get("confirmed") === "1") {
+        setNotice("Email confirmed successfully. You can now sign in.");
+      }
+      if (params.get("passwordUpdated") === "1") {
+        setNotice("Your password was updated. Sign in with your new password.");
+      }
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
 
   const handleLogin = async () => {
     if (!email) { setError("Please enter your email."); return; }
     setError("");
     setLoading(true);
-    const result = await login(email, password);
+    const result = await login(email, password, rememberMe);
     setLoading(false);
     if (!result.success) { setError(result.error ?? "Login failed."); return; }
     if (result.user?.role === "superadmin") router.push("/admin");
@@ -132,6 +149,11 @@ export default function LoginPage() {
                   <AlertCircle className="w-4 h-4 shrink-0" /> {error}
                 </div>
               )}
+              {notice && (
+                <div className="rounded-xl border border-violet-500/30 bg-violet-500/10 p-3 text-sm font-medium text-violet-200 light:border-violet-200 light:bg-violet-50 light:text-violet-700">
+                  {notice}
+                </div>
+              )}
 
               <div className="space-y-1.5">
                 <label className="text-sm font-semibold text-slate-300 light:text-gray-800">Email Address</label>
@@ -157,9 +179,14 @@ export default function LoginPage() {
 
               <div className="flex items-center justify-between text-sm">
                 <label className="flex items-center gap-2 text-slate-400 light:text-gray-700 cursor-pointer font-medium">
-                  <input type="checkbox" defaultChecked className="w-4 h-4 accent-violet-500 rounded" /> Remember me
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(event) => setRememberMe(event.target.checked)}
+                    className="w-4 h-4 accent-violet-500 rounded"
+                  /> Remember me
                 </label>
-                <button className="text-violet-400 light:text-violet-600 hover:text-violet-300 light:hover:text-violet-700 font-semibold transition-colors">Forgot password?</button>
+                <Link href="/forgot-password" className="text-violet-400 light:text-violet-600 hover:text-violet-300 light:hover:text-violet-700 font-semibold transition-colors">Forgot password?</Link>
               </div>
 
               <button onClick={handleLogin} disabled={loading}

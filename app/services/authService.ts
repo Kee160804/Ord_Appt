@@ -31,16 +31,15 @@ const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", 
 const tenantProvisioningByUser = new Map<string, Promise<string | null>>();
 
 function errorMessage(error: unknown, fallback: string) {
-  if (error instanceof Error && error.message) return error.message;
-  if (
-    typeof error === "object" &&
-    error !== null &&
-    "message" in error &&
-    typeof error.message === "string" &&
-    error.message
-  ) {
-    return error.message;
+  const message = error instanceof Error && error.message
+    ? error.message
+    : typeof error === "object" && error !== null && "message" in error && typeof error.message === "string"
+      ? error.message
+      : "";
+  if (message.includes("tenant_memberships_tenant_id_profile_id_key")) {
+    return "Your account membership already exists but could not be loaded. Sign out, then sign in again. If this continues, ask the platform administrator to run the onboarding repair migration.";
   }
+  if (message) return message;
   return fallback;
 }
 
@@ -288,7 +287,11 @@ export async function supabaseLogin(email: string, password: string): Promise<Au
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error || !data.user) return { error: error?.message ?? "Invalid email or password." };
 
-  return loadAuthenticatedAppSession(data.user);
+  const result = await loadAuthenticatedAppSession(data.user);
+  if (!result.user) {
+    await supabase.auth.signOut({ scope: "local" });
+  }
+  return result;
 }
 
 export async function supabaseSignup(
@@ -312,10 +315,13 @@ export async function supabaseSignup(
     business_phone: phone.trim(),
     business_slug: slugify(slug || businessName),
   };
+  const emailRedirectTo = typeof window === "undefined"
+    ? undefined
+    : `${window.location.origin}/auth/confirm?next=/dashboard`;
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: { data: metadata },
+    options: { data: metadata, emailRedirectTo },
   });
 
   if (error || !data.user) return { error: error?.message ?? "Unable to create account." };
@@ -327,4 +333,45 @@ export async function supabaseSignup(
 export async function supabaseLogout() {
   const supabase = getSupabaseBrowserClient();
   if (supabase) await supabase.auth.signOut();
+}
+
+export async function requestPasswordReset(email: string) {
+  const supabase = getSupabaseBrowserClient();
+  if (!supabase) throw new Error("Password recovery is not configured for this deployment.");
+
+  const redirectTo = typeof window === "undefined"
+    ? undefined
+    : `${window.location.origin}/auth/confirm?next=/reset-password`;
+  const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
+    redirectTo,
+  });
+  if (error) throw new Error(errorMessage(error, "Unable to send the password reset email."));
+}
+
+export async function resendSignupConfirmation(email: string) {
+  const supabase = getSupabaseBrowserClient();
+  if (!supabase) throw new Error("Email confirmation is not configured for this deployment.");
+  const emailRedirectTo = typeof window === "undefined"
+    ? undefined
+    : `${window.location.origin}/auth/confirm?next=/dashboard`;
+  const { error } = await supabase.auth.resend({
+    type: "signup",
+    email: email.trim().toLowerCase(),
+    options: { emailRedirectTo },
+  });
+  if (error) throw new Error(errorMessage(error, "Unable to resend the confirmation email."));
+}
+
+export async function updateAccountPassword(password: string) {
+  if (password.length < 8) throw new Error("Password must be at least 8 characters.");
+  const supabase = getSupabaseBrowserClient();
+  if (!supabase) throw new Error("Password recovery is not configured for this deployment.");
+
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError || !sessionData.session) {
+    throw new Error("This password reset link is invalid or has expired. Request a new link.");
+  }
+
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) throw new Error(errorMessage(error, "Unable to update your password."));
 }

@@ -9,6 +9,7 @@ import { Modal } from "../components/Modal";
 import { Input, Textarea, Select } from "../components/input";
 import { getProductsByTenant, getCategoriesByTenant } from "../data/mock";
 import { formatCurrency, cn } from "../lib/utils";
+import { tenantHasFeature } from "../lib/plans";
 import { getStoredProducts, setStoredProducts } from "../lib/storage";
 // NEW: Import useRealtime for emitting product events
 import { useRealtime } from "../contexts/realtime";
@@ -31,6 +32,7 @@ interface Props { tenant: Tenant }
 export function ProductsView({ tenant }: Props) {
   // NEW: Get realtime context to emit events
   const realtime = useRealtime();
+  const canUseAdvancedCatalog = tenantHasFeature(tenant, "advanced_catalog");
   
   const [products, setProducts] = useState<Product[]>(
     isSupabaseConfigured() ? [] : getProductsByTenant(tenant.id),
@@ -92,7 +94,7 @@ export function ProductsView({ tenant }: Props) {
     description: "",
     categoryId: "",
     inventory: "",
-    trackInventory: true,
+    trackInventory: canUseAdvancedCatalog,
     image: "",
     tags: [] as string[],
     addons: [] as ProductAddon[],
@@ -155,7 +157,7 @@ export function ProductsView({ tenant }: Props) {
 
   const openAdd = () => {
     setEditingProduct(null);
-    setNewProduct({ name: "", price: "", description: "", categoryId: "", inventory: "", trackInventory: true, image: "", tags: [], addons: [] });
+    setNewProduct({ name: "", price: "", description: "", categoryId: "", inventory: "", trackInventory: canUseAdvancedCatalog, image: "", tags: [], addons: [] });
     setError("");
     setShowAdd(true);
   };
@@ -268,7 +270,7 @@ export function ProductsView({ tenant }: Props) {
         tenantId: tenant.id,
         product,
       });
-      setNewProduct({ name: "", price: "", description: "", categoryId: "", inventory: "", trackInventory: true, image: "", tags: [], addons: [] });
+      setNewProduct({ name: "", price: "", description: "", categoryId: "", inventory: "", trackInventory: canUseAdvancedCatalog, image: "", tags: [], addons: [] });
       setEditingProduct(null);
       setShowAdd(false);
     } catch (createError) {
@@ -286,6 +288,10 @@ export function ProductsView({ tenant }: Props) {
   };
 
   const openCategoryManager = () => {
+    if (!canUseAdvancedCatalog) {
+      setError("Categories, inventory tracking, and product add-ons are available on the Pro plan.");
+      return;
+    }
     setEditingCategory(null);
     setCategoryName("");
     setCategorySortOrder(String(Math.max(0, ...categories.map((category) => category.sortOrder)) + 1));
@@ -380,7 +386,13 @@ export function ProductsView({ tenant }: Props) {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button onClick={openCategoryManager} size="sm" variant="outline">
+          <Button
+            onClick={openCategoryManager}
+            size="sm"
+            variant="outline"
+            disabled={!canUseAdvancedCatalog}
+            title={canUseAdvancedCatalog ? "Manage storefront categories" : "Available on the Pro plan"}
+          >
             <FolderTree className="w-4 h-4" /> Manage Categories
           </Button>
           <Button onClick={openAdd} size="sm" className="bg-violet-600 hover:bg-violet-700 text-white">
@@ -478,7 +490,7 @@ export function ProductsView({ tenant }: Props) {
               value={newProduct.price}
               onChange={e => setNewProduct({ ...newProduct, price: e.target.value })}
             />
-            <Select
+            {canUseAdvancedCatalog && <Select
               label="Category"
               options={[
                 { value: "", label: "Select category..." },
@@ -491,7 +503,7 @@ export function ProductsView({ tenant }: Props) {
               ]}
               value={newProduct.categoryId}
               onChange={e => setNewProduct({ ...newProduct, categoryId: e.target.value })}
-            />
+            />}
           </div>
           <Textarea
             label="Description"
@@ -500,7 +512,7 @@ export function ProductsView({ tenant }: Props) {
             value={newProduct.description}
             onChange={e => setNewProduct({ ...newProduct, description: e.target.value })}
           />
-          <div className="rounded-lg border border-slate-700 light:border-slate-200 p-3 space-y-3">
+          {canUseAdvancedCatalog ? <div className="rounded-lg border border-slate-700 light:border-slate-200 p-3 space-y-3">
             <label className="flex cursor-pointer items-start gap-3">
               <input
                 type="checkbox"
@@ -535,7 +547,11 @@ export function ProductsView({ tenant }: Props) {
                 Unlimited inventory — orders will not reduce a stock count.
               </p>
             )}
-          </div>
+          </div> : (
+            <div className="rounded-lg border border-violet-500/25 bg-violet-500/10 p-3 text-xs text-violet-200 light:border-violet-200 light:bg-violet-50 light:text-violet-800">
+              Upgrade to Pro to organize products into categories, track inventory, and configure add-ons. Basic product details remain available on Beginner.
+            </div>
+          )}
           <div>
             <Input
               label="Image URL"
@@ -544,7 +560,7 @@ export function ProductsView({ tenant }: Props) {
               onChange={e => setNewProduct({ ...newProduct, image: e.target.value })}
             />
           </div>
-          <div className="space-y-2">
+          {canUseAdvancedCatalog && <div className="space-y-2">
             <div className="flex items-center justify-between">
               <label className="text-sm font-semibold">Add-ons</label>
               <Button
@@ -596,7 +612,7 @@ export function ProductsView({ tenant }: Props) {
                 </Button>
               </div>
             ))}
-          </div>
+          </div>}
         </div>
       </Modal>
 

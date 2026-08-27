@@ -6,6 +6,7 @@ import { Sparkles, Check, Calendar, ShoppingBag, ArrowRight, ArrowLeft } from "l
 import { cn } from "../lib/utils";
 // NEW: Import useAuth to access signup method
 import { useAuth } from "../contexts/auth";
+import { resendSignupConfirmation } from "../services/authService";
 import type { BusinessType } from "../types/index";
 
 export default function RegisterPage() {
@@ -17,6 +18,8 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [confirmationEmail, setConfirmationEmail] = useState("");
+  const [isResending, setIsResending] = useState(false);
   const [form, setForm] = useState({ firstName: "", lastName: "", email: "", password: "", businessName: "", city: "", phone: "", slug: "" });
 
   const update = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
@@ -63,6 +66,7 @@ export default function RegisterPage() {
     // ENHANCED: Wait a moment before redirecting to ensure user data is saved
     if (result.success) {
       if (result.requiresEmailConfirmation) {
+        setConfirmationEmail(form.email.trim().toLowerCase());
         setSuccessMessage(
           "Account created. Check your email to confirm your address, then sign in to finish setting up your business.",
         );
@@ -76,6 +80,20 @@ export default function RegisterPage() {
     } else {
       setError(result.error || "Signup failed. Please try again.");
       setLoading(false);
+    }
+  };
+
+  const resendConfirmation = async () => {
+    if (!confirmationEmail) return;
+    setIsResending(true);
+    setError("");
+    try {
+      await resendSignupConfirmation(confirmationEmail);
+      setSuccessMessage("A new confirmation email was sent. Check your inbox and spam folder.");
+    } catch (resendError) {
+      setError(resendError instanceof Error ? resendError.message : "Unable to resend the confirmation email.");
+    } finally {
+      setIsResending(false);
     }
   };
 
@@ -106,8 +124,17 @@ export default function RegisterPage() {
         )}
 
         {successMessage && (
-          <div className="mb-6 p-4 bg-emerald-500/20 border border-emerald-500/30 rounded-xl text-sm text-emerald-200">
-            {successMessage}
+          <div className="mb-6 space-y-3 rounded-xl border border-violet-500/30 bg-violet-500/15 p-4 text-sm text-violet-100">
+            <p>{successMessage}</p>
+            {confirmationEmail && (
+              <button
+                disabled={isResending}
+                onClick={() => void resendConfirmation()}
+                className="font-bold text-violet-300 underline underline-offset-2 hover:text-white disabled:opacity-50"
+              >
+                {isResending ? "Resending..." : "Resend confirmation email"}
+              </button>
+            )}
           </div>
         )}
 
