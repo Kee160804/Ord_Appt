@@ -525,3 +525,38 @@ export async function loadAdminTenantData(tenantId: string): Promise<AdminTenant
   if (!tenant) return null;
   return { tenant, analytics: data.analyticsByTenant[tenant.id] ?? emptyAnalytics() };
 }
+
+export async function updateAdminTenantSubscription(
+  tenantId: string,
+  plan: Tenant["plan"],
+  status: Tenant["subscriptionStatus"],
+  trialDays?: number,
+) {
+  const { data, error } = await client().rpc("set_tenant_subscription", {
+    p_tenant_id: tenantId,
+    p_plan: plan,
+    p_subscription_status: status,
+    p_trial_days: trialDays ?? null,
+  });
+
+  if (error) {
+    if (error.code === "PGRST202") {
+      throw new Error(
+        "Subscription administration is not installed. Apply the tenant trial migration in Supabase.",
+      );
+    }
+    throw new Error(error.message);
+  }
+
+  const row = data as TenantRow;
+  return {
+    plan: row.plan === "pro" || row.plan === "enterprise" ? row.plan : "starter",
+    subscriptionStatus:
+      row.subscription_status === "active" ||
+      row.subscription_status === "cancelled" ||
+      row.subscription_status === "past_due"
+        ? row.subscription_status
+        : "trial",
+    trialEndsAt: row.trial_ends_at ?? undefined,
+  } satisfies Pick<Tenant, "plan" | "subscriptionStatus" | "trialEndsAt">;
+}

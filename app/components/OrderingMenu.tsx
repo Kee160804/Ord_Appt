@@ -34,6 +34,7 @@ interface OrderingMenuProps {
   cart: CartItem[];
   updateCart: (items: CartItem[]) => void;
   onOrderPlaced?: (items: { productId: string; quantity: number }[]) => void;
+  viewOnly?: boolean;
 }
 
 const PLACEHOLDER_IMG = "/fallback-product.png";
@@ -46,6 +47,7 @@ export function OrderingMenu({
   cart,
   updateCart,
   onOrderPlaced,
+  viewOnly = false,
 }: OrderingMenuProps) {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -159,6 +161,10 @@ export function OrderingMenu({
   };
 
   const placeOrder = async () => {
+    if (viewOnly) {
+      setOrderError("This is a view-only demo. No order was submitted.");
+      return;
+    }
     if (cart.length === 0) {
       setOrderError("Your cart is empty.");
       return;
@@ -525,10 +531,10 @@ export function OrderingMenu({
                 </Button>
                 <Button
                   onClick={placeOrder}
-                  disabled={isPlacingOrder}
+                  disabled={isPlacingOrder || viewOnly}
                   className="flex-1 bg-violet-600 hover:bg-violet-700 text-white text-sm"
                 >
-                  {isPlacingOrder ? "Placing..." : "Place Order"}
+                  {viewOnly ? "Demo Preview" : isPlacingOrder ? "Placing..." : "Place Order"}
                 </Button>
               </div>
             </div>

@@ -30,6 +30,7 @@ interface ExtendedService extends Service {
 interface AppointmentBookingProps {
   tenant: Tenant;
   services: Service[];
+  viewOnly?: boolean;
 }
 
 // Helpers
@@ -73,6 +74,7 @@ const FAKE_REVIEWS: Record<string, { rating: number; text: string }[]> = {};
 export function AppointmentBooking({
   tenant,
   services,
+  viewOnly = false,
 }: AppointmentBookingProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -92,7 +94,7 @@ export function AppointmentBooking({
   const calendarDays = useMemo(() => buildCalendarDays(currentMonth), [currentMonth]);
   const selectedService = services.find((service) => service.id === selectedServiceId) ?? null;
   useEffect(() => {
-    if (!selectedDate || !selectedServiceId || !isSupabaseConfigured()) {
+    if (viewOnly || !selectedDate || !selectedServiceId || !isSupabaseConfigured()) {
       setAvailableSlots([]);
       setIsLoadingAvailability(false);
       setAvailabilityError("");
@@ -126,16 +128,16 @@ export function AppointmentBooking({
     return () => {
       active = false;
     };
-  }, [selectedDate, selectedServiceId, tenant.id]);
+  }, [selectedDate, selectedServiceId, tenant.id, viewOnly]);
 
   const timeSlots = useMemo(() => {
     if (!selectedDate) return [];
     const selectedDay = new Date(`${selectedDate}T12:00:00`).getDay();
     const hours = tenant.businessHours[selectedDay];
     if (!hours || hours.closed || !hours.open || !hours.close) return [];
-    if (isSupabaseConfigured()) return availableSlots;
+    if (isSupabaseConfigured() && !viewOnly) return availableSlots;
     return buildTimeSlots(hours.open, hours.close, selectedService?.duration ?? 30);
-  }, [availableSlots, selectedDate, selectedService?.duration, tenant.businessHours]);
+  }, [availableSlots, selectedDate, selectedService?.duration, tenant.businessHours, viewOnly]);
 
   const today = dateKey(new Date());
 
@@ -166,6 +168,10 @@ export function AppointmentBooking({
   };
 
   const submitBooking = async () => {
+    if (viewOnly) {
+      setBookingError("This is a view-only demo. No appointment was submitted.");
+      return;
+    }
     if (!selectedServiceId || !selectedDate || !selectedTime) return;
     if (!customer.name.trim() || !customer.email.trim() || !customer.phone.trim()) {
       setBookingError("Name, email, and phone are required.");
@@ -445,7 +451,7 @@ export function AppointmentBooking({
                       className="flex-1 py-2 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold transition"
                       aria-label={`Book ${service.name}`}
                     >
-                      Book Now
+                      {viewOnly ? "Preview Service" : "Book Now"}
                     </button>
                     <button
                       onClick={() => setSelectedServiceId(service.id)}
@@ -570,10 +576,10 @@ export function AppointmentBooking({
             <div className="p-5 border-t border-slate-100 dark:border-slate-800 flex-shrink-0">
               <button
                 onClick={() => beginBooking()}
-                disabled={!canBook}
+                disabled={viewOnly || !canBook}
                 className="w-full py-3 rounded-xl bg-violet-600 hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-bold transition"
               >
-                {canBook ? "Book Now →" : "Select date & time to book"}
+                {viewOnly ? "Demo preview only" : canBook ? "Book Now →" : "Select date & time to book"}
               </button>
             </div>
           </>
@@ -589,7 +595,7 @@ export function AppointmentBooking({
       </aside>
 
       {/* Floating confirmation bar */}
-      {canBook && (
+      {canBook && !viewOnly && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-white dark:bg-slate-800 rounded-full shadow-xl border border-slate-200 dark:border-slate-700 px-5 py-2.5 flex items-center gap-4 text-sm">
           <span className="font-semibold text-slate-800 dark:text-white">
             {detailService?.name}

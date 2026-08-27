@@ -25,12 +25,12 @@ export default function HomePage() {
     {
       icon: Calendar,
       title: "Smart Scheduling",
-      desc: "Appointment booking with automatic confirmations, deposits, and reminders.",
+      desc: "Public booking with live availability, conflict protection, service durations, and deposit settings.",
     },
     {
       icon: ShoppingBag,
       title: "Online Ordering",
-      desc: "Let customers order products and services directly from your business page.",
+      desc: "Accept storefront orders and manage menus, categories, add-ons, inventory, and fulfilment status.",
     },
     {
       icon: BarChart3,
@@ -44,57 +44,74 @@ export default function HomePage() {
     },
     {
       icon: Shield,
-      title: "Secure Payments",
-      desc: "Stripe-powered payments with deposit support and payout tracking.",
+      title: "Secure Business Data",
+      desc: "Tenant-scoped access keeps each business's products, orders, customers, and appointments separated.",
     },
     {
       icon: Users,
-      title: "Team Management",
-      desc: "Add staff, assign roles, and manage your whole team from one place.",
+      title: "Customer Management",
+      desc: "Create, edit, search, and manage customer records with activity and spending history.",
     },
   ];
 
   const plans = [
     {
-      name: "Starter",
-      price: "$29",
-      period: "/mo",
-      color: "border-slate-600 light:border-gray-200",
+      name: "Beginner",
+      price: "9",
+      audience: "For new and side businesses",
+      description: "Launch your storefront and start serving customers online.",
+      dailyPrice: "About $0.30 a day",
+      priceAnchor: "Everything needed to get online",
+      checkoutUrl: process.env.NEXT_PUBLIC_BEGINNER_CHECKOUT_URL,
+      color: "border-slate-700 light:border-gray-200",
       badge: null,
+      cta: "Start with Beginner",
       features: [
-        "1 business location",
-        "Up to 50 bookings/mo",
-        "Basic storefront",
-        "Email support",
+        "1 branded business storefront",
+        "Online ordering or appointment booking",
+        "Up to 50 orders or bookings per month",
+        "Product or service management",
+        "Customer records and business settings",
       ],
     },
     {
       name: "Pro",
-      price: "$79",
-      period: "/mo",
+      price: "12",
+      audience: "For growing local businesses",
+      description: "Unlock the controls and insights that help you grow faster.",
+      dailyPrice: "Less than $0.40 a day",
+      priceAnchor: "Only $3 more than Beginner",
+      checkoutUrl: process.env.NEXT_PUBLIC_PRO_CHECKOUT_URL,
       color: "border-violet-500 light:border-violet-300",
-      badge: "Most Popular",
+      badge: "Best Value · Most Popular",
+      cta: "Choose Pro",
       features: [
-        "1 business location",
-        "Unlimited bookings",
-        "Custom domain",
-        "Analytics dashboard",
-        "Priority support",
-        "Stripe payouts",
+        "Everything in Beginner",
+        "Up to 150 orders or bookings per month",
+        "Live revenue and customer analytics",
+        "Inventory, categories and product add-ons",
+        "Availability and appointment deposit settings",
+        "Full storefront branding controls",
       ],
     },
     {
       name: "Enterprise",
-      price: "$199",
-      period: "/mo",
-      color: "border-slate-600 light:border-gray-200",
-      badge: null,
+      price: "16",
+      audience: "For established, high-volume businesses",
+      description: "Remove the limits and get extra help as demand increases.",
+      dailyPrice: "About $0.53 a day",
+      priceAnchor: "Just $4 more than Pro",
+      checkoutUrl: process.env.NEXT_PUBLIC_ENTERPRISE_CHECKOUT_URL,
+      color: "border-indigo-500/70 light:border-indigo-300",
+      badge: "Maximum Scale",
+      cta: "Go Enterprise",
       features: [
-        "Multiple locations",
-        "Unlimited everything",
-        "White-label option",
-        "Dedicated support",
-        "Custom integrations",
+        "Everything in Pro",
+        "Unlimited orders or appointments",
+        "Unlimited products or services",
+        "Complete customer management and history",
+        "Priority onboarding assistance",
+        "Priority product support",
       ],
     },
   ];
@@ -238,22 +255,29 @@ export default function HomePage() {
 
         <div className="flex items-center justify-center gap-4 flex-wrap">
           <Link
-            href="/register"
+            href="/register?mode=trial"
             className="inline-flex items-center gap-2 px-8 py-4 bg-violet-600 hover:bg-violet-500 light:bg-violet-600 light:hover:bg-violet-700 text-white font-bold rounded-2xl transition-colors shadow-lg shadow-violet-900/30 light:shadow-violet-600/30 text-base"
           >
             Start free trial <ArrowRight className="w-5 h-5" />
           </Link>
           <Link
-            href="/register"
+            href="#pricing"
             className="inline-flex items-center gap-2 px-8 py-4 border border-white/10 light:border-gray-300 hover:border-white/20 light:hover:border-gray-400 text-slate-300 light:text-gray-700 hover:text-white light:hover:text-gray-900 font-bold rounded-2xl transition-colors text-base"
           >
             Sign Up
           </Link>
         </div>
 
-        <p className="text-sm text-slate-600 light:text-gray-500 mt-5">
-          No credit card required · 14-day free trial
-        </p>
+        <div className="mt-6 inline-flex flex-wrap items-center justify-center gap-x-3 gap-y-1 rounded-2xl border border-violet-400/45 bg-gradient-to-r from-violet-600/20 via-purple-500/10 to-indigo-500/20 px-5 py-3 text-sm shadow-[0_0_28px_rgba(139,92,246,0.22)] light:border-violet-300 light:from-violet-100 light:via-white light:to-indigo-100 light:shadow-violet-200/80">
+          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-violet-600 text-white shadow-sm shadow-violet-950/30">
+            <Check className="h-3.5 w-3.5 stroke-[3]" />
+          </span>
+          <strong className="font-black uppercase tracking-wide text-violet-300 light:text-violet-700">
+            14 days completely free
+          </strong>
+          <span className="hidden h-4 w-px bg-violet-400/35 sm:block" />
+          <span className="font-bold text-white light:text-slate-800">No credit card required</span>
+        </div>
       </section>
 
       {/* Business Types */}
@@ -370,7 +394,7 @@ export default function HomePage() {
               See it live
             </h2>
             <p className="text-slate-400 light:text-gray-600">
-              Real business storefronts — built on LocalSpace
+              Sample storefront previews — see what your business could look like
             </p>
           </div>
 
@@ -378,9 +402,7 @@ export default function HomePage() {
             {demos.map((d) => (
               <Link
                 key={d.slug}
-                href={`/store-front/${d.slug}`}
-                target="_blank"
-                rel="noopener noreferrer"
+                href={`/store-front/${d.slug}?demo=1`}
                 className="bg-slate-800/60 light:bg-white border border-slate-700/50 light:border-gray-200 rounded-2xl p-5 hover:border-slate-500 light:hover:border-gray-300 hover:-translate-y-1 transition-all group text-center space-y-4"
               >
                 <div
@@ -407,7 +429,7 @@ export default function HomePage() {
                   {d.type}
                 </span>
                 <div className="flex items-center justify-center gap-1 text-xs text-slate-500 light:text-gray-500 group-hover:text-slate-300 light:group-hover:text-gray-700 transition-colors">
-                  Visit store <ChevronRight className="w-3 h-3" />
+                  View demo <ChevronRight className="w-3 h-3" />
                 </div>
               </Link>
             ))}
@@ -415,10 +437,10 @@ export default function HomePage() {
 
           <div className="mt-10 text-center">
             <Link
-              href="/login"
+              href="/register"
               className="inline-flex items-center gap-2 text-sm text-violet-400 light:text-violet-600 hover:text-violet-300 light:hover:text-violet-700 font-semibold transition-colors"
             >
-              Log in to see the owner dashboard{" "}
+              Ready to build yours? Create your account{" "}
               <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
@@ -428,66 +450,131 @@ export default function HomePage() {
       {/* Pricing */}
       <section
         id="pricing"
-        className="bg-slate-900/40 light:bg-gray-50 border-y border-white/5 light:border-gray-200 py-24"
+        className="relative scroll-mt-20 overflow-hidden bg-slate-900/40 light:bg-gray-50 border-y border-white/5 light:border-gray-200 py-24"
       >
-        <div className="max-w-5xl mx-auto px-6 md:px-12">
-          <div className="text-center mb-16">
+        <div className="pointer-events-none absolute left-1/2 top-0 h-96 w-96 -translate-x-1/2 rounded-full bg-violet-600/10 blur-3xl light:bg-violet-400/10" />
+        <div className="relative max-w-6xl mx-auto px-6 md:px-12">
+          <div className="text-center mb-14">
+            <div className="mb-6 inline-flex flex-wrap items-center justify-center gap-x-3 gap-y-1 rounded-2xl border border-violet-400/50 bg-gradient-to-r from-violet-600/25 via-purple-500/10 to-indigo-500/25 px-5 py-3 shadow-[0_0_32px_rgba(139,92,246,0.25)] light:border-violet-300 light:from-violet-100 light:via-white light:to-indigo-100 light:shadow-violet-200/90">
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-violet-600 text-white shadow-md shadow-violet-950/30">
+                <Check className="h-4 w-4 stroke-[3]" />
+              </span>
+              <span className="text-sm font-black uppercase tracking-wide text-violet-300 light:text-violet-700">14-day free trial</span>
+              <span className="hidden h-5 w-px bg-violet-400/35 sm:block" />
+              <span className="text-sm font-bold text-white light:text-slate-800">No credit card required</span>
+            </div>
             <h2 className="text-3xl md:text-4xl font-black text-white light:text-gray-900 mb-3">
-              Simple, transparent pricing
+              One customer can pay for your whole month
             </h2>
-            <p className="text-slate-400 light:text-gray-600">
-              Start free. Scale as you grow. Cancel anytime.
+            <p className="mx-auto max-w-2xl text-slate-400 light:text-gray-600">
+              Start with the essentials, add growth tools when you need them,
+              and keep every order, appointment, customer, and insight in one place.
             </p>
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs font-semibold text-slate-500 light:text-gray-500">
+              <span className="flex items-center gap-1.5"><Check className="h-3.5 w-3.5 text-violet-400" /> Ordering or appointments</span>
+              <span className="flex items-center gap-1.5"><Check className="h-3.5 w-3.5 text-violet-400" /> Branded storefront included</span>
+              <span className="flex items-center gap-1.5"><Check className="h-3.5 w-3.5 text-violet-400" /> Cancel anytime</span>
+            </div>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-6 items-start">
+          <div className="grid gap-6 md:grid-cols-3 md:items-stretch">
             {plans.map((p) => (
               <div
                 key={p.name}
-                className={`relative bg-slate-800/60 light:bg-white border-2 ${p.color} rounded-3xl p-8 ${p.badge ? "md:-mt-4 md:pb-12" : ""}`}
+                className={`group relative flex flex-col rounded-3xl border-2 bg-slate-800/70 p-7 shadow-xl shadow-black/10 transition duration-300 hover:-translate-y-1 light:bg-white light:shadow-slate-200/60 ${p.color} ${p.name === "Pro" ? "md:-mt-3 md:mb-[-12px] md:p-8 shadow-violet-950/20 light:shadow-violet-200/60" : ""}`}
               >
                 {p.badge && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 bg-violet-600 text-white text-xs font-bold rounded-full whitespace-nowrap">
+                  <div className={`absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full px-4 py-1 text-[11px] font-black uppercase tracking-wide text-white ${p.name === "Pro" ? "bg-violet-600" : "bg-indigo-600"}`}>
                     {p.badge}
                   </div>
                 )}
-                <p className="font-bold text-slate-400 light:text-gray-500 text-sm mb-2">
+                <p className="mb-2 text-xs font-bold uppercase tracking-wider text-violet-300 light:text-violet-700">
+                  {p.audience}
+                </p>
+                <p className="text-xl font-black text-white light:text-gray-900">
                   {p.name}
                 </p>
-                <div className="flex items-end gap-1 mb-6">
-                  <span className="text-4xl font-black text-white light:text-gray-900">
+                <p className="mt-2 min-h-10 text-sm leading-5 text-slate-400 light:text-gray-600">
+                  {p.description}
+                </p>
+                <div className="mt-6 flex items-end gap-1">
+                  <span className="mb-1 text-xl font-black text-white light:text-gray-900">$</span>
+                  <span className="text-5xl font-black tracking-tight text-white light:text-gray-900">
                     {p.price}
                   </span>
-                  <span className="text-slate-500 light:text-gray-500 text-sm mb-1">
-                    {p.period}
+                  <span className="mb-1.5 text-sm text-slate-500 light:text-gray-500">
+                    BZD/ month
                   </span>
                 </div>
-                <ul className="space-y-3 mb-8">
+                <p className="mt-2 text-xs font-semibold text-emerald-400 light:text-emerald-700">
+                  {p.dailyPrice}
+                </p>
+                <div className={`mt-5 rounded-xl border px-3 py-2.5 text-center text-xs font-bold ${p.name === "Pro" ? "border-violet-500/30 bg-violet-500/10 text-violet-200 light:border-violet-200 light:bg-violet-50 light:text-violet-700" : "border-slate-700 bg-slate-900/40 text-slate-300 light:border-gray-200 light:bg-gray-50 light:text-gray-700"}`}>
+                  {p.priceAnchor}
+                </div>
+                <div className="my-6 h-px bg-slate-700/70 light:bg-gray-200" />
+                <p className="mb-4 text-xs font-black uppercase tracking-wider text-slate-300 light:text-gray-700">
+                  What you get
+                </p>
+                <ul className="mb-8 space-y-3">
                   {p.features.map((f) => (
                     <li
                       key={f}
-                      className="flex items-center gap-3 text-sm text-slate-300 light:text-gray-700"
+                      className="flex items-start gap-3 text-sm leading-5 text-slate-300 light:text-gray-700"
                     >
-                      <div className="w-4 h-4 bg-emerald-500/20 light:bg-emerald-100 border border-emerald-500/30 light:border-emerald-300 rounded-full flex items-center justify-center flex-shrink-0">
+                      <div className="mt-0.5 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full border border-emerald-500/30 bg-emerald-500/20 light:border-emerald-300 light:bg-emerald-100">
                         <Check className="w-2.5 h-2.5 text-emerald-400 light:text-emerald-600" />
                       </div>
                       {f}
                     </li>
                   ))}
                 </ul>
-                <Link
-                  href="/register"
-                  className={`block text-center py-3 rounded-xl font-bold text-sm transition-colors ${
-                    p.badge
-                      ? "bg-violet-600 hover:bg-violet-500 light:bg-violet-600 light:hover:bg-violet-700 text-white"
-                      : "bg-slate-700 light:bg-gray-200 hover:bg-slate-600 light:hover:bg-gray-300 text-white light:text-gray-900"
-                  }`}
-                >
-                  Get started
-                </Link>
+                {p.checkoutUrl ? (
+                  <a
+                    href={p.checkoutUrl}
+                    aria-label={`Pay for the ${p.name} plan at $${p.price} per month`}
+                    className={`mt-auto block rounded-xl py-3.5 text-center text-sm font-bold transition-all ${
+                      p.name === "Pro"
+                        ? "bg-violet-600 text-white shadow-lg shadow-violet-950/30 hover:bg-violet-500 light:bg-violet-600 light:shadow-violet-300/30 light:hover:bg-violet-700"
+                        : "bg-slate-700 light:bg-gray-200 hover:bg-slate-600 light:hover:bg-gray-300 text-white light:text-gray-900"
+                    }`}
+                  >
+                    Pay ${p.price} / month
+                  </a>
+                ) : (
+                  <Link
+                    href="/register?mode=trial"
+                    aria-label={`Start a free trial before choosing the ${p.name} plan`}
+                    className={`mt-auto block rounded-xl py-3.5 text-center text-sm font-bold transition-all ${
+                      p.name === "Pro"
+                        ? "bg-violet-600 text-white shadow-lg shadow-violet-950/30 hover:bg-violet-500 light:bg-violet-600 light:shadow-violet-300/30 light:hover:bg-violet-700"
+                        : "bg-slate-700 light:bg-gray-200 hover:bg-slate-600 light:hover:bg-gray-300 text-white light:text-gray-900"
+                    }`}
+                  >
+                    {p.cta}
+                  </Link>
+                )}
               </div>
             ))}
           </div>
+
+          <div className="mx-auto mt-12 grid max-w-4xl gap-4 rounded-2xl border border-violet-500/20 bg-violet-500/[0.07] p-5 sm:grid-cols-[auto_1fr] sm:items-center light:border-violet-200 light:bg-violet-50">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-600 text-white shadow-lg shadow-violet-950/20">
+              <Zap className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="font-black text-white light:text-gray-900">Why Pro is the smartest starting point</p>
+              <p className="mt-1 text-sm leading-6 text-slate-400 light:text-gray-600">
+                For only $3 more than Beginner, you get 5× the monthly activity,
+                live analytics, and advanced ordering or booking controls—while
+                still paying less than $0.40 per day.
+              </p>
+            </div>
+          </div>
+
+          <p className="mt-7 text-center text-xs text-slate-500 light:text-gray-500">
+            All prices are monthly in USD. Your 14-day trial starts when your tenant account is created.
+          </p>
         </div>
       </section>
 

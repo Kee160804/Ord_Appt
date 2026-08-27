@@ -2,7 +2,10 @@
 
 import { useState, useEffect } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import {
+  ArrowLeft,
+  LayoutDashboard,
   Sun,
   Moon,
   X,
@@ -14,12 +17,14 @@ import {
   Facebook,
   Instagram,
   Twitter,
+  Store,
 } from "lucide-react";
 import { getServicesByTenant, getProductsByTenant, getCategoriesByTenant } from "@/app/data/mock";
 import { getStoredProducts, getStoredServices } from "@/app/lib/storage";
 import { isSupabaseConfigured } from "@/app/lib/supabase/config";
 import { AppointmentBooking } from "../components/AppointmentBooking";
 import { OrderingMenu } from "../components/OrderingMenu";
+import { DemoDashboardPreview } from "../components/DemoDashboardPreview";
 import { useTheme } from "@/app/contexts/theme";
 import type { Category, Tenant, Service, Product } from "@/app/types/index";
 
@@ -46,6 +51,7 @@ interface StorefrontClientProps {
   initialCategories?: Category[];
   initialProducts?: Product[];
   initialServices?: Service[];
+  viewOnly?: boolean;
 }
 
 export default function StorefrontClient({
@@ -53,6 +59,7 @@ export default function StorefrontClient({
   initialCategories,
   initialProducts,
   initialServices,
+  viewOnly = false,
 }: StorefrontClientProps) {
   // Cast to extended type to safely access optional fields
   const extendedTenant = tenant as ExtendedTenant;
@@ -114,7 +121,9 @@ export default function StorefrontClient({
 
   // Storage event listener
   useEffect(() => {
-    if (isSupabaseConfigured()) return;
+    // The guided demo must always use its bundled sample data. In particular,
+    // do not let old browser demo/local data replace the curated preview.
+    if (viewOnly || isSupabaseConfigured()) return;
 
     const frame = window.requestAnimationFrame(() => {
       if (isAppt) {
@@ -140,12 +149,15 @@ export default function StorefrontClient({
       window.cancelAnimationFrame(frame);
       window.removeEventListener("storage", handleStorageChange);
     };
-  }, [tenant.id, isAppt]);
+  }, [tenant.id, isAppt, viewOnly]);
 
 
 
   // ---------- Tab Navigation ----------
   const [activeTab, setActiveTab] = useState<"home" | "contact">("home");
+  const [activeDemoView, setActiveDemoView] = useState<"dashboard" | "storefront">(
+    viewOnly ? "dashboard" : "storefront",
+  );
 
   const { theme, toggleTheme } = useTheme();
 
@@ -177,23 +189,69 @@ export default function StorefrontClient({
     <div className="min-h-screen bg-white dark:bg-[#070b14] transition-colors duration-200">
       {/* Header */}
       <header className="border-b border-slate-100 dark:border-slate-800 sticky top-0 bg-white dark:bg-[#070b14] z-20">
-        <div className="max-w-6xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
+        <div className="mx-auto max-w-[1500px] px-3 py-3 sm:px-5">
+          <div className="flex items-center gap-3 sm:gap-4">
+            {viewOnly && (
+              <Link
+                href="/login"
+                className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:border-violet-400 hover:text-violet-600 dark:border-slate-700 dark:text-slate-300 dark:hover:border-violet-500 dark:hover:text-violet-300"
+                aria-label="Back to sign in"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                <span className="hidden sm:inline">Back to sign in</span>
+              </Link>
+            )}
             <div className="flex items-center gap-3">
               <div
-                className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white font-bold"
                 style={{ backgroundColor: tenant.logoBg }}
               >
                 {tenant.logo}
               </div>
-              <div>
-                <h1 className="font-bold text-slate-900 dark:text-white">{tenant.name}</h1>
+              <div className={viewOnly ? "hidden min-w-0 sm:block" : "min-w-0"}>
+                <h1 className="truncate font-bold text-slate-900 dark:text-white">{tenant.name}</h1>
                 <p className="text-xs text-slate-500 dark:text-slate-400">{tenant.city}</p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
+
+            {viewOnly && (
+              <div className="mx-auto flex items-center rounded-xl border border-slate-200 bg-slate-100 p-1 dark:border-slate-700 dark:bg-slate-900" role="tablist" aria-label="Demo view">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeDemoView === "dashboard"}
+                  onClick={() => setActiveDemoView("dashboard")}
+                  className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold transition sm:px-4 ${
+                    activeDemoView === "dashboard"
+                      ? "bg-violet-600 text-white shadow-sm"
+                      : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+                  }`}
+                >
+                  <LayoutDashboard className="h-4 w-4" />
+                  <span className="hidden sm:inline">Demo Dashboard</span>
+                  <span className="sm:hidden">Dashboard</span>
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeDemoView === "storefront"}
+                  onClick={() => setActiveDemoView("storefront")}
+                  className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold transition sm:px-4 ${
+                    activeDemoView === "storefront"
+                      ? "bg-violet-600 text-white shadow-sm"
+                      : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+                  }`}
+                >
+                  <Store className="h-4 w-4" />
+                  Storefront
+                </button>
+              </div>
+            )}
+
+            <div className="ml-auto flex items-center gap-3">
               {/* Navigation Tabs */}
-              <div className="flex gap-2 text-sm font-medium">
+              {(!viewOnly || activeDemoView === "storefront") && (
+              <div className="hidden gap-2 text-sm font-medium lg:flex">
                 <button
                   onClick={() => setActiveTab("home")}
                   className={`px-3 py-1.5 rounded-lg transition ${
@@ -217,6 +275,7 @@ export default function StorefrontClient({
                   Contact
                 </button>
               </div>
+              )}
               {/* Theme Toggle */}
               <button
                 onClick={toggleTheme}
@@ -230,8 +289,18 @@ export default function StorefrontClient({
         </div>
       </header>
 
+      {viewOnly && (
+        <div className="border-b border-violet-200 bg-violet-50 px-4 py-3 text-center text-sm font-medium text-violet-800 dark:border-violet-900/60 dark:bg-violet-950/40 dark:text-violet-200">
+          Demo experience — sample data only. Nothing here changes your account, Supabase data, orders, or appointments.
+        </div>
+      )}
+
+      {viewOnly && activeDemoView === "dashboard" && (
+        <DemoDashboardPreview tenant={tenant} />
+      )}
+
       {/* Hero (clickable, only on home tab) */}
-      {activeTab === "home" && (
+      {(!viewOnly || activeDemoView === "storefront") && activeTab === "home" && (
         <div
           className="relative h-64 md:h-80 overflow-hidden cursor-pointer"
           onClick={() => {
@@ -260,12 +329,14 @@ export default function StorefrontClient({
       )}
 
       {/* Main content */}
+      {(!viewOnly || activeDemoView === "storefront") && (
       <main className="max-w-6xl mx-auto px-4 py-12">
         {activeTab === "home" ? (
           isAppt ? (
             <AppointmentBooking
               tenant={tenant}
               services={services}
+              viewOnly={viewOnly}
             />
           ) : (
             <OrderingMenu
@@ -276,6 +347,7 @@ export default function StorefrontClient({
               cart={cart}
               updateCart={setCart}
               onOrderPlaced={handleOrderPlaced}
+              viewOnly={viewOnly}
             />
           )
         ) : (
@@ -362,9 +434,10 @@ export default function StorefrontClient({
           </div>
         )}
       </main>
+      )}
 
       {/* Image Gallery Modal */}
-      {galleryOpen && (
+      {galleryOpen && (!viewOnly || activeDemoView === "storefront") && (
         <div
           className="fixed inset-0 bg-black/90 flex items-center justify-center z-50"
           onClick={() => setGalleryOpen(false)}

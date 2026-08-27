@@ -3,13 +3,15 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { AlertCircle, ArrowLeft, Eye } from "lucide-react";
+import { AlertCircle, ArrowLeft, CheckCircle2, CreditCard, Eye } from "lucide-react";
 import { Card, CardBody, CardHeader } from "@/app/components/Card";
 import { formatCurrency } from "@/app/lib/utils";
 import {
   loadAdminTenantData,
+  updateAdminTenantSubscription,
   type AdminTenantData,
 } from "@/app/services/adminService";
+import type { Tenant } from "@/app/types";
 
 export default function TenantDetailPage() {
   const params = useParams<{ Id: string }>();
@@ -18,6 +20,9 @@ export default function TenantDetailPage() {
   const [data, setData] = useState<AdminTenantData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [selectedPlan, setSelectedPlan] = useState<Tenant["plan"]>("starter");
+  const [isUpdatingSubscription, setIsUpdatingSubscription] = useState(false);
+  const [subscriptionMessage, setSubscriptionMessage] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -26,6 +31,7 @@ export default function TenantDetailPage() {
         const result = await loadAdminTenantData(tenantId);
         if (!active) return;
         setData(result);
+        if (result) setSelectedPlan(result.tenant.plan);
         setError(result ? "" : "This tenant was not found or is not accessible.");
       } catch (loadError) {
         if (!active) return;
@@ -47,6 +53,37 @@ export default function TenantDetailPage() {
       active = false;
     };
   }, [tenantId]);
+
+  const updateSubscription = async (
+    status: Tenant["subscriptionStatus"],
+    trialDays?: number,
+  ) => {
+    setIsUpdatingSubscription(true);
+    setError("");
+    setSubscriptionMessage("");
+    try {
+      const updated = await updateAdminTenantSubscription(
+        tenantId,
+        selectedPlan,
+        status,
+        trialDays,
+      );
+      setData((current) => current
+        ? { ...current, tenant: { ...current.tenant, ...updated } }
+        : current);
+      setSubscriptionMessage(
+        status === "active"
+          ? "Paid access activated successfully."
+          : status === "trial"
+            ? "The trial was extended by 14 days."
+            : "Tenant access is now marked past due.",
+      );
+    } catch (updateError) {
+      setError(updateError instanceof Error ? updateError.message : "Unable to update subscription access.");
+    } finally {
+      setIsUpdatingSubscription(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -151,10 +188,48 @@ export default function TenantDetailPage() {
             <Info label="Plan" value={`${tenant.plan} plan`} capitalize />
             <Info label="Subscription" value={tenant.subscriptionStatus} capitalize />
             <Info
+              label="Trial Ends"
+              value={tenant.trialEndsAt ? new Date(tenant.trialEndsAt).toLocaleString() : "Not set"}
+            />
+            <Info
               label="Created"
               value={tenant.createdAt ? new Date(tenant.createdAt).toLocaleDateString() : "Unknown"}
             />
           </div>
+        </CardBody>
+      </Card>
+
+      <Card className="border-slate-700 bg-slate-800/50 light:border-slate-200 light:bg-white">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <CreditCard className="h-4 w-4 text-violet-400" />
+            <h3 className="font-semibold text-white light:text-gray-900">Subscription Access</h3>
+          </div>
+        </CardHeader>
+        <CardBody>
+          <p className="max-w-2xl text-sm leading-6 text-slate-400 light:text-slate-600">
+            Use these secured controls after confirming payment, to grant another trial period, or to pause access for an unpaid account.
+          </p>
+          <div className="mt-5 flex flex-wrap items-end gap-3">
+            <label className="min-w-44">
+              <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-400">Plan</span>
+              <select value={selectedPlan} onChange={(event) => setSelectedPlan(event.target.value as Tenant["plan"])} className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2.5 text-sm text-white outline-none focus:border-violet-500 light:border-slate-300 light:bg-white light:text-slate-900">
+                <option value="starter">Beginner — $9</option>
+                <option value="pro">Pro — $12</option>
+                <option value="enterprise">Enterprise — $16</option>
+              </select>
+            </label>
+            <button disabled={isUpdatingSubscription} onClick={() => void updateSubscription("active")} className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-500 disabled:opacity-50">
+              Activate paid access
+            </button>
+            <button disabled={isUpdatingSubscription} onClick={() => void updateSubscription("trial", 14)} className="rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-violet-500 disabled:opacity-50">
+              Extend trial 14 days
+            </button>
+            <button disabled={isUpdatingSubscription} onClick={() => void updateSubscription("past_due")} className="rounded-xl border border-rose-500/40 px-4 py-2.5 text-sm font-bold text-rose-300 hover:bg-rose-500/10 disabled:opacity-50 light:text-rose-700">
+              Mark past due
+            </button>
+          </div>
+          {subscriptionMessage && <p className="mt-4 flex items-center gap-2 text-sm text-emerald-400 light:text-emerald-700"><CheckCircle2 className="h-4 w-4" />{subscriptionMessage}</p>}
         </CardBody>
       </Card>
 
@@ -182,10 +257,7 @@ export default function TenantDetailPage() {
         </CardBody>
       </Card>
 
-      <p className="text-xs text-slate-500">
-        This screen is currently read-only. Tenant suspension and deletion will require audited
-        server-side admin actions.
-      </p>
+      <p className="text-xs text-slate-500">Subscription changes use a secured SUPER_ADMIN-only database action. Tenant suspension and deletion remain read-only.</p>
     </div>
   );
 }

@@ -222,6 +222,7 @@ export default function RegisterPage() {
               <div className="p-4 bg-violet-900/20 border border-violet-500/20 rounded-xl text-sm text-violet-300">
                 <p className="font-bold mb-1">🎉 You&apos;re almost there!</p>
                 <p className="text-violet-400/70">Your {bType === "appointment" ? "appointment booking" : "online ordering"} storefront will be live instantly after signup.</p>
+                <p className="mt-2 text-violet-300">Your 14-day free trial begins when this business is created. No credit card is required today.</p>
               </div>
               <div className="flex gap-3">
                 <button onClick={() => setStep(2)} className="flex-1 py-3 border border-slate-600 hover:border-slate-500 text-slate-300 font-bold rounded-xl transition-colors flex items-center justify-center gap-2">
