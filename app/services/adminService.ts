@@ -48,6 +48,66 @@ interface AdminCustomerRow {
   tenant_id: string;
 }
 
+interface AdminProfileRow {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+  platform_role: string | null;
+  is_active: boolean;
+  created_at: string | null;
+}
+
+interface AdminMembershipRow {
+  id: string;
+  tenant_id: string;
+  profile_id: string;
+  role_id: string;
+  is_active: boolean;
+}
+
+interface AdminRoleRow {
+  id: string;
+  tenant_id: string | null;
+  name: string;
+  description: string | null;
+  is_system_role: boolean;
+}
+
+export interface AdminAgentRecord {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  tenantId: string | null;
+  tenantName: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface AdminRoleSummary {
+  id: string;
+  name: string;
+  description: string;
+  isSystem: boolean;
+  userCount: number;
+  tenantCount: number;
+}
+
+export interface AdminRevenuePoint {
+  date: string;
+  revenue: number;
+  activity: number;
+}
+
+export interface AdminActivityRecord {
+  id: string;
+  type: "tenant" | "order" | "appointment";
+  title: string;
+  description: string;
+  createdAt: string;
+  tenantName: string;
+}
+
 export interface AdminTenantData {
   tenant: Tenant;
   analytics: AnalyticsSummary;
@@ -59,6 +119,11 @@ export interface AdminPlatformData {
   totalRevenue: number;
   totalActivity: number;
   totalCustomers: number;
+  totalUsers: number;
+  agents: AdminAgentRecord[];
+  roles: AdminRoleSummary[];
+  revenueSeries: AdminRevenuePoint[];
+  recentActivity: AdminActivityRecord[];
 }
 
 function client() {
@@ -149,7 +214,15 @@ async function loadData(tenantId?: string): Promise<AdminPlatformData> {
   const tenantFilter = <T extends { eq: (column: string, value: string) => T }>(query: T) =>
     tenantId ? query.eq("tenant_id", tenantId) : query;
 
-  const [tenantRows, orderRows, appointmentRows, customerRows] = await Promise.all([
+  const [
+    tenantRows,
+    orderRows,
+    appointmentRows,
+    customerRows,
+    profileRows,
+    membershipRows,
+    roleRows,
+  ] = await Promise.all([
     collectPages<TenantRow>(async (from, to) => {
       let query = supabase.from("tenants").select("*").order("created_at", { ascending: false });
       if (tenantId) query = query.eq("id", tenantId);
@@ -181,6 +254,30 @@ async function loadData(tenantId?: string): Promise<AdminPlatformData> {
       query = tenantFilter(query);
       const { data, error } = await query.range(from, to);
       return { data: data as AdminCustomerRow[] | null, error };
+    }),
+    collectPages<AdminProfileRow>(async (from, to) => {
+      const query = supabase
+        .from("profiles")
+        .select("id, full_name, email, platform_role, is_active, created_at")
+        .order("created_at", { ascending: false });
+      const { data, error } = await query.range(from, to);
+      return { data: data as AdminProfileRow[] | null, error };
+    }),
+    collectPages<AdminMembershipRow>(async (from, to) => {
+      let query = supabase
+        .from("tenant_memberships")
+        .select("id, tenant_id, profile_id, role_id, is_active");
+      query = tenantFilter(query);
+      const { data, error } = await query.range(from, to);
+      return { data: data as AdminMembershipRow[] | null, error };
+    }),
+    collectPages<AdminRoleRow>(async (from, to) => {
+      let query = supabase
+        .from("roles")
+        .select("id, tenant_id, name, description, is_system_role");
+      query = tenantFilter(query);
+      const { data, error } = await query.range(from, to);
+      return { data: data as AdminRoleRow[] | null, error };
     }),
   ]);
 
@@ -270,6 +367,136 @@ async function loadData(tenantId?: string): Promise<AdminPlatformData> {
     monthlyRevenue: monthlyRevenue.get(row.id) ?? 0,
   }));
   const analyticsRecord = Object.fromEntries(analyticsByTenant);
+  const tenantNameById = new Map(tenants.map((tenant) => [tenant.id, tenant.name]));
+  const roleById = new Map(roleRows.map((role) => [role.id, role]));
+  const membershipsByProfile = new Map<string, AdminMembershipRow[]>();
+
+  for (const membership of membershipRows) {
+    const current = membershipsByProfile.get(membership.profile_id) ?? [];
+    current.push(membership);
+    membershipsByProfile.set(membership.profile_id, current);
+  }
+
+  const agents = profileRows
+    .map<AdminAgentRecord>((profile) => {
+      const membership = membershipsByProfile.get(profile.id)?.[0];
+      const isSuperAdmin = profile.platform_role?.toUpperCase() === "SUPER_ADMIN";
+      const role = membership ? roleById.get(membership.role_id) : undefined;
+      return {
+        id: profile.id,
+        name: profile.full_name?.trim() || profile.email?.split("@")[0] || "Unnamed user",
+        email: profile.email ?? "No email",
+        role: isSuperAdmin ? "Super Admin" : role?.name ?? "Unassigned",
+        tenantId: membership?.tenant_id ?? null,
+        tenantName: membership
+          ? tenantNameById.get(membership.tenant_id) ?? "Unknown tenant"
+          : isSuperAdmin
+            ? "Platform"
+            : "Unassigned",
+        isActive: profile.is_active && (membership?.is_active ?? true),
+        createdAt: profile.created_at ?? "",
+      };
+    })
+    .filter((agent) => !tenantId || agent.tenantId === tenantId);
+
+  const roleGroups = new Map<string, AdminRoleSummary>();
+  for (const role of roleRows) {
+    const key = role.name.trim().toUpperCase();
+    const current = roleGroups.get(key) ?? {
+      id: key.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+      name: role.name,
+      description: role.description ?? "Tenant access role",
+      isSystem: role.is_system_role,
+      userCount: 0,
+      tenantCount: 0,
+    };
+    current.isSystem ||= role.is_system_role;
+    roleGroups.set(key, current);
+  }
+
+  for (const [key, summary] of roleGroups) {
+    const matchingRoles = new Set(
+      roleRows.filter((role) => role.name.trim().toUpperCase() === key).map((role) => role.id),
+    );
+    const matchingMemberships = membershipRows.filter((membership) =>
+      matchingRoles.has(membership.role_id),
+    );
+    summary.userCount = new Set(matchingMemberships.map((membership) => membership.profile_id)).size;
+    summary.tenantCount = new Set(matchingMemberships.map((membership) => membership.tenant_id)).size;
+  }
+
+  const superAdmins = profileRows.filter(
+    (profile) => profile.platform_role?.toUpperCase() === "SUPER_ADMIN",
+  );
+  if (superAdmins.length && !tenantId) {
+    roleGroups.set("SUPER_ADMIN", {
+      id: "super-admin",
+      name: "Super Admin",
+      description: "Full platform access across all tenants",
+      isSystem: true,
+      userCount: superAdmins.length,
+      tenantCount: tenants.length,
+    });
+  }
+
+  const seriesByDate = new Map<string, AdminRevenuePoint>();
+  for (let offset = 29; offset >= 0; offset -= 1) {
+    const date = new Date();
+    date.setHours(0, 0, 0, 0);
+    date.setDate(date.getDate() - offset);
+    const key = date.toISOString().slice(0, 10);
+    seriesByDate.set(key, { date: key, revenue: 0, activity: 0 });
+  }
+
+  for (const order of orderRows) {
+    const point = seriesByDate.get(order.created_at.slice(0, 10));
+    if (!point) continue;
+    point.activity += 1;
+    if (["DELIVERED", "COMPLETED"].includes(order.status.toUpperCase())) {
+      point.revenue += Number(order.total) || 0;
+    }
+  }
+  for (const appointment of appointmentRows) {
+    const point = seriesByDate.get(appointment.created_at.slice(0, 10));
+    if (!point) continue;
+    point.activity += 1;
+    if (appointment.status.toUpperCase() === "COMPLETED") {
+      const services = appointment.appointment_services ?? [];
+      point.revenue +=
+        Number(appointment.total ?? appointment.subtotal) ||
+        services.reduce((sum, service) => sum + (Number(service.price) || 0), 0);
+    }
+  }
+
+  const recentActivity: AdminActivityRecord[] = [
+    ...tenantRows.map((tenant) => ({
+      id: `tenant-${tenant.id}`,
+      type: "tenant" as const,
+      title: "Business registered",
+      description: `${tenant.business_name} joined the platform`,
+      createdAt: tenant.created_at ?? "",
+      tenantName: tenant.business_name,
+    })),
+    ...orderRows.map((order) => ({
+      id: `order-${order.id}`,
+      type: "order" as const,
+      title: "Order placed",
+      description: `Order ${order.id.slice(0, 8).toUpperCase()} was created`,
+      createdAt: order.created_at,
+      tenantName: tenantNameById.get(order.tenant_id) ?? "Unknown tenant",
+    })),
+    ...appointmentRows.map((appointment) => ({
+      id: `appointment-${appointment.id}`,
+      type: "appointment" as const,
+      title: "Appointment booked",
+      description: `Appointment ${appointment.id.slice(0, 8).toUpperCase()} was created`,
+      createdAt: appointment.created_at,
+      tenantName: tenantNameById.get(appointment.tenant_id) ?? "Unknown tenant",
+    })),
+  ]
+    .filter((activity) => activity.createdAt)
+    .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
+    .slice(0, 6);
 
   return {
     tenants,
@@ -280,6 +507,11 @@ async function loadData(tenantId?: string): Promise<AdminPlatformData> {
     ),
     totalActivity: orderRows.length + appointmentRows.length,
     totalCustomers: customerRows.length,
+    totalUsers: profileRows.length,
+    agents,
+    roles: [...roleGroups.values()].sort((a, b) => b.userCount - a.userCount),
+    revenueSeries: [...seriesByDate.values()],
+    recentActivity,
   };
 }
 
