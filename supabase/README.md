@@ -30,6 +30,12 @@ For projects that already applied the first owner-onboarding migration, apply
 cooperate with foundational `trg_initialize_new_tenant` installations and
 prevents duplicate OWNER membership inserts.
 
+The live super-admin overview requires
+`202608260003_super_admin_access.sql`. It installs the database-level platform
+role check, prevents browser self-promotion, and adds cross-tenant policies for
+the application tables. Assign individual super admins separately by updating
+`profiles.platform_role` from a trusted SQL/admin environment.
+
 ## Cross-tenant RLS verification
 
 Seed two test owner accounts in different tenants. Business B must have at

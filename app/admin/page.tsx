@@ -1,34 +1,47 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/app/contexts/auth";
-import { useRealtime } from "@/app/contexts/realtime";
-import { mockTenants, mockAnalytics } from "@/app/data/mock";
 import { Card, CardHeader } from "@/app/components/Card";
 import { formatCurrency, cn } from "@/app/lib/utils";
 import { TenantManagement } from "@/app/components/TenantManagement";
 import { AgentManagement } from "@/app/components/AgentManagement";
 import { RoleManagement } from "@/app/components/RoleManagement";
 import {
-  Building2,
-  Users,
-  DollarSign,
-  ShoppingBag,
+  loadAdminPlatformData,
+  type AdminPlatformData,
+} from "@/app/services/adminService";
+import {
+  AlertCircle,
   ArrowRight,
+  Building2,
+  DollarSign,
   LayoutGrid,
-  Users2,
+  RefreshCw,
   Shield,
+  ShoppingBag,
+  Users,
+  Users2,
 } from "lucide-react";
-import type { Role, Agent } from "@/app/types";
+import type { Agent, Role } from "@/app/types";
+
+const EMPTY_PLATFORM_DATA: AdminPlatformData = {
+  tenants: [],
+  analyticsByTenant: {},
+  totalRevenue: 0,
+  totalActivity: 0,
+  totalCustomers: 0,
+};
 
 export default function AdminPage() {
   const { logout } = useAuth();
-  const realtime = useRealtime();
-
   const [activeTab, setActiveTab] = useState<
     "overview" | "tenants" | "agents" | "roles"
   >("overview");
+  const [platformData, setPlatformData] = useState<AdminPlatformData>(EMPTY_PLATFORM_DATA);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
   const [roles, setRoles] = useState<Role[]>([
     {
       id: "role-admin",
@@ -56,56 +69,33 @@ export default function AdminPage() {
   ]);
   const [agents, setAgents] = useState<Agent[]>([]);
 
-  const registeredUsers = realtime.getAllRegisteredUsers();
-  const dynamicTenants = realtime.getTenantTenants();
-  const allTenants = [...mockTenants, ...dynamicTenants];
+  const refreshPlatformData = useCallback(async () => {
+    setIsLoading(true);
+    setError("");
+    try {
+      setPlatformData(await loadAdminPlatformData());
+    } catch (loadError) {
+      setError(
+        loadError instanceof Error
+          ? loadError.message
+          : "Unable to load platform data from Supabase.",
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
-  const totalRevenue = Object.values(mockAnalytics).reduce(
-    (sum, a) => sum + a.totalRevenue,
-    0,
-  );
-  const totalActivity = Object.values(mockAnalytics).reduce(
-    (sum, a) => sum + a.totalActivity,
-    0,
-  );
-  const totalCustomers =
-    Object.values(mockAnalytics).reduce((sum, a) => sum + a.newCustomers, 0) +
-    registeredUsers.length;
+  useEffect(() => {
+    void refreshPlatformData();
+  }, [refreshPlatformData]);
 
-  const handleAddRole = (newRole: Partial<Role>) => {
-    setRoles([...roles, newRole as Role]);
-  };
-
-  const handleDeleteRole = (id: string) => {
-    setRoles(roles.filter((r) => r.id !== id));
-  };
-
-  const handleAddAgent = (newAgent: Partial<Agent>) => {
-    setAgents([...agents, newAgent as Agent]);
-  };
-
-  const handleDeleteAgent = (id: string) => {
-    setAgents(agents.filter((a) => a.id !== id));
-  };
-
-  const handleToggleAgentStatus = (id: string) => {
-    setAgents(
-      agents.map((a) => (a.id === id ? { ...a, isActive: !a.isActive } : a)),
+  const explainReadOnlyAction = () => {
+    setError(
+      "Tenant write controls are not enabled yet. Live data is read-only until audited admin actions are installed.",
     );
   };
 
-  const handleAddTenant = () => {
-    // In a real app, this would persist to database
-  };
-
-  const handleDeleteTenant = () => {
-    // In a real app, this would delete from database
-  };
-
-  const handleToggleTenantStatus = () => {
-    // In a real app, this would update in database
-  };
-
+  const activeTenants = platformData.tenants.filter((tenant) => tenant.isActive).length;
   const tabs = [
     { id: "overview", label: "Overview", icon: LayoutGrid },
     { id: "tenants", label: "Tenant Management", icon: Building2 },
@@ -114,137 +104,154 @@ export default function AdminPage() {
   ];
 
   return (
-    <div className="p-8 space-y-6 bg-[#070b14] light:bg-white min-h-screen text-white light:text-gray-900">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+    <div className="min-h-screen space-y-6 bg-[#070b14] p-8 text-white light:bg-white light:text-gray-900">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black text-white light:text-gray-900">
             Super Admin Dashboard
           </h1>
-          <p className="text-slate-400 light:text-gray-600">
-            Platform management &amp; configuration
-          </p>
+          <p className="text-slate-400 light:text-gray-600">Live platform data from Supabase</p>
         </div>
-        <button
-          onClick={logout}
-          className="px-4 py-2 text-sm font-medium text-slate-400 light:text-gray-700 hover:text-white light:hover:text-gray-900 bg-slate-800 light:bg-gray-100 rounded-xl hover:bg-slate-700 light:hover:bg-gray-200 transition"
-        >
-          Logout
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => void refreshPlatformData()}
+            disabled={isLoading}
+            className="inline-flex items-center gap-2 rounded-xl bg-slate-800 px-4 py-2 text-sm font-medium text-slate-300 transition hover:bg-slate-700 disabled:opacity-50 light:bg-gray-100 light:text-gray-700 light:hover:bg-gray-200"
+          >
+            <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+            Refresh
+          </button>
+          <button
+            onClick={logout}
+            className="rounded-xl bg-slate-800 px-4 py-2 text-sm font-medium text-slate-400 transition hover:bg-slate-700 hover:text-white light:bg-gray-100 light:text-gray-700 light:hover:bg-gray-200 light:hover:text-gray-900"
+          >
+            Logout
+          </button>
+        </div>
       </div>
 
-      {/* Tab Navigation */}
-      <div className="flex gap-2 border-b border-slate-700 light:border-gray-200 overflow-x-auto">
+      {error && (
+        <div className="flex items-start gap-3 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300 light:text-red-700">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+
+      <div className="flex gap-2 overflow-x-auto border-b border-slate-700 light:border-gray-200">
         {tabs.map((tab) => {
           const Icon = tab.icon;
-          const isActive =
-            activeTab ===
-            (tab.id as "overview" | "tenants" | "agents" | "roles");
+          const tabId = tab.id as typeof activeTab;
           return (
             <button
               key={tab.id}
-              onClick={() =>
-                setActiveTab(
-                  tab.id as "overview" | "tenants" | "agents" | "roles",
-                )
-              }
+              onClick={() => setActiveTab(tabId)}
               className={cn(
-                "flex items-center gap-2 px-4 py-3 border-b-2 font-medium text-sm transition whitespace-nowrap",
-                isActive
+                "flex items-center gap-2 whitespace-nowrap border-b-2 px-4 py-3 text-sm font-medium transition",
+                activeTab === tabId
                   ? "border-violet-500 text-violet-400 light:text-violet-600"
-                  : "border-transparent text-slate-400 light:text-gray-600 hover:text-white light:hover:text-gray-900",
+                  : "border-transparent text-slate-400 hover:text-white light:text-gray-600 light:hover:text-gray-900",
               )}
             >
-              <Icon className="w-4 h-4" />
+              <Icon className="h-4 w-4" />
               {tab.label}
             </button>
           );
         })}
       </div>
 
-      {/* Overview Tab */}
       {activeTab === "overview" && (
         <div className="space-y-6">
-          {/* Global stats */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <StatCard
-              label="Total Revenue"
-              value={formatCurrency(totalRevenue)}
-              icon={<DollarSign className="w-5 h-5 text-emerald-500" />}
+              label="Recognized Revenue"
+              value={formatCurrency(platformData.totalRevenue)}
+              icon={<DollarSign className="h-5 w-5 text-emerald-500" />}
               bg="bg-emerald-500/20 light:bg-emerald-50"
             />
             <StatCard
-              label="Total Transactions"
-              value={totalActivity.toString()}
-              icon={<ShoppingBag className="w-5 h-5 text-blue-500" />}
+              label="Orders & Appointments"
+              value={platformData.totalActivity.toString()}
+              icon={<ShoppingBag className="h-5 w-5 text-blue-500" />}
               bg="bg-blue-500/20 light:bg-blue-50"
             />
             <StatCard
-              label="Total Customers"
-              value={totalCustomers.toString()}
-              icon={<Users className="w-5 h-5 text-violet-500" />}
+              label="Persisted Customers"
+              value={platformData.totalCustomers.toString()}
+              icon={<Users className="h-5 w-5 text-violet-500" />}
               bg="bg-violet-500/20 light:bg-violet-50"
             />
             <StatCard
               label="Active Tenants"
-              value={allTenants.length.toString()}
-              icon={<Building2 className="w-5 h-5 text-amber-500" />}
+              value={activeTenants.toString()}
+              icon={<Building2 className="h-5 w-5 text-amber-500" />}
               bg="bg-amber-500/20 light:bg-amber-50"
             />
           </div>
 
-          {/* Tenant list */}
-          <Card className="bg-slate-800/50 light:bg-white border-slate-700 light:border-gray-200">
+          <Card className="border-slate-700 bg-slate-800/50 light:border-gray-200 light:bg-white">
             <CardHeader>
-              <h3 className="font-semibold text-white light:text-gray-900">
-                All Businesses
-              </h3>
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-white light:text-gray-900">All Businesses</h3>
+                <span className="text-xs text-slate-400">
+                  {isLoading ? "Loading..." : `${platformData.tenants.length} tenants`}
+                </span>
+              </div>
             </CardHeader>
             <div className="divide-y divide-slate-700 light:divide-slate-100">
-              {allTenants.map((tenant) => {
-                const analytics = mockAnalytics[tenant.id];
+              {!isLoading && platformData.tenants.length === 0 && (
+                <p className="px-6 py-10 text-center text-sm text-slate-400">
+                  No businesses were returned by Supabase.
+                </p>
+              )}
+              {platformData.tenants.map((tenant) => {
+                const analytics = platformData.analyticsByTenant[tenant.id];
                 return (
                   <div
                     key={tenant.id}
-                    className="px-6 py-4 flex items-center gap-4 hover:bg-slate-700 light:hover:bg-gray-50 transition-colors"
+                    className="flex items-center gap-4 px-6 py-4 transition-colors hover:bg-slate-700/60 light:hover:bg-gray-50"
                   >
                     <div
-                      className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold"
+                      className="flex h-10 w-10 items-center justify-center rounded-lg font-bold text-white"
                       style={{ backgroundColor: tenant.logoBg }}
                     >
                       {tenant.logo}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
                         <p className="text-sm font-semibold text-white light:text-gray-900">
                           {tenant.name}
                         </p>
                         <span
                           className={cn(
-                            "text-xs px-2 py-0.5 rounded-full",
+                            "rounded-full px-2 py-0.5 text-xs",
                             tenant.businessType === "appointment"
-                              ? "bg-violet-500/20 light:bg-violet-100 text-violet-400 light:text-violet-700"
-                              : "bg-orange-500/20 light:bg-orange-100 text-orange-400 light:text-orange-700",
+                              ? "bg-violet-500/20 text-violet-400 light:bg-violet-100 light:text-violet-700"
+                              : "bg-orange-500/20 text-orange-400 light:bg-orange-100 light:text-orange-700",
                           )}
                         >
                           {tenant.businessType}
                         </span>
-                        {dynamicTenants.some((t) => t.id === tenant.id) && (
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400">
-                            ✨ New
-                          </span>
-                        )}
+                        <span
+                          className={cn(
+                            "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                            tenant.isActive
+                              ? "bg-emerald-500/15 text-emerald-400"
+                              : "bg-slate-500/15 text-slate-400",
+                          )}
+                        >
+                          {tenant.isActive ? "Active" : "Inactive"}
+                        </span>
                       </div>
-                      <p className="text-xs text-slate-400 light:text-gray-600 mt-0.5">
-                        Revenue: {formatCurrency(analytics?.totalRevenue ?? 0)}{" "}
-                        · Transactions: {analytics?.totalActivity}
+                      <p className="mt-0.5 text-xs text-slate-400 light:text-gray-600">
+                        Revenue: {formatCurrency(analytics?.totalRevenue ?? 0)} · Transactions:{" "}
+                        {analytics?.totalActivity ?? 0} · Customers: {analytics?.newCustomers ?? 0}
                       </p>
                     </div>
                     <Link
                       href={`/admin/tenant/${tenant.id}`}
-                      className="text-sm text-violet-400 light:text-violet-600 hover:text-violet-300 light:hover:text-violet-800 font-medium flex items-center gap-1"
+                      className="flex items-center gap-1 text-sm font-medium text-violet-400 hover:text-violet-300 light:text-violet-600 light:hover:text-violet-800"
                     >
-                      View <ArrowRight className="w-3 h-3" />
+                      View <ArrowRight className="h-3 w-3" />
                     </Link>
                   </div>
                 );
@@ -254,34 +261,38 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* Tenant Management Tab */}
       {activeTab === "tenants" && (
         <TenantManagement
-          tenants={allTenants}
-          onAddTenant={handleAddTenant}
-          onDeleteTenant={handleDeleteTenant}
-          onToggleTenantStatus={handleToggleTenantStatus}
+          tenants={platformData.tenants}
+          onAddTenant={explainReadOnlyAction}
+          onDeleteTenant={explainReadOnlyAction}
+          onToggleTenantStatus={explainReadOnlyAction}
+          readOnly
         />
       )}
 
-      {/* Agent Management Tab */}
       {activeTab === "agents" && (
         <AgentManagement
           agents={agents}
           roles={roles}
-          tenants={allTenants}
-          onAddAgent={handleAddAgent}
-          onDeleteAgent={handleDeleteAgent}
-          onToggleAgentStatus={handleToggleAgentStatus}
+          tenants={platformData.tenants}
+          onAddAgent={(agent) => setAgents((current) => [...current, agent as Agent])}
+          onDeleteAgent={(id) => setAgents((current) => current.filter((agent) => agent.id !== id))}
+          onToggleAgentStatus={(id) =>
+            setAgents((current) =>
+              current.map((agent) =>
+                agent.id === id ? { ...agent, isActive: !agent.isActive } : agent,
+              ),
+            )
+          }
         />
       )}
 
-      {/* Role Management Tab */}
       {activeTab === "roles" && (
         <RoleManagement
           roles={roles}
-          onAddRole={handleAddRole}
-          onDeleteRole={handleDeleteRole}
+          onAddRole={(role) => setRoles((current) => [...current, role as Role])}
+          onDeleteRole={(id) => setRoles((current) => current.filter((role) => role.id !== id))}
         />
       )}
     </div>
@@ -300,17 +311,13 @@ function StatCard({
   bg: string;
 }) {
   return (
-    <div className="bg-slate-800/50 light:bg-white rounded-2xl border border-slate-700 light:border-gray-200 shadow-sm p-6">
+    <div className="rounded-2xl border border-slate-700 bg-slate-800/50 p-6 shadow-sm light:border-gray-200 light:bg-white">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-sm font-medium text-slate-400 light:text-gray-600">
-            {label}
-          </p>
-          <p className="text-2xl font-bold text-white light:text-gray-900 mt-1.5">
-            {value}
-          </p>
+          <p className="text-sm font-medium text-slate-400 light:text-gray-600">{label}</p>
+          <p className="mt-1.5 text-2xl font-bold text-white light:text-gray-900">{value}</p>
         </div>
-        <div className={`p-3 rounded-xl ${bg}`}>{icon}</div>
+        <div className={`rounded-xl p-3 ${bg}`}>{icon}</div>
       </div>
     </div>
   );

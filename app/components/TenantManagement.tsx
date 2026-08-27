@@ -20,6 +20,7 @@ interface TenantManagementProps {
   onAddTenant: (tenant: Partial<Tenant>) => void;
   onDeleteTenant: (id: string) => void;
   onToggleTenantStatus: (id: string) => void;
+  readOnly?: boolean;
 }
 
 export function TenantManagement({
@@ -27,6 +28,7 @@ export function TenantManagement({
   onAddTenant,
   onDeleteTenant,
   onToggleTenantStatus,
+  readOnly = false,
 }: TenantManagementProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [filters, setFilters] = useState<{
@@ -93,17 +95,23 @@ export function TenantManagement({
             Create, manage, and monitor all business tenants
           </p>
         </div>
-        <button
-          onClick={() => setIsAddingTenant(!isAddingTenant)}
-          className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg font-medium transition"
-        >
-          <Plus className="w-4 h-4" />
-          Add Tenant
-        </button>
+        {readOnly ? (
+          <span className="rounded-full border border-slate-700 px-3 py-1.5 text-xs font-semibold text-slate-400 light:border-slate-200 light:text-slate-600">
+            Live · Read-only
+          </span>
+        ) : (
+          <button
+            onClick={() => setIsAddingTenant(!isAddingTenant)}
+            className="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg font-medium transition"
+          >
+            <Plus className="w-4 h-4" />
+            Add Tenant
+          </button>
+        )}
       </div>
 
       {/* Add Tenant Form */}
-      {isAddingTenant && (
+      {!readOnly && isAddingTenant && (
         <Card className="bg-slate-800/50 light:bg-white border-slate-700 light:border-gray-200">
           <CardHeader>
             <h3 className="font-semibold text-white light:text-gray-900">
@@ -279,6 +287,9 @@ export function TenantManagement({
                     </span>
                   </td>
                   <td className="px-6 py-4">
+                    {readOnly ? (
+                      <span className="text-xs text-slate-500">Read-only</span>
+                    ) : (
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => onToggleTenantStatus(tenant.id)}
@@ -309,6 +320,7 @@ export function TenantManagement({
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
+                    )}
                   </td>
                 </tr>
               ))}
