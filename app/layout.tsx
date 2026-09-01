@@ -52,7 +52,7 @@
 // });
 
 // export const metadata: Metadata = {
-//   title: "LocalSpace",
+//   title: "YuhBusiness",
 //   description: "Platform for local businesses to manage appointments and orders.",
 // };
 
@@ -92,7 +92,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "LocalSpace",
+  title: "YuhBusiness",
   description:
     "Platform for local businesses to manage appointments and orders.",
 };
@@ -120,7 +120,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="light" suppressHydrationWarning>
+    <html lang="en-BZ" className="light" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeBootstrapScript }} />
       </head>

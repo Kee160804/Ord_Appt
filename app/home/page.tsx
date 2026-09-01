@@ -93,6 +93,7 @@ export default function HomePage() {
         "Inventory, categories and product add-ons",
         "Availability and appointment deposit settings",
         "Full storefront branding controls",
+        "Storefront contact message form",
       ],
     },
     {
@@ -161,7 +162,7 @@ export default function HomePage() {
             <Sparkles className="w-4 h-4 text-white" />
           </div>
           <span className="font-black text-white light:text-gray-900 text-lg tracking-tight">
-            LocalSpace
+            YuhBusiness
           </span>
         </div>
 
@@ -237,15 +238,14 @@ export default function HomePage() {
         </div>
 
         <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-violet-500/10 light:bg-violet-100 border border-violet-500/20 light:border-violet-200 text-violet-300 light:text-violet-700 text-xs font-bold rounded-full mb-8">
-          <Zap className="w-3 h-3" /> The all-in-one platform for local
-          businesses
+          <Zap className="w-3 h-3" /> Evriting fi run yuh local business
         </div>
 
         <h1 className="text-5xl sm:text-6xl lg:text-7xl font-black text-white light:text-gray-900 leading-[1.05] tracking-tight mb-6">
-          Your business.
+          Tek Yuh Business Online.
           <br />
           <span className="bg-gradient-to-r from-violet-400 to-indigo-400 light:from-violet-600 light:to-indigo-600 bg-clip-text text-transparent">
-            Online in minutes.
+            Eena minutes.
           </span>
         </h1>
 
@@ -259,13 +259,13 @@ export default function HomePage() {
             href="/register?mode=trial"
             className="inline-flex items-center gap-2 px-8 py-4 bg-violet-600 hover:bg-violet-500 light:bg-violet-600 light:hover:bg-violet-700 text-white font-bold rounded-2xl transition-colors shadow-lg shadow-violet-900/30 light:shadow-violet-600/30 text-base"
           >
-            Start free trial <ArrowRight className="w-5 h-5" />
+            Start yuh free trial <ArrowRight className="w-5 h-5" />
           </Link>
           <Link
             href="#pricing"
             className="inline-flex items-center gap-2 px-8 py-4 border border-white/10 light:border-gray-300 hover:border-white/20 light:hover:border-gray-400 text-slate-300 light:text-gray-700 hover:text-white light:hover:text-gray-900 font-bold rounded-2xl transition-colors text-base"
           >
-            Sign Up
+            Si di plans
           </Link>
         </div>
 
@@ -274,10 +274,10 @@ export default function HomePage() {
             <Check className="h-3.5 w-3.5 stroke-[3]" />
           </span>
           <strong className="font-black uppercase tracking-wide text-violet-300 light:text-violet-700">
-            14 days completely free
+            14 days free fi true
           </strong>
           <span className="hidden h-4 w-px bg-violet-400/35 sm:block" />
-          <span className="font-bold text-white light:text-slate-800">No credit card required</span>
+          <span className="font-bold text-white light:text-slate-800">No card needed</span>
         </div>
       </section>
 
@@ -290,7 +290,7 @@ export default function HomePage() {
               <Calendar className="w-6 h-6 text-violet-400 light:text-violet-600" />
             </div>
             <h3 className="text-xl font-black text-white light:text-gray-900 mb-2">
-              Appointment Businesses
+              Fi Appointment Businesses
             </h3>
             <p className="text-slate-400 light:text-gray-600 text-sm mb-5">
               Let clients book your services 24/7. Manage your calendar,
@@ -321,7 +321,7 @@ export default function HomePage() {
               <ShoppingBag className="w-6 h-6 text-orange-400 light:text-orange-600" />
             </div>
             <h3 className="text-xl font-black text-white light:text-gray-900 mb-2">
-              Ordering Businesses
+              Fi Ordering Businesses
             </h3>
             <p className="text-slate-400 light:text-gray-600 text-sm mb-5">
               Take orders online for pickup or delivery. Manage your menu,
@@ -356,7 +356,7 @@ export default function HomePage() {
         <div className="max-w-6xl mx-auto px-6 md:px-12">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-black text-white light:text-gray-900 mb-3">
-              Everything your business needs
+              Evriting yuh business need
             </h2>
             <p className="text-slate-400 light:text-gray-600 text-lg">
               All the tools. One platform. Zero setup headaches.
@@ -392,7 +392,7 @@ export default function HomePage() {
         <div className="max-w-6xl mx-auto px-6 md:px-12">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-black text-white light:text-gray-900 mb-3">
-              See it live
+              Si how ih look
             </h2>
             <p className="text-slate-400 light:text-gray-600">
               Sample storefront previews — see what your business could look like
@@ -430,7 +430,7 @@ export default function HomePage() {
                   {d.type}
                 </span>
                 <div className="flex items-center justify-center gap-1 text-xs text-slate-500 light:text-gray-500 group-hover:text-slate-300 light:group-hover:text-gray-700 transition-colors">
-                  View demo <ChevronRight className="w-3 h-3" />
+                  Si di demo <ChevronRight className="w-3 h-3" />
                 </div>
               </Link>
             ))}
@@ -441,7 +441,7 @@ export default function HomePage() {
               href="/register"
               className="inline-flex items-center gap-2 text-sm text-violet-400 light:text-violet-600 hover:text-violet-300 light:hover:text-violet-700 font-semibold transition-colors"
             >
-              Ready to build yours? Create your account{" "}
+              Ready fi build yours? Create your account{" "}
               <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
@@ -460,12 +460,12 @@ export default function HomePage() {
               <span className="flex h-7 w-7 items-center justify-center rounded-full bg-violet-600 text-white shadow-md shadow-violet-950/30">
                 <Check className="h-4 w-4 stroke-[3]" />
               </span>
-              <span className="text-sm font-black uppercase tracking-wide text-violet-300 light:text-violet-700">14-day free trial</span>
+              <span className="text-sm font-black uppercase tracking-wide text-violet-300 light:text-violet-700">Yuh 14-day free trial</span>
               <span className="hidden h-5 w-px bg-violet-400/35 sm:block" />
-              <span className="text-sm font-bold text-white light:text-slate-800">No credit card required</span>
+              <span className="text-sm font-bold text-white light:text-slate-800">No card needed</span>
             </div>
             <h2 className="text-3xl md:text-4xl font-black text-white light:text-gray-900 mb-3">
-              One customer can pay for your whole month
+              One customer could pay fi yuh whole month
             </h2>
             <p className="mx-auto max-w-2xl text-slate-400 light:text-gray-600">
               Start with the essentials, add growth tools when you need them,
@@ -552,7 +552,7 @@ export default function HomePage() {
                         : "bg-slate-700 light:bg-gray-200 hover:bg-slate-600 light:hover:bg-gray-300 text-white light:text-gray-900"
                     }`}
                   >
-                    {p.cta}
+                    {p.name === "Pro" ? "Choose Pro — di best value" : p.name === "Enterprise" ? "Go big wid Enterprise" : "Start wid Beginner"}
                   </Link>
                 )}
               </div>
@@ -564,7 +564,7 @@ export default function HomePage() {
               <Zap className="h-5 w-5" />
             </div>
             <div>
-              <p className="font-black text-white light:text-gray-900">Why Pro is the smartest starting point</p>
+              <p className="font-black text-white light:text-gray-900">Why Pro da di smartest place fi start</p>
               <p className="mt-1 text-sm leading-6 text-slate-400 light:text-gray-600">
                 For only $3 more than Beginner, you get 5× the monthly activity,
                 live analytics, and advanced ordering or booking controls—while
@@ -605,19 +605,19 @@ export default function HomePage() {
       <section className="py-20 bg-gradient-to-r from-violet-900/40 to-indigo-900/40 light:from-violet-100 light:to-indigo-100 border-y border-violet-500/20 light:border-violet-200">
         <div className="max-w-3xl mx-auto px-6 text-center">
           <h2 className="text-3xl md:text-4xl font-black text-white light:text-gray-900 mb-4">
-            Ready to grow your business?
+            Ready fi grow yuh business?
           </h2>
           <p className="text-slate-400 light:text-gray-600 mb-8">
-            Join thousands of local businesses already using LocalSpace.
+            Join thousands of local businesses already using YuhBusiness.
           </p>
           <Link
             href="/register"
             className="inline-flex items-center gap-2 px-8 py-4 bg-violet-600 hover:bg-violet-500 light:bg-violet-600 light:hover:bg-violet-700 text-white font-bold rounded-2xl transition-colors shadow-lg shadow-violet-900/30 light:shadow-violet-600/30"
           >
-            Create your free account <ArrowRight className="w-5 h-5" />
+            Mek yuh free account <ArrowRight className="w-5 h-5" />
           </Link>
           <div className="flex items-center justify-center gap-6 mt-8 text-sm text-slate-500 light:text-gray-600">
-            {["No credit card", "14-day free trial", "Cancel anytime"].map(
+            {["No card needed", "14 days free", "Cancel anytime"].map(
               (t) => (
                 <span key={t} className="flex items-center gap-1.5">
                   <Check className="w-3.5 h-3.5 text-emerald-500 light:text-emerald-600" />{" "}
@@ -637,7 +637,7 @@ export default function HomePage() {
               <Sparkles className="w-3.5 h-3.5 text-white" />
             </div>
             <span className="font-black text-white light:text-gray-900">
-              BzLocalSpace
+              YuhBusiness
             </span>
           </div>
           <div className="flex items-center gap-6 text-sm text-slate-500 light:text-gray-600">
@@ -665,7 +665,7 @@ export default function HomePage() {
             >
               Admin
             </Link>
-            <span>© 2025 BzLocalSpace Platform</span>
+            <span>© 2025 YuhBusiness Platform</span>
           </div>
         </div>
       </footer>

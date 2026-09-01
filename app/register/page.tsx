@@ -107,11 +107,11 @@ export default function RegisterPage() {
           <div className="w-9 h-9 bg-violet-600/20 border border-violet-500/30 rounded-xl flex items-center justify-center">
             <Sparkles className="w-4 h-4 text-violet-400" />
           </div>
-          <span className="font-black text-xl text-white">LocalSpace</span>
+          <span className="font-black text-xl text-white">YuhBusiness</span>
         </div>
 
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-black text-white">Create your business</h1>
+          <h1 className="text-2xl font-black text-white">Mek yuh business</h1>
           <p className="text-slate-500 text-sm mt-1">Set up your digital storefront in minutes</p>
         </div>
 
@@ -162,7 +162,7 @@ export default function RegisterPage() {
           {/* Step 1: Account */}
           {step === 1 && (
             <div className="space-y-5 animate-fade-in">
-              <div><h2 className="text-lg font-black text-white">Your account</h2><p className="text-sm text-slate-500 mt-0.5">Start with your personal details</p></div>
+              <div><h2 className="text-lg font-black text-white">Yuh account</h2><p className="text-sm text-slate-500 mt-0.5">Start with your personal details</p></div>
               <div className="grid grid-cols-2 gap-4">
                 <Field label="First Name" placeholder="Jane" value={form.firstName} onChange={v => update("firstName", v)} />
                 <Field label="Last Name" placeholder="Smith" value={form.lastName} onChange={v => update("lastName", v)} />
@@ -189,7 +189,7 @@ export default function RegisterPage() {
           {/* Step 2: Business type */}
           {step === 2 && (
             <div className="space-y-5 animate-fade-in">
-              <div><h2 className="text-lg font-black text-white">Business type</h2><p className="text-sm text-slate-500 mt-0.5">What kind of business are you running?</p></div>
+              <div><h2 className="text-lg font-black text-white">Yuh business type</h2><p className="text-sm text-slate-500 mt-0.5">What kind of business are you running?</p></div>
               <div className="grid grid-cols-2 gap-4">
                 {[
                   { type: "appointment" as BusinessType, icon: Calendar, label: "Appointments", desc: "Salons, barbers, clinics, studios", color: "violet", examples: ["💅 Nail salons", "💈 Barbershops", "🧘 Yoga studios"] },
@@ -232,12 +232,12 @@ export default function RegisterPage() {
           {/* Step 3: Business details */}
           {step === 3 && (
             <div className="space-y-5 animate-fade-in">
-              <div><h2 className="text-lg font-black text-white">Business details</h2><p className="text-sm text-slate-500 mt-0.5">Your public storefront information</p></div>
+              <div><h2 className="text-lg font-black text-white">Yuh business details</h2><p className="text-sm text-slate-500 mt-0.5">Your public storefront information</p></div>
               <Field label="Business Name" placeholder="e.g. Luxe Beauty Studio" value={form.businessName} onChange={v => update("businessName", v)} />
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-1.5">Storefront URL</label>
                 <div className="flex items-center">
-                  <span className="text-sm text-slate-500 bg-slate-700/50 border border-slate-600 rounded-l-xl px-3 py-2.5 border-r-0 whitespace-nowrap">localspace.io/</span>
+                  <span className="text-sm text-slate-500 bg-slate-700/50 border border-slate-600 rounded-l-xl px-3 py-2.5 border-r-0 whitespace-nowrap">YuhBusiness.io/</span>
                   <input value={form.slug} onChange={e => update("slug", e.target.value)} placeholder="your-business"
                     className="flex-1 px-4 py-2.5 border border-slate-600 rounded-r-xl text-sm bg-slate-700/50 text-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500 transition placeholder:text-slate-600" />
                 </div>
@@ -247,7 +247,7 @@ export default function RegisterPage() {
                 <Field label="Phone" type="tel" placeholder="(555) 000-0000" value={form.phone} onChange={v => update("phone", v)} />
               </div>
               <div className="p-4 bg-violet-900/20 border border-violet-500/20 rounded-xl text-sm text-violet-300">
-                <p className="font-bold mb-1">🎉 You&apos;re almost there!</p>
+                <p className="font-bold mb-1">🎉 Yuh nearly deh!</p>
                 <p className="text-violet-400/70">Your {bType === "appointment" ? "appointment booking" : "online ordering"} storefront will be live instantly after signup.</p>
                 <p className="mt-2 text-violet-300">Your 14-day free trial begins when this business is created. No credit card is required today.</p>
               </div>
@@ -257,7 +257,7 @@ export default function RegisterPage() {
                 </button>
                 <button onClick={submit} disabled={loading}
                   className="flex-1 py-3 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2">
-                  {loading ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Creating...</> : <>Launch Business 🚀</>}
+                  {loading ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Creating...</> : <>Launch Yuh Business 🚀</>}
                 </button>
               </div>
             </div>
@@ -266,7 +266,7 @@ export default function RegisterPage() {
 
         <p className="text-center text-sm text-slate-500 mt-5">
           Already have an account?{" "}
-          <Link href="/login" className="text-violet-400 font-bold hover:text-violet-300 transition-colors">Sign in</Link>
+          <Link href="/login" className="text-violet-400 font-bold hover:text-violet-300 transition-colors">Sign een</Link>
         </p>
       </div>
     </div>

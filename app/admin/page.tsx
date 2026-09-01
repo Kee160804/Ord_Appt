@@ -113,7 +113,7 @@ function AdminSidebar({ activeView, isOpen, onClose, onLogout, onSelect, userEma
     <aside className={cn("fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-slate-800 bg-[#09101d] px-4 py-5 transition-transform duration-200 light:border-slate-200 light:bg-white lg:translate-x-0", isOpen ? "translate-x-0" : "-translate-x-full")}>
       <div className="mb-7 flex items-center gap-3 px-2">
         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-indigo-700 text-white shadow-lg shadow-violet-900/30"><Sparkles className="h-5 w-5" /></div>
-        <div className="min-w-0 flex-1"><p className="truncate text-sm font-bold text-white light:text-slate-950">LocalSpace</p><p className="text-[11px] text-slate-500">Super Admin</p></div>
+        <div className="min-w-0 flex-1"><p className="truncate text-sm font-bold text-white light:text-slate-950">YuhBusiness</p><p className="text-[11px] text-slate-500">Super Admin</p></div>
         <button aria-label="Close navigation" className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-white light:hover:bg-slate-100 light:hover:text-slate-900 lg:hidden" onClick={onClose}><X className="h-5 w-5" /></button>
       </div>
       <nav className="space-y-1">

@@ -52,7 +52,7 @@ export default function LoginPage() {
           <div className="w-8 h-8 rounded-xl bg-linear-to-br from-violet-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-violet-900/40 light:shadow-violet-500/30">
             <Sparkles className="w-4 h-4 text-white" />
           </div>
-          <span className="font-black text-white light:text-gray-900 text-lg tracking-tight">LocalSpace</span>
+          <span className="font-black text-white light:text-gray-900 text-lg tracking-tight">YuhBusiness</span>
         </div>
 
         <div className="hidden md:flex items-center gap-8 text-sm font-medium">
@@ -93,7 +93,7 @@ export default function LoginPage() {
           </Link>
 
           <Link href="/register" className="text-sm font-bold text-white bg-violet-600 hover:bg-violet-500 light:bg-violet-600 light:hover:bg-violet-700 px-4 py-2 rounded-xl transition-colors shadow-sm">
-            Get Started Free
+            Start free
           </Link>
         </div>
       </nav>
@@ -109,11 +109,11 @@ export default function LoginPage() {
           <div className="space-y-8">
             <div className="space-y-4">
               <h2 className="text-4xl font-black text-white light:text-gray-900 leading-tight">
-                Your business.<br />Your storefront.<br />
-                <span className="bg-linear-to-r from-violet-400 to-indigo-400 light:from-violet-600 light:to-indigo-600 bg-clip-text text-transparent">Your way.</span>
+                Find weh yuh need.<br /> Book it.<br />
+                <span className="bg-linear-to-r from-violet-400 to-indigo-400 light:from-violet-600 light:to-indigo-600 bg-clip-text text-transparent">Order it.</span>
               </h2>
               <p className="text-slate-400 light:text-gray-700 leading-relaxed max-w-sm font-medium">
-                Thousands of local businesses use LocalSpace to accept bookings and orders online — without building a website.
+                Thousands of local businesses use YuhBusiness to accept bookings and orders online — without building a website.
               </p>
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -124,7 +124,7 @@ export default function LoginPage() {
               ))}
             </div>
           </div>
-          <p className="text-slate-600 light:text-gray-600 text-sm font-medium">© 2025 LocalSpace Platform</p>
+          <p className="text-slate-600 light:text-gray-600 text-sm font-medium">© 2025 YuhBusiness Platform</p>
         </div>
 
         {/* Right form */}
@@ -135,11 +135,11 @@ export default function LoginPage() {
               <div className="w-9 h-9 bg-violet-600/20 border border-violet-500/30 rounded-xl flex items-center justify-center">
                 <Sparkles className="w-4 h-4 text-violet-400" />
               </div>
-              <span className="font-black text-xl text-white light:text-gray-900">LocalSpace</span>
+              <span className="font-black text-xl text-white light:text-gray-900">YuhBusiness</span>
             </div>
 
             <div>
-              <h1 className="text-2xl font-black text-white light:text-gray-900">Welcome back</h1>
+              <h1 className="text-2xl font-black text-white light:text-gray-900">Welcome bak</h1>
               <p className="text-slate-500 light:text-gray-700 text-sm mt-1 font-medium">Sign in to your business dashboard</p>
             </div>
 
@@ -191,13 +191,13 @@ export default function LoginPage() {
 
               <button onClick={handleLogin} disabled={loading}
                 className="w-full py-3 bg-violet-600 hover:bg-violet-500 light:bg-violet-600 light:hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2 shadow-lg shadow-violet-900/30 light:shadow-violet-600/30">
-                {loading ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Signing in...</> : "Sign In"}
+                {loading ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Signing in...</> : "Sign een"}
               </button>
             </div>
 
             <p className="text-center text-sm text-slate-500 light:text-gray-700 font-medium">
               Don&apos;t have an account?{" "}
-              <Link href="/register" className="text-violet-400 light:text-violet-600 font-bold hover:text-violet-300 light:hover:text-violet-700 transition-colors">Create one free</Link>
+              <Link href="/register" className="text-violet-400 light:text-violet-600 font-bold hover:text-violet-300 light:hover:text-violet-700 transition-colors">Mek one free</Link>
             </p>
 
           </div>

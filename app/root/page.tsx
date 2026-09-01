@@ -8,7 +8,7 @@ const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "LocalSpace — Business Management Platform",
+  title: "YuhBusiness — Business Management Platform",
   description: "The all-in-one platform for appointment and ordering businesses.",
 };
 

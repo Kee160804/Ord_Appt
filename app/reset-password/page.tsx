@@ -78,20 +78,20 @@ export default function ResetPasswordPage() {
       <main className="w-full max-w-md rounded-3xl border border-slate-800 bg-slate-900/70 p-7 shadow-2xl light:border-slate-200 light:bg-white sm:p-9">
         <Link href="/home" className="mb-8 flex items-center gap-2.5 font-black">
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-600 text-white"><Sparkles className="h-4 w-4" /></span>
-          LocalSpace
+          YuhBusiness
         </Link>
 
         {complete ? (
           <div className="text-center">
             <CheckCircle2 className="mx-auto h-12 w-12 text-violet-400" />
-            <h1 className="mt-5 text-2xl font-black">Password updated</h1>
+            <h1 className="mt-5 text-2xl font-black">Yuh password set now</h1>
             <p className="mt-3 text-sm text-slate-400 light:text-slate-600">Your recovery session has been closed. Sign in again using your new password.</p>
             <Link href="/login?passwordUpdated=1" className="mt-7 inline-flex rounded-xl bg-violet-600 px-5 py-3 text-sm font-bold text-white hover:bg-violet-500">Continue to sign in</Link>
           </div>
         ) : (
           <>
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-500/15 text-violet-400"><KeyRound className="h-5 w-5" /></div>
-            <h1 className="mt-5 text-2xl font-black">Choose a new password</h1>
+            <h1 className="mt-5 text-2xl font-black">Choose yuh new password</h1>
             <p className="mt-2 text-sm text-slate-400 light:text-slate-600">Use at least eight characters and avoid reusing an old password.</p>
             {error && <p className="mt-5 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300 light:text-red-700">{error}</p>}
             {isChecking ? (

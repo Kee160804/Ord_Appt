@@ -192,7 +192,7 @@ export function DemoDashboardPreview({ tenant }: { tenant: Tenant }) {
       <aside className="hidden w-56 shrink-0 flex-col border-r border-white/5 bg-[#111a35] md:flex">
         <div className="flex items-center gap-3 border-b border-white/5 px-5 py-5">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-purple-700"><Sparkles className="h-4 w-4" /></div>
-          <div><p className="text-sm font-bold">LocalSpace</p><p className="text-[9px] uppercase tracking-[0.2em] text-slate-400">Demo Dashboard</p></div>
+          <div><p className="text-sm font-bold">YuhBusiness</p><p className="text-[9px] uppercase tracking-[0.2em] text-slate-400">Demo Dashboard</p></div>
         </div>
         <div className="border-b border-white/5 p-4">
           <div className="flex items-center gap-3 rounded-xl bg-white/5 p-3">

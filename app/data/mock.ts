@@ -85,7 +85,7 @@ export const mockTenants: Tenant[] = [
 ];
 
 export const mockUsers: User[] = [
-  { id: "sa1", tenantId: null, name: "Alex Rivera", email: "admin@localspace.io", role: "superadmin", avatar: "AR", createdAt: "2024-01-01", lastLogin: "2025-01-10" },
+  { id: "sa1", tenantId: null, name: "Alex Rivera", email: "admin@YuhBusiness.io", role: "superadmin", avatar: "AR", createdAt: "2024-01-01", lastLogin: "2025-01-10" },
   { id: "u1", tenantId: "apt-001", name: "Serena Williams", email: "serena@luxebeauty.com", role: "owner", avatar: "SW", createdAt: "2024-01-15", lastLogin: "2025-01-10" },
   { id: "u2", tenantId: "apt-001", name: "Maya Johnson", email: "maya@luxebeauty.com", role: "admin", avatar: "MJ", createdAt: "2024-01-20", lastLogin: "2025-01-09" },
   { id: "u3", tenantId: "apt-001", name: "Zoe Chen", email: "zoe@luxebeauty.com", role: "staff", avatar: "ZC", createdAt: "2024-02-01", lastLogin: "2025-01-08" },
@@ -98,7 +98,7 @@ export const mockUsers: User[] = [
 ];
 
 export const demoAccounts = [
-  { label: "Super Admin", email: "admin@localspace.io", password: "admin123", role: "superadmin" as const, tenantId: null },
+  { label: "Super Admin", email: "admin@YuhBusiness.io", password: "admin123", role: "superadmin" as const, tenantId: null },
   { label: "Luxe Beauty Studio", email: "serena@luxebeauty.com", password: "password123", role: "owner" as const, tenantId: "apt-001" },
   { label: "Iron Edge Barbershop", email: "marcus@ironedge.com", password: "password123", role: "owner" as const, tenantId: "apt-002" },
   { label: "Ember & Oak Kitchen", email: "isabella@emberoakkitchen.com", password: "password123", role: "owner" as const, tenantId: "ord-001" },

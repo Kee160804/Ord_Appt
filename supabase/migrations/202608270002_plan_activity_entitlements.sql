@@ -1,6 +1,6 @@
 BEGIN;
 
--- LocalSpace plan limits are intentionally kept in a small immutable function
+-- YuhBusiness plan limits are intentionally kept in a small immutable function
 -- so public RPCs, owner usage displays, and future payment webhooks share one
 -- source of truth. "starter" is the database value for the Beginner plan.
 CREATE OR REPLACE FUNCTION public.plan_monthly_activity_limit(p_plan TEXT)

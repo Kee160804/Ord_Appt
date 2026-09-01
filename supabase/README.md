@@ -129,7 +129,7 @@ In Supabase Dashboard, open **Edge Functions > Secrets** and add:
 
 ```text
 RESEND_API_KEY=re_...
-RESEND_FROM_EMAIL=LocalSpace <bookings@your-verified-domain.com>
+RESEND_FROM_EMAIL=YuhBusiness <bookings@your-verified-domain.com>
 NOTIFICATION_WEBHOOK_SECRET=a-long-random-value
 ```
 

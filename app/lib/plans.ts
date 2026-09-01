@@ -4,7 +4,8 @@ export type PlanFeature =
   | "detailed_analytics"
   | "advanced_catalog"
   | "booking_deposits"
-  | "storefront_branding";
+  | "storefront_branding"
+  | "storefront_contact_form";
 
 export interface PlanDefinition {
   id: PlanType;
@@ -53,6 +54,7 @@ const MINIMUM_PLAN_BY_FEATURE: Record<PlanFeature, PlanType> = {
   advanced_catalog: "pro",
   booking_deposits: "pro",
   storefront_branding: "pro",
+  storefront_contact_form: "pro",
 };
 
 export function planHasFeature(plan: PlanType, feature: PlanFeature) {

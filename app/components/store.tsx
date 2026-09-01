@@ -11,12 +11,6 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
-  Mail,
-  Phone,
-  Globe,
-  Facebook,
-  Instagram,
-  Twitter,
   Store,
 } from "lucide-react";
 import { getServicesByTenant, getProductsByTenant, getCategoriesByTenant } from "@/app/data/mock";
@@ -25,15 +19,12 @@ import { isSupabaseConfigured } from "@/app/lib/supabase/config";
 import { AppointmentBooking } from "../components/AppointmentBooking";
 import { OrderingMenu } from "../components/OrderingMenu";
 import { DemoDashboardPreview } from "../components/DemoDashboardPreview";
+import { StorefrontContact } from "../components/StorefrontContact";
 import { useTheme } from "@/app/contexts/theme";
 import type { Category, Tenant, Service, Product } from "@/app/types/index";
 
 // Extend Tenant with optional fields used in this component
 interface ExtendedTenant extends Tenant {
-  website?: string;
-  facebook?: string;
-  instagram?: string;
-  twitter?: string;
   galleryImages?: string[];
 }
 
@@ -160,18 +151,6 @@ export default function StorefrontClient({
   );
 
   const { theme, toggleTheme } = useTheme();
-
-  // ---------- Contact Information ----------
-  const contactInfo = {
-    email: extendedTenant.email || `contact@${extendedTenant.slug}.com`,
-    phone: extendedTenant.phone || "+1 (555) 123-4567",
-    website: extendedTenant.website || `https://${extendedTenant.slug}.com`,
-    social: {
-      facebook: extendedTenant.facebook || null,
-      instagram: extendedTenant.instagram || null,
-      twitter: extendedTenant.twitter || null,
-    },
-  };
 
   // ---------- Image Gallery Modal ----------
   const [galleryOpen, setGalleryOpen] = useState(false);
@@ -330,7 +309,7 @@ export default function StorefrontClient({
 
       {/* Main content */}
       {(!viewOnly || activeDemoView === "storefront") && (
-      <main className="max-w-6xl mx-auto px-4 py-12">
+      <main className={`${activeTab === "contact" ? "max-w-[1500px]" : "max-w-6xl"} mx-auto px-4 py-8 sm:py-12`}>
         {activeTab === "home" ? (
           isAppt ? (
             <AppointmentBooking
@@ -351,87 +330,7 @@ export default function StorefrontClient({
             />
           )
         ) : (
-          // Contact Page
-          <div className="max-w-2xl mx-auto bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 md:p-8">
-            <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-6">
-              Contact {tenant.name}
-            </h2>
-            <div className="space-y-6 text-slate-600 dark:text-slate-300">
-              {contactInfo.email && (
-                <div className="flex items-center gap-3">
-                  <Mail className="w-5 h-5 text-violet-500" />
-                  <a href={`mailto:${contactInfo.email}`} className="hover:text-violet-600">
-                    {contactInfo.email}
-                  </a>
-                </div>
-              )}
-              {contactInfo.phone && (
-                <div className="flex items-center gap-3">
-                  <Phone className="w-5 h-5 text-violet-500" />
-                  <a href={`tel:${contactInfo.phone}`} className="hover:text-violet-600">
-                    {contactInfo.phone}
-                  </a>
-                </div>
-              )}
-              {contactInfo.website && (
-                <div className="flex items-center gap-3">
-                  <Globe className="w-5 h-5 text-violet-500" />
-                  <a
-                    href={contactInfo.website}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="hover:text-violet-600"
-                  >
-                    Website
-                  </a>
-                </div>
-              )}
-              {(contactInfo.social.facebook ||
-                contactInfo.social.instagram ||
-                contactInfo.social.twitter) && (
-                <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
-                  <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">
-                    Social Media
-                  </h3>
-                  <div className="flex gap-4">
-                    {contactInfo.social.facebook && (
-                      <a
-                        href={contactInfo.social.facebook}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-slate-500 hover:text-violet-600 transition"
-                        aria-label="Facebook"
-                      >
-                        <Facebook className="w-5 h-5" />
-                      </a>
-                    )}
-                    {contactInfo.social.instagram && (
-                      <a
-                        href={contactInfo.social.instagram}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-slate-500 hover:text-violet-600 transition"
-                        aria-label="Instagram"
-                      >
-                        <Instagram className="w-5 h-5" />
-                      </a>
-                    )}
-                    {contactInfo.social.twitter && (
-                      <a
-                        href={contactInfo.social.twitter}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-slate-500 hover:text-violet-600 transition"
-                        aria-label="Twitter"
-                      >
-                        <Twitter className="w-5 h-5" />
-                      </a>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
+          <StorefrontContact tenant={tenant} viewOnly={viewOnly} />
         )}
       </main>
       )}

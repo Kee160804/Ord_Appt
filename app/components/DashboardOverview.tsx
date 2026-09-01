@@ -106,10 +106,10 @@ export function DashboardOverview({ tenant }: OverviewProps) {
         <div className="relative z-10 flex min-h-[124px] items-center justify-between gap-4 px-6 py-5">
           <div>
             <p className="text-xs font-medium text-slate-400 light:text-[#566681]">
-              Good morning, {firstName}! <span aria-hidden="true">👋</span>
+              Gud maanin, {firstName}! <span aria-hidden="true">👋</span>
             </p>
             <h2 className="mt-2 text-xl font-bold tracking-tight text-white light:text-[#111b31]">
-              Welcome back to {tenant.name}
+              Welcome bak to {tenant.name}
             </h2>
             <p className="mt-1 text-xs text-slate-400 light:text-[#71809a]">
               {pendingCount

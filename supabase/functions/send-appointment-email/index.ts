@@ -134,7 +134,7 @@ function buildEmail(delivery: DeliveryRow) {
           ${contactItems.length ? `<p style="font-size:14px;line-height:1.6;color:#475569;margin:0">Questions? Contact ${businessName} at ${escapeHtml(contactItems.join(" or "))}.</p>` : ""}
         </div>
       </div>
-      <p style="font-size:12px;line-height:1.5;text-align:center;color:#94a3b8;margin:18px 0 0">Sent by LocalSpace on behalf of ${businessName}.</p>
+      <p style="font-size:12px;line-height:1.5;text-align:center;color:#94a3b8;margin:18px 0 0">Sent by YuhBusiness on behalf of ${businessName}.</p>
     </div>
   </body>
 </html>`;

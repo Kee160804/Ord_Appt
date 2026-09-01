@@ -73,7 +73,7 @@ export function Sidebar({ tenant, user }: SidebarProps) {
         </div>
         {!collapsed && (
           <div className="leading-none">
-            <p className="text-[13px] font-bold tracking-tight text-white">LocalSpace</p>
+            <p className="text-[13px] font-bold tracking-tight text-white">YuhBusiness</p>
             <p className="mt-1 text-[7px] font-semibold uppercase tracking-[0.2em] text-slate-400">Platform</p>
           </div>
         )}

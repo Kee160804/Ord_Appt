@@ -1,7 +1,7 @@
 BEGIN;
 
 -- Columns consumed by the Next.js application. These statements are safe to
--- run after the supplied LocalSpace evolution script.
+-- run after the supplied YuhBusiness evolution script.
 ALTER TABLE public.tenants
   ADD COLUMN IF NOT EXISTS business_type TEXT DEFAULT 'appointment',
   ADD COLUMN IF NOT EXISTS description TEXT,

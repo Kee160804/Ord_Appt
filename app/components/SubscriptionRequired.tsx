@@ -35,7 +35,7 @@ export function SubscriptionRequired({
         <header className="flex items-center justify-between gap-4">
           <Link href="/home" className="flex items-center gap-2.5">
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-indigo-700 text-white"><Sparkles className="h-4 w-4" /></span>
-            <span className="font-black">LocalSpace</span>
+            <span className="font-black">YuhBusiness</span>
           </Link>
           <button onClick={() => void onLogout()} className="inline-flex items-center gap-2 rounded-xl border border-slate-700 px-4 py-2 text-xs font-semibold text-slate-300 hover:border-slate-500 hover:text-white light:border-slate-300 light:text-slate-600 light:hover:text-slate-900">
             <LogOut className="h-4 w-4" /> Sign out
