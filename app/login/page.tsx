@@ -45,14 +45,14 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-dvh bg-[#070b14] light:bg-white text-white light:text-gray-900">
+    <div className="flex min-h-dvh flex-col bg-[#070b14] text-white light:bg-white light:text-gray-900">
       {/* Navbar */}
-      <nav className="sticky top-0 z-50 flex items-center justify-between gap-2 border-b border-white/5 bg-[#070b14]/90 px-3 py-4 backdrop-blur-xl light:border-gray-200 light:bg-white/90 sm:px-6 md:px-12 md:py-5">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-linear-to-br from-violet-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-violet-900/40 light:shadow-violet-500/30">
+      <nav className="site-header sticky top-0 z-50 flex flex-shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-2 border-b border-white/5 bg-[#070b14]/90 backdrop-blur-xl light:border-gray-200 light:bg-white/90 md:flex-nowrap">
+        <div className="flex min-w-0 flex-shrink-0 items-center gap-2 sm:gap-2.5">
+          <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-violet-500 to-indigo-600 shadow-lg shadow-violet-900/40 light:shadow-violet-500/30 sm:h-8 sm:w-8">
             <Sparkles className="w-4 h-4 text-white" />
           </div>
-          <span className="font-black text-white light:text-gray-900 text-lg tracking-tight">YuhBusiness</span>
+          <span className="whitespace-nowrap text-[15px] font-black tracking-tight text-white light:text-gray-900 sm:text-lg">YuhBusiness</span>
         </div>
 
         <div className="hidden md:flex items-center gap-8 text-sm font-medium">
@@ -75,32 +75,37 @@ export default function LoginPage() {
           </Link>
         </div>
 
-        <div className="flex flex-shrink-0 items-center gap-1.5 sm:gap-3">
-          <Link
-            href="/"
-            className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 px-2.5 py-2 text-[10px] font-semibold text-slate-200 transition-colors hover:bg-white/10 light:border-gray-300 light:bg-white light:text-gray-700 sm:hidden"
-            aria-label="Back to home"
-          >
-            Home
-          </Link>
-
+        <div className="contents md:flex md:min-w-0 md:flex-shrink-0 md:items-center md:gap-3">
           <button
             onClick={toggleTheme}
-            className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-700 bg-transparent text-slate-400 transition-colors hover:bg-white/5 light:border-gray-300 light:text-gray-600 light:hover:bg-gray-100 sm:h-10 sm:w-10"
+            className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl border border-slate-700 bg-transparent text-slate-400 transition-colors hover:bg-white/5 light:border-gray-300 light:text-gray-600 light:hover:bg-gray-100 md:h-10 md:w-10"
             aria-label="Toggle main theme"
             title="Toggle main theme"
           >
             {theme === "dark" ? <Sun className="h-4 w-4 sm:h-5 sm:w-5" /> : <Moon className="h-4 w-4 sm:h-5 sm:w-5" />}
           </button>
 
-          <Link href="/register" className="inline-flex items-center justify-center rounded-xl bg-violet-600 px-3 py-2 text-[10px] font-bold text-white shadow-sm transition-colors hover:bg-violet-500 light:bg-violet-600 light:hover:bg-violet-700 sm:px-4 sm:text-sm">
-            Start free
-          </Link>
+          <div className="order-last grid w-full grid-cols-2 gap-2 md:order-none md:flex md:w-auto md:items-center md:gap-3">
+            <Link
+              href="/"
+              className="inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-xl border border-slate-700 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200 transition-colors hover:bg-white/10 light:border-gray-300 light:bg-white light:text-gray-700 light:hover:bg-gray-100 md:hidden"
+              aria-label="Back to home"
+            >
+              Home
+            </Link>
+
+            <Link
+              href="/register"
+              className="inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-xl bg-violet-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:bg-violet-500 light:bg-violet-600 light:hover:bg-violet-700 md:min-h-0"
+            >
+              Get Started Free
+            </Link>
+          </div>
         </div>
       </nav>
 
       {/* Main content (two columns) */}
-      <div className="flex min-h-[calc(100dvh-65px)] flex-col lg:flex-row">
+      <div className="flex flex-1 flex-col lg:flex-row">
         {/* Left panel - hidden on mobile */}
         <div className="hidden lg:flex lg:w-1/2 flex-col justify-between p-14 relative overflow-hidden bg-linear-to-br from-[#0d1020] to-[#0a0f1a] light:from-gray-50 light:to-white border-r border-white/5 light:border-gray-200">
           <div className="absolute top-0 left-0 w-full h-full -z-10">
