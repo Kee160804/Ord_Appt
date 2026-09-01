@@ -168,29 +168,34 @@ export function Sidebar({ tenant, user }: SidebarProps) {
         </Link>
       </div>
 
-      <div className={cn("flex items-center gap-2 border-t border-white/[0.06] p-4", collapsed && "justify-center px-3")}>
-        {!collapsed && (
-          <div
-            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border border-violet-400/30 bg-violet-500/15 text-[10px] font-bold text-violet-100"
-            title={user.name}
+      <div className={cn("border-t border-white/[0.06] p-3", collapsed && "px-2") }>
+        <div className={cn(
+          "flex items-center gap-3 rounded-2xl border border-white/[0.04] bg-white/[0.02] px-3 py-2.5",
+          collapsed && "justify-center px-2 py-2.5"
+        )}>
+          {!collapsed && (
+            <div
+              className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-violet-400/30 bg-violet-500/15 text-[10px] font-bold text-violet-100"
+              title={user.name}
+            >
+              {user.avatar}
+            </div>
+          )}
+          {!collapsed && (
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[11px] font-semibold text-white">{user.name}</p>
+              <p className="mt-0.5 text-[9px] capitalize text-slate-400">{user.role}</p>
+            </div>
+          )}
+          <button
+            onClick={() => void logout()}
+            aria-label="Sign out"
+            title="Sign out"
+            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-white/[0.06] hover:text-white"
           >
-            {user.avatar}
-          </div>
-        )}
-        {!collapsed && (
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-[11px] font-semibold text-white">{user.name}</p>
-            <p className="mt-0.5 text-[9px] capitalize text-slate-400">{user.role}</p>
-          </div>
-        )}
-        <button
-          onClick={() => void logout()}
-          aria-label="Sign out"
-          title="Sign out"
-          className="rounded-lg p-2 text-slate-500 transition-colors hover:bg-white/[0.06] hover:text-white"
-        >
-          <LogOut className="h-3.5 w-3.5" />
-        </button>
+            <LogOut className="h-3.5 w-3.5" />
+          </button>
+        </div>
       </div>
       </aside>
     </>
