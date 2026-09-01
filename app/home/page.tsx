@@ -156,7 +156,7 @@ export default function HomePage() {
   return (
     <div className="min-h-dvh bg-[#070b14] light:bg-white text-white light:text-gray-900 transition-colors">
       {/* Navbar */}
-      <nav className="site-header sticky top-0 z-50 flex items-center justify-between gap-1 border-b border-white/5 bg-[#070b14]/90 backdrop-blur-xl light:border-gray-200 light:bg-white/90 sm:gap-2">
+      <nav className="site-header sticky top-0 z-50 flex flex-wrap items-center justify-between gap-x-2 gap-y-2 border-b border-white/5 bg-[#070b14]/90 backdrop-blur-xl light:border-gray-200 light:bg-white/90 md:flex-nowrap">
         <div className="flex min-w-0 flex-shrink-0 items-center gap-2 sm:gap-2.5">
           <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 shadow-lg shadow-violet-900/40 light:shadow-violet-500/30 sm:h-8 sm:w-8">
             <Sparkles className="w-3.5 h-3.5 text-white sm:w-4 sm:h-4" />
@@ -193,10 +193,10 @@ export default function HomePage() {
           </a>
         </div>
 
-        <div className="flex min-w-0 flex-shrink-0 items-center gap-1 sm:gap-3">
+        <div className="contents md:flex md:min-w-0 md:flex-shrink-0 md:items-center md:gap-3">
           <button
             onClick={toggleTheme}
-            className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl border border-slate-700 bg-transparent text-slate-400 transition-all duration-300 hover:bg-white/10 hover:text-white light:border-gray-300 light:text-gray-600 light:hover:bg-gray-200 light:hover:text-gray-800 sm:h-10 sm:w-10"
+            className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl border border-slate-700 bg-transparent text-slate-400 transition-all duration-300 hover:bg-white/10 hover:text-white light:border-gray-300 light:text-gray-600 light:hover:bg-gray-200 light:hover:text-gray-800 md:h-10 md:w-10"
             aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
             title={`Switch to ${theme === "dark" ? "light" : "dark"} mode (currently ${theme})`}
           >
@@ -207,20 +207,21 @@ export default function HomePage() {
             )}
           </button>
 
-          <Link
-            href="/login"
-            className="inline-flex flex-shrink-0 items-center justify-center whitespace-nowrap rounded-xl px-2 py-2 text-[10px] font-semibold text-slate-300 transition-colors hover:bg-white/5 hover:text-white light:text-gray-600 light:hover:bg-gray-100 light:hover:text-gray-900 sm:px-4 sm:text-sm"
-          >
-            Sign In
-          </Link>
+          <div className="order-last grid w-full grid-cols-2 gap-2 md:order-none md:flex md:w-auto md:items-center md:gap-3">
+            <Link
+              href="/login"
+              className="inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-200 transition-colors hover:bg-white/5 hover:text-white light:border-gray-300 light:text-gray-700 light:hover:bg-gray-100 light:hover:text-gray-900 md:min-h-0 md:border-transparent"
+            >
+              Sign In
+            </Link>
 
-          <Link
-            href="/register"
-            className="inline-flex flex-shrink-0 items-center justify-center whitespace-nowrap rounded-xl bg-violet-600 px-2 py-2 text-[10px] font-bold text-white shadow-sm shadow-violet-900/30 transition-colors hover:bg-violet-500 light:bg-violet-600 light:shadow-violet-600/30 light:hover:bg-violet-700 sm:px-4 sm:text-sm"
-          >
-            <span className="sm:hidden">Start Free</span>
-            <span className="hidden sm:inline">Get Started Free</span>
-          </Link>
+            <Link
+              href="/register"
+              className="inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-xl bg-violet-600 px-4 py-2 text-sm font-bold text-white shadow-sm shadow-violet-900/30 transition-colors hover:bg-violet-500 light:bg-violet-600 light:shadow-violet-600/30 light:hover:bg-violet-700 md:min-h-0"
+            >
+              Get Started Free
+            </Link>
+          </div>
         </div>
       </nav>
 

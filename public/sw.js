@@ -1,4 +1,4 @@
-const CACHE_NAME = "yuhbusiness-offline-v2";
+const CACHE_NAME = "yuhbusiness-offline-v3";
 const OFFLINE_PAGE = "/home";
 
 self.addEventListener("install", (event) => {
@@ -21,7 +21,18 @@ self.addEventListener("activate", (event) => {
             .map((key) => caches.delete(key)),
         ),
       )
-      .then(() => self.clients.claim()),
+      .then(async () => {
+        await self.clients.claim();
+
+        // Refresh pages still controlled by the old cache-first worker so
+        // returning mobile browsers receive the current Vercel deployment.
+        const windowClients = await self.clients.matchAll({ type: "window" });
+        await Promise.all(
+          windowClients.map((client) =>
+            client.navigate(client.url).catch(() => undefined),
+          ),
+        );
+      }),
   );
 });
 

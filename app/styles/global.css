@@ -100,6 +100,16 @@ body {
   }
 }
 
+/* iOS can report a zero safe-area inset for an already-installed PWA. */
+@media (display-mode: standalone) {
+  .site-header {
+    padding-top: max(
+      3rem,
+      calc(1.25rem + env(safe-area-inset-top, 0px))
+    );
+  }
+}
+
 @media (max-width: 640px) {
   html, body {
     min-height: 100%;
