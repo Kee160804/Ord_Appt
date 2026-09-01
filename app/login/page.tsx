@@ -75,10 +75,10 @@ export default function LoginPage() {
           </Link>
         </div>
 
-        <div className="flex flex-shrink-0 items-center gap-1 sm:gap-3">
+        <div className="flex flex-shrink-0 items-center gap-1.5 sm:gap-3">
           <Link
             href="/"
-            className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 px-2.5 py-2 text-[10px] font-semibold text-slate-200 transition-colors hover:bg-white/10 light:border-gray-300 light:bg-white light:text-gray-700"
+            className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 px-2.5 py-2 text-[10px] font-semibold text-slate-200 transition-colors hover:bg-white/10 light:border-gray-300 light:bg-white light:text-gray-700 sm:hidden"
             aria-label="Back to home"
           >
             Home
@@ -86,14 +86,14 @@ export default function LoginPage() {
 
           <button
             onClick={toggleTheme}
-            className="p-2 rounded-xl text-slate-400 light:text-gray-600 hover:bg-white/5 light:hover:bg-gray-100 transition-colors"
+            className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-700 bg-transparent text-slate-400 transition-colors hover:bg-white/5 light:border-gray-300 light:text-gray-600 light:hover:bg-gray-100 sm:h-10 sm:w-10"
             aria-label="Toggle main theme"
             title="Toggle main theme"
           >
-            {theme === "dark" ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+            {theme === "dark" ? <Sun className="h-4 w-4 sm:h-5 sm:w-5" /> : <Moon className="h-4 w-4 sm:h-5 sm:w-5" />}
           </button>
 
-          <Link href="/register" className="rounded-xl bg-violet-600 px-3 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-violet-500 light:bg-violet-600 light:hover:bg-violet-700 sm:px-4 sm:text-sm">
+          <Link href="/register" className="inline-flex items-center justify-center rounded-xl bg-violet-600 px-3 py-2 text-[10px] font-bold text-white shadow-sm transition-colors hover:bg-violet-500 light:bg-violet-600 light:hover:bg-violet-700 sm:px-4 sm:text-sm">
             Start free
           </Link>
         </div>

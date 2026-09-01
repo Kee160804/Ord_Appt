@@ -193,35 +193,30 @@ export default function HomePage() {
           </a>
         </div>
 
-        <div className="flex flex-shrink-0 items-center gap-2 sm:gap-3">
+        <div className="flex flex-shrink-0 items-center gap-1.5 sm:gap-3">
           <button
-            onClick={() => {
-              console.log("🎯 HOME PAGE BUTTON CLICKED!");
-              console.log("🎯 Current theme before toggle:", theme);
-              toggleTheme();
-              console.log("🎯 toggleTheme() function called");
-              console.log("✨ Theme button clicked! Current theme:", theme);
-            }}
-            className="rounded-xl border border-slate-700 p-2 text-slate-400 transition-all duration-300 hover:bg-white/10 hover:text-white light:border-gray-300 light:text-gray-600 light:hover:bg-gray-200 light:hover:text-gray-800 sm:p-2.5"
+            onClick={toggleTheme}
+            className="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-700 bg-transparent text-slate-400 transition-all duration-300 hover:bg-white/10 hover:text-white light:border-gray-300 light:text-gray-600 light:hover:bg-gray-200 light:hover:text-gray-800 sm:h-10 sm:w-10"
             aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
             title={`Switch to ${theme === "dark" ? "light" : "dark"} mode (currently ${theme})`}
           >
             {theme === "dark" ? (
-              <Sun className="w-4 h-4 text-yellow-400 sm:w-5 sm:h-5" />
+              <Sun className="h-4 w-4 text-yellow-400 sm:h-5 sm:w-5" />
             ) : (
-              <Moon className="w-4 h-4 text-slate-600 sm:w-5 sm:h-5" />
+              <Moon className="h-4 w-4 text-slate-600 sm:h-5 sm:w-5" />
             )}
           </button>
 
           <Link
             href="/login"
-            className="inline-flex items-center justify-center rounded-xl px-2.5 py-2 text-[10px] font-semibold text-slate-400 transition-colors hover:bg-white/5 hover:text-white light:text-gray-600 light:hover:bg-gray-100 light:hover:text-gray-900 sm:px-4 sm:text-sm"
+            className="inline-flex items-center justify-center rounded-xl px-2.5 py-2 text-[10px] font-semibold text-slate-300 transition-colors hover:bg-white/5 hover:text-white light:text-gray-600 light:hover:bg-gray-100 light:hover:text-gray-900 sm:px-4 sm:text-sm"
           >
             Sign In
           </Link>
+
           <Link
             href="/register"
-            className="rounded-xl bg-violet-600 px-3 py-2 text-[10px] font-bold text-white shadow-sm shadow-violet-900/30 transition-colors hover:bg-violet-500 light:bg-violet-600 light:shadow-violet-600/30 light:hover:bg-violet-700 sm:px-4 sm:text-sm"
+            className="inline-flex items-center justify-center rounded-xl bg-violet-600 px-3 py-2 text-[10px] font-bold text-white shadow-sm shadow-violet-900/30 transition-colors hover:bg-violet-500 light:bg-violet-600 light:shadow-violet-600/30 light:hover:bg-violet-700 sm:px-4 sm:text-sm"
           >
             <span className="sm:hidden">Start Free</span>
             <span className="hidden sm:inline">Get Started Free</span>
