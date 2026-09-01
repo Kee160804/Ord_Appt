@@ -226,14 +226,14 @@ export default function RolesManagementPage() {
   // COMMENT: Verify user is super admin
   if (user?.role !== "superadmin") {
     return (
-      <div className="min-h-dvh bg-[#070b14] p-4 text-white sm:p-8">
+      <div className="pwa-page-safe min-h-dvh bg-[#070b14] p-4 text-white sm:p-8">
         <p className="text-red-400">Access denied. Super admin only.</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-dvh space-y-6 bg-[#070b14] p-4 text-white light:bg-white light:text-gray-900 sm:p-8">
+    <div className="pwa-page-safe min-h-dvh space-y-6 bg-[#070b14] p-4 text-white light:bg-white light:text-gray-900 sm:p-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-black">Role Management</h1>

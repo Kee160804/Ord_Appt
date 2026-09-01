@@ -100,7 +100,7 @@ export default function RegisterPage() {
   const steps = ["Account", "Business Type", "Business Details"];
 
   return (
-    <div className="flex min-h-dvh items-center justify-center bg-[#070b14] p-3 sm:p-4">
+    <div className="pwa-page-safe flex min-h-dvh items-center justify-center bg-[#070b14] p-3 sm:p-4">
       <div className="w-full max-w-lg">
         {/* Brand */}
         <div className="flex items-center gap-2 justify-center mb-8">

@@ -34,9 +34,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <div className="flex h-dvh min-h-0 overflow-hidden bg-[#f8fafc] dark:bg-[#08111f]">
+    <div className="pwa-shell-safe flex h-dvh min-h-0 overflow-hidden bg-[#f8fafc] dark:bg-[#08111f]">
       <Sidebar tenant={tenant} user={user} />
-      <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-[#f8fafc] text-[#14213a] dark:bg-[#08111f] dark:text-white">
+      <main className="pwa-shell-safe flex min-w-0 flex-1 flex-col overflow-hidden bg-[#f8fafc] text-[#14213a] dark:bg-[#08111f] dark:text-white">
         <TrialStatusBanner tenant={tenant} />
         <PlanUsageBanner tenant={tenant} />
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">

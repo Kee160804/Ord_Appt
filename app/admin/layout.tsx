@@ -15,11 +15,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }, [user, isLoading, router]);
 
   if (isLoading || !user) {
-    return <div className="flex min-h-dvh items-center justify-center">Loading...</div>;
+    return <div className="pwa-page-safe flex min-h-dvh items-center justify-center bg-[#070b14] text-white light:bg-white light:text-slate-900">Loading...</div>;
   }
 
   return (
-    <div className="min-h-dvh bg-slate-50">
+    <div className="pwa-shell-safe min-h-dvh bg-slate-50 light:bg-white">
       {children}
     </div>
   );

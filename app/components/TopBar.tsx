@@ -58,7 +58,7 @@ export function TopBar({ title, action }: TopBarProps) {
           onClick={() => window.dispatchEvent(new Event("dashboard-sidebar-toggle"))}
           aria-label="Toggle sidebar"
           title="Toggle sidebar"
-          className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-800 light:hover:bg-slate-100 hover:text-white light:hover:text-slate-900"
+          className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-800 light:hover:bg-slate-100 hover:text-white light:hover:text-slate-900 sm:h-10 sm:w-10"
         >
           <Menu className="h-4 w-4" />
         </button>
@@ -92,7 +92,7 @@ export function TopBar({ title, action }: TopBarProps) {
             onClick={() => setNotificationsOpen((current) => !current)}
             aria-label="Notifications"
             title="Notifications"
-            className="relative flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-800 light:hover:bg-slate-100 hover:text-white light:hover:text-slate-900"
+            className="relative flex h-11 w-11 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-800 light:hover:bg-slate-100 hover:text-white light:hover:text-slate-900 sm:h-9 sm:w-9"
           >
             <Bell className="h-4 w-4" />
           </button>
@@ -108,7 +108,7 @@ export function TopBar({ title, action }: TopBarProps) {
 
         <button
           onClick={toggleTheme}
-          className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-800 light:hover:bg-slate-100 hover:text-white light:hover:text-slate-900"
+          className="flex h-11 w-11 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-800 light:hover:bg-slate-100 hover:text-white light:hover:text-slate-900 sm:h-9 sm:w-9"
           aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
           title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
         >
@@ -129,7 +129,7 @@ export function TopBar({ title, action }: TopBarProps) {
         {action && (
           <button
             onClick={action.onClick}
-            className="ml-1 flex h-9 items-center gap-1.5 rounded-lg bg-violet-600 px-2.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-violet-700 sm:px-3"
+            className="ml-1 flex h-11 min-w-11 items-center justify-center gap-1.5 rounded-lg bg-violet-600 px-2.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-violet-700 sm:h-9 sm:px-3"
             aria-label={action.label}
             title={action.label}
           >

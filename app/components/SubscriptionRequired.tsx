@@ -30,7 +30,7 @@ export function SubscriptionRequired({
   const hasCheckout = plans.some((plan) => Boolean(plan.checkoutUrl));
 
   return (
-    <div className="min-h-dvh bg-[#070b14] px-4 py-8 text-white light:bg-[#f6f8fc] light:text-slate-900 sm:px-6">
+    <div className="pwa-page-roomy min-h-dvh bg-[#070b14] px-4 py-8 text-white light:bg-[#f6f8fc] light:text-slate-900 sm:px-6">
       <div className="mx-auto max-w-5xl">
         <header className="flex items-center justify-between gap-4">
           <Link href="/home" className="flex items-center gap-2.5">

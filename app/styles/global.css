@@ -110,6 +110,68 @@ body {
   }
 }
 
+/* Shared safe areas for authenticated shells, drawers, and standalone pages. */
+.pwa-shell-safe,
+.pwa-header-inset {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.pwa-sidebar-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.pwa-admin-sidebar-safe {
+  padding-top: calc(1.25rem + env(safe-area-inset-top, 0px));
+  padding-bottom: calc(1.25rem + env(safe-area-inset-bottom, 0px));
+}
+
+.pwa-admin-header-safe {
+  padding-top: calc(1rem + env(safe-area-inset-top, 0px));
+}
+
+.pwa-page-safe {
+  padding-top: max(1rem, env(safe-area-inset-top, 0px));
+  padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+}
+
+.pwa-page-roomy {
+  padding-top: max(2rem, env(safe-area-inset-top, 0px));
+  padding-bottom: max(2rem, env(safe-area-inset-bottom, 0px));
+}
+
+@media (min-width: 640px) {
+  .pwa-page-safe {
+    padding-top: max(2rem, env(safe-area-inset-top, 0px));
+    padding-bottom: max(2rem, env(safe-area-inset-bottom, 0px));
+  }
+}
+
+@media (display-mode: standalone) {
+  .pwa-shell-safe,
+  .pwa-header-inset,
+  .pwa-sidebar-safe {
+    padding-top: max(2rem, env(safe-area-inset-top, 0px));
+  }
+
+  .pwa-sidebar-safe {
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+  }
+
+  .pwa-admin-sidebar-safe,
+  .pwa-admin-header-safe,
+  .pwa-page-safe,
+  .pwa-page-roomy {
+    padding-top: max(3rem, env(safe-area-inset-top, 0px));
+  }
+
+  .pwa-admin-sidebar-safe,
+  .pwa-page-safe,
+  .pwa-page-roomy {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+  }
+}
+
 @media (max-width: 640px) {
   html, body {
     min-height: 100%;

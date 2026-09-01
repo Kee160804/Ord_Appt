@@ -82,7 +82,7 @@ export default function AdminPage() {
   const activeItem = NAVIGATION.find((item) => item.id === activeView) ?? NAVIGATION[0];
 
   return (
-    <div className="min-h-dvh bg-[#070d19] text-slate-100 light:bg-[#f5f7fb] light:text-slate-900">
+    <div className="pwa-shell-safe min-h-dvh bg-[#070d19] text-slate-100 light:bg-[#f5f7fb] light:text-slate-900">
       {mobileSidebarOpen && <button aria-label="Close navigation" className="fixed inset-0 z-40 bg-slate-950/70 backdrop-blur-sm lg:hidden" onClick={() => setMobileSidebarOpen(false)} />}
       <AdminSidebar activeView={activeView} isOpen={mobileSidebarOpen} onClose={() => setMobileSidebarOpen(false)} onLogout={() => void logout()} onSelect={selectView} userEmail={user?.email ?? "Platform administrator"} userName={user?.name ?? "Super Admin"} />
 
@@ -110,13 +110,13 @@ function AdminSidebar({ activeView, isOpen, onClose, onLogout, onSelect, userEma
   onSelect: (view: AdminView) => void; userEmail: string; userName: string;
 }) {
   return (
-    <aside className={cn("fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-slate-800 bg-[#09101d] px-4 py-5 transition-transform duration-200 light:border-slate-200 light:bg-white lg:translate-x-0", isOpen ? "translate-x-0" : "-translate-x-full")}>
+    <aside className={cn("pwa-admin-sidebar-safe fixed inset-y-0 left-0 z-50 flex w-64 flex-col overflow-hidden border-r border-slate-800 bg-[#09101d] px-4 transition-transform duration-200 light:border-slate-200 light:bg-white lg:translate-x-0", isOpen ? "translate-x-0" : "-translate-x-full")}>
       <div className="mb-7 flex items-center gap-3 px-2">
         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-indigo-700 text-white shadow-lg shadow-violet-900/30"><Sparkles className="h-5 w-5" /></div>
         <div className="min-w-0 flex-1"><p className="truncate text-sm font-bold text-white light:text-slate-950">YuhBusiness</p><p className="text-[11px] text-slate-500">Super Admin</p></div>
         <button aria-label="Close navigation" className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-white light:hover:bg-slate-100 light:hover:text-slate-900 lg:hidden" onClick={onClose}><X className="h-5 w-5" /></button>
       </div>
-      <nav className="space-y-1">
+      <nav className="flex-1 space-y-1 overflow-y-auto">
         {NAVIGATION.map((item) => {
           const Icon = item.icon;
           const active = activeView === item.id;
@@ -139,17 +139,17 @@ function AdminHeader({ activeItem, isLoading, onMenu, onRefresh, onToggleTheme, 
   onToggleTheme: () => void; theme: "dark" | "light";
 }) {
   return (
-    <header className="sticky top-0 z-30 border-b border-slate-800/80 bg-[#070d19]/90 px-4 py-4 backdrop-blur-xl light:border-slate-200 light:bg-[#f5f7fb]/90 sm:px-6 lg:px-8">
-      <div className="mx-auto flex max-w-[1600px] items-center justify-between gap-4">
+    <header className="pwa-admin-header-safe sticky top-0 z-30 border-b border-slate-800/80 bg-[#070d19]/90 px-4 pb-4 backdrop-blur-xl light:border-slate-200 light:bg-[#f5f7fb]/90 sm:px-6 lg:px-8">
+      <div className="mx-auto flex max-w-[1600px] items-center justify-between gap-2 sm:gap-4">
         <div className="flex min-w-0 items-center gap-3">
-          <button aria-label="Open navigation" className="rounded-xl border border-slate-800 p-2 text-slate-400 hover:text-white light:border-slate-200 light:hover:text-slate-900 lg:hidden" onClick={onMenu}><Menu className="h-5 w-5" /></button>
-          <div className="min-w-0"><h1 className="truncate text-lg font-bold text-white light:text-slate-950 sm:text-xl">{activeItem.id === "overview" ? "Super Admin Dashboard" : activeItem.label}</h1><p className="hidden text-xs text-slate-500 sm:block">{activeItem.id === "overview" ? "Live platform data from Supabase" : "Platform-wide administration and oversight"}</p></div>
+          <button aria-label="Open navigation" className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl border border-slate-800 text-slate-400 hover:text-white light:border-slate-200 light:hover:text-slate-900 lg:hidden" onClick={onMenu}><Menu className="h-5 w-5" /></button>
+          <div className="min-w-0"><h1 className="max-w-[42vw] truncate text-base font-bold text-white light:text-slate-950 sm:max-w-none sm:text-xl">{activeItem.id === "overview" ? "Super Admin Dashboard" : activeItem.label}</h1><p className="hidden text-xs text-slate-500 sm:block">{activeItem.id === "overview" ? "Live platform data from Supabase" : "Platform-wide administration and oversight"}</p></div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-shrink-0 items-center gap-1.5 sm:gap-2">
           <div suppressHydrationWarning className="hidden items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/50 px-3 py-2 text-xs text-slate-400 light:border-slate-200 light:bg-white light:text-slate-600 md:flex"><CalendarDays className="h-4 w-4" />{new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(new Date())}</div>
-          <button aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`} className="rounded-xl border border-slate-800 bg-slate-900/50 p-2.5 text-slate-400 transition hover:border-violet-500/50 hover:text-violet-300 light:border-slate-200 light:bg-white light:text-slate-600 light:hover:text-violet-700" onClick={onToggleTheme} title={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}>{theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}</button>
+          <button aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`} className="flex h-11 w-11 items-center justify-center rounded-xl border border-slate-800 bg-slate-900/50 text-slate-400 transition hover:border-violet-500/50 hover:text-violet-300 light:border-slate-200 light:bg-white light:text-slate-600 light:hover:text-violet-700" onClick={onToggleTheme} title={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}>{theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}</button>
           <button className="hidden items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/50 px-3 py-2.5 text-xs font-medium text-slate-300 transition hover:border-violet-500/50 hover:text-white disabled:opacity-50 light:border-slate-200 light:bg-white light:text-slate-700 light:hover:text-violet-700 sm:flex" disabled={isLoading} onClick={onRefresh}><RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />Refresh</button>
-          <button aria-label="Notifications" className="relative rounded-xl border border-slate-800 bg-slate-900/50 p-2.5 text-slate-400 light:border-slate-200 light:bg-white light:text-slate-600"><Bell className="h-4 w-4" /><span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-rose-500" /></button>
+          <button aria-label="Notifications" className="relative flex h-11 w-11 items-center justify-center rounded-xl border border-slate-800 bg-slate-900/50 text-slate-400 light:border-slate-200 light:bg-white light:text-slate-600"><Bell className="h-4 w-4" /><span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-rose-500" /></button>
         </div>
       </div>
     </header>

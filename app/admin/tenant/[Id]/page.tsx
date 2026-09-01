@@ -87,7 +87,7 @@ export default function TenantDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-dvh items-center justify-center bg-[#070b14] text-sm text-slate-400 light:bg-white">
+      <div className="pwa-page-safe flex min-h-dvh items-center justify-center bg-[#070b14] text-sm text-slate-400 light:bg-white">
         Loading business data from Supabase...
       </div>
     );
@@ -95,7 +95,7 @@ export default function TenantDetailPage() {
 
   if (!data) {
     return (
-      <div className="min-h-dvh bg-[#070b14] p-4 text-white light:bg-white light:text-gray-900 sm:p-8">
+      <div className="pwa-page-safe min-h-dvh bg-[#070b14] p-4 text-white light:bg-white light:text-gray-900 sm:p-8">
         <div className="mx-auto mt-12 max-w-md rounded-2xl border border-red-500 bg-red-900/20 p-6 light:border-red-300 light:bg-red-50">
           <div className="flex gap-3">
             <AlertCircle className="mt-0.5 h-6 w-6 shrink-0 text-red-500" />
@@ -119,7 +119,7 @@ export default function TenantDetailPage() {
 
   const { tenant, analytics } = data;
   return (
-    <div className="min-h-dvh space-y-6 bg-[#070b14] p-4 text-white light:bg-white light:text-gray-900 sm:p-8">
+    <div className="pwa-page-safe min-h-dvh space-y-6 bg-[#070b14] p-4 text-white light:bg-white light:text-gray-900 sm:p-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Link
           href="/admin"

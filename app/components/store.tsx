@@ -167,7 +167,7 @@ export default function StorefrontClient({
   return (
     <div className="min-h-dvh bg-white transition-colors duration-200 dark:bg-[#070b14]">
       {/* Header */}
-      <header className="border-b border-slate-100 dark:border-slate-800 sticky top-0 bg-white dark:bg-[#070b14] z-20">
+      <header className="pwa-header-inset sticky top-0 z-20 border-b border-slate-100 bg-white dark:border-slate-800 dark:bg-[#070b14]">
         <div className="mx-auto max-w-[1500px] px-3 py-3 sm:px-5">
           <div className="flex flex-wrap items-center gap-3 sm:gap-4">
             {viewOnly && (
