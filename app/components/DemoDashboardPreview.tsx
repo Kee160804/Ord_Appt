@@ -243,7 +243,7 @@ export function DemoDashboardPreview({ tenant }: { tenant: Tenant }) {
         </div>
       </main>
 
-      {notice && <div role="status" className="fixed bottom-5 right-5 z-50 flex max-w-sm items-start gap-3 rounded-xl border border-emerald-500/30 bg-slate-950 px-4 py-3 text-xs text-emerald-300 shadow-2xl light:bg-white light:text-emerald-700"><Check className="h-4 w-4 shrink-0" /><span>{notice}</span><button onClick={() => setNotice("")} aria-label="Close message"><X className="h-3.5 w-3.5" /></button></div>}
+      {notice && <div role="status" className="fixed bottom-3 left-3 right-3 z-50 flex max-w-sm items-start gap-3 rounded-xl border border-emerald-500/30 bg-slate-950 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] text-xs text-emerald-300 shadow-2xl light:bg-white light:text-emerald-700 sm:bottom-5 sm:left-auto sm:right-5"><Check className="h-4 w-4 shrink-0" /><span>{notice}</span><button onClick={() => setNotice("")} aria-label="Close message"><X className="h-3.5 w-3.5" /></button></div>}
     </div>
   );
 }
@@ -308,7 +308,7 @@ function DemoStat({ icon: Icon, label, value, color }: { icon: ComponentType<{ c
 }
 
 function SearchBox({ onChange, placeholder, value }: { onChange: (value: string) => void; placeholder: string; value: string }) {
-  return <label className="relative min-w-[220px] flex-1"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" /><input value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className="w-full rounded-xl border border-slate-700 bg-slate-800 py-2.5 pl-10 pr-3 text-xs outline-none focus:border-violet-500 light:border-slate-200 light:bg-slate-50" /></label>;
+  return <label className="relative min-w-0 flex-1 sm:min-w-[220px]"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" /><input value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className="w-full rounded-xl border border-slate-700 bg-slate-800 py-2.5 pl-10 pr-3 text-xs outline-none focus:border-violet-500 light:border-slate-200 light:bg-slate-50" /></label>;
 }
 
 function DemoField({ label, onChange, value }: { label: string; onChange: (value: string) => void; value: string }) {

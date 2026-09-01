@@ -25,7 +25,7 @@ export function Modal({ open, onClose, title, children, maxWidth = "max-w-lg", f
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4"
       aria-modal="true"
       role="dialog"
     >
@@ -37,15 +37,15 @@ export function Modal({ open, onClose, title, children, maxWidth = "max-w-lg", f
       {/* Panel */}
       <div
         className={cn(
-          "relative bg-slate-800 light:bg-white border border-slate-700 light:border-[#e1e6ef] rounded-xl shadow-2xl shadow-black/20 w-full flex flex-col",
+          "relative flex w-full min-w-0 flex-col overflow-hidden rounded-t-2xl border border-slate-700 bg-slate-800 shadow-2xl shadow-black/20 light:border-[#e1e6ef] light:bg-white sm:rounded-xl",
           maxWidth,
-          "max-h-[90vh]",
+          "max-h-[calc(100dvh-env(safe-area-inset-top))] sm:max-h-[90dvh]",
         )}
       >
         {title && (
-          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-700 light:border-[#e8ecf3] flex-shrink-0">
-            <h2 className="text-base font-bold text-white light:text-slate-900">{title}</h2>
-            <button title="Close"
+          <div className="flex flex-shrink-0 items-center justify-between gap-3 border-b border-slate-700 px-4 py-4 light:border-[#e8ecf3] sm:px-6">
+            <h2 className="min-w-0 truncate text-base font-bold text-white light:text-slate-900">{title}</h2>
+            <button title="Close" aria-label="Close dialog"
               onClick={onClose}
               className="p-1.5 rounded-lg text-slate-400 hover:text-white light:hover:text-slate-900 hover:bg-slate-700 light:hover:bg-slate-100 transition-colors"
             >
@@ -53,9 +53,9 @@ export function Modal({ open, onClose, title, children, maxWidth = "max-w-lg", f
             </button>
           </div>
         )}
-        <div className="overflow-y-auto flex-1 px-6 py-5">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">{children}</div>
         {footer && (
-          <div className="px-6 py-4 border-t border-slate-700 light:border-[#e8ecf3] flex-shrink-0">{footer}</div>
+          <div className="flex-shrink-0 border-t border-slate-700 px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] light:border-[#e8ecf3] sm:px-6">{footer}</div>
         )}
       </div>
     </div>

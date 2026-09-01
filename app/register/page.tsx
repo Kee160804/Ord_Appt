@@ -100,7 +100,7 @@ export default function RegisterPage() {
   const steps = ["Account", "Business Type", "Business Details"];
 
   return (
-    <div className="min-h-screen bg-[#070b14] flex items-center justify-center p-4">
+    <div className="flex min-h-dvh items-center justify-center bg-[#070b14] p-3 sm:p-4">
       <div className="w-full max-w-lg">
         {/* Brand */}
         <div className="flex items-center gap-2 justify-center mb-8">
@@ -158,12 +158,12 @@ export default function RegisterPage() {
           })}
         </div>
 
-        <div className="bg-slate-800/60 border border-slate-700/50 rounded-2xl p-8 shadow-xl shadow-black/30">
+        <div className="rounded-2xl border border-slate-700/50 bg-slate-800/60 p-5 shadow-xl shadow-black/30 sm:p-8">
           {/* Step 1: Account */}
           {step === 1 && (
             <div className="space-y-5 animate-fade-in">
               <div><h2 className="text-lg font-black text-white">Yuh account</h2><p className="text-sm text-slate-500 mt-0.5">Start with your personal details</p></div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Field label="First Name" placeholder="Jane" value={form.firstName} onChange={v => update("firstName", v)} />
                 <Field label="Last Name" placeholder="Smith" value={form.lastName} onChange={v => update("lastName", v)} />
               </div>
@@ -190,7 +190,7 @@ export default function RegisterPage() {
           {step === 2 && (
             <div className="space-y-5 animate-fade-in">
               <div><h2 className="text-lg font-black text-white">Yuh business type</h2><p className="text-sm text-slate-500 mt-0.5">What kind of business are you running?</p></div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 {[
                   { type: "appointment" as BusinessType, icon: Calendar, label: "Appointments", desc: "Salons, barbers, clinics, studios", color: "violet", examples: ["💅 Nail salons", "💈 Barbershops", "🧘 Yoga studios"] },
                   { type: "ordering" as BusinessType, icon: ShoppingBag, label: "Ordering", desc: "Restaurants, bakeries, cafes", color: "orange", examples: ["🍕 Restaurants", "🥐 Bakeries", "☕ Cafes"] },
@@ -236,13 +236,13 @@ export default function RegisterPage() {
               <Field label="Business Name" placeholder="e.g. Luxe Beauty Studio" value={form.businessName} onChange={v => update("businessName", v)} />
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-1.5">Storefront URL</label>
-                <div className="flex items-center">
+                <div className="flex min-w-0 items-center">
                   <span className="text-sm text-slate-500 bg-slate-700/50 border border-slate-600 rounded-l-xl px-3 py-2.5 border-r-0 whitespace-nowrap">YuhBusiness.io/</span>
                   <input value={form.slug} onChange={e => update("slug", e.target.value)} placeholder="your-business"
-                    className="flex-1 px-4 py-2.5 border border-slate-600 rounded-r-xl text-sm bg-slate-700/50 text-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500 transition placeholder:text-slate-600" />
+                    className="min-w-0 flex-1 px-3 py-2.5 sm:px-4 border border-slate-600 rounded-r-xl text-sm bg-slate-700/50 text-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500 transition placeholder:text-slate-600" />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Field label="City" placeholder="Miami, FL" value={form.city} onChange={v => update("city", v)} />
                 <Field label="Phone" type="tel" placeholder="(555) 000-0000" value={form.phone} onChange={v => update("phone", v)} />
               </div>

@@ -216,7 +216,7 @@ export function ServicesView({ tenant }: Props) {
   };
 
   return (
-    <div className="min-h-screen space-y-4 bg-[#08111f] light:bg-[#f8fafc] p-4 text-white light:text-[#14213a] md:p-5">
+    <div className="min-h-full space-y-4 bg-[#08111f] light:bg-[#f8fafc] p-4 text-white light:text-[#14213a] md:p-5">
       <div className="flex items-center justify-end">
         <div className="sr-only">
           <h2 className="text-sm font-bold text-white light:text-[#17223a]">Services</h2>
@@ -276,7 +276,7 @@ export function ServicesView({ tenant }: Props) {
             value={form.name}
             onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
           />
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Input label="Price ($)" type="number" min="0" step="0.01" placeholder="0.00" value={form.price}
               onChange={(event) => setForm((current) => ({ ...current, price: event.target.value }))} />
             <Input label="Duration (min)" type="number" min="1" placeholder="60" value={form.duration}
@@ -297,7 +297,7 @@ export function ServicesView({ tenant }: Props) {
               Require deposit for this service
             </label>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Select
               label="Deposit Type"
               value={form.depositType}
@@ -328,7 +328,7 @@ function ServiceCard({ service, onEdit, onToggle, onDelete }: {
   onDelete: (id: string) => void;
 }) {
   return (
-    <Card className="group max-w-[270px] overflow-hidden">
+    <Card className="group w-full overflow-hidden">
       <div className="relative h-32 overflow-hidden bg-slate-800 light:bg-slate-100">
         {service.image ? (
           <img

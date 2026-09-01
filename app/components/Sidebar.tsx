@@ -31,6 +31,7 @@ export function Sidebar({ tenant, user }: SidebarProps) {
   const pathname = usePathname();
   const { logout } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const isAppointmentBusiness = tenant.businessType === "appointment";
   const base = "/dashboard";
   const navItems = [
@@ -55,18 +56,44 @@ export function Sidebar({ tenant, user }: SidebarProps) {
   ];
 
   useEffect(() => {
-    const toggle = () => setCollapsed((current) => !current);
+    const toggle = () => {
+      if (window.matchMedia("(max-width: 767px)").matches) {
+        setCollapsed(false);
+        setMobileOpen((current) => !current);
+        return;
+      }
+      setCollapsed((current) => !current);
+    };
+    const media = window.matchMedia("(max-width: 767px)");
+    const handleViewportChange = (event: MediaQueryListEvent) => {
+      setMobileOpen(false);
+      if (event.matches) setCollapsed(false);
+    };
     window.addEventListener("dashboard-sidebar-toggle", toggle);
-    return () => window.removeEventListener("dashboard-sidebar-toggle", toggle);
+    media.addEventListener("change", handleViewportChange);
+    return () => {
+      window.removeEventListener("dashboard-sidebar-toggle", toggle);
+      media.removeEventListener("change", handleViewportChange);
+    };
   }, []);
 
   return (
-    <aside
-      className={cn(
-        "relative z-30 flex h-screen flex-shrink-0 flex-col overflow-hidden bg-[#111a35] text-white shadow-[6px_0_28px_rgba(8,20,44,0.08)] transition-[width] duration-300",
-        collapsed ? "w-[72px]" : "w-[216px]",
+    <>
+      {mobileOpen && (
+        <button
+          type="button"
+          aria-label="Close navigation"
+          className="fixed inset-0 z-40 bg-slate-950/60 backdrop-blur-[2px] md:hidden"
+          onClick={() => setMobileOpen(false)}
+        />
       )}
-    >
+      <aside
+        className={cn(
+          "fixed inset-y-0 left-0 z-50 flex h-dvh w-[min(86vw,280px)] flex-shrink-0 flex-col overflow-hidden bg-[#111a35] text-white shadow-[6px_0_28px_rgba(8,20,44,0.18)] transition-[transform,width] duration-300 md:relative md:z-30 md:translate-x-0",
+          mobileOpen ? "translate-x-0" : "-translate-x-full",
+          collapsed ? "md:w-[72px]" : "md:w-[216px]",
+        )}
+      >
       <div className={cn("flex h-[66px] items-center gap-3 border-b border-white/[0.06] px-5", collapsed && "justify-center px-3")}>
         <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-purple-700 shadow-lg shadow-violet-950/30">
           <Sparkles className="h-4 w-4 text-white" />
@@ -107,6 +134,7 @@ export function Sidebar({ tenant, user }: SidebarProps) {
             <Link
               key={item.href}
               href={item.href}
+              onClick={() => setMobileOpen(false)}
               title={collapsed ? item.label : undefined}
               className={cn(
                 "group flex h-10 items-center gap-3 rounded-lg px-3 text-[12px] font-medium transition-colors",
@@ -164,6 +192,7 @@ export function Sidebar({ tenant, user }: SidebarProps) {
           <LogOut className="h-3.5 w-3.5" />
         </button>
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }

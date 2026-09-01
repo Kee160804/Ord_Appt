@@ -83,21 +83,21 @@ export default function AgentsManagementPage() {
   // COMMENT: Verify user is super admin
   if (user?.role !== "superadmin") {
     return (
-      <div className="p-8 bg-[#070b14] min-h-screen text-white">
+      <div className="min-h-dvh bg-[#070b14] p-4 text-white sm:p-8">
         <p className="text-red-400">Access denied. Super admin only.</p>
       </div>
     );
   }
 
   return (
-    <div className="p-8 space-y-6 bg-[#070b14] light:bg-white min-h-screen text-white light:text-gray-900">
+    <div className="min-h-dvh space-y-6 bg-[#070b14] p-4 text-white light:bg-white light:text-gray-900 sm:p-8">
       {/* HEADER */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-black">Agent Management</h1>
           <p className="text-slate-400">Manage internal staff and admins</p>
         </div>
-        <div className="flex gap-4">
+        <div className="flex flex-wrap gap-2 sm:gap-4">
           <button
             onClick={() => {
               setEditingAgent(null);
@@ -209,8 +209,8 @@ export default function AgentsManagementPage() {
             All Agents ({filteredAgents.length})
           </h3>
         </CardHeader>
-        <div className="divide-y divide-slate-700">
-          <div className="px-6 py-4 grid grid-cols-4 gap-4 text-sm font-semibold text-slate-400">
+        <div className="divide-y divide-slate-700 overflow-x-auto">
+          <div className="grid min-w-[680px] grid-cols-4 gap-4 px-4 py-4 text-sm font-semibold text-slate-400 sm:px-6">
             <div>Name</div>
             <div>Email</div>
             <div>Role</div>
@@ -226,7 +226,7 @@ export default function AgentsManagementPage() {
             filteredAgents.map((agent) => (
               <div
                 key={agent.id}
-                className="px-6 py-4 grid grid-cols-4 gap-4 items-center hover:bg-slate-700/30 transition"
+                className="grid min-w-[680px] grid-cols-4 items-center gap-4 px-4 py-4 transition hover:bg-slate-700/30 sm:px-6"
               >
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-full bg-violet-600 flex items-center justify-center text-sm font-bold">

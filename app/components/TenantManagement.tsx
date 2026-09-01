@@ -86,7 +86,7 @@ export function TenantManagement({
   return (
     <div className="space-y-6">
       {/* Header with Add Button */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-xl font-bold text-white light:text-gray-900">
             Tenant Management
@@ -118,7 +118,7 @@ export function TenantManagement({
               Create New Tenant
             </h3>
           </CardHeader>
-          <div className="p-6 space-y-4">
+          <div className="space-y-4 p-4 sm:p-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <input
                 type="text"

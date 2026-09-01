@@ -126,7 +126,7 @@ export function OrdersView({ tenant }: Props) {
   };
 
   return (
-    <div className="min-h-screen space-y-4 bg-[#08111f] light:bg-[#f8fafc] p-4 text-white light:text-[#14213a] md:p-5">
+    <div className="min-h-full space-y-4 bg-[#08111f] light:bg-[#f8fafc] p-4 text-white light:text-[#14213a] md:p-5">
       {/* Status summary */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         {STATUS_FLOW.map(status => (

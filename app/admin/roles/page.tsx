@@ -226,20 +226,20 @@ export default function RolesManagementPage() {
   // COMMENT: Verify user is super admin
   if (user?.role !== "superadmin") {
     return (
-      <div className="p-8 bg-[#070b14] min-h-screen text-white">
+      <div className="min-h-dvh bg-[#070b14] p-4 text-white sm:p-8">
         <p className="text-red-400">Access denied. Super admin only.</p>
       </div>
     );
   }
 
   return (
-    <div className="p-8 space-y-6 bg-[#070b14] light:bg-white min-h-screen text-white light:text-gray-900">
-      <div className="flex items-center justify-between">
+    <div className="min-h-dvh space-y-6 bg-[#070b14] p-4 text-white light:bg-white light:text-gray-900 sm:p-8">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-black">Role Management</h1>
           <p className="text-slate-400">Define roles and permissions</p>
         </div>
-        <div className="flex gap-4">
+        <div className="flex flex-wrap gap-2 sm:gap-4">
           <button
             onClick={() => {
               setEditingRole(null);

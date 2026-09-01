@@ -45,9 +45,9 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#070b14] light:bg-white text-white light:text-gray-900">
+    <div className="min-h-dvh bg-[#070b14] light:bg-white text-white light:text-gray-900">
       {/* Navbar */}
-      <nav className="flex items-center justify-between px-6 md:px-12 py-5 border-b border-white/5 light:border-gray-200 sticky top-0 z-50 bg-[#070b14]/90 light:bg-white/90 backdrop-blur-xl">
+      <nav className="sticky top-0 z-50 flex items-center justify-between gap-2 border-b border-white/5 bg-[#070b14]/90 px-3 py-4 backdrop-blur-xl light:border-gray-200 light:bg-white/90 sm:px-6 md:px-12 md:py-5">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-xl bg-linear-to-br from-violet-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-violet-900/40 light:shadow-violet-500/30">
             <Sparkles className="w-4 h-4 text-white" />
@@ -75,7 +75,7 @@ export default function LoginPage() {
           </Link>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-shrink-0 items-center gap-1 sm:gap-3">
           <button
             onClick={toggleTheme}
             className="p-2 rounded-xl text-slate-400 light:text-gray-600 hover:bg-white/5 light:hover:bg-gray-100 transition-colors"
@@ -85,21 +85,14 @@ export default function LoginPage() {
             {theme === "dark" ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
           </button>
 
-          <Link
-            href="/login"
-            className="text-sm font-semibold text-slate-400 light:text-gray-600 hover:text-white light:hover:text-gray-900 px-4 py-2 rounded-xl hover:bg-white/5 light:hover:bg-gray-100 transition-colors"
-          >
-            Sign In
-          </Link>
-
-          <Link href="/register" className="text-sm font-bold text-white bg-violet-600 hover:bg-violet-500 light:bg-violet-600 light:hover:bg-violet-700 px-4 py-2 rounded-xl transition-colors shadow-sm">
+          <Link href="/register" className="rounded-xl bg-violet-600 px-3 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-violet-500 light:bg-violet-600 light:hover:bg-violet-700 sm:px-4 sm:text-sm">
             Start free
           </Link>
         </div>
       </nav>
 
       {/* Main content (two columns) */}
-      <div className="flex flex-col lg:flex-row min-h-[calc(100vh-73px)]">
+      <div className="flex min-h-[calc(100dvh-65px)] flex-col lg:flex-row">
         {/* Left panel - hidden on mobile */}
         <div className="hidden lg:flex lg:w-1/2 flex-col justify-between p-14 relative overflow-hidden bg-linear-to-br from-[#0d1020] to-[#0a0f1a] light:from-gray-50 light:to-white border-r border-white/5 light:border-gray-200">
           <div className="absolute top-0 left-0 w-full h-full -z-10">
@@ -128,7 +121,7 @@ export default function LoginPage() {
         </div>
 
         {/* Right form */}
-        <div className="flex-1 flex items-center justify-center p-8">
+        <div className="flex flex-1 items-center justify-center p-4 sm:p-8">
           <div className="w-full max-w-sm space-y-7">
             {/* Mobile logo */}
             <div className="flex lg:hidden items-center gap-3 justify-center mb-6">
@@ -177,7 +170,7 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center justify-between gap-3 text-xs sm:text-sm">
                 <label className="flex items-center gap-2 text-slate-400 light:text-gray-700 cursor-pointer font-medium">
                   <input
                     type="checkbox"

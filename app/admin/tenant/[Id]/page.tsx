@@ -87,7 +87,7 @@ export default function TenantDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#070b14] text-sm text-slate-400 light:bg-white">
+      <div className="flex min-h-dvh items-center justify-center bg-[#070b14] text-sm text-slate-400 light:bg-white">
         Loading business data from Supabase...
       </div>
     );
@@ -95,7 +95,7 @@ export default function TenantDetailPage() {
 
   if (!data) {
     return (
-      <div className="min-h-screen bg-[#070b14] p-8 text-white light:bg-white light:text-gray-900">
+      <div className="min-h-dvh bg-[#070b14] p-4 text-white light:bg-white light:text-gray-900 sm:p-8">
         <div className="mx-auto mt-12 max-w-md rounded-2xl border border-red-500 bg-red-900/20 p-6 light:border-red-300 light:bg-red-50">
           <div className="flex gap-3">
             <AlertCircle className="mt-0.5 h-6 w-6 shrink-0 text-red-500" />
@@ -119,7 +119,7 @@ export default function TenantDetailPage() {
 
   const { tenant, analytics } = data;
   return (
-    <div className="min-h-screen space-y-6 bg-[#070b14] p-8 text-white light:bg-white light:text-gray-900">
+    <div className="min-h-dvh space-y-6 bg-[#070b14] p-4 text-white light:bg-white light:text-gray-900 sm:p-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Link
           href="/admin"
@@ -144,14 +144,14 @@ export default function TenantDetailPage() {
         </div>
       )}
 
-      <div className="flex items-center gap-4">
+      <div className="flex min-w-0 items-center gap-4">
         <div
           className="flex h-12 w-12 items-center justify-center rounded-xl text-lg font-bold text-white"
           style={{ backgroundColor: tenant.logoBg }}
         >
           {tenant.logo}
         </div>
-        <div>
+        <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-2xl font-black text-white light:text-gray-900">{tenant.name}</h1>
             <span className="rounded-full bg-slate-700 px-2 py-0.5 text-[10px] font-semibold uppercase text-slate-300 light:bg-slate-100 light:text-slate-600">
@@ -162,7 +162,7 @@ export default function TenantDetailPage() {
             {tenant.businessType === "appointment" ? "Appointment Booking" : "Food Ordering"}
             {tenant.city ? ` · ${tenant.city}` : ""}
           </p>
-          <p className="mt-1 text-xs text-slate-500 light:text-gray-500">ID: {tenant.id}</p>
+          <p className="mt-1 break-all text-xs text-slate-500 light:text-gray-500">ID: {tenant.id}</p>
         </div>
       </div>
 
@@ -211,7 +211,7 @@ export default function TenantDetailPage() {
             Use these secured controls after confirming payment, to grant another trial period, or to pause access for an unpaid account.
           </p>
           <div className="mt-5 flex flex-wrap items-end gap-3">
-            <label className="min-w-44">
+            <label className="w-full sm:min-w-44 sm:w-auto">
               <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-400">Plan</span>
               <select value={selectedPlan} onChange={(event) => setSelectedPlan(event.target.value as Tenant["plan"])} className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2.5 text-sm text-white outline-none focus:border-violet-500 light:border-slate-300 light:bg-white light:text-slate-900">
                 <option value="starter">Beginner — $9</option>

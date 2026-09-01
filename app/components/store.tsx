@@ -165,11 +165,11 @@ export default function StorefrontClient({
     setCurrentImageIndex((prev) => (prev - 1 + galleryImages.length) % galleryImages.length);
 
   return (
-    <div className="min-h-screen bg-white dark:bg-[#070b14] transition-colors duration-200">
+    <div className="min-h-dvh bg-white transition-colors duration-200 dark:bg-[#070b14]">
       {/* Header */}
       <header className="border-b border-slate-100 dark:border-slate-800 sticky top-0 bg-white dark:bg-[#070b14] z-20">
         <div className="mx-auto max-w-[1500px] px-3 py-3 sm:px-5">
-          <div className="flex items-center gap-3 sm:gap-4">
+          <div className="flex flex-wrap items-center gap-3 sm:gap-4">
             {viewOnly && (
               <Link
                 href="/login"
@@ -194,7 +194,7 @@ export default function StorefrontClient({
             </div>
 
             {viewOnly && (
-              <div className="mx-auto flex items-center rounded-xl border border-slate-200 bg-slate-100 p-1 dark:border-slate-700 dark:bg-slate-900" role="tablist" aria-label="Demo view">
+              <div className="order-last mx-auto flex w-full items-center justify-center rounded-xl border border-slate-200 bg-slate-100 p-1 dark:border-slate-700 dark:bg-slate-900 sm:w-auto lg:order-none" role="tablist" aria-label="Demo view">
                 <button
                   type="button"
                   role="tab"
@@ -265,6 +265,36 @@ export default function StorefrontClient({
               </button>
             </div>
           </div>
+          {(!viewOnly || activeDemoView === "storefront") && (
+            <div className="mt-3 grid grid-cols-2 gap-2 lg:hidden" role="tablist" aria-label="Storefront pages">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === "home"}
+                onClick={() => setActiveTab("home")}
+                className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${
+                  activeTab === "home"
+                    ? "bg-violet-600 text-white"
+                    : "bg-slate-100 text-slate-600 dark:bg-slate-900 dark:text-slate-300"
+                }`}
+              >
+                Home
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === "contact"}
+                onClick={() => setActiveTab("contact")}
+                className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${
+                  activeTab === "contact"
+                    ? "bg-violet-600 text-white"
+                    : "bg-slate-100 text-slate-600 dark:bg-slate-900 dark:text-slate-300"
+                }`}
+              >
+                Contact
+              </button>
+            </div>
+          )}
         </div>
       </header>
 
@@ -309,7 +339,7 @@ export default function StorefrontClient({
 
       {/* Main content */}
       {(!viewOnly || activeDemoView === "storefront") && (
-      <main className={`${activeTab === "contact" ? "max-w-[1500px]" : "max-w-6xl"} mx-auto px-4 py-8 sm:py-12`}>
+      <main className={`${activeTab === "contact" ? "max-w-[1500px]" : "max-w-6xl"} mx-auto px-3 py-8 sm:px-4 sm:py-12`}>
         {activeTab === "home" ? (
           isAppt ? (
             <AppointmentBooking
@@ -352,7 +382,7 @@ export default function StorefrontClient({
             >
               <X className="w-6 h-6" />
             </button>
-            <div className="relative w-full h-[80vh]">
+            <div className="relative h-[80dvh] w-full">
               <Image
                 src={galleryImages[currentImageIndex]}
                 alt="Gallery"

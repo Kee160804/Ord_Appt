@@ -29,7 +29,7 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#070b14] p-4 text-white light:bg-white light:text-slate-900">
+    <div className="flex min-h-dvh items-center justify-center bg-[#070b14] p-3 text-white light:bg-white light:text-slate-900 sm:p-4">
       <main className="w-full max-w-md rounded-3xl border border-slate-800 bg-slate-900/70 p-7 shadow-2xl light:border-slate-200 light:bg-white sm:p-9">
         <Link href="/home" className="mb-8 flex items-center gap-2.5 font-black">
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-600 text-white"><Sparkles className="h-4 w-4" /></span>

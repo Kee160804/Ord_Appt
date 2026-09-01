@@ -154,9 +154,9 @@ export default function HomePage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#070b14] light:bg-white text-white light:text-gray-900 transition-colors">
+    <div className="min-h-dvh bg-[#070b14] light:bg-white text-white light:text-gray-900 transition-colors">
       {/* Navbar */}
-      <nav className="flex items-center justify-between px-6 md:px-12 py-5 border-b border-white/5 light:border-gray-200 sticky top-0 z-50 bg-[#070b14]/90 light:bg-white/90 backdrop-blur-xl">
+      <nav className="sticky top-0 z-50 flex items-center justify-between gap-2 border-b border-white/5 bg-[#070b14]/90 px-3 py-4 backdrop-blur-xl light:border-gray-200 light:bg-white/90 sm:px-6 md:px-12 md:py-5">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-violet-900/40 light:shadow-violet-500/30">
             <Sparkles className="w-4 h-4 text-white" />
@@ -193,7 +193,7 @@ export default function HomePage() {
           </a>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-shrink-0 items-center gap-1 sm:gap-3">
           {/* NEW: Enhanced theme toggle button with better visibility and feedback */}
           <button
             onClick={() => {
@@ -204,7 +204,7 @@ export default function HomePage() {
               console.log("🎯 toggleTheme() function called");
               console.log("✨ Theme button clicked! Current theme:", theme);
             }}
-            className="p-2.5 rounded-xl text-slate-400 light:text-gray-600 hover:bg-white/10 light:hover:bg-gray-200 hover:text-white light:hover:text-gray-800 transition-all duration-300 cursor-pointer border border-slate-700 light:border-gray-300"
+            className="rounded-xl border border-slate-700 p-2 text-slate-400 transition-all duration-300 hover:bg-white/10 hover:text-white light:border-gray-300 light:text-gray-600 light:hover:bg-gray-200 light:hover:text-gray-800 sm:p-2.5"
             aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
             title={`Switch to ${theme === "dark" ? "light" : "dark"} mode (currently ${theme})`}
           >
@@ -218,30 +218,30 @@ export default function HomePage() {
 
           <Link
             href="/login"
-            className="text-sm font-semibold text-slate-400 light:text-gray-600 hover:text-white light:hover:text-gray-900 px-4 py-2 rounded-xl hover:bg-white/5 light:hover:bg-gray-100 transition-colors"
+            className="hidden rounded-xl px-4 py-2 text-sm font-semibold text-slate-400 transition-colors hover:bg-white/5 hover:text-white light:text-gray-600 light:hover:bg-gray-100 light:hover:text-gray-900 sm:inline-flex"
           >
             Sign In
           </Link>
           <Link
             href="/register"
-            className="text-sm font-bold text-white bg-violet-600 hover:bg-violet-500 light:bg-violet-600 light:hover:bg-violet-700 px-4 py-2 rounded-xl transition-colors shadow-sm shadow-violet-900/30 light:shadow-violet-600/30"
+            className="rounded-xl bg-violet-600 px-3 py-2 text-xs font-bold text-white shadow-sm shadow-violet-900/30 transition-colors hover:bg-violet-500 light:bg-violet-600 light:shadow-violet-600/30 light:hover:bg-violet-700 sm:px-4 sm:text-sm"
           >
-            Get Started Free
+            <span className="sm:hidden">Start Free</span><span className="hidden sm:inline">Get Started Free</span>
           </Link>
         </div>
       </nav>
 
       {/* Hero */}
-      <section className="relative max-w-6xl mx-auto px-6 md:px-12 pt-24 pb-20 text-center overflow-hidden">
+      <section className="relative mx-auto max-w-6xl overflow-hidden px-4 pb-16 pt-16 text-center sm:px-6 sm:pb-20 sm:pt-24 md:px-12">
         <div className="absolute inset-0 -z-10">
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-violet-600/10 light:bg-violet-500/5 rounded-full blur-3xl" />
+          <div className="absolute left-1/2 top-0 h-[min(600px,100vw)] w-[min(600px,100vw)] -translate-x-1/2 rounded-full bg-violet-600/10 blur-3xl light:bg-violet-500/5" />
         </div>
 
         <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-violet-500/10 light:bg-violet-100 border border-violet-500/20 light:border-violet-200 text-violet-300 light:text-violet-700 text-xs font-bold rounded-full mb-8">
           <Zap className="w-3 h-3" /> Evriting fi run yuh local business
         </div>
 
-        <h1 className="text-5xl sm:text-6xl lg:text-7xl font-black text-white light:text-gray-900 leading-[1.05] tracking-tight mb-6">
+        <h1 className="mb-6 text-4xl font-black leading-[1.05] tracking-tight text-white light:text-gray-900 sm:text-6xl lg:text-7xl">
           Tek Yuh Business Online.
           <br />
           <span className="bg-gradient-to-r from-violet-400 to-indigo-400 light:from-violet-600 light:to-indigo-600 bg-clip-text text-transparent">
@@ -249,12 +249,12 @@ export default function HomePage() {
           </span>
         </h1>
 
-        <p className="text-xl text-slate-400 light:text-gray-600 max-w-2xl mx-auto leading-relaxed mb-10">
+        <p className="mx-auto mb-10 max-w-2xl text-lg leading-relaxed text-slate-400 light:text-gray-600 sm:text-xl">
           Give your business a professional online presence. Accept bookings,
           take orders, and manage everything from one powerful dashboard.
         </p>
 
-        <div className="flex items-center justify-center gap-4 flex-wrap">
+        <div className="flex flex-col items-stretch justify-center gap-4 sm:flex-row sm:flex-wrap sm:items-center">
           <Link
             href="/register?mode=trial"
             className="inline-flex items-center gap-2 px-8 py-4 bg-violet-600 hover:bg-violet-500 light:bg-violet-600 light:hover:bg-violet-700 text-white font-bold rounded-2xl transition-colors shadow-lg shadow-violet-900/30 light:shadow-violet-600/30 text-base"

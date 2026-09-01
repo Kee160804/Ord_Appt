@@ -68,7 +68,7 @@ export function RoleManagement({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-xl font-bold text-white light:text-gray-900">
             Role Management
@@ -94,7 +94,7 @@ export function RoleManagement({
               Create New Role
             </h3>
           </CardHeader>
-          <div className="p-6 space-y-4">
+          <div className="space-y-4 p-4 sm:p-6">
             <div>
               <label className="block text-sm font-medium text-white light:text-gray-900 mb-2">
                 Role Name

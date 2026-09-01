@@ -568,7 +568,7 @@ export function SettingsView({ tenant, onTenantUpdated }: Props) {
   const [active, setActive] = useState<Tab>("business");
   const [hours, setHours] = useState(tenant.businessHours);
   return (
-    <div className="min-h-screen space-y-4 bg-[#08111f] light:bg-[#f8fafc] p-4 text-white light:text-[#14213a] md:p-5">
+    <div className="min-h-full space-y-4 bg-[#08111f] light:bg-[#f8fafc] p-4 text-white light:text-[#14213a] md:p-5">
       <div className="sr-only">
         <h2 className="text-sm font-bold text-white light:text-[#17223a]">
           Settings
@@ -689,7 +689,7 @@ function BusinessTab({
             Your business initial is used until image uploads are enabled.
           </p>
         </div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Input
             label="Business Name"
             value={form.name}
@@ -904,7 +904,7 @@ function StorefrontTab({
           >
             Storefront URL
           </label>
-          <div className="flex items-center">
+          <div className="flex min-w-0 items-center">
             <span className="text-sm text-slate-400 light:text-gray-600 bg-slate-700 light:bg-gray-100 border border-slate-600 light:border-gray-300 rounded-l-xl px-3 py-2.5 border-r-0 whitespace-nowrap">
               platform.com/
             </span>
@@ -913,7 +913,7 @@ function StorefrontTab({
               title="Storefront Slug"
               value={slug}
               onChange={(event) => setSlug(event.target.value)}
-              className="flex-1 px-4 py-2.5 bg-slate-700 light:bg-white border border-slate-600 light:border-gray-300 rounded-r-xl text-sm text-white light:text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30"
+              className="min-w-0 flex-1 px-3 py-2.5 bg-slate-700 light:bg-white border border-slate-600 light:border-gray-300 rounded-r-xl text-sm text-white light:text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 sm:px-4"
             />
           </div>
         </div>
@@ -922,7 +922,7 @@ function StorefrontTab({
           value={coverImage}
           onChange={(event) => setCoverImage(event.target.value)}
         />
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label
               htmlFor="primary-color"

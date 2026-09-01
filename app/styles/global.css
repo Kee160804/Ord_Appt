@@ -23,19 +23,26 @@
   box-sizing: border-box;
 }
 
+html {
+  color-scheme: light;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  scroll-behavior: smooth;
+  overflow-x: clip;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
+  min-width: 320px;
+  min-height: 100dvh;
+  overflow-x: clip;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   transition:
     background-color 0.2s ease,
     color 0.2s ease,
     border-color 0.2s ease;
-}
-
-html {
-  color-scheme: light;
 }
 
 /* NEW: Light mode CSS variables override - this is the key section */
@@ -67,7 +74,6 @@ body.dark {
 html,
 body {
   transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
-  min-height: 100%;
 }
 
 button,
@@ -80,6 +86,27 @@ select {
 button,
 a {
   -webkit-tap-highlight-color: transparent;
+}
+
+img,
+video,
+canvas {
+  max-width: 100%;
+  height: auto;
+}
+
+input,
+textarea,
+select {
+  max-width: 100%;
+}
+
+@media (max-width: 640px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
 }
 
 html.light ::selection,
@@ -167,9 +194,17 @@ html.light ::-webkit-scrollbar-thumb:hover,
   animation: slideIn 0.25s ease forwards;
 }
 
-.animate-fade-in {
-  animation: fadeIn 0.3s ease forwards;
-}
-.animate-slide-in {
-  animation: slideIn 0.25s ease forwards;
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
 }

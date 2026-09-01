@@ -17,7 +17,7 @@ export default function DashboardPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#070b14] light:bg-white">
+      <div className="flex min-h-full items-center justify-center bg-[#070b14] light:bg-white">
         <div className="text-white light:text-gray-900">Loading dashboard...</div>
       </div>
     );
@@ -29,7 +29,7 @@ export default function DashboardPage() {
 
   if (!tenant) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#070b14] light:bg-white">
+      <div className="flex min-h-full items-center justify-center bg-[#070b14] light:bg-white">
         <div className="text-white light:text-gray-900">Tenant not found</div>
       </div>
     );

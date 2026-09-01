@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, Menu, Moon, Plus, Search, Sun } from "lucide-react";
+import { Bell, Menu, Plus, Search, Sun } from "lucide-react";
 import { useTheme } from "@/app/contexts/theme";
 import { useAuth } from "@/app/contexts/auth";
 
@@ -52,20 +52,20 @@ export function TopBar({ title, action }: TopBarProps) {
   };
 
   return (
-    <header className="sticky top-0 z-20 flex h-[56px] flex-shrink-0 items-center justify-between border-b border-slate-700/60 light:border-[#e7ebf2] bg-[#0b1424]/95 light:bg-white/95 px-4 backdrop-blur md:px-5">
-      <div className="flex min-w-0 items-center gap-3">
+    <header className="sticky top-0 z-20 flex min-h-14 flex-shrink-0 items-center justify-between gap-2 border-b border-slate-700/60 bg-[#0b1424]/95 px-2 py-2 backdrop-blur light:border-[#e7ebf2] light:bg-white/95 sm:px-4 md:px-5">
+      <div className="flex min-w-0 items-center gap-1.5 sm:gap-3">
         <button
           onClick={() => window.dispatchEvent(new Event("dashboard-sidebar-toggle"))}
           aria-label="Toggle sidebar"
           title="Toggle sidebar"
-          className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-800 light:hover:bg-slate-100 hover:text-white light:hover:text-slate-900"
+          className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-800 light:hover:bg-slate-100 hover:text-white light:hover:text-slate-900"
         >
           <Menu className="h-4 w-4" />
         </button>
-        <h1 className="truncate text-sm font-bold text-white light:text-[#111b31]">{title}</h1>
+        <h1 className="max-w-[30vw] truncate text-sm font-bold text-white light:text-[#111b31] sm:max-w-none">{title}</h1>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex flex-shrink-0 items-center gap-0.5 sm:gap-2">
         <div className="relative hidden md:block">
           <form onSubmit={handleSearch}>
             <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
@@ -92,7 +92,7 @@ export function TopBar({ title, action }: TopBarProps) {
             onClick={() => setNotificationsOpen((current) => !current)}
             aria-label="Notifications"
             title="Notifications"
-            className="relative rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-800 light:hover:bg-slate-100 hover:text-white light:hover:text-slate-900"
+            className="relative flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-800 light:hover:bg-slate-100 hover:text-white light:hover:text-slate-900"
           >
             <Bell className="h-4 w-4" />
           </button>
@@ -108,7 +108,7 @@ export function TopBar({ title, action }: TopBarProps) {
 
         <button
           onClick={toggleTheme}
-          className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-800 light:hover:bg-slate-100 hover:text-white light:hover:text-slate-900"
+          className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-800 light:hover:bg-slate-100 hover:text-white light:hover:text-slate-900"
           aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
           title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
         >
@@ -120,7 +120,7 @@ export function TopBar({ title, action }: TopBarProps) {
         </button>
 
         <div
-          className="ml-1 flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-amber-200 to-violet-300 text-[9px] font-bold text-slate-800 ring-2 ring-white/10 light:ring-slate-100"
+          className="ml-1 hidden h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-amber-200 to-violet-300 text-[9px] font-bold text-slate-800 ring-2 ring-white/10 light:ring-slate-100 sm:flex"
           title={user?.name ?? "Account"}
         >
           {user?.avatar || (user?.name ? user.name.split(" ").filter(Boolean).map((part) => part[0]).join("").slice(0, 2).toUpperCase() : "KM")}
@@ -129,10 +129,12 @@ export function TopBar({ title, action }: TopBarProps) {
         {action && (
           <button
             onClick={action.onClick}
-            className="ml-1 flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-violet-700"
+            className="ml-1 flex h-9 items-center gap-1.5 rounded-lg bg-violet-600 px-2.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-violet-700 sm:px-3"
+            aria-label={action.label}
+            title={action.label}
           >
             <Plus className="h-3.5 w-3.5" />
-            {action.label}
+            <span className="hidden sm:inline">{action.label}</span>
           </button>
         )}
       </div>

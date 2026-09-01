@@ -114,7 +114,7 @@ export default function AdminPage() {
   ];
 
   return (
-    <div className="p-8 space-y-6 bg-[#070b14] light:bg-white min-h-screen text-white light:text-gray-900">
+    <div className="min-h-dvh space-y-6 bg-[#070b14] p-4 text-white light:bg-white light:text-gray-900 sm:p-8">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

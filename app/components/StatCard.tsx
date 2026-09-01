@@ -23,7 +23,7 @@ export function StatCard({
   return (
     <div
       className={cn(
-        "min-h-[126px] rounded-xl border border-slate-700/50 light:border-[#e4e9f1] bg-slate-900/70 light:bg-white p-4 shadow-sm light:shadow-[0_1px_3px_rgba(15,23,42,0.04)]",
+        "min-h-[126px] min-w-0 rounded-xl border border-slate-700/50 light:border-[#e4e9f1] bg-slate-900/70 light:bg-white p-4 shadow-sm light:shadow-[0_1px_3px_rgba(15,23,42,0.04)]",
         className,
       )}
     >
@@ -35,7 +35,7 @@ export function StatCard({
       </div>
       <div className="mt-3 flex items-end justify-between gap-3">
         <p className="text-2xl font-bold tracking-tight text-white light:text-[#101a2f]">{value}</p>
-        <svg aria-hidden="true" viewBox="0 0 68 28" className={cn("h-7 w-[68px]", chartColor)}>
+        <svg aria-hidden="true" viewBox="0 0 68 28" className={cn("hidden h-7 w-[68px] sm:block", chartColor)}>
           <path
             d="M2 23 L12 18 L20 20 L29 7 L38 22 L48 13 L57 19 L66 5"
             fill="none"

@@ -74,7 +74,7 @@
 //   );
 // }
 
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/app/contexts/theme";
 import { AuthProvider } from "@/app/contexts/auth";
@@ -95,6 +95,16 @@ export const metadata: Metadata = {
   title: "YuhBusiness",
   description:
     "Platform for local businesses to manage appointments and orders.",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#070b14" },
+  ],
 };
 
 const themeBootstrapScript = `

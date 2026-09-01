@@ -82,11 +82,11 @@ export default function AdminPage() {
   const activeItem = NAVIGATION.find((item) => item.id === activeView) ?? NAVIGATION[0];
 
   return (
-    <div className="min-h-screen bg-[#070d19] text-slate-100 light:bg-[#f5f7fb] light:text-slate-900">
+    <div className="min-h-dvh bg-[#070d19] text-slate-100 light:bg-[#f5f7fb] light:text-slate-900">
       {mobileSidebarOpen && <button aria-label="Close navigation" className="fixed inset-0 z-40 bg-slate-950/70 backdrop-blur-sm lg:hidden" onClick={() => setMobileSidebarOpen(false)} />}
       <AdminSidebar activeView={activeView} isOpen={mobileSidebarOpen} onClose={() => setMobileSidebarOpen(false)} onLogout={() => void logout()} onSelect={selectView} userEmail={user?.email ?? "Platform administrator"} userName={user?.name ?? "Super Admin"} />
 
-      <div className="min-h-screen lg:pl-64">
+      <div className="min-h-dvh lg:pl-64">
         <AdminHeader activeItem={activeItem} isLoading={isLoading} onMenu={() => setMobileSidebarOpen(true)} onRefresh={() => void refreshPlatformData()} onToggleTheme={toggleTheme} theme={theme} />
         <main className="mx-auto max-w-[1600px] px-4 pb-10 pt-5 sm:px-6 lg:px-8">
           {error && <div className="mb-5 flex items-start gap-3 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300 light:text-red-700"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><span>{error}</span></div>}

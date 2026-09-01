@@ -182,7 +182,7 @@ export function AppointmentsView({ tenant }: Props) {
   const today = new Date().toLocaleDateString("en-CA");
 
   return (
-    <div className="min-h-screen space-y-4 bg-[#08111f] light:bg-[#f8fafc] p-4 text-white light:text-[#14213a] md:p-5">
+    <div className="min-h-full space-y-4 bg-[#08111f] light:bg-[#f8fafc] p-4 text-white light:text-[#14213a] md:p-5">
       {/* Summary chips */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
@@ -336,7 +336,7 @@ export function AppointmentsView({ tenant }: Props) {
               </Button>
             </div>
           ) : selected?.status === "confirmed" ? (
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
               <Button
                 variant="danger"
                 disabled={updatingId === selected.id}

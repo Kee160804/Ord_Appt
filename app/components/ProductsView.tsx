@@ -377,15 +377,15 @@ export function ProductsView({ tenant }: Props) {
   };
 
   return (
-    <div className="min-h-screen space-y-4 bg-[#08111f] light:bg-[#f8fafc] p-4 text-white light:text-[#14213a] md:p-5">
-      <div className="flex items-center justify-between">
+    <div className="min-h-full space-y-4 bg-[#08111f] light:bg-[#f8fafc] p-4 text-white light:text-[#14213a] md:p-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-sm font-bold text-white light:text-[#17223a]">Products</h2>
           <p className="mt-0.5 text-[10px] text-slate-400 light:text-[#71809a]">
             {products.filter(p => p.isActive).length} active · {products.length} total
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             onClick={openCategoryManager}
             size="sm"
@@ -482,7 +482,7 @@ export function ProductsView({ tenant }: Props) {
             value={newProduct.name}
             onChange={e => setNewProduct({ ...newProduct, name: e.target.value })}
           />
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Input
               label="Price ($)"
               type="number"

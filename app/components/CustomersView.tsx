@@ -161,15 +161,15 @@ export function CustomersView({ tenant }: Props) {
   }, [customers, search]);
 
   return (
-    <div className="min-h-screen space-y-4 bg-[#08111f] light:bg-[#f8fafc] p-4 text-white light:text-[#14213a] md:p-5">
-      <div className="flex items-center justify-between gap-4">
+    <div className="min-h-full space-y-4 bg-[#08111f] light:bg-[#f8fafc] p-4 text-white light:text-[#14213a] md:p-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-sm font-bold text-white light:text-[#17223a]">Customers</h2>
           <p className="mt-0.5 text-[10px] text-slate-400 light:text-[#71809a]">
             {customers.length} unique customer{customers.length === 1 ? "" : "s"}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex w-full items-center gap-2 sm:w-auto">
           {isSupabaseConfigured() && (
             <Button className="bg-violet-600 text-white" onClick={() => setEditing({
               id: "",
@@ -183,14 +183,14 @@ export function CustomersView({ tenant }: Props) {
               Add Customer
             </Button>
           )}
-          <div className="relative">
+          <div className="relative min-w-0 flex-1 sm:flex-none">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 light:text-gray-500" />
           <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Search customers..."
             aria-label="Search customers"
-            className="h-8 w-52 rounded-lg border border-slate-700 light:border-[#e3e8f0] bg-slate-900/70 light:bg-white pl-9 pr-3 text-[10px] text-white light:text-[#17223a] outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/10 placeholder:text-slate-500"
+            className="h-8 w-full rounded-lg border border-slate-700 light:border-[#e3e8f0] bg-slate-900/70 light:bg-white pl-9 pr-3 text-[10px] text-white light:text-[#17223a] outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/10 placeholder:text-slate-500 sm:w-52"
           />
           </div>
         </div>
@@ -203,8 +203,8 @@ export function CustomersView({ tenant }: Props) {
       )}
       {isLoading && <p className="text-xs text-slate-400">Loading customers from Supabase...</p>}
 
-      <Card>
-        <div className="grid grid-cols-4 gap-4 border-b border-slate-700 light:border-[#e8ecf3] px-5 py-3">
+      <Card className="overflow-x-auto">
+        <div className="grid min-w-[600px] grid-cols-4 gap-4 border-b border-slate-700 light:border-[#e8ecf3] px-5 py-3">
           <p className="text-xs font-semibold text-slate-400 light:text-gray-600 uppercase tracking-wider col-span-2">Customer</p>
           <p className="text-xs font-semibold text-slate-400 light:text-gray-600 uppercase tracking-wider">Last Activity</p>
           <p className="text-xs font-semibold text-slate-400 light:text-gray-600 uppercase tracking-wider text-right">Total Spend</p>
@@ -220,7 +220,7 @@ export function CustomersView({ tenant }: Props) {
             </div>
           )}
           {filtered.map((customer) => (
-            <div key={customer.key} className="grid grid-cols-4 items-center gap-4 px-5 py-3 transition-colors hover:bg-slate-700/60 light:hover:bg-[#fafbfe]">
+            <div key={customer.key} className="grid min-w-[600px] grid-cols-4 items-center gap-4 px-5 py-3 transition-colors hover:bg-slate-700/60 light:hover:bg-[#fafbfe]">
               <div className="col-span-2 flex items-center gap-3 min-w-0">
                 <div className="w-9 h-9 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
                   {customer.name.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase()}
