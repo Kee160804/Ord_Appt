@@ -39,9 +39,22 @@ export default function LoginPage() {
     setLoading(true);
     const result = await login(email, password, rememberMe);
     setLoading(false);
-    if (!result.success) { setError(result.error ?? "Login failed."); return; }
-    if (result.user?.role === "superadmin") router.push("/admin");
-    else router.push("/dashboard");
+
+    if (!result.success) {
+      setError(result.error ?? "Login failed.");
+      return;
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    const nextPath = params.get("next");
+    const safeNextPath = nextPath && nextPath.startsWith("/") ? nextPath : null;
+
+    if (result.user?.role === "superadmin") {
+      router.replace(safeNextPath?.startsWith("/admin") ? safeNextPath : "/admin");
+      return;
+    }
+
+    router.replace(safeNextPath ?? "/dashboard");
   };
 
   return (

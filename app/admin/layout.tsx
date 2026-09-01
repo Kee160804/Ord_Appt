@@ -10,7 +10,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     if (!isLoading && (!user || user.role !== "superadmin")) {
-      router.push("/login");
+      const loginUrl = new URL("/login", window.location.origin);
+      loginUrl.searchParams.set("next", "/admin");
+      router.replace(loginUrl.pathname + loginUrl.search);
     }
   }, [user, isLoading, router]);
 

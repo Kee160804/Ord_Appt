@@ -15,10 +15,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   useEffect(() => {
     if (!isLoading && !user) {
-      router.push("/login");
+      const loginUrl = new URL("/login", window.location.origin);
+      loginUrl.searchParams.set("next", "/dashboard");
+      router.replace(loginUrl.pathname + loginUrl.search);
+      return;
     }
+
     if (user?.role === "superadmin") {
-      router.push("/admin");
+      const adminUrl = new URL("/admin", window.location.origin);
+      router.replace(adminUrl.pathname + adminUrl.search);
     }
   }, [user, isLoading, router]);
 
