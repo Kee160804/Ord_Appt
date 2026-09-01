@@ -13,7 +13,11 @@ import {
   saveStoredUserRecord,
 } from "@/app/lib/data";
 import { getSupabaseBrowserClient } from "@/app/lib/supabase/client";
-import { isDemoModeEnabled, isSupabaseConfigured } from "@/app/lib/supabase/config";
+import {
+  isDemoModeEnabled,
+  isSupabaseConfigured,
+  missingSupabaseConfigMessage,
+} from "@/app/lib/supabase/config";
 import {
   loadAuthenticatedAppSession,
   supabaseLogin,
@@ -169,7 +173,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (!isDemoModeEnabled()) {
       setIsLoading(false);
-      return { success: false, error: "Authentication is not configured for this deployment." };
+      return { success: false, error: missingSupabaseConfigMessage };
     }
 
     const account = demoAccounts.find(
@@ -237,7 +241,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (!isDemoModeEnabled()) {
       setIsLoading(false);
-      return { success: false, error: "Authentication is not configured for this deployment." };
+      return { success: false, error: missingSupabaseConfigMessage };
     }
     if (findUserRecordByEmail(normalizedEmail)) {
       setIsLoading(false);

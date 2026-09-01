@@ -21,6 +21,34 @@ link to:
 
 Add the local and deployed application URLs to Supabase Auth redirect URLs.
 
+## Vercel production setup
+
+`.env.local` is intentionally excluded from Git, so GitHub-to-Vercel deployments
+do not receive local environment variables automatically. In the Vercel project,
+open **Settings > Environment Variables** and add these variables to Production
+(and Preview if preview deployments should use the same Supabase project):
+
+```text
+NEXT_PUBLIC_SUPABASE_URL
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+NEXT_PUBLIC_ENABLE_DEMO_MODE=false
+```
+
+Use the same URL and publishable key as `.env.local`. Never place a Supabase
+secret/service-role key in a `NEXT_PUBLIC_` variable. Create a new deployment
+after changing Vercel environment variables because previous deployments keep
+the values that were present when their client bundles were built.
+
+In Supabase, open **Authentication > URL Configuration** and configure:
+
+```text
+Site URL: https://ord-appt.vercel.app
+Redirect URL: https://ord-appt.vercel.app/auth/confirm**
+```
+
+The redirect configuration is used by signup confirmation and password recovery.
+Password login itself requires the two public Supabase variables above.
+
 When Supabase is not configured, development automatically uses the original
 mock/demo data. Production never enables the browser-password demo fallback
 unless `NEXT_PUBLIC_ENABLE_DEMO_MODE=true` is explicitly set.
