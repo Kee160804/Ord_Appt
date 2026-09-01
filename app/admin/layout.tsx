@@ -21,7 +21,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }
 
   return (
-    <div className="pwa-shell-safe min-h-dvh bg-slate-50 light:bg-white">
+    <div className="min-h-dvh bg-slate-50 light:bg-white">
       {children}
     </div>
   );

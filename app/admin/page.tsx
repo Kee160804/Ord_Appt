@@ -82,7 +82,7 @@ export default function AdminPage() {
   const activeItem = NAVIGATION.find((item) => item.id === activeView) ?? NAVIGATION[0];
 
   return (
-    <div className="pwa-shell-safe min-h-dvh bg-[#070d19] text-slate-100 light:bg-[#f5f7fb] light:text-slate-900">
+    <div className="min-h-dvh bg-[#070d19] text-slate-100 light:bg-[#f5f7fb] light:text-slate-900">
       {mobileSidebarOpen && <button aria-label="Close navigation" className="fixed inset-0 z-40 bg-slate-950/70 backdrop-blur-sm lg:hidden" onClick={() => setMobileSidebarOpen(false)} />}
       <AdminSidebar activeView={activeView} isOpen={mobileSidebarOpen} onClose={() => setMobileSidebarOpen(false)} onLogout={() => void logout()} onSelect={selectView} userEmail={user?.email ?? "Platform administrator"} userName={user?.name ?? "Super Admin"} />
 

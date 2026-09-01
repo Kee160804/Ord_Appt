@@ -1,4 +1,4 @@
-const CACHE_NAME = "yuhbusiness-offline-v3";
+const CACHE_NAME = "yuhbusiness-offline-v4";
 const OFFLINE_PAGE = "/home";
 
 self.addEventListener("install", (event) => {
