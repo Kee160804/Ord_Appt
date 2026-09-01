@@ -9,6 +9,7 @@ import {
   ExternalLink,
   LayoutDashboard,
   LogOut,
+  ArrowRight,
   Package,
   Scissors,
   Settings,
@@ -170,30 +171,33 @@ export function Sidebar({ tenant, user }: SidebarProps) {
 
       <div className={cn("border-t border-white/[0.06] p-3", collapsed && "px-2") }>
         <div className={cn(
-          "flex items-center gap-3 rounded-2xl border border-white/[0.04] bg-white/[0.02] px-3 py-2.5",
+          "flex items-center justify-between gap-3 rounded-2xl border border-white/[0.04] bg-white/[0.02] px-3 py-2.5",
           collapsed && "justify-center px-2 py-2.5"
         )}>
-          {!collapsed && (
-            <div
-              className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-violet-400/30 bg-violet-500/15 text-[10px] font-bold text-violet-100"
-              title={user.name}
-            >
-              {user.avatar}
-            </div>
-          )}
-          {!collapsed && (
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-[11px] font-semibold text-white">{user.name}</p>
-              <p className="mt-0.5 text-[9px] capitalize text-slate-400">{user.role}</p>
-            </div>
-          )}
+          <div className="flex min-w-0 items-center gap-3">
+            {!collapsed && (
+              <div
+                className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-violet-400/30 bg-violet-500/15 text-[10px] font-bold text-violet-100"
+                title={user.name}
+              >
+                {user.avatar}
+              </div>
+            )}
+            {!collapsed && (
+              <div className="min-w-0">
+                <p className="truncate text-[11px] font-semibold text-white">{user.name}</p>
+                <p className="mt-0.5 text-[9px] capitalize text-slate-400">{user.role}</p>
+              </div>
+            )}
+          </div>
+
           <button
             onClick={() => void logout()}
             aria-label="Sign out"
             title="Sign out"
-            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-white/[0.06] hover:text-white"
+            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-slate-300 transition-colors hover:bg-white/[0.06] hover:text-white"
           >
-            <LogOut className="h-3.5 w-3.5" />
+            <ArrowRight className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>
