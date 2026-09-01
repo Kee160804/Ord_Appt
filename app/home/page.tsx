@@ -215,13 +215,13 @@ export default function HomePage() {
 
           <Link
             href="/login"
-            className="hidden rounded-xl px-3 py-2 text-sm font-semibold text-slate-400 transition-colors hover:bg-white/5 hover:text-white light:text-gray-600 light:hover:bg-gray-100 light:hover:text-gray-900 sm:inline-flex"
+            className="inline-flex items-center justify-center rounded-xl px-2.5 py-2 text-[10px] font-semibold text-slate-400 transition-colors hover:bg-white/5 hover:text-white light:text-gray-600 light:hover:bg-gray-100 light:hover:text-gray-900 sm:px-4 sm:text-sm"
           >
             Sign In
           </Link>
           <Link
             href="/register"
-            className="rounded-xl bg-violet-600 px-3 py-2 text-[11px] font-bold text-white shadow-sm shadow-violet-900/30 transition-colors hover:bg-violet-500 light:bg-violet-600 light:shadow-violet-600/30 light:hover:bg-violet-700 sm:px-4 sm:text-sm"
+            className="rounded-xl bg-violet-600 px-3 py-2 text-[10px] font-bold text-white shadow-sm shadow-violet-900/30 transition-colors hover:bg-violet-500 light:bg-violet-600 light:shadow-violet-600/30 light:hover:bg-violet-700 sm:px-4 sm:text-sm"
           >
             <span className="sm:hidden">Start Free</span>
             <span className="hidden sm:inline">Get Started Free</span>
