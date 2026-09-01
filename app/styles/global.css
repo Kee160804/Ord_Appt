@@ -76,6 +76,22 @@ body {
   transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
 }
 
+@media (max-width: 640px) {
+  html, body {
+    min-height: 100%;
+  }
+
+  body {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  nav a,
+  nav button,
+  .mobile-safe-text {
+    min-height: 44px;
+  }
+}
+
 button,
 input,
 textarea,

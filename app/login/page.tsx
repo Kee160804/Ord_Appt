@@ -76,6 +76,14 @@ export default function LoginPage() {
         </div>
 
         <div className="flex flex-shrink-0 items-center gap-1 sm:gap-3">
+          <Link
+            href="/"
+            className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 px-2.5 py-2 text-[10px] font-semibold text-slate-200 transition-colors hover:bg-white/10 light:border-gray-300 light:bg-white light:text-gray-700 sm:hidden"
+            aria-label="Back to home"
+          >
+            Home
+          </Link>
+
           <button
             onClick={toggleTheme}
             className="p-2 rounded-xl text-slate-400 light:text-gray-600 hover:bg-white/5 light:hover:bg-gray-100 transition-colors"

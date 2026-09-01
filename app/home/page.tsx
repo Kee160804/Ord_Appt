@@ -156,12 +156,12 @@ export default function HomePage() {
   return (
     <div className="min-h-dvh bg-[#070b14] light:bg-white text-white light:text-gray-900 transition-colors">
       {/* Navbar */}
-      <nav className="sticky top-0 z-50 flex items-center justify-between gap-2 border-b border-white/5 bg-[#070b14]/90 px-3 py-4 backdrop-blur-xl light:border-gray-200 light:bg-white/90 sm:px-6 md:px-12 md:py-5">
+      <nav className="sticky top-0 z-50 flex items-center justify-between gap-2 border-b border-white/5 bg-[#070b14]/90 px-3 py-3.5 backdrop-blur-xl light:border-gray-200 light:bg-white/90 sm:px-6 md:px-12 md:py-5">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-violet-900/40 light:shadow-violet-500/30">
-            <Sparkles className="w-4 h-4 text-white" />
+          <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-violet-900/40 light:shadow-violet-500/30 sm:w-8 sm:h-8">
+            <Sparkles className="w-3.5 h-3.5 text-white sm:w-4 sm:h-4" />
           </div>
-          <span className="font-black text-white light:text-gray-900 text-lg tracking-tight">
+          <span className="font-black text-white light:text-gray-900 text-base tracking-tight sm:text-lg">
             YuhBusiness
           </span>
         </div>
@@ -218,30 +218,31 @@ export default function HomePage() {
 
           <Link
             href="/login"
-            className="hidden rounded-xl px-4 py-2 text-sm font-semibold text-slate-400 transition-colors hover:bg-white/5 hover:text-white light:text-gray-600 light:hover:bg-gray-100 light:hover:text-gray-900 sm:inline-flex"
+            className="inline-flex rounded-xl px-3 py-2 text-xs font-semibold text-slate-400 transition-colors hover:bg-white/5 hover:text-white light:text-gray-600 light:hover:bg-gray-100 light:hover:text-gray-900 sm:px-4 sm:text-sm"
           >
             Sign In
           </Link>
           <Link
             href="/register"
-            className="rounded-xl bg-violet-600 px-3 py-2 text-xs font-bold text-white shadow-sm shadow-violet-900/30 transition-colors hover:bg-violet-500 light:bg-violet-600 light:shadow-violet-600/30 light:hover:bg-violet-700 sm:px-4 sm:text-sm"
+            className="rounded-xl bg-violet-600 px-3 py-2 text-[11px] font-bold text-white shadow-sm shadow-violet-900/30 transition-colors hover:bg-violet-500 light:bg-violet-600 light:shadow-violet-600/30 light:hover:bg-violet-700 sm:px-4 sm:text-sm"
           >
-            <span className="sm:hidden">Start Free</span><span className="hidden sm:inline">Get Started Free</span>
+            <span className="sm:hidden">Start</span>
+            <span className="hidden sm:inline">Get Started Free</span>
           </Link>
         </div>
       </nav>
 
       {/* Hero */}
-      <section className="relative mx-auto max-w-6xl overflow-hidden px-4 pb-16 pt-16 text-center sm:px-6 sm:pb-20 sm:pt-24 md:px-12">
+      <section className="relative mx-auto max-w-6xl overflow-hidden px-4 pb-12 pt-10 text-center sm:px-6 sm:pb-20 sm:pt-24 md:px-12">
         <div className="absolute inset-0 -z-10">
           <div className="absolute left-1/2 top-0 h-[min(600px,100vw)] w-[min(600px,100vw)] -translate-x-1/2 rounded-full bg-violet-600/10 blur-3xl light:bg-violet-500/5" />
         </div>
 
-        <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-violet-500/10 light:bg-violet-100 border border-violet-500/20 light:border-violet-200 text-violet-300 light:text-violet-700 text-xs font-bold rounded-full mb-8">
-          <Zap className="w-3 h-3" /> Evriting fi run yuh local business
+        <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-violet-500/20 bg-violet-500/10 px-3 py-1.5 text-[11px] font-bold text-violet-300 light:border-violet-200 light:bg-violet-100 light:text-violet-700 sm:mb-8 sm:text-xs">
+          <Zap className="h-3 w-3" /> Evriting fi run yuh local business
         </div>
 
-        <h1 className="mb-6 text-4xl font-black leading-[1.05] tracking-tight text-white light:text-gray-900 sm:text-6xl lg:text-7xl">
+        <h1 className="mb-5 text-[3rem] font-black leading-[0.96] tracking-tight text-white light:text-gray-900 sm:mb-6 sm:text-6xl lg:text-7xl">
           Tek Yuh Business Online.
           <br />
           <span className="bg-gradient-to-r from-violet-400 to-indigo-400 light:from-violet-600 light:to-indigo-600 bg-clip-text text-transparent">
@@ -249,7 +250,7 @@ export default function HomePage() {
           </span>
         </h1>
 
-        <p className="mx-auto mb-10 max-w-2xl text-lg leading-relaxed text-slate-400 light:text-gray-600 sm:text-xl">
+        <p className="mx-auto mb-8 max-w-2xl text-base leading-relaxed text-slate-400 light:text-gray-600 sm:mb-10 sm:text-lg md:text-xl">
           Give your business a professional online presence. Accept bookings,
           take orders, and manage everything from one powerful dashboard.
         </p>
@@ -257,13 +258,13 @@ export default function HomePage() {
         <div className="flex flex-col items-stretch justify-center gap-4 sm:flex-row sm:flex-wrap sm:items-center">
           <Link
             href="/register?mode=trial"
-            className="inline-flex items-center gap-2 px-8 py-4 bg-violet-600 hover:bg-violet-500 light:bg-violet-600 light:hover:bg-violet-700 text-white font-bold rounded-2xl transition-colors shadow-lg shadow-violet-900/30 light:shadow-violet-600/30 text-base"
+            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-violet-600 px-6 py-4 text-base font-bold text-white shadow-lg shadow-violet-900/30 transition-colors hover:bg-violet-500 light:bg-violet-600 light:shadow-violet-600/30 light:hover:bg-violet-700 sm:px-8"
           >
-            Start yuh free trial <ArrowRight className="w-5 h-5" />
+            Start yuh free trial <ArrowRight className="h-5 w-5" />
           </Link>
           <Link
             href="#pricing"
-            className="inline-flex items-center gap-2 px-8 py-4 border border-white/10 light:border-gray-300 hover:border-white/20 light:hover:border-gray-400 text-slate-300 light:text-gray-700 hover:text-white light:hover:text-gray-900 font-bold rounded-2xl transition-colors text-base"
+            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 px-6 py-4 text-base font-bold text-slate-300 transition-colors hover:border-white/20 hover:text-white light:border-gray-300 light:text-gray-700 light:hover:border-gray-400 light:hover:text-gray-900 sm:px-8"
           >
             Si di plans
           </Link>

@@ -79,6 +79,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/app/contexts/theme";
 import { AuthProvider } from "@/app/contexts/auth";
 import { RealtimeProvider } from "@/app/contexts/realtime";
+import { PwaRegister } from "@/components/PwaRegister";
 import "@/app/styles/global.css";
 
 const geistSans = Geist({
@@ -95,6 +96,12 @@ export const metadata: Metadata = {
   title: "YuhBusiness",
   description:
     "Platform for local businesses to manage appointments and orders.",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "YuhBusiness",
+  },
 };
 
 export const viewport: Viewport = {
@@ -139,7 +146,10 @@ export default function RootLayout({
       >
         <ThemeProvider>
           <AuthProvider>
-            <RealtimeProvider>{children}</RealtimeProvider>
+            <RealtimeProvider>
+              <PwaRegister />
+              {children}
+            </RealtimeProvider>
           </AuthProvider>
         </ThemeProvider>
       </body>
