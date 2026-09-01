@@ -76,6 +76,30 @@ body {
   transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
 }
 
+/* Keep the landing header below the iOS/PWA status bar. */
+.site-header {
+  padding-top: calc(0.875rem + env(safe-area-inset-top, 0px));
+  padding-right: max(0.75rem, env(safe-area-inset-right, 0px));
+  padding-bottom: 0.875rem;
+  padding-left: max(0.75rem, env(safe-area-inset-left, 0px));
+}
+
+@media (min-width: 640px) {
+  .site-header {
+    padding-right: max(1.5rem, env(safe-area-inset-right, 0px));
+    padding-left: max(1.5rem, env(safe-area-inset-left, 0px));
+  }
+}
+
+@media (min-width: 768px) {
+  .site-header {
+    padding-top: calc(1.25rem + env(safe-area-inset-top, 0px));
+    padding-right: max(3rem, env(safe-area-inset-right, 0px));
+    padding-bottom: 1.25rem;
+    padding-left: max(3rem, env(safe-area-inset-left, 0px));
+  }
+}
+
 @media (max-width: 640px) {
   html, body {
     min-height: 100%;

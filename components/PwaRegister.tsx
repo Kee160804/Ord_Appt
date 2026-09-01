@@ -10,16 +10,25 @@ export function PwaRegister() {
 
     const registerServiceWorker = async () => {
       try {
-        await navigator.serviceWorker.register("/sw.js");
+        const registration = await navigator.serviceWorker.register("/sw.js", {
+          updateViaCache: "none",
+        });
+        await registration.update();
       } catch (error) {
         console.warn("Service worker registration failed:", error);
       }
     };
 
-    window.addEventListener("load", registerServiceWorker, { once: true });
+    const handleLoad = () => void registerServiceWorker();
+
+    if (document.readyState === "complete") {
+      handleLoad();
+    } else {
+      window.addEventListener("load", handleLoad, { once: true });
+    }
 
     return () => {
-      window.removeEventListener("load", registerServiceWorker);
+      window.removeEventListener("load", handleLoad);
     };
   }, []);
 
