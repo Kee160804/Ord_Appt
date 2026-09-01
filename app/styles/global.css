@@ -122,12 +122,12 @@ body {
 }
 
 .pwa-admin-sidebar-safe {
-  padding-top: calc(1.25rem + env(safe-area-inset-top, 0px));
-  padding-bottom: calc(1.25rem + env(safe-area-inset-bottom, 0px));
+  padding-top: calc(0.75rem + env(safe-area-inset-top, 0px));
+  padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
 }
 
 .pwa-admin-header-safe {
-  padding-top: calc(1rem + env(safe-area-inset-top, 0px));
+  padding-top: calc(0.5rem + env(safe-area-inset-top, 0px));
 }
 
 .pwa-page-safe {
@@ -162,13 +162,13 @@ body {
   .pwa-admin-header-safe,
   .pwa-page-safe,
   .pwa-page-roomy {
-    padding-top: max(0.75rem, env(safe-area-inset-top, 0px));
+    padding-top: max(0.25rem, env(safe-area-inset-top, 0px));
   }
 
   .pwa-admin-sidebar-safe,
   .pwa-page-safe,
   .pwa-page-roomy {
-    padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
   }
 }
 
