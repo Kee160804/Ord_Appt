@@ -193,11 +193,9 @@ export default function HomePage() {
           </a>
         </div>
 
-        <div className="flex flex-shrink-0 items-center gap-1 sm:gap-3">
-          {/* NEW: Enhanced theme toggle button with better visibility and feedback */}
+        <div className="flex flex-shrink-0 items-center gap-2 sm:gap-3">
           <button
             onClick={() => {
-              // NEW: AGGRESSIVE DEBUG - Verify button click is registered
               console.log("🎯 HOME PAGE BUTTON CLICKED!");
               console.log("🎯 Current theme before toggle:", theme);
               toggleTheme();
@@ -208,17 +206,16 @@ export default function HomePage() {
             aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
             title={`Switch to ${theme === "dark" ? "light" : "dark"} mode (currently ${theme})`}
           >
-            {/* NEW: Sun icon for dark mode (click to switch to light), Moon for light mode (click to switch to dark) */}
             {theme === "dark" ? (
-              <Sun className="w-5 h-5 text-yellow-400" />
+              <Sun className="w-4 h-4 text-yellow-400 sm:w-5 sm:h-5" />
             ) : (
-              <Moon className="w-5 h-5 text-slate-600" />
+              <Moon className="w-4 h-4 text-slate-600 sm:w-5 sm:h-5" />
             )}
           </button>
 
           <Link
             href="/login"
-            className="inline-flex rounded-xl px-3 py-2 text-xs font-semibold text-slate-400 transition-colors hover:bg-white/5 hover:text-white light:text-gray-600 light:hover:bg-gray-100 light:hover:text-gray-900 sm:px-4 sm:text-sm"
+            className="hidden rounded-xl px-3 py-2 text-sm font-semibold text-slate-400 transition-colors hover:bg-white/5 hover:text-white light:text-gray-600 light:hover:bg-gray-100 light:hover:text-gray-900 sm:inline-flex"
           >
             Sign In
           </Link>
@@ -226,7 +223,7 @@ export default function HomePage() {
             href="/register"
             className="rounded-xl bg-violet-600 px-3 py-2 text-[11px] font-bold text-white shadow-sm shadow-violet-900/30 transition-colors hover:bg-violet-500 light:bg-violet-600 light:shadow-violet-600/30 light:hover:bg-violet-700 sm:px-4 sm:text-sm"
           >
-            <span className="sm:hidden">Start</span>
+            <span className="sm:hidden">Start Free</span>
             <span className="hidden sm:inline">Get Started Free</span>
           </Link>
         </div>
