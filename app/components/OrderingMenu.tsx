@@ -579,17 +579,12 @@ export function OrderingMenu({
           onClick={scrollToOrderSummary}
           data-testid="floating-cart"
           aria-label={`View cart with ${itemCount} ${itemCount === 1 ? "item" : "items"}, total ${formatCurrency(grandTotal)}`}
-          className="fixed bottom-[calc(env(safe-area-inset-bottom)+1rem)] right-[max(1rem,env(safe-area-inset-right))] z-40 inline-flex min-h-14 items-center gap-3 rounded-full border border-violet-300/30 bg-violet-600 px-3.5 py-2.5 text-white shadow-[0_16px_40px_rgba(109,40,217,0.45)] transition hover:bg-violet-500 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-violet-400/35 active:scale-[0.98] xl:hidden"
+          title={`View cart · ${formatCurrency(grandTotal)}`}
+          className="fixed bottom-[calc(env(safe-area-inset-bottom)+1.25rem)] right-[max(1.25rem,env(safe-area-inset-right))] z-40 flex h-16 w-16 items-center justify-center rounded-full border border-violet-300/30 bg-violet-600 text-white shadow-[0_14px_34px_rgba(109,40,217,0.5)] transition hover:bg-violet-500 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-violet-400/35 active:scale-95 xl:hidden"
         >
-          <span className="relative flex h-9 w-9 items-center justify-center rounded-full bg-white/15">
-            <ShoppingCart className="h-5 w-5" />
-            <span className="absolute -right-1.5 -top-1.5 flex min-h-5 min-w-5 items-center justify-center rounded-full border-2 border-violet-600 bg-white px-1 text-[10px] font-black leading-none text-violet-700">
-              {itemCount > 99 ? "99+" : itemCount}
-            </span>
-          </span>
-          <span className="pr-1 text-left leading-tight">
-            <span className="block text-[10px] font-bold uppercase tracking-wide text-violet-100">View cart</span>
-            <span className="block text-sm font-black">{formatCurrency(grandTotal)}</span>
+          <ShoppingCart className="h-6 w-6" strokeWidth={2.25} />
+          <span className="absolute right-0 top-0 flex min-h-6 min-w-6 translate-x-1/4 -translate-y-1/4 items-center justify-center rounded-full border-2 border-violet-600 bg-white px-1 text-[10px] font-black leading-none text-violet-700 shadow-sm">
+            {itemCount > 99 ? "99+" : itemCount}
           </span>
         </button>
       )}
