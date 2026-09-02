@@ -50,6 +50,7 @@ export interface CreatedTeamInvitation {
   email: string;
   role: BusinessTeamRole;
   expiresAt: string;
+  emailSent?: boolean;
 }
 
 export interface AdminSeatSummary {
@@ -116,7 +117,18 @@ export async function createBusinessTeamInvitation(
     p_role_name: role,
   });
   rpcError(error, "Unable to create the team invitation.");
-  return data as CreatedTeamInvitation;
+  const invitation = data as CreatedTeamInvitation;
+  try {
+    const response = await fetch("/api/email/team-invitation", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tenantId, invitationId: invitation.id, token: invitation.token }),
+    });
+    invitation.emailSent = response.ok;
+  } catch {
+    invitation.emailSent = false;
+  }
+  return invitation;
 }
 
 export async function changeBusinessTeamRole(

@@ -192,7 +192,19 @@ then run `npm run test:onboarding`. It verifies the auth user, profile, tenant,
 membership, OWNER role, fourteen-day trial, and Beginner entitlement using
 that user's JWT.
 
-## Appointment confirmation emails
+## Centralized transactional email (current)
+
+Apply `migrations/202609050001_transactional_email_service.sql` after the
+business growth migration. Then follow the complete Resend, Vercel, Supabase
+Cron, SMTP, webhook, and testing guide in
+[`../docs/transactional-email.md`](../docs/transactional-email.md).
+
+The centralized Next.js worker consumes the established order, appointment,
+and reminder delivery tables, so no business records are duplicated. The Edge
+Function setup below is retained only for a safe rolling deployment and should
+be disabled after the central worker is live.
+
+## Legacy appointment confirmation Edge Function
 
 The confirmation-email pipeline consists of:
 

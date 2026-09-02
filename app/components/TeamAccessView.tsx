@@ -89,7 +89,9 @@ export function TeamAccessView({ tenant }: { tenant: Tenant }) {
       link.searchParams.set("token", invitation.token);
       setInvitationLink(link.toString());
       setEmail("");
-      setSuccess(`Invitation created for ${invitation.email}. It expires in 72 hours.`);
+      setSuccess(invitation.emailSent
+        ? `Invitation emailed to ${invitation.email}. It expires in 72 hours.`
+        : `Invitation created for ${invitation.email}, but email delivery was unavailable. Copy the secure link below.`);
       await load();
     } catch (inviteError) {
       setError(inviteError instanceof Error ? inviteError.message : "Unable to invite this team member.");
@@ -220,7 +222,7 @@ export function TeamAccessView({ tenant }: { tenant: Tenant }) {
           {invitationLink && (
             <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4">
               <p className="flex items-center gap-2 text-xs font-bold text-emerald-300 light:text-emerald-800"><CheckCircle2 className="h-4 w-4" /> Secure invitation ready</p>
-              <p className="mt-1 text-[11px] text-emerald-100/80 light:text-emerald-800">Send this link only to the invited email address. Automated team-email delivery can be connected with your notification provider later.</p>
+              <p className="mt-1 text-[11px] text-emerald-100/80 light:text-emerald-800">The invitation is emailed when delivery is configured. You can also send this secure link directly to the invited email address.</p>
               <div className="mt-3 flex gap-2">
                 <input readOnly value={invitationLink} aria-label="Invitation link" className={`${inputClass} min-w-0 flex-1`} />
                 <button type="button" onClick={() => void copyInvitation()} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-xs font-bold text-white hover:bg-emerald-500"><Copy className="h-4 w-4" /> Copy</button>

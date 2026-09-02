@@ -4,6 +4,9 @@ LocalSpace is a multi-tenant platform for appointment-based and ordering-based
 local businesses. It uses Next.js 16 and Supabase Auth/Postgres with row-level
 security.
 
+See [Transactional email setup](docs/transactional-email.md) for the Resend,
+Supabase, scheduler, and end-to-end testing guide.
+
 ## Local setup
 
 1. Create `.env.local`.
@@ -32,6 +35,12 @@ open **Settings > Environment Variables** and add these variables to Production
 NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
 NEXT_PUBLIC_ENABLE_DEMO_MODE=false
+RESEND_API_KEY
+RESEND_FROM_EMAIL
+SUPABASE_SECRET_KEY
+CRON_SECRET
+EMAIL_WEBHOOK_SECRET
+NEXT_PUBLIC_APP_URL
 ```
 
 Use the same URL and publishable key as `.env.local`. Never place a Supabase

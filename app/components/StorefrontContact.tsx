@@ -20,6 +20,7 @@ import {
   UserRound,
 } from "lucide-react";
 import { planHasFeature } from "@/app/lib/plans";
+import { submitStorefrontContactMessage } from "@/app/services/contactService";
 import type { BusinessHours, Tenant } from "@/app/types";
 
 interface StorefrontContactProps {
@@ -86,6 +87,7 @@ export function StorefrontContact({ tenant, viewOnly = false }: StorefrontContac
   const [form, setForm] = useState<ContactFormState>(EMPTY_FORM);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
+  const [isSending, setIsSending] = useState(false);
   const canSendMessage = planHasFeature(tenant.plan, "storefront_contact_form");
   const hours = useMemo(() => compactHours(tenant.businessHours), [tenant.businessHours]);
   const location = [tenant.address, tenant.city].filter(Boolean).join(", ");
@@ -94,7 +96,7 @@ export function StorefrontContact({ tenant, viewOnly = false }: StorefrontContac
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`
     : "";
 
-  const submitMessage = (event: FormEvent<HTMLFormElement>) => {
+  const submitMessage = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError("");
     setStatus("");
@@ -109,15 +111,24 @@ export function StorefrontContact({ tenant, viewOnly = false }: StorefrontContac
       return;
     }
 
-    const subject = form.subject.trim() || `Storefront message from ${form.name.trim()}`;
-    const body = [
-      `Name: ${form.name.trim()}`,
-      `Email: ${form.email.trim()}`,
-      "",
-      form.message.trim(),
-    ].join("\n");
-    window.location.href = `mailto:${tenant.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    setStatus("Your email app is opening with the message ready to send.");
+    setIsSending(true);
+    try {
+      await submitStorefrontContactMessage({ tenantId: tenant.id, ...form });
+      setForm(EMPTY_FORM);
+      setStatus("Your message was received successfully.");
+    } catch (submitError) {
+      const message = submitError instanceof Error ? submitError.message : "Unable to send your message.";
+      if (message.includes("not installed yet") && tenant.email) {
+        const subject = form.subject.trim() || `Storefront message from ${form.name.trim()}`;
+        const body = [`Name: ${form.name.trim()}`, `Email: ${form.email.trim()}`, "", form.message.trim()].join("\n");
+        window.location.href = `mailto:${tenant.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        setStatus("Storefront email is still being deployed, so your email app was opened as a safe fallback.");
+      } else {
+        setError(message);
+      }
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const infoRows = [
@@ -284,10 +295,11 @@ export function StorefrontContact({ tenant, viewOnly = false }: StorefrontContac
 
             <button
               type="submit"
+              disabled={isSending}
               className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl px-5 py-3.5 text-sm font-black text-white shadow-lg transition hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-violet-500/40"
               style={{ background: `linear-gradient(90deg, ${tenant.primaryColor}, ${tenant.accentColor})` }}
             >
-              <Send className="h-4 w-4" /> Send Message
+              <Send className="h-4 w-4" /> {isSending ? "Sending..." : "Send Message"}
             </button>
 
             <p className="mt-4 flex items-center justify-center gap-2 text-center text-xs text-slate-400">

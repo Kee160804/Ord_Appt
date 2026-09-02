@@ -11,6 +11,7 @@ export interface PublicOrderItemInput {
 export interface PublicOrderInput {
   tenantId: string;
   customerName: string;
+  customerEmail: string;
   customerPhone: string;
   orderType: "dine_in" | "pickup" | "delivery";
   items: PublicOrderItemInput[];
@@ -132,10 +133,10 @@ export async function listOrders(tenantId: string): Promise<Order[]> {
 }
 
 export async function createPublicOrder(input: PublicOrderInput): Promise<PublicOrderResult> {
-  const usePromotion = Boolean(input.promotionCode?.trim());
-  const { data, error } = await client().rpc(usePromotion ? "create_public_order_with_promotion" : "create_public_order", {
+  const payload = {
     p_tenant_id: input.tenantId,
     p_customer_name: input.customerName.trim(),
+    p_customer_email: input.customerEmail.trim().toLowerCase(),
     p_customer_phone: input.customerPhone.trim(),
     p_order_type: input.orderType,
     p_notes: null,
@@ -144,8 +145,26 @@ export async function createPublicOrder(input: PublicOrderInput): Promise<Public
       quantity: item.quantity,
       addons: item.addons.map(({ id }) => ({ id })),
     })),
-    ...(usePromotion ? { p_promotion_code: input.promotionCode?.trim() || null } : {}),
-  });
+    p_promotion_code: input.promotionCode?.trim() || null,
+  };
+  let { data, error } = await client().rpc("create_public_order_with_email", payload);
+
+  // Rolling-deploy safety: storefront orders remain usable if the application
+  // reaches Vercel before the additive email migration reaches Supabase.
+  if (error?.code === "PGRST202") {
+    const usePromotion = Boolean(input.promotionCode?.trim());
+    const fallback = await client().rpc(usePromotion ? "create_public_order_with_promotion" : "create_public_order", {
+      p_tenant_id: input.tenantId,
+      p_customer_name: input.customerName.trim(),
+      p_customer_phone: input.customerPhone.trim(),
+      p_order_type: input.orderType,
+      p_notes: null,
+      p_items: payload.p_items,
+      ...(usePromotion ? { p_promotion_code: input.promotionCode?.trim() || null } : {}),
+    });
+    data = fallback.data;
+    error = fallback.error;
+  }
 
   if (error) throw orderCreationError(error);
   const result = Array.isArray(data) ? data[0] : data;

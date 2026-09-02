@@ -57,6 +57,7 @@ export function OrderingMenu({
   const [quantity, setQuantity] = useState(1);
   const [selectedAddons, setSelectedAddons] = useState<AddonOption[]>([]);
   const [customerName, setCustomerName] = useState("");
+  const [customerEmail, setCustomerEmail] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [orderType, setOrderType] = useState("dine_in");
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
@@ -219,8 +220,8 @@ export function OrderingMenu({
       setOrderError("Your cart is empty.");
       return;
     }
-    if (!customerName.trim() || !phoneNumber.trim()) {
-      setOrderError("Name and phone number are required.");
+    if (!customerName.trim() || !customerEmail.trim() || !phoneNumber.trim()) {
+      setOrderError("Name, email address, and phone number are required.");
       return;
     }
     if (!isSupabaseConfigured()) {
@@ -235,6 +236,7 @@ export function OrderingMenu({
       const result = await createPublicOrder({
         tenantId: tenant.id,
         customerName,
+        customerEmail,
         customerPhone: phoneNumber,
         orderType: orderType as "dine_in" | "pickup" | "delivery",
         items: cart.map((item) => ({
@@ -248,6 +250,7 @@ export function OrderingMenu({
       onOrderPlaced?.(cart.map((item) => ({ productId: item.id, quantity: item.quantity })));
       updateCart([]);
       setCustomerName("");
+      setCustomerEmail("");
       setPhoneNumber("");
       setOrderType("dine_in");
       setPromotionCode("");
@@ -438,6 +441,14 @@ export function OrderingMenu({
                 value={customerName}
                 onChange={(e) => setCustomerName(e.target.value)}
                 placeholder="Enter Name"
+              />
+              <Input
+                label="Email Address"
+                type="email"
+                value={customerEmail}
+                onChange={(e) => setCustomerEmail(e.target.value)}
+                placeholder="you@example.com"
+                autoComplete="email"
               />
               <Input
                 label="Phone Number"
