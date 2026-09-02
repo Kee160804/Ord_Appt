@@ -573,7 +573,7 @@ export function OrderingMenu({
         </div>
       </div>
 
-      {cart.length > 0 && !checkoutActionsVisible && (
+      {!checkoutActionsVisible && (
         <button
           type="button"
           onClick={scrollToOrderSummary}
