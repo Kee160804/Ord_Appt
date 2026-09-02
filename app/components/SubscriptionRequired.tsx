@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ArrowRight, Check, CreditCard, LogOut, ShieldCheck, Sparkles } from "lucide-react";
 import { PLAN_DEFINITIONS, PLAN_ORDER } from "@/app/lib/plans";
 import type { Tenant, User } from "@/app/types";
+import { BusinessSwitcher } from "@/app/components/BusinessSwitcher";
 
 const checkoutUrls = {
   starter: process.env.NEXT_PUBLIC_BEGINNER_CHECKOUT_URL,
@@ -17,6 +18,18 @@ const plans = PLAN_ORDER.map((planId) => ({
   features: PLAN_DEFINITIONS[planId].shortFeatures,
   popular: planId === "pro",
 }));
+
+function checkoutHref(baseUrl: string, tenant: Tenant, planId: string) {
+  try {
+    const url = new URL(baseUrl);
+    url.searchParams.set("tenant_id", tenant.id);
+    url.searchParams.set("business", tenant.name);
+    url.searchParams.set("plan", planId);
+    return url.toString();
+  } catch {
+    return baseUrl;
+  }
+}
 
 export function SubscriptionRequired({
   tenant,
@@ -32,14 +45,19 @@ export function SubscriptionRequired({
   return (
     <div className="pwa-page-roomy min-h-dvh bg-[#070b14] px-4 py-8 text-white light:bg-[#f6f8fc] light:text-slate-900 sm:px-6">
       <div className="mx-auto max-w-5xl">
-        <header className="flex items-center justify-between gap-4">
+        <header className="flex flex-wrap items-center justify-between gap-4">
           <Link href="/home" className="flex items-center gap-2.5">
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-indigo-700 text-white"><Sparkles className="h-4 w-4" /></span>
             <span className="font-black">YuhBusiness</span>
           </Link>
-          <button onClick={() => void onLogout()} className="inline-flex items-center gap-2 rounded-xl border border-slate-700 px-4 py-2 text-xs font-semibold text-slate-300 hover:border-slate-500 hover:text-white light:border-slate-300 light:text-slate-600 light:hover:text-slate-900">
-            <LogOut className="h-4 w-4" /> Sign out
-          </button>
+          <div className="flex items-center gap-2">
+            <div className="w-48 rounded-xl border border-slate-700 bg-slate-900 px-2 py-1 light:border-slate-300">
+              <BusinessSwitcher tenant={tenant} />
+            </div>
+            <button onClick={() => void onLogout()} className="inline-flex items-center gap-2 rounded-xl border border-slate-700 px-4 py-2 text-xs font-semibold text-slate-300 hover:border-slate-500 hover:text-white light:border-slate-300 light:text-slate-600 light:hover:text-slate-900">
+              <LogOut className="h-4 w-4" /> Sign out
+            </button>
+          </div>
         </header>
 
         <section className="mx-auto max-w-2xl py-14 text-center sm:py-20">
@@ -58,12 +76,12 @@ export function SubscriptionRequired({
               {plan.popular && <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-violet-600 px-3 py-1 text-[10px] font-black uppercase tracking-wide text-white">Best value</span>}
               <h2 className="text-lg font-black">{plan.name}</h2>
               <p className="mt-2 min-h-10 text-xs leading-5 text-slate-400 light:text-slate-600">{plan.description}</p>
-              <p className="mt-5"><span className="text-4xl font-black">${plan.price}</span><span className="text-xs text-slate-500"> USD / month</span></p>
+              <p className="mt-5"><span className="text-4xl font-black">${plan.price}</span><span className="text-xs text-slate-500"> BZD / month per business</span></p>
               <ul className="my-6 space-y-3 text-xs text-slate-300 light:text-slate-700">
                 {plan.features.map((feature) => <li key={feature} className="flex items-start gap-2"><Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-400" />{feature}</li>)}
               </ul>
               {plan.checkoutUrl ? (
-                <a href={plan.checkoutUrl} className={`mt-auto inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-xs font-bold text-white ${plan.popular ? "bg-violet-600 hover:bg-violet-500" : "bg-slate-700 hover:bg-slate-600"}`}>
+                <a href={checkoutHref(plan.checkoutUrl, tenant, plan.id)} className={`mt-auto inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-xs font-bold text-white ${plan.popular ? "bg-violet-600 hover:bg-violet-500" : "bg-slate-700 hover:bg-slate-600"}`}>
                   Pay securely <ArrowRight className="h-4 w-4" />
                 </a>
               ) : (

@@ -120,7 +120,7 @@ export function SearchFilters({
               className="px-3 py-1 text-sm bg-slate-700 light:bg-white text-white light:text-gray-900 rounded-lg border border-slate-600 light:border-gray-300 focus:outline-none focus:border-violet-500"
             >
               <option value="">All Plans</option>
-              <option value="starter">Starter</option>
+              <option value="starter">Beginner</option>
               <option value="pro">Pro</option>
               <option value="enterprise">Enterprise</option>
             </select>

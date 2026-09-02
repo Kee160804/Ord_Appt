@@ -19,10 +19,12 @@ import {
   missingSupabaseConfigMessage,
 } from "@/app/lib/supabase/config";
 import {
+  createAdditionalBusiness,
   loadAuthenticatedAppSession,
   supabaseLogin,
   supabaseLogout,
   supabaseSignup,
+  type CreateBusinessInput,
 } from "@/app/services/authService";
 import type { BusinessType, Tenant, User } from "@/app/types/index";
 
@@ -36,7 +38,10 @@ interface AuthActionResult {
 interface AuthContextType {
   user: User | null;
   tenant: Tenant | null;
+  businesses: Tenant[];
   updateTenant: (updatedTenant: Tenant) => void;
+  switchBusiness: (tenantId: string) => Promise<AuthActionResult>;
+  addBusiness: (input: CreateBusinessInput) => Promise<AuthActionResult>;
   login: (email: string, password: string, rememberMe?: boolean) => Promise<AuthActionResult>;
   signup: (
     email: string,
@@ -50,6 +55,7 @@ interface AuthContextType {
   ) => Promise<AuthActionResult>;
   logout: () => Promise<void>;
   isLoading: boolean;
+  isSwitchingBusiness: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -94,7 +100,9 @@ function createUniqueSlug(initial: string) {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [tenant, setTenant] = useState<Tenant | null>(null);
+  const [businesses, setBusinesses] = useState<Tenant[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSwitchingBusiness, setIsSwitchingBusiness] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -104,6 +112,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(demoUser);
         setTenant(
           demoUser?.tenantId ? getTenantById(demoUser.tenantId) ?? null : null,
+        );
+        setBusinesses(
+          demoUser?.tenantId ? [getTenantById(demoUser.tenantId)].filter((item): item is Tenant => Boolean(item)) : [],
         );
         setIsLoading(false);
       });
@@ -126,6 +137,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!active) return;
         setUser(null);
         setTenant(null);
+        setBusinesses([]);
         setIsLoading(false);
         return;
       }
@@ -133,6 +145,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!active) return;
       setUser(result.user ?? null);
       setTenant(result.tenant ?? null);
+      setBusinesses(result.businesses ?? []);
       setIsLoading(false);
     };
 
@@ -141,6 +154,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (event === "SIGNED_OUT" || !session?.user) {
         setUser(null);
         setTenant(null);
+        setBusinesses([]);
         setIsLoading(false);
         return;
       }
@@ -168,6 +182,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       saveSessionPreference(rememberMe);
       setUser(result.user);
       setTenant(result.tenant ?? null);
+      setBusinesses(result.businesses ?? []);
       return { success: true, user: result.user };
     }
 
@@ -192,7 +207,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     setUser(demoUser);
-    setTenant(demoUser.tenantId ? getTenantById(demoUser.tenantId) ?? null : null);
+    const demoTenant = demoUser.tenantId ? getTenantById(demoUser.tenantId) ?? null : null;
+    setTenant(demoTenant);
+    setBusinesses(demoTenant ? [demoTenant] : []);
     saveDemoSession(demoUser, rememberMe);
     setIsLoading(false);
     return { success: true, user: demoUser };
@@ -236,6 +253,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       setUser(result.user);
       setTenant(result.tenant ?? null);
+      setBusinesses(result.businesses ?? []);
       return { success: true, user: result.user };
     }
 
@@ -291,6 +309,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     saveDemoSession(newUser);
     setUser(newUser);
     setTenant(newTenant);
+    setBusinesses([newTenant]);
     setIsLoading(false);
     return { success: true, user: newUser };
   };
@@ -306,16 +325,76 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     setUser(null);
     setTenant(null);
+    setBusinesses([]);
     setIsLoading(false);
     router.push("/login");
   };
 
   const updateTenant = (updatedTenant: Tenant) => {
     setTenant((current) => (current?.id === updatedTenant.id ? updatedTenant : current));
+    setBusinesses((current) => current.map((business) => (
+      business.id === updatedTenant.id ? updatedTenant : business
+    )));
+  };
+
+  const switchBusiness = async (tenantId: string): Promise<AuthActionResult> => {
+    if (tenant?.id === tenantId) return { success: true, user: user ?? undefined };
+    setIsSwitchingBusiness(true);
+
+    if (isSupabaseConfigured()) {
+      const result = await loadAuthenticatedAppSession(undefined, tenantId);
+      setIsSwitchingBusiness(false);
+      if (!result.user || !result.tenant || result.tenant.id !== tenantId) {
+        return { success: false, error: result.error ?? "You do not have access to that business." };
+      }
+      setUser(result.user);
+      setTenant(result.tenant);
+      setBusinesses(result.businesses ?? []);
+      router.push("/dashboard");
+      return { success: true, user: result.user };
+    }
+
+    const selected = businesses.find((business) => business.id === tenantId);
+    setIsSwitchingBusiness(false);
+    if (!selected || !user) return { success: false, error: "Business not found." };
+    setTenant(selected);
+    setUser({ ...user, tenantId: selected.id });
+    router.push("/dashboard");
+    return { success: true, user };
+  };
+
+  const addBusiness = async (input: CreateBusinessInput): Promise<AuthActionResult> => {
+    if (!isSupabaseConfigured()) {
+      return { success: false, error: "Adding another business requires a connected Supabase project." };
+    }
+
+    setIsSwitchingBusiness(true);
+    const result = await createAdditionalBusiness(input);
+    setIsSwitchingBusiness(false);
+    if (!result.user || !result.tenant) {
+      return { success: false, error: result.error ?? "Unable to add this business." };
+    }
+    setUser(result.user);
+    setTenant(result.tenant);
+    setBusinesses(result.businesses ?? []);
+    router.push("/dashboard");
+    return { success: true, user: result.user };
   };
 
   return (
-    <AuthContext.Provider value={{ user, tenant, updateTenant, login, signup, logout, isLoading }}>
+    <AuthContext.Provider value={{
+      user,
+      tenant,
+      businesses,
+      updateTenant,
+      switchBusiness,
+      addBusiness,
+      login,
+      signup,
+      logout,
+      isLoading,
+      isSwitchingBusiness,
+    }}>
       {children}
     </AuthContext.Provider>
   );

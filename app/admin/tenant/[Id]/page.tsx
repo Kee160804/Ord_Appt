@@ -214,9 +214,9 @@ export default function TenantDetailPage() {
             <label className="w-full sm:min-w-44 sm:w-auto">
               <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-400">Plan</span>
               <select value={selectedPlan} onChange={(event) => setSelectedPlan(event.target.value as Tenant["plan"])} className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2.5 text-sm text-white outline-none focus:border-violet-500 light:border-slate-300 light:bg-white light:text-slate-900">
-                <option value="starter">Beginner — $9</option>
-                <option value="pro">Pro — $12</option>
-                <option value="enterprise">Enterprise — $16</option>
+                <option value="starter">Beginner — $9 BZD</option>
+                <option value="pro">Pro — $12 BZD</option>
+                <option value="enterprise">Enterprise — $16 BZD</option>
               </select>
             </label>
             <button disabled={isUpdatingSubscription} onClick={() => void updateSubscription("active")} className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-500 disabled:opacity-50">

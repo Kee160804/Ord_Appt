@@ -568,7 +568,7 @@ export default function HomePage() {
           </div>
 
           <p className="mt-7 text-center text-xs text-slate-500 light:text-gray-500">
-            All prices are monthly in USD. Your 14-day trial starts when your tenant account is created.
+            All prices are monthly in BZD and apply per business. Each business starts its own 14-day trial.
           </p>
         </div>
       </section>

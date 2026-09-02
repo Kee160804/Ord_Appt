@@ -526,12 +526,15 @@
 
 
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Building2,
   Clock,
   Globe,
   ChevronRight,
+  ImageIcon,
+  Upload,
+  X,
 } from "lucide-react";
 import { Card, CardHeader, CardBody } from "../components/Card";
 import { Button } from "../components/Button";
@@ -542,7 +545,10 @@ import { PlanFeatureRequired } from "./PlanFeatureRequired";
 import {
   updateBusinessDetails,
   updateBusinessHours,
+  deleteStorefrontCoverImage,
   updateStorefrontSettings,
+  uploadStorefrontCoverImage,
+  validateStorefrontCoverImage,
 } from "../services/settingsService";
 import type { Tenant } from "../types/index";
 
@@ -862,27 +868,77 @@ function StorefrontTab({
   const [coverImage, setCoverImage] = useState(tenant.coverImage);
   const [primaryColor, setPrimaryColor] = useState(tenant.primaryColor);
   const [accentColor, setAccentColor] = useState(tenant.accentColor);
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverPreview, setCoverPreview] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const previewUrlRef = useRef("");
+  const coverInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => () => {
+    if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+  }, []);
+
+  const clearSelectedFile = () => {
+    if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+    previewUrlRef.current = "";
+    setCoverFile(null);
+    setCoverPreview("");
+    if (coverInputRef.current) coverInputRef.current.value = "";
+  };
+
+  const selectCoverFile = (file: File | null) => {
+    if (!file) return;
+    setError("");
+    setSuccess("");
+    try {
+      validateStorefrontCoverImage(file);
+      clearSelectedFile();
+      const previewUrl = URL.createObjectURL(file);
+      previewUrlRef.current = previewUrl;
+      setCoverFile(file);
+      setCoverPreview(previewUrl);
+    } catch (selectionError) {
+      if (coverInputRef.current) coverInputRef.current.value = "";
+      setError(selectionError instanceof Error ? selectionError.message : "Unable to use this photo.");
+    }
+  };
+
+  const removeCoverImage = () => {
+    clearSelectedFile();
+    setCoverImage("");
+    setSuccess("");
+  };
 
   const save = async () => {
     setIsSaving(true);
     setError("");
     setSuccess("");
+    let uploadedCoverImage = "";
 
     try {
+      if (coverFile) {
+        uploadedCoverImage = await uploadStorefrontCoverImage(tenant.id, coverFile);
+      }
       const saved = await updateStorefrontSettings(tenant.id, {
         slug,
-        coverImage,
+        coverImage: uploadedCoverImage || coverImage,
         primaryColor,
         accentColor,
       });
       setSlug(saved.slug);
       setCoverImage(saved.coverImage);
+      clearSelectedFile();
       onTenantUpdated({ ...tenant, ...saved });
+      if (uploadedCoverImage && tenant.coverImage !== uploadedCoverImage) {
+        await deleteStorefrontCoverImage(tenant.id, tenant.coverImage);
+      }
       setSuccess("Storefront settings saved.");
     } catch (saveError) {
+      if (uploadedCoverImage) {
+        await deleteStorefrontCoverImage(tenant.id, uploadedCoverImage);
+      }
       setError(saveError instanceof Error ? saveError.message : "Unable to save storefront settings.");
     } finally {
       setIsSaving(false);
@@ -917,11 +973,75 @@ function StorefrontTab({
             />
           </div>
         </div>
-        <Input
-          label="Cover Image URL"
-          value={coverImage}
-          onChange={(event) => setCoverImage(event.target.value)}
-        />
+        <div className="space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <label className="text-sm font-medium text-slate-300 light:text-gray-700">
+              Cover Image
+            </label>
+            {(coverPreview || coverImage) && (
+              <button
+                type="button"
+                onClick={removeCoverImage}
+                className="inline-flex items-center gap-1 text-xs font-semibold text-slate-400 transition hover:text-red-400"
+              >
+                <X className="h-3.5 w-3.5" /> Remove
+              </button>
+            )}
+          </div>
+
+          <div
+            className="relative flex min-h-36 items-center justify-center overflow-hidden rounded-2xl border border-slate-600 bg-slate-800 bg-cover bg-center light:border-slate-300 light:bg-slate-100"
+            style={(coverPreview || coverImage) ? {
+              backgroundImage: `linear-gradient(rgba(8,17,31,.12),rgba(8,17,31,.4)),url(${JSON.stringify(coverPreview || coverImage)})`,
+            } : undefined}
+          >
+            {!coverPreview && !coverImage && (
+              <div className="text-center text-slate-500">
+                <ImageIcon className="mx-auto h-7 w-7" />
+                <p className="mt-2 text-xs font-medium">No cover image selected</p>
+              </div>
+            )}
+            {coverFile && (
+              <span className="absolute bottom-3 left-3 max-w-[calc(100%-1.5rem)] truncate rounded-full bg-slate-950/75 px-3 py-1 text-[10px] font-bold text-white backdrop-blur">
+                Ready to upload · {coverFile.name}
+              </span>
+            )}
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-[minmax(0,auto)_minmax(0,1fr)] sm:items-end">
+            <div>
+              <span className="mb-1.5 block text-xs font-semibold text-slate-300 light:text-slate-700">Upload a photo</span>
+              <label
+                htmlFor="storefront-cover-upload"
+                className="inline-flex h-[42px] w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-violet-500/70 bg-violet-500/10 px-4 text-xs font-bold text-violet-300 transition hover:bg-violet-500/20 light:text-violet-700 sm:w-auto"
+              >
+                <Upload className="h-4 w-4" /> Choose photo
+              </label>
+              <input
+                ref={coverInputRef}
+                id="storefront-cover-upload"
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={(event) => selectCoverFile(event.target.files?.[0] ?? null)}
+                className="sr-only"
+              />
+            </div>
+            <Input
+              label="Or paste an image URL"
+              type="url"
+              value={coverImage}
+              onChange={(event) => {
+                clearSelectedFile();
+                setCoverImage(event.target.value);
+                setSuccess("");
+              }}
+              placeholder="https://example.com/cover.jpg"
+            />
+          </div>
+          <p className="text-[11px] text-slate-500 light:text-slate-600">
+            JPG, PNG, or WebP · Maximum 5 MB. Recommended wide format: 1600 × 700.
+          </p>
+        </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label

@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import { Minus, Plus, ShoppingBag, Trash2, Eye } from "lucide-react";
+import { Minus, Plus, ShoppingBag, ShoppingCart, Trash2, Eye } from "lucide-react";
 import { Button } from "@/app/components/Button";
 import { Modal } from "@/app/components/Modal";
 import { Input, Select } from "@/app/components/input";
@@ -61,6 +61,9 @@ export function OrderingMenu({
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
   const [orderError, setOrderError] = useState("");
   const [orderConfirmation, setOrderConfirmation] = useState("");
+  const [checkoutActionsVisible, setCheckoutActionsVisible] = useState(false);
+  const orderSummaryRef = useRef<HTMLDivElement>(null);
+  const checkoutActionsRef = useRef<HTMLDivElement>(null);
 
   const filteredProducts = useMemo(() => {
     return products.filter((p) => {
@@ -107,6 +110,30 @@ export function OrderingMenu({
   const tax = subtotal * 0.1;
   const discount = subtotal > 100 ? subtotal * 0.05 : 0;
   const grandTotal = subtotal + tax - discount;
+  const itemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+
+  useEffect(() => {
+    const actions = checkoutActionsRef.current;
+    if (!actions || typeof IntersectionObserver === "undefined") {
+      setCheckoutActionsVisible(false);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => setCheckoutActionsVisible(entry.isIntersecting),
+      { threshold: 0.35 },
+    );
+    observer.observe(actions);
+    return () => observer.disconnect();
+  }, [cart.length]);
+
+  const scrollToOrderSummary = () => {
+    const summary = orderSummaryRef.current;
+    if (!summary) return;
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    summary.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
+    window.setTimeout(() => summary.focus({ preventScroll: true }), reduceMotion ? 0 : 450);
+  };
 
   const openAddModal = (product: Product) => {
     if (isSoldOut(product)) return;
@@ -362,7 +389,12 @@ export function OrderingMenu({
         </div>
 
         {/* RIGHT: Order Summary */}
-        <div className="flex min-w-0 flex-col overflow-hidden border-t border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900 xl:border-l xl:border-t-0">
+        <div
+          ref={orderSummaryRef}
+          id="order-summary"
+          tabIndex={-1}
+          className="scroll-mt-36 flex min-w-0 flex-col overflow-hidden border-t border-slate-200 bg-white outline-none dark:border-slate-700 dark:bg-slate-900 xl:border-l xl:border-t-0"
+        >
           <div className="flex-1 space-y-5 p-4 sm:p-5 xl:overflow-y-auto">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-bold text-slate-900 dark:text-white">Order Summary</h3>
@@ -506,7 +538,7 @@ export function OrderingMenu({
           </div>
 
           {cart.length > 0 && (
-            <div className="flex-shrink-0 border-t border-slate-100 dark:border-slate-800 p-5 space-y-2">
+            <div ref={checkoutActionsRef} className="flex-shrink-0 border-t border-slate-100 dark:border-slate-800 p-5 space-y-2">
               <TotalRow label="Subtotal" value={formatCurrency(subtotal)} />
               <TotalRow label="Tax (10%)" value={formatCurrency(tax)} />
               {discount > 0 && (
@@ -540,6 +572,27 @@ export function OrderingMenu({
           )}
         </div>
       </div>
+
+      {cart.length > 0 && !checkoutActionsVisible && (
+        <button
+          type="button"
+          onClick={scrollToOrderSummary}
+          data-testid="floating-cart"
+          aria-label={`View cart with ${itemCount} ${itemCount === 1 ? "item" : "items"}, total ${formatCurrency(grandTotal)}`}
+          className="fixed bottom-[calc(env(safe-area-inset-bottom)+1rem)] right-[max(1rem,env(safe-area-inset-right))] z-40 inline-flex min-h-14 items-center gap-3 rounded-full border border-violet-300/30 bg-violet-600 px-3.5 py-2.5 text-white shadow-[0_16px_40px_rgba(109,40,217,0.45)] transition hover:bg-violet-500 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-violet-400/35 active:scale-[0.98] xl:hidden"
+        >
+          <span className="relative flex h-9 w-9 items-center justify-center rounded-full bg-white/15">
+            <ShoppingCart className="h-5 w-5" />
+            <span className="absolute -right-1.5 -top-1.5 flex min-h-5 min-w-5 items-center justify-center rounded-full border-2 border-violet-600 bg-white px-1 text-[10px] font-black leading-none text-violet-700">
+              {itemCount > 99 ? "99+" : itemCount}
+            </span>
+          </span>
+          <span className="pr-1 text-left leading-tight">
+            <span className="block text-[10px] font-bold uppercase tracking-wide text-violet-100">View cart</span>
+            <span className="block text-sm font-black">{formatCurrency(grandTotal)}</span>
+          </span>
+        </button>
+      )}
 
       {/* Add-on Modal */}
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Add to Cart">

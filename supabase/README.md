@@ -30,6 +30,28 @@ For projects that already applied the first owner-onboarding migration, apply
 cooperate with foundational `trg_initialize_new_tenant` installations and
 prevents duplicate OWNER membership inserts.
 
+## Multi-business accounts
+
+Apply `202609010001_multi_business_accounts.sql` after the entitlement and
+ordering migrations. It makes `tenant_memberships` the account-to-business
+authorization source, adds the authenticated additional-business RPC, and
+installs membership-scoped policies for the complete tenant dataset.
+
+One Supabase Auth user may then own multiple businesses without another email
+or password. Every new business receives its own OWNER membership, Beginner
+plan, 14-day trial, storefront slug, modules, and tenant-level subscription.
+The internal database plan value remains `starter` for backward compatibility;
+the application displays it as Beginner at $9 BZD per month. Pro is $12 BZD
+and Enterprise is $16 BZD, charged independently for each tenant.
+
+## Storefront cover photo uploads
+
+Apply `202609020001_storefront_media_storage.sql` after the multi-business
+migration. It creates the public `storefront-media` bucket with a 5 MB limit
+for JPG, PNG, and WebP images. Uploads and deletions are restricted to tenant
+members through the business ID folder, while the resulting cover image is
+publicly readable on that business's storefront.
+
 The live super-admin overview requires
 `202608260003_super_admin_access.sql`. It installs the database-level platform
 role check, prevents browser self-promotion, and adds cross-tenant policies for

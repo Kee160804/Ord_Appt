@@ -11,6 +11,7 @@ import type {
 export interface AuthenticatedAppSession {
   user: User;
   tenant: Tenant | null;
+  businesses: Tenant[];
 }
 
 export interface AuthResult extends Partial<AuthenticatedAppSession> {
@@ -27,8 +28,17 @@ interface SignupBusinessMetadata {
   business_slug: string;
 }
 
+export interface CreateBusinessInput {
+  businessName: string;
+  businessType: BusinessType;
+  city: string;
+  phone: string;
+  slug: string;
+}
+
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const tenantProvisioningByUser = new Map<string, Promise<string | null>>();
+const ACTIVE_BUSINESS_KEY_PREFIX = "yuhbusiness_active_business:";
 
 function errorMessage(error: unknown, fallback: string) {
   const message = error instanceof Error && error.message
@@ -131,18 +141,30 @@ function mapTenant(row: TenantRow, hours: BusinessHourRow[]): Tenant {
   };
 }
 
-async function getMembership(supabase: SupabaseClient, profileId: string) {
+async function getMemberships(supabase: SupabaseClient, profileId: string) {
   const { data, error } = await supabase
     .from("tenant_memberships")
     .select("id, tenant_id, profile_id, role_id, is_active, roles(name)")
     .eq("profile_id", profileId)
     .eq("is_active", true)
-    .order("joined_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
+    .order("joined_at", { ascending: true });
 
   if (error) throw error;
-  return (data as MembershipRow | null) ?? null;
+  return (data as MembershipRow[] | null) ?? [];
+}
+
+function activeBusinessStorageKey(profileId: string) {
+  return `${ACTIVE_BUSINESS_KEY_PREFIX}${profileId}`;
+}
+
+function getStoredActiveBusiness(profileId: string) {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem(activeBusinessStorageKey(profileId));
+}
+
+function storeActiveBusiness(profileId: string, tenantId: string) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(activeBusinessStorageKey(profileId), tenantId);
 }
 
 function metadataFromUser(user: SupabaseUser): SignupBusinessMetadata | null {
@@ -209,6 +231,7 @@ async function provisionTenantFromMetadata(supabase: SupabaseClient, authUser: S
 
 export async function loadAuthenticatedAppSession(
   suppliedAuthUser?: SupabaseUser,
+  requestedTenantId?: string,
 ): Promise<AuthResult> {
   const supabase = getSupabaseBrowserClient();
   if (!supabase) return { error: "Supabase is not configured." };
@@ -248,35 +271,91 @@ export async function loadAuthenticatedAppSession(
     const profile = profileData as ProfileRow;
     if (!profile.is_active) return { error: "This account has been deactivated." };
 
-    let membership = await getMembership(supabase, profile.id);
-    if (!membership && profile.platform_role?.toUpperCase() !== "SUPER_ADMIN") {
+    let memberships = await getMemberships(supabase, profile.id);
+    if (memberships.length === 0 && profile.platform_role?.toUpperCase() !== "SUPER_ADMIN") {
       const tenantId = await provisionTenantFromMetadata(supabase, authUser);
-      if (tenantId) membership = await getMembership(supabase, profile.id);
+      if (tenantId) memberships = await getMemberships(supabase, profile.id);
     }
 
-    const user = mapUser(profile, membership);
-    if (!membership) return { user, tenant: null };
+    if (memberships.length === 0) {
+      return { user: mapUser(profile, null), tenant: null, businesses: [] };
+    }
+
+    const tenantIds = memberships.map((membership) => membership.tenant_id);
 
     const [{ data: tenantData, error: tenantError }, { data: hoursData, error: hoursError }] =
       await Promise.all([
-        supabase.from("tenants").select("*").eq("id", membership.tenant_id).single(),
+        supabase.from("tenants").select("*").in("id", tenantIds),
         supabase
           .from("business_hours")
-          .select("day_of_week, open_time, close_time, is_closed")
-          .eq("tenant_id", membership.tenant_id),
+          .select("tenant_id, day_of_week, open_time, close_time, is_closed")
+          .in("tenant_id", tenantIds),
       ]);
 
-    if (tenantError || !tenantData) {
-      return { error: tenantError?.message ?? "Your business could not be loaded." };
-    }
+    if (tenantError) return { error: tenantError.message };
     if (hoursError) return { error: hoursError.message };
+
+    const tenantRows = (tenantData ?? []) as TenantRow[];
+    const hourRows = (hoursData ?? []) as (BusinessHourRow & { tenant_id: string })[];
+    const tenantById = new Map(
+      tenantRows.map((row) => [
+        row.id,
+        mapTenant(row, hourRows.filter((hour) => hour.tenant_id === row.id)),
+      ]),
+    );
+    const businesses = tenantIds
+      .map((tenantId) => tenantById.get(tenantId))
+      .filter((business): business is Tenant => Boolean(business));
+
+    if (businesses.length === 0) {
+      return { error: "None of your active business memberships could be loaded." };
+    }
+
+    const storedTenantId = getStoredActiveBusiness(profile.id);
+    const desiredTenantId = requestedTenantId ?? storedTenantId;
+    const tenant = businesses.find((business) => business.id === desiredTenantId) ?? businesses[0];
+    const membership = memberships.find((candidate) => candidate.tenant_id === tenant.id) ?? null;
+    const user = mapUser(profile, membership);
+    storeActiveBusiness(profile.id, tenant.id);
 
     return {
       user,
-      tenant: mapTenant(tenantData as TenantRow, (hoursData ?? []) as BusinessHourRow[]),
+      tenant,
+      businesses,
     };
   } catch (error) {
     return { error: errorMessage(error, "Unable to load your account.") };
+  }
+}
+
+export async function createAdditionalBusiness(input: CreateBusinessInput): Promise<AuthResult> {
+  const supabase = getSupabaseBrowserClient();
+  if (!supabase) return { error: "Supabase is not configured." };
+
+  const businessName = input.businessName.trim();
+  if (businessName.length < 2) return { error: "Business name is required." };
+
+  try {
+    const { data, error } = await supabase.rpc("create_additional_owner_business", {
+      p_business_name: businessName,
+      p_business_type: input.businessType,
+      p_city: input.city.trim(),
+      p_phone: input.phone.trim(),
+      p_slug: slugify(input.slug || businessName),
+    });
+
+    if (error) {
+      if (error.code === "PGRST202") {
+        throw new Error(
+          "Multi-business setup is not installed yet. Apply the multi-business migration in Supabase and try again.",
+        );
+      }
+      throw error;
+    }
+
+    return loadAuthenticatedAppSession(undefined, data as string);
+  } catch (error) {
+    return { error: errorMessage(error, "Unable to add this business.") };
   }
 }
 

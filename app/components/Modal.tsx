@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { cn } from "../lib/utils";
 
@@ -17,13 +18,18 @@ export function Modal({ open, onClose, title, children, maxWidth = "max-w-lg", f
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+    return () => {
+      window.removeEventListener("keydown", handler);
+      document.body.style.overflow = previousOverflow;
+    };
   }, [open, onClose]);
 
-  if (!open) return null;
+  if (!open || typeof document === "undefined") return null;
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-end justify-center p-0 sm:items-center sm:p-4"
       aria-modal="true"
@@ -58,6 +64,7 @@ export function Modal({ open, onClose, title, children, maxWidth = "max-w-lg", f
           <div className="flex-shrink-0 border-t border-slate-700 px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] light:border-[#e8ecf3] sm:px-6">{footer}</div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

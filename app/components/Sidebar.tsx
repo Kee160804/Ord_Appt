@@ -8,7 +8,6 @@ import {
   Calendar,
   ExternalLink,
   LayoutDashboard,
-  LogOut,
   ArrowRight,
   Package,
   Scissors,
@@ -22,6 +21,7 @@ import { cn } from "../lib/utils";
 import { tenantHasFeature } from "../lib/plans";
 import type { Tenant, User } from "../types/index";
 import { useAuth } from "../contexts/auth";
+import { BusinessSwitcher } from "./BusinessSwitcher";
 
 interface SidebarProps {
   tenant: Tenant;
@@ -108,23 +108,11 @@ export function Sidebar({ tenant, user }: SidebarProps) {
       </div>
 
       <div className={cn("border-b border-white/[0.06] px-4 py-4", collapsed && "px-3")}>
-        <div className={cn("flex items-center gap-3 rounded-xl px-1 py-1", collapsed && "justify-center")}>
-          <div
-            className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg text-xs font-bold text-white shadow-sm"
-            style={{ backgroundColor: tenant.logoBg }}
-            title={tenant.name}
-          >
-            {tenant.logo}
-          </div>
-          {!collapsed && (
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-semibold text-white">{tenant.name}</p>
-              <span className="mt-1 inline-flex rounded-full bg-violet-600 px-2 py-0.5 text-[7px] font-bold uppercase tracking-wide text-white">
-                {isAppointmentBusiness ? "Business" : "Ordering"}
-              </span>
-            </div>
-          )}
-        </div>
+        <BusinessSwitcher
+          tenant={tenant}
+          collapsed={collapsed}
+          onBusinessSelected={() => setMobileOpen(false)}
+        />
       </div>
 
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
