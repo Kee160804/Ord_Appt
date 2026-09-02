@@ -21,9 +21,12 @@ import { getSupabaseBrowserClient } from "../lib/supabase/client";
 import { isSupabaseConfigured } from "../lib/supabase/config";
 import {
   deleteAppointment,
+  assignAppointmentProvider,
   listAppointments,
   setAppointmentStatus,
 } from "../services/appointmentService";
+import { listServiceProviders, type ServiceProvider } from "../services/businessToolsService";
+import { useAuth } from "../contexts/auth";
 import {
   formatCurrency,
   formatDate,
@@ -44,6 +47,7 @@ interface Props {
 export function AppointmentsView({ tenant }: Props) {
   // NEW: Get realtime context to emit appointment events
   const realtime = useRealtime();
+  const { user } = useAuth();
   
   const [apts, setApts] = useState<Appointment[]>(
     isSupabaseConfigured() ? [] : getAppointmentsByTenant(tenant.id),
@@ -56,6 +60,7 @@ export function AppointmentsView({ tenant }: Props) {
   const [notice, setNotice] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<Appointment | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [providers, setProviders] = useState<ServiceProvider[]>([]);
 
   useEffect(() => {
     if (!isSupabaseConfigured()) return;
@@ -78,6 +83,10 @@ export function AppointmentsView({ tenant }: Props) {
         if (active) setIsLoading(false);
       }
     };
+
+    if (user?.role === "owner") {
+      void listServiceProviders(tenant.id).then((value) => { if (active) setProviders(value); }).catch(() => undefined);
+    }
 
     void load();
     const channel = supabase
@@ -102,7 +111,7 @@ export function AppointmentsView({ tenant }: Props) {
       window.removeEventListener("focus", handleFocus);
       if (channel && supabase) void supabase.removeChannel(channel);
     };
-  }, [tenant.id]);
+  }, [tenant.id, user?.role]);
 
   const tabs: Filter[] = [
     "all",
@@ -180,6 +189,18 @@ export function AppointmentsView({ tenant }: Props) {
   };
 
   const today = new Date().toLocaleDateString("en-CA");
+  const assignProvider = async (providerId: string) => {
+    if (!selected) return;
+    setUpdatingId(selected.id); setError("");
+    try {
+      await assignAppointmentProvider(tenant.id, selected.id, providerId || undefined);
+      const provider = providers.find((item) => item.id === providerId);
+      const next = { ...selected, providerId: providerId || undefined, providerName: provider?.name };
+      setSelected(next); setApts((current) => current.map((item) => item.id === next.id ? next : item));
+      setNotice(provider ? `Appointment assigned to ${provider.name}.` : "Provider assignment removed.");
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to assign provider."); }
+    finally { setUpdatingId(null); }
+  };
 
   return (
     <div className="min-h-full space-y-4 bg-[#08111f] light:bg-[#f8fafc] p-4 text-white light:text-[#14213a] md:p-5">
@@ -292,7 +313,7 @@ export function AppointmentsView({ tenant }: Props) {
                   <StatusBadge status={apt.status} />
                 </div>
                 <p className="mt-1 truncate text-[10px] text-slate-400 light:text-[#71809a]">
-                  {apt.serviceName} · {formatTime(apt.time)} ·{" "}
+                  {apt.serviceName} · {formatTime(apt.time)}{apt.providerName ? ` · ${apt.providerName}` : ""} ·{" "}
                   {formatDuration(apt.duration)}
                 </p>
               </div>
@@ -418,6 +439,10 @@ export function AppointmentsView({ tenant }: Props) {
                 </div>
               </div>
             </div>
+
+            {user?.role === "owner" && providers.some((provider) => provider.serviceIds.includes(selected.serviceId)) && (
+              <div><label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-400 light:text-gray-500">Service Provider</label><select value={selected.providerId ?? ""} disabled={updatingId === selected.id} onChange={(event) => void assignProvider(event.target.value)} className="w-full rounded-xl border border-slate-600 bg-slate-800 px-3 py-2.5 text-sm light:border-slate-200 light:bg-white"><option value="">Unassigned</option>{providers.filter((provider) => provider.isActive && provider.serviceIds.includes(selected.serviceId)).map((provider) => <option key={provider.id} value={provider.id}>{provider.name}</option>)}</select></div>
+            )}
 
             <div className="bg-slate-800 light:bg-gray-50 rounded-xl p-4 space-y-2 text-sm">
               <div className="flex justify-between">

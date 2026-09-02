@@ -51,6 +51,7 @@ export default async function StorePage({ params, searchParams }: StorePageProps
         initialCategories={storefront.categories}
         initialProducts={storefront.products}
         initialServices={storefront.services}
+        initialProviders={storefront.providers}
       />
     );
   }

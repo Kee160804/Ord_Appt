@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Sidebar } from "@/app/components/Sidebar";
 import { SubscriptionRequired } from "@/app/components/SubscriptionRequired";
 import { TrialStatusBanner } from "@/app/components/TrialStatusBanner";
@@ -12,6 +12,21 @@ import { getTenantEntitlement } from "@/app/lib/subscription";
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, tenant, isLoading, logout } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
+
+  const isStaffRouteBlocked = user?.role === "staff" && tenant
+    ? ![
+        "/dashboard",
+        tenant.businessType === "appointment" ? "/dashboard/appointments" : "/dashboard/orders",
+      ].some((allowedPath) => pathname === allowedPath || (
+        allowedPath !== "/dashboard" && pathname.startsWith(`${allowedPath}/`)
+      ))
+    : false;
+  const isOwnerRouteBlocked = Boolean(
+    user && user.role !== "owner" && (
+      pathname.startsWith("/dashboard/settings") || pathname.startsWith("/dashboard/tools")
+    ),
+  );
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -24,14 +39,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (user?.role === "superadmin") {
       const adminUrl = new URL("/admin", window.location.origin);
       router.replace(adminUrl.pathname + adminUrl.search);
+      return;
     }
-  }, [user, isLoading, router]);
+
+    if (isStaffRouteBlocked || isOwnerRouteBlocked) {
+      router.replace("/dashboard");
+    }
+  }, [user, isLoading, router, isStaffRouteBlocked, isOwnerRouteBlocked]);
 
   if (isLoading || !user) {
     return <div className="flex min-h-dvh items-center justify-center">Loading...</div>;
   }
 
   if (!tenant) return null;
+
+  if (isStaffRouteBlocked || isOwnerRouteBlocked) return null;
 
   const entitlement = getTenantEntitlement(tenant);
   if (!entitlement.hasAccess) {

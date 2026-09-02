@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Search, Users } from "lucide-react";
+import { DollarSign, History, Search, UserRoundCheck, Users } from "lucide-react";
 import { Card } from "../components/Card";
 import { Button } from "../components/Button";
 import { Input, Textarea } from "../components/input";
@@ -22,14 +22,14 @@ function demoCustomers(tenant: Tenant): CustomerSummary[] {
         email: appointment.customerEmail,
         phone: appointment.customerPhone,
         date: appointment.date,
-        value: appointment.status === "cancelled" ? 0 : appointment.servicePrice,
+        value: appointment.status === "completed" ? appointment.servicePrice : 0,
       }))
     : getOrdersByTenant(tenant.id).map((order) => ({
         name: order.customerName,
         email: order.customerEmail,
         phone: order.customerPhone,
         date: order.createdAt.slice(0, 10),
-        value: order.status === "cancelled" ? 0 : order.totalAmount,
+        value: order.status === "delivered" ? order.totalAmount : 0,
       }));
   const grouped = new Map<string, CustomerSummary>();
   for (const record of records) {
@@ -58,6 +58,8 @@ export function CustomersView({ tenant }: Props) {
   const [records, setRecords] = useState<CustomerRecord[]>([]);
   const [editing, setEditing] = useState<CustomerRecord | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [historyCustomer, setHistoryCustomer] = useState<CustomerSummary | null>(null);
+  const [activities, setActivities] = useState<{ customerId?: string; contact: string; label: string; date: string; value: number; status: string }[]>([]);
 
   useEffect(() => {
     if (!isSupabaseConfigured()) return;
@@ -66,6 +68,9 @@ export function CustomersView({ tenant }: Props) {
       .then(([data, loadedCustomers]) => {
         if (!active) return;
         setRecords(loadedCustomers);
+        setActivities(tenant.businessType === "appointment"
+          ? data.appointments.map((item) => ({ customerId: item.customerId, contact: item.customerEmail.toLowerCase() || item.customerPhone, label: item.serviceName, date: item.date, value: item.servicePrice, status: item.status }))
+          : data.orders.map((item) => ({ customerId: item.customerId, contact: item.customerEmail.toLowerCase() || item.customerPhone, label: item.orderNumber, date: item.createdAt, value: item.totalAmount, status: item.status })));
         const activityByContact = new Map(data.customers.map((customer) => [
           customer.email.toLowerCase() || customer.phone,
           customer,
@@ -160,6 +165,11 @@ export function CustomersView({ tenant }: Props) {
     );
   }, [customers, search]);
 
+  const returningCustomers = customers.filter((customer) => customer.activityCount > 1).length;
+  const lifetimeValue = customers.reduce((sum, customer) => sum + customer.totalValue, 0);
+  const averageValue = customers.length ? lifetimeValue / customers.length : 0;
+  const selectedActivities = historyCustomer ? activities.filter((activity) => activity.customerId === historyCustomer.id || activity.contact === (historyCustomer.email.toLowerCase() || historyCustomer.phone)) : [];
+
   return (
     <div className="min-h-full space-y-4 bg-[#08111f] light:bg-[#f8fafc] p-4 text-white light:text-[#14213a] md:p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -203,6 +213,10 @@ export function CustomersView({ tenant }: Props) {
       )}
       {isLoading && <p className="text-xs text-slate-400">Loading customers from Supabase...</p>}
 
+      <div className="grid gap-3 sm:grid-cols-3">
+        {[{ label: "Returning Customers", value: String(returningCustomers), icon: UserRoundCheck }, { label: "Customer Lifetime Value", value: formatCurrency(lifetimeValue), icon: DollarSign }, { label: "Average Customer Value", value: formatCurrency(averageValue), icon: Users }].map(({ label, value, icon: Icon }) => <Card key={label} className="p-4"><div className="flex items-center gap-3"><span className="rounded-lg bg-violet-500/15 p-2 text-violet-400"><Icon className="h-4 w-4" /></span><div><p className="text-[10px] text-slate-400">{label}</p><p className="mt-1 text-sm font-bold">{value}</p></div></div></Card>)}
+      </div>
+
       <Card className="overflow-x-auto">
         <div className="grid min-w-[600px] grid-cols-4 gap-4 border-b border-slate-700 light:border-[#e8ecf3] px-5 py-3">
           <p className="text-xs font-semibold text-slate-400 light:text-gray-600 uppercase tracking-wider col-span-2">Customer</p>
@@ -228,6 +242,7 @@ export function CustomersView({ tenant }: Props) {
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="truncate text-xs font-semibold text-white light:text-[#17223a]">{customer.name}</p>
+                    {customer.activityCount > 1 && <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[9px] font-semibold text-emerald-400">Returning</span>}
                     {customer.isActive === false && (
                       <span className="rounded-full bg-slate-700 px-2 py-0.5 text-[9px] text-slate-300 light:bg-slate-100 light:text-slate-500">
                         Inactive
@@ -240,6 +255,7 @@ export function CustomersView({ tenant }: Props) {
               <p className="text-xs text-slate-300 light:text-[#566681]">{formatDate(customer.lastActivity)}</p>
               <div className="flex items-center justify-end gap-2">
                 <p className="text-right text-xs font-bold text-white light:text-[#17223a]">{formatCurrency(customer.totalValue)}</p>
+                <button className="text-violet-400" title="View customer history" aria-label={`View ${customer.name} history`} onClick={() => setHistoryCustomer(customer)}><History className="h-4 w-4" /></button>
                 {customer.id && <button className="text-[10px] text-violet-400" onClick={() => {
                   const record = records.find((candidate) => candidate.id === customer.id);
                   if (record) setEditing(record);
@@ -267,6 +283,12 @@ export function CustomersView({ tenant }: Props) {
             </Button>
           )}
         </div>}
+      </Modal>
+      <Modal open={!!historyCustomer} onClose={() => setHistoryCustomer(null)} title={`${historyCustomer?.name ?? "Customer"} history`}>
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3 rounded-xl bg-violet-500/10 p-4"><div><p className="text-[10px] text-slate-400">Visits / Orders</p><p className="text-lg font-bold">{historyCustomer?.activityCount ?? 0}</p></div><div><p className="text-[10px] text-slate-400">Total spending</p><p className="text-lg font-bold">{formatCurrency(historyCustomer?.totalValue ?? 0)}</p></div></div>
+          {selectedActivities.length === 0 ? <p className="py-6 text-center text-xs text-slate-400">No transaction history yet.</p> : selectedActivities.sort((a, b) => b.date.localeCompare(a.date)).map((activity, index) => <div key={`${activity.date}-${index}`} className="flex items-center justify-between rounded-xl border border-slate-700 p-3 light:border-slate-200"><div><p className="text-xs font-semibold">{activity.label}</p><p className="mt-1 text-[10px] capitalize text-slate-400">{formatDate(activity.date)} · {activity.status.replace("_", " ")}</p></div><p className="text-xs font-bold">{formatCurrency(activity.value)}</p></div>)}
+        </div>
       </Modal>
     </div>
   );

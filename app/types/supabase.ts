@@ -90,6 +90,7 @@ export interface ServiceRow {
   requires_deposit: boolean | null;
   deposit_amount: number | string | null;
   deposit_type: "fixed" | "percentage" | null;
+  department_id?: string | null;
 }
 
 export interface AppointmentServiceRow {
@@ -118,6 +119,8 @@ export interface AppointmentRow {
   total: number | string | null;
   created_at: string;
   appointment_services?: AppointmentServiceRow[] | null;
+  staff_id?: string | null;
+  staff?: { display_name: string | null } | { display_name: string | null }[] | null;
 }
 
 export interface CategoryRow {

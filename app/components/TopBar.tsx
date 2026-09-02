@@ -2,9 +2,10 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, Menu, Plus, Search, Sun } from "lucide-react";
+import { Menu, Plus, Search, Sun } from "lucide-react";
 import { useTheme } from "@/app/contexts/theme";
 import { useAuth } from "@/app/contexts/auth";
+import { NotificationCenter } from "@/app/components/NotificationCenter";
 
 interface TopBarProps {
   title: string;
@@ -18,7 +19,6 @@ export function TopBar({ title, action }: TopBarProps) {
   const { user, tenant } = useAuth();
   const [search, setSearch] = useState("");
   const [searchMessage, setSearchMessage] = useState("");
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
 
   const handleSearch = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -38,6 +38,7 @@ export function TopBar({ title, action }: TopBarProps) {
       { terms: ["customer", "customers"], href: "/dashboard/customers" },
       { terms: ["analytics", "reports", "report"], href: "/dashboard/analytics" },
       { terms: ["settings", "business", "storefront", "hours"], href: "/dashboard/settings" },
+      { terms: ["tools", "providers", "team", "departments", "promotions", "discounts", "reminders", "qr"], href: "/dashboard/tools" },
     ];
     const destination = destinations.find((candidate) =>
       candidate.terms.some((term) => term.includes(query) || query.includes(term)),
@@ -87,24 +88,7 @@ export function TopBar({ title, action }: TopBarProps) {
           )}
         </div>
 
-        <div className="relative">
-          <button
-            onClick={() => setNotificationsOpen((current) => !current)}
-            aria-label="Notifications"
-            title="Notifications"
-            className="relative flex h-11 w-11 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-800 light:hover:bg-slate-100 hover:text-white light:hover:text-slate-900 sm:h-9 sm:w-9"
-          >
-            <Bell className="h-4 w-4" />
-          </button>
-          {notificationsOpen && (
-            <div className="absolute right-0 top-10 w-64 rounded-xl border border-slate-700 light:border-[#e3e8f0] bg-slate-900 light:bg-white p-4 shadow-xl">
-              <p className="text-xs font-semibold text-white light:text-slate-900">Notifications</p>
-              <p className="mt-2 text-[11px] leading-5 text-slate-400 light:text-slate-500">
-                No new dashboard notifications.
-              </p>
-            </div>
-          )}
-        </div>
+        <NotificationCenter tenantId={tenant?.id} />
 
         <button
           onClick={toggleTheme}

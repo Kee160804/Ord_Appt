@@ -25,7 +25,11 @@ export const PLAN_DEFINITIONS: Record<PlanType, PlanDefinition> = {
     price: 9,
     monthlyActivityLimit: 50,
     description: "The essentials for getting your business online.",
-    shortFeatures: ["Branded storefront", "Up to 50 monthly orders or bookings"],
+    shortFeatures: [
+      "Branded storefront",
+      "Up to 50 monthly orders or bookings",
+      "Owner-only access (no staff seats)",
+    ],
   },
   pro: {
     id: "pro",
@@ -34,7 +38,11 @@ export const PLAN_DEFINITIONS: Record<PlanType, PlanDefinition> = {
     price: 12,
     monthlyActivityLimit: 150,
     description: "Growth tools, analytics, inventory, and booking controls.",
-    shortFeatures: ["Up to 150 monthly activities", "Analytics and advanced controls"],
+    shortFeatures: [
+      "Up to 150 monthly activities",
+      "Analytics and advanced controls",
+      "1 staff included; add up to 3 at $2 BZD each",
+    ],
   },
   enterprise: {
     id: "enterprise",
@@ -43,7 +51,11 @@ export const PLAN_DEFINITIONS: Record<PlanType, PlanDefinition> = {
     price: 16,
     monthlyActivityLimit: null,
     description: "Unlimited activity and priority platform support.",
-    shortFeatures: ["Unlimited orders or appointments", "Priority onboarding and support"],
+    shortFeatures: [
+      "Unlimited orders or appointments",
+      "Priority onboarding and support",
+      "2 staff included; add up to 8 at $2 BZD each",
+    ],
   },
 };
 

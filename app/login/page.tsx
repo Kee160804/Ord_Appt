@@ -1,14 +1,12 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { Sparkles, Eye, EyeOff, AlertCircle, Sun, Moon } from "lucide-react";
 import { useAuth } from "@/app/contexts/auth";
 import { useTheme } from "@/app/contexts/theme";
 
 export default function LoginPage() {
-  const router = useRouter();
-  const { login } = useAuth();
+  const { login, isLoading: isAuthLoading } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -34,6 +32,7 @@ export default function LoginPage() {
   }, []);
 
   const handleLogin = async () => {
+    if (loading || isAuthLoading) return;
     if (!email) { setError("Please enter your email."); return; }
     setError("");
     setLoading(true);
@@ -47,14 +46,29 @@ export default function LoginPage() {
 
     const params = new URLSearchParams(window.location.search);
     const nextPath = params.get("next");
-    const safeNextPath = nextPath && nextPath.startsWith("/") ? nextPath : null;
+    const safeNextPath = nextPath
+      && nextPath.startsWith("/")
+      && !nextPath.startsWith("//")
+      && !nextPath.includes("\\")
+      ? nextPath
+      : null;
 
     if (result.user?.role === "superadmin") {
-      router.replace(safeNextPath?.startsWith("/admin") ? safeNextPath : "/admin");
+      const adminDestination = safeNextPath === "/admin" || safeNextPath?.startsWith("/admin/")
+        ? safeNextPath
+        : "/admin";
+      window.location.replace(adminDestination);
       return;
     }
 
-    router.replace(safeNextPath ?? "/dashboard");
+    // A full navigation guarantees that the Supabase auth cookies written by
+    // signInWithPassword reach the server proxy before it evaluates the
+    // protected dashboard route. This avoids a mobile/PWA redirect loop that
+    // otherwise appears to resolve only after a manual refresh or tab switch.
+    const dashboardDestination = safeNextPath === "/dashboard" || safeNextPath?.startsWith("/dashboard/")
+      ? safeNextPath
+      : "/dashboard";
+    window.location.replace(dashboardDestination);
   };
 
   return (
@@ -177,7 +191,8 @@ export default function LoginPage() {
               <div className="space-y-1.5">
                 <label className="text-sm font-semibold text-slate-300 light:text-gray-800">Email Address</label>
                 <input type="email" value={email} onChange={e => setEmail(e.target.value)}
-                  onKeyDown={e => e.key === "Enter" && handleLogin()}
+                  disabled={isAuthLoading || loading}
+                  onKeyDown={e => e.key === "Enter" && !isAuthLoading && !loading && handleLogin()}
                   placeholder="you@business.com"
                   className="w-full px-4 py-2.5 text-sm border border-slate-600 light:border-gray-400 rounded-xl bg-slate-800/50 light:bg-gray-50 text-white light:text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500 transition placeholder:text-slate-600 light:placeholder:text-gray-500" />
               </div>
@@ -186,7 +201,8 @@ export default function LoginPage() {
                 <label className="text-sm font-semibold text-slate-300 light:text-gray-800">Password</label>
                 <div className="relative">
                   <input type={showPw ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)}
-                    onKeyDown={e => e.key === "Enter" && handleLogin()}
+                    disabled={isAuthLoading || loading}
+                    onKeyDown={e => e.key === "Enter" && !isAuthLoading && !loading && handleLogin()}
                     placeholder="••••••••"
                     className="w-full px-4 py-2.5 pr-10 text-sm border border-slate-600 light:border-gray-400 rounded-xl bg-slate-800/50 light:bg-gray-50 text-white light:text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500 transition placeholder:text-slate-600 light:placeholder:text-gray-500" />
                   <button type="button" onClick={() => setShowPw(!showPw)}
@@ -208,9 +224,9 @@ export default function LoginPage() {
                 <Link href="/forgot-password" className="text-violet-400 light:text-violet-600 hover:text-violet-300 light:hover:text-violet-700 font-semibold transition-colors">Forgot password?</Link>
               </div>
 
-              <button onClick={handleLogin} disabled={loading}
+              <button onClick={handleLogin} disabled={loading || isAuthLoading}
                 className="w-full py-3 bg-violet-600 hover:bg-violet-500 light:bg-violet-600 light:hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2 shadow-lg shadow-violet-900/30 light:shadow-violet-600/30">
-                {loading ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Signing in...</> : "Sign een"}
+                {loading || isAuthLoading ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> {loading ? "Signing in..." : "Preparing sign in..."}</> : "Sign een"}
               </button>
             </div>
 

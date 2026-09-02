@@ -16,6 +16,7 @@ import {
   Sparkles,
   Users,
   LockKeyhole,
+  BriefcaseBusiness,
 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { tenantHasFeature } from "../lib/plans";
@@ -34,26 +35,31 @@ export function Sidebar({ tenant, user }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const isAppointmentBusiness = tenant.businessType === "appointment";
+  const canManageBusiness = user.role === "owner" || user.role === "manager" || user.role === "admin";
+  const isOwner = user.role === "owner";
   const base = "/dashboard";
   const navItems = [
     { href: base, label: "Overview", icon: LayoutDashboard },
     ...(isAppointmentBusiness
       ? [
           { href: `${base}/appointments`, label: "Appointments", icon: Calendar },
-          { href: `${base}/services`, label: "Services", icon: Scissors },
+          ...(canManageBusiness ? [{ href: `${base}/services`, label: "Services", icon: Scissors }] : []),
         ]
       : [
           { href: `${base}/orders`, label: "Orders", icon: ShoppingBag },
-          { href: `${base}/products`, label: "Products", icon: Package },
+          ...(canManageBusiness ? [{ href: `${base}/products`, label: "Products", icon: Package }] : []),
         ]),
-    { href: `${base}/customers`, label: "Customers", icon: Users },
-    {
+    ...(canManageBusiness ? [{ href: `${base}/customers`, label: "Customers", icon: Users }] : []),
+    ...(canManageBusiness ? [{
       href: `${base}/analytics`,
       label: "Analytics",
       icon: BarChart3,
       locked: !tenantHasFeature(tenant, "detailed_analytics"),
-    },
-    { href: `${base}/settings`, label: "Settings", icon: Settings },
+    }] : []),
+    ...(isOwner ? [
+      { href: `${base}/tools`, label: "Business Tools", icon: BriefcaseBusiness },
+      { href: `${base}/settings`, label: "Settings", icon: Settings },
+    ] : []),
   ];
 
   useEffect(() => {

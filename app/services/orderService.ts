@@ -14,6 +14,7 @@ export interface PublicOrderInput {
   customerPhone: string;
   orderType: "dine_in" | "pickup" | "delivery";
   items: PublicOrderItemInput[];
+  promotionCode?: string;
 }
 
 export interface PublicOrderResult {
@@ -131,7 +132,8 @@ export async function listOrders(tenantId: string): Promise<Order[]> {
 }
 
 export async function createPublicOrder(input: PublicOrderInput): Promise<PublicOrderResult> {
-  const { data, error } = await client().rpc("create_public_order", {
+  const usePromotion = Boolean(input.promotionCode?.trim());
+  const { data, error } = await client().rpc(usePromotion ? "create_public_order_with_promotion" : "create_public_order", {
     p_tenant_id: input.tenantId,
     p_customer_name: input.customerName.trim(),
     p_customer_phone: input.customerPhone.trim(),
@@ -142,6 +144,7 @@ export async function createPublicOrder(input: PublicOrderInput): Promise<Public
       quantity: item.quantity,
       addons: item.addons.map(({ id }) => ({ id })),
     })),
+    ...(usePromotion ? { p_promotion_code: input.promotionCode?.trim() || null } : {}),
   });
 
   if (error) throw orderCreationError(error);

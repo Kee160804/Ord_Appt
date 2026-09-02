@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { AlertCircle, ArrowLeft, CheckCircle2, CreditCard, Eye } from "lucide-react";
+import { AlertCircle, ArrowLeft, CheckCircle2, CreditCard, Eye, Users } from "lucide-react";
 import { Card, CardBody, CardHeader } from "@/app/components/Card";
 import { formatCurrency } from "@/app/lib/utils";
 import {
@@ -11,6 +11,12 @@ import {
   updateAdminTenantSubscription,
   type AdminTenantData,
 } from "@/app/services/adminService";
+import {
+  getAdminSeatSummary,
+  rejectAdminPaidStaffSeatRequest,
+  setAdminPaidStaffSeats,
+  type AdminSeatSummary,
+} from "@/app/services/teamService";
 import type { Tenant } from "@/app/types";
 
 export default function TenantDetailPage() {
@@ -23,6 +29,12 @@ export default function TenantDetailPage() {
   const [selectedPlan, setSelectedPlan] = useState<Tenant["plan"]>("starter");
   const [isUpdatingSubscription, setIsUpdatingSubscription] = useState(false);
   const [subscriptionMessage, setSubscriptionMessage] = useState("");
+  const [seatSummary, setSeatSummary] = useState<AdminSeatSummary | null>(null);
+  const [paidStaffSeats, setPaidStaffSeats] = useState(0);
+  const [seatReviewNote, setSeatReviewNote] = useState("");
+  const [isUpdatingSeats, setIsUpdatingSeats] = useState(false);
+  const [seatError, setSeatError] = useState("");
+  const [seatMessage, setSeatMessage] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -33,6 +45,22 @@ export default function TenantDetailPage() {
         setData(result);
         if (result) setSelectedPlan(result.tenant.plan);
         setError(result ? "" : "This tenant was not found or is not accessible.");
+        if (result) {
+          try {
+            const summary = await getAdminSeatSummary(tenantId);
+            if (!active) return;
+            setSeatSummary(summary);
+            setPaidStaffSeats(summary.paidStaffSeats);
+            setSeatError("");
+          } catch (seatLoadError) {
+            if (!active) return;
+            setSeatError(
+              seatLoadError instanceof Error
+                ? seatLoadError.message
+                : "Unable to load staff-seat access.",
+            );
+          }
+        }
       } catch (loadError) {
         if (!active) return;
         setError(
@@ -71,6 +99,18 @@ export default function TenantDetailPage() {
       setData((current) => current
         ? { ...current, tenant: { ...current.tenant, ...updated } }
         : current);
+      try {
+        const summary = await getAdminSeatSummary(tenantId);
+        setSeatSummary(summary);
+        setPaidStaffSeats(summary.paidStaffSeats);
+        setSeatError("");
+      } catch (seatLoadError) {
+        setSeatError(
+          seatLoadError instanceof Error
+            ? seatLoadError.message
+            : "Unable to refresh staff-seat access.",
+        );
+      }
       setSubscriptionMessage(
         status === "active"
           ? "Paid access activated successfully."
@@ -82,6 +122,63 @@ export default function TenantDetailPage() {
       setError(updateError instanceof Error ? updateError.message : "Unable to update subscription access.");
     } finally {
       setIsUpdatingSubscription(false);
+    }
+  };
+
+  const refreshSeatSummary = async () => {
+    const summary = await getAdminSeatSummary(tenantId);
+    setSeatSummary(summary);
+    setPaidStaffSeats(summary.paidStaffSeats);
+    return summary;
+  };
+
+  const savePaidStaffSeats = async (requestId?: string, requestedSeats?: number) => {
+    const nextSeats = requestedSeats ?? paidStaffSeats;
+    setIsUpdatingSeats(true);
+    setSeatError("");
+    setSeatMessage("");
+    try {
+      await setAdminPaidStaffSeats(tenantId, nextSeats, requestId, seatReviewNote);
+      await refreshSeatSummary();
+      setSeatReviewNote("");
+      setSeatMessage(
+        nextSeats > (seatSummary?.paidStaffSeats ?? 0)
+          ? "Paid staff seats approved after payment confirmation."
+          : "Paid staff-seat access updated.",
+      );
+    } catch (seatUpdateError) {
+      setSeatError(
+        seatUpdateError instanceof Error
+          ? seatUpdateError.message
+          : "Unable to update staff-seat access.",
+      );
+    } finally {
+      setIsUpdatingSeats(false);
+    }
+  };
+
+  const rejectSeatRequest = async () => {
+    if (!seatSummary?.pendingRequest) return;
+    setIsUpdatingSeats(true);
+    setSeatError("");
+    setSeatMessage("");
+    try {
+      await rejectAdminPaidStaffSeatRequest(
+        tenantId,
+        seatSummary.pendingRequest.id,
+        seatReviewNote,
+      );
+      await refreshSeatSummary();
+      setSeatReviewNote("");
+      setSeatMessage("The paid staff-seat request was rejected.");
+    } catch (seatUpdateError) {
+      setSeatError(
+        seatUpdateError instanceof Error
+          ? seatUpdateError.message
+          : "Unable to reject this staff-seat request.",
+      );
+    } finally {
+      setIsUpdatingSeats(false);
     }
   };
 
@@ -202,6 +299,115 @@ export default function TenantDetailPage() {
       <Card className="border-slate-700 bg-slate-800/50 light:border-slate-200 light:bg-white">
         <CardHeader>
           <div className="flex items-center gap-2">
+            <Users className="h-4 w-4 text-violet-400" />
+            <h3 className="font-semibold text-white light:text-gray-900">Paid Staff Seats</h3>
+          </div>
+        </CardHeader>
+        <CardBody>
+          {seatError && (
+            <div className="mb-4 flex items-start gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-300 light:text-rose-700">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>{seatError}</span>
+            </div>
+          )}
+
+          {seatSummary ? (
+            <>
+              <p className="max-w-3xl text-sm leading-6 text-slate-400 light:text-slate-600">
+                Staff access belongs to this business, not the owner&apos;s account. Confirm payment before increasing paid seats. Pending requests never grant access or create a charge.
+              </p>
+              <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <SeatStat label="Active staff" value={seatSummary.activeStaff} />
+                <SeatStat label="Included" value={seatSummary.includedStaff} />
+                <SeatStat label="Paid seats" value={seatSummary.paidStaffSeats} />
+                <SeatStat label="Maximum staff" value={seatSummary.maxStaff} />
+              </div>
+
+              {seatSummary.pendingRequest && (
+                <div className="mt-5 rounded-xl border border-amber-400/30 bg-amber-400/10 p-4">
+                  <p className="font-semibold text-amber-200 light:text-amber-800">
+                    Payment approval requested for {seatSummary.pendingRequest.requestedPaidSeats} paid staff {seatSummary.pendingRequest.requestedPaidSeats === 1 ? "seat" : "seats"}
+                  </p>
+                  <p className="mt-1 text-xs text-amber-200/70 light:text-amber-700">
+                    Requested {new Date(seatSummary.pendingRequest.createdAt).toLocaleString()} · BZD ${seatSummary.pendingRequest.requestedPaidSeats * seatSummary.additionalSeatPrice}/month
+                  </p>
+                </div>
+              )}
+
+              <div className="mt-5 grid gap-3 lg:grid-cols-[minmax(180px,240px)_minmax(260px,1fr)]">
+                <label>
+                  <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-400">Approved paid seats</span>
+                  <select
+                    value={paidStaffSeats}
+                    onChange={(event) => setPaidStaffSeats(Number(event.target.value))}
+                    className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2.5 text-sm text-white outline-none focus:border-violet-500 light:border-slate-300 light:bg-white light:text-slate-900"
+                  >
+                    {Array.from(
+                      { length: Math.max(0, seatSummary.maxStaff - seatSummary.includedStaff) + 1 },
+                      (_, index) => index,
+                    ).map((count) => (
+                      <option key={count} value={count}>
+                        {count} {count === 1 ? "seat" : "seats"} · BZD ${count * seatSummary.additionalSeatPrice}/month
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-400">Payment reference / review note</span>
+                  <input
+                    value={seatReviewNote}
+                    onChange={(event) => setSeatReviewNote(event.target.value)}
+                    placeholder="Required when approving more paid seats"
+                    className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2.5 text-sm text-white outline-none placeholder:text-slate-600 focus:border-violet-500 light:border-slate-300 light:bg-white light:text-slate-900"
+                  />
+                </label>
+              </div>
+
+              <div className="mt-4 flex flex-wrap gap-3">
+                <button
+                  disabled={isUpdatingSeats}
+                  onClick={() => void savePaidStaffSeats()}
+                  className="rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-violet-500 disabled:opacity-50"
+                >
+                  Save approved seats
+                </button>
+                {seatSummary.pendingRequest && (
+                  <>
+                    <button
+                      disabled={isUpdatingSeats}
+                      onClick={() => void savePaidStaffSeats(
+                        seatSummary.pendingRequest?.id,
+                        seatSummary.pendingRequest?.requestedPaidSeats,
+                      )}
+                      className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-500 disabled:opacity-50"
+                    >
+                      Confirm payment &amp; approve
+                    </button>
+                    <button
+                      disabled={isUpdatingSeats}
+                      onClick={() => void rejectSeatRequest()}
+                      className="rounded-xl border border-rose-500/40 px-4 py-2.5 text-sm font-bold text-rose-300 hover:bg-rose-500/10 disabled:opacity-50 light:text-rose-700"
+                    >
+                      Reject request
+                    </button>
+                  </>
+                )}
+              </div>
+              {seatMessage && (
+                <p className="mt-4 flex items-center gap-2 text-sm text-emerald-400 light:text-emerald-700">
+                  <CheckCircle2 className="h-4 w-4" /> {seatMessage}
+                </p>
+              )}
+            </>
+          ) : !seatError ? (
+            <p className="text-sm text-slate-400">Loading staff-seat access...</p>
+          ) : null}
+        </CardBody>
+      </Card>
+
+      <Card className="border-slate-700 bg-slate-800/50 light:border-slate-200 light:bg-white">
+        <CardHeader>
+          <div className="flex items-center gap-2">
             <CreditCard className="h-4 w-4 text-violet-400" />
             <h3 className="font-semibold text-white light:text-gray-900">Subscription Access</h3>
           </div>
@@ -278,6 +484,15 @@ function StatCard({ label, value }: { label: string; value: string }) {
     <div className="rounded-2xl border border-slate-700 bg-slate-800/50 p-6 shadow-sm light:border-slate-100 light:bg-white">
       <p className="text-sm font-medium text-slate-400 light:text-slate-500">{label}</p>
       <p className="mt-1.5 text-2xl font-bold text-white light:text-slate-900">{value}</p>
+    </div>
+  );
+}
+
+function SeatStat({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-xl border border-slate-700 bg-slate-900/60 p-4 light:border-slate-200 light:bg-slate-50">
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+      <p className="mt-1 text-xl font-bold text-white light:text-slate-900">{value}</p>
     </div>
   );
 }

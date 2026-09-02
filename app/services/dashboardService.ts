@@ -49,6 +49,18 @@ function customerKey(email: string, phone: string, name: string) {
   return email.trim().toLowerCase() || phone.replace(/\D/g, "") || name.trim().toLowerCase();
 }
 
+function mostCommon(values: string[], fallback = "Not enough data") {
+  if (!values.length) return fallback;
+  const counts = new Map<string, number>();
+  for (const value of values) counts.set(value, (counts.get(value) ?? 0) + 1);
+  return [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? fallback;
+}
+
+function percentageChange(current: number, previous: number) {
+  if (!previous) return current ? 100 : 0;
+  return Math.round(((current - previous) / previous) * 1000) / 10;
+}
+
 function mergePersistedCustomers(
   records: CustomerRecord[],
   activity: CustomerSummary[],
@@ -88,7 +100,7 @@ function buildAppointmentCustomers(appointments: Appointment[]) {
     );
     const current = customers.get(key);
     const activityDate = appointment.date || dateKey(appointment.createdAt);
-    const value = appointment.status === "cancelled" ? 0 : appointment.servicePrice;
+    const value = appointment.status === "completed" ? appointment.servicePrice : 0;
     customers.set(key, {
       id: appointment.customerId,
       key,
@@ -110,7 +122,7 @@ function buildOrderCustomers(orders: Order[]) {
     const key = order.customerId ?? customerKey(order.customerEmail, order.customerPhone, order.customerName);
     const current = customers.get(key);
     const activityDate = dateKey(order.createdAt);
-    const value = order.status === "cancelled" ? 0 : order.totalAmount;
+    const value = order.status === "delivered" ? order.totalAmount : 0;
     customers.set(key, {
       id: order.customerId,
       key,
@@ -152,17 +164,24 @@ function aggregateAppointments(appointments: Appointment[], customers: CustomerS
   }
 
   const completedValue = completed.reduce((sum, appointment) => sum + appointment.servicePrice, 0);
+  const midpoint = new Date(); midpoint.setDate(midpoint.getDate() - 5);
+  const currentValue = completed.filter((item) => new Date(item.date) >= midpoint).reduce((sum, item) => sum + item.servicePrice, 0);
+  const previousValue = completedValue - currentValue;
   return {
     totalRevenue: completedValue,
     totalActivity: appointments.length,
     newCustomers: customers.length,
-    avgOrderValue: active.length
-      ? active.reduce((sum, appointment) => sum + appointment.servicePrice, 0) / active.length
+    avgOrderValue: completed.length
+      ? completedValue / completed.length
       : 0,
-    revenueChange: 0,
-    activityChange: 0,
+    revenueChange: percentageChange(currentValue, previousValue),
+    activityChange: percentageChange(active.filter((item) => new Date(item.date) >= midpoint).length, active.filter((item) => new Date(item.date) < midpoint).length),
     topItems: [...items.values()].sort((a, b) => b.count - a.count).slice(0, 5),
     revenueData: [...revenueByDate.values()],
+    returningCustomers: customers.filter((customer) => customer.activityCount > 1).length,
+    busiestDay: mostCommon(active.map((item) => new Date(`${item.date}T12:00:00`).toLocaleDateString(undefined, { weekday: "long" }))),
+    busiestTime: mostCommon(active.map((item) => { const hour = Number(item.time.slice(0, 2)); return Number.isFinite(hour) ? `${String(hour).padStart(2, "0")}:00` : ""; }).filter(Boolean)),
+    completionRate: appointments.length ? Math.round((completed.length / appointments.length) * 100) : 0,
   } satisfies AnalyticsSummary;
 }
 
@@ -194,17 +213,24 @@ function aggregateOrders(orders: Order[], customers: CustomerSummary[]) {
   }
 
   const deliveredValue = delivered.reduce((sum, order) => sum + order.totalAmount, 0);
+  const midpoint = new Date(); midpoint.setDate(midpoint.getDate() - 5);
+  const currentValue = delivered.filter((item) => new Date(item.createdAt) >= midpoint).reduce((sum, item) => sum + item.totalAmount, 0);
+  const previousValue = deliveredValue - currentValue;
   return {
     totalRevenue: deliveredValue,
     totalActivity: orders.length,
     newCustomers: customers.length,
-    avgOrderValue: active.length
-      ? active.reduce((sum, order) => sum + order.totalAmount, 0) / active.length
+    avgOrderValue: delivered.length
+      ? deliveredValue / delivered.length
       : 0,
-    revenueChange: 0,
-    activityChange: 0,
+    revenueChange: percentageChange(currentValue, previousValue),
+    activityChange: percentageChange(active.filter((item) => new Date(item.createdAt) >= midpoint).length, active.filter((item) => new Date(item.createdAt) < midpoint).length),
     topItems: [...items.values()].sort((a, b) => b.count - a.count).slice(0, 5),
     revenueData: [...revenueByDate.values()],
+    returningCustomers: customers.filter((customer) => customer.activityCount > 1).length,
+    busiestDay: mostCommon(active.map((item) => new Date(item.createdAt).toLocaleDateString(undefined, { weekday: "long" }))),
+    busiestTime: mostCommon(active.map((item) => `${String(new Date(item.createdAt).getHours()).padStart(2, "0")}:00`)),
+    completionRate: orders.length ? Math.round((delivered.length / orders.length) * 100) : 0,
   } satisfies AnalyticsSummary;
 }
 

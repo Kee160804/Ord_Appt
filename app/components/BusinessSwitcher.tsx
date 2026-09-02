@@ -34,7 +34,7 @@ function slugify(value: string) {
 }
 
 export function BusinessSwitcher({ tenant, collapsed = false, onBusinessSelected }: BusinessSwitcherProps) {
-  const { businesses, switchBusiness, addBusiness, isSwitchingBusiness } = useAuth();
+  const { user, businesses, switchBusiness, addBusiness, isSwitchingBusiness } = useAuth();
   const [open, setOpen] = useState(false);
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState("");
@@ -242,13 +242,15 @@ export function BusinessSwitcher({ tenant, collapsed = false, onBusinessSelected
 
             {error && <p role="alert" className="mt-3 rounded-xl bg-rose-500/10 px-3 py-2 text-xs text-rose-300 light:text-rose-700">{error}</p>}
 
-            <button
-              type="button"
-              onClick={() => { setAdding(true); setError(""); }}
-              className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-violet-500/60 text-xs font-bold text-violet-300 transition hover:bg-violet-500/10 light:text-violet-700"
-            >
-              <Plus className="h-4 w-4" /> Add another business
-            </button>
+            {user?.role === "owner" && (
+              <button
+                type="button"
+                onClick={() => { setAdding(true); setError(""); }}
+                className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-violet-500/60 text-xs font-bold text-violet-300 transition hover:bg-violet-500/10 light:text-violet-700"
+              >
+                <Plus className="h-4 w-4" /> Add another business
+              </button>
+            )}
           </div>
         )}
       </Modal>

@@ -534,6 +534,7 @@ import {
   ChevronRight,
   ImageIcon,
   Upload,
+  Users,
   X,
 } from "lucide-react";
 import { Card, CardHeader, CardBody } from "../components/Card";
@@ -542,6 +543,7 @@ import { Input, Textarea } from "../components/input";
 import { cn } from "../lib/utils";
 import { tenantHasFeature } from "../lib/plans";
 import { PlanFeatureRequired } from "./PlanFeatureRequired";
+import { TeamAccessView } from "./TeamAccessView";
 import {
   updateBusinessDetails,
   updateBusinessHours,
@@ -550,7 +552,7 @@ import {
   uploadStorefrontCoverImage,
   validateStorefrontCoverImage,
 } from "../services/settingsService";
-import type { Tenant } from "../types/index";
+import type { Tenant, User } from "../types/index";
 
 type Tab =
   | "business"
@@ -563,14 +565,16 @@ type Tab =
 const TABS: { id: Tab; label: string; icon: typeof Building2 }[] = [
   { id: "business", label: "Business Info", icon: Building2 },
   { id: "hours", label: "Business Hours", icon: Clock },
+  { id: "team", label: "Team & Access", icon: Users },
   { id: "storefront", label: "Storefront", icon: Globe },
 ];
 
 interface Props {
   tenant: Tenant;
+  user: User;
   onTenantUpdated: (tenant: Tenant) => void;
 }
-export function SettingsView({ tenant, onTenantUpdated }: Props) {
+export function SettingsView({ tenant, user, onTenantUpdated }: Props) {
   const [active, setActive] = useState<Tab>("business");
   const [hours, setHours] = useState(tenant.businessHours);
   return (
@@ -624,6 +628,11 @@ export function SettingsView({ tenant, onTenantUpdated }: Props) {
               setHours={setHours}
               onTenantUpdated={onTenantUpdated}
             />
+          )}
+          {active === "team" && (
+            user.role === "owner"
+              ? <TeamAccessView tenant={tenant} />
+              : <Card><CardBody><p className="text-sm text-slate-400 light:text-slate-600">Only the business owner can manage team access.</p></CardBody></Card>
           )}
           {active === "storefront" && (
             tenantHasFeature(tenant, "storefront_branding")

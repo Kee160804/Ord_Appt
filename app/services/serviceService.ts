@@ -35,6 +35,7 @@ function mapService(row: ServiceRow): Service {
     depositAmount: row.deposit_amount == null ? undefined : Number(row.deposit_amount),
     depositType: row.deposit_type ?? undefined,
     createdAt: row.created_at,
+    departmentId: row.department_id ?? undefined,
   };
 }
 

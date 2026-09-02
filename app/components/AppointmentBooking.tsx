@@ -18,7 +18,7 @@ import { isSupabaseConfigured } from "@/app/lib/supabase/config";
 import { Button } from "@/app/components/Button";
 import { Input } from "@/app/components/input";
 import { Modal } from "@/app/components/Modal";
-import type { Service, Tenant } from "@/app/types/index";
+import type { PublicServiceProvider, Service, Tenant } from "@/app/types/index";
 
 // Extend Service type locally to include optional fields used in this component
 interface ExtendedService extends Service {
@@ -30,6 +30,7 @@ interface ExtendedService extends Service {
 interface AppointmentBookingProps {
   tenant: Tenant;
   services: Service[];
+  providers?: PublicServiceProvider[];
   viewOnly?: boolean;
 }
 
@@ -74,6 +75,7 @@ const FAKE_REVIEWS: Record<string, { rating: number; text: string }[]> = {};
 export function AppointmentBooking({
   tenant,
   services,
+  providers = [],
   viewOnly = false,
 }: AppointmentBookingProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -81,6 +83,7 @@ export function AppointmentBooking({
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
   const [concerns, setConcerns] = useState("");
   const [bookingOpen, setBookingOpen] = useState(false);
   const [customer, setCustomer] = useState({ name: "", email: "", phone: "" });
@@ -90,9 +93,15 @@ export function AppointmentBooking({
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
   const [isLoadingAvailability, setIsLoadingAvailability] = useState(false);
   const [availabilityError, setAvailabilityError] = useState("");
+  const [selectedProviderId, setSelectedProviderId] = useState("");
+  const [promotionCode, setPromotionCode] = useState("");
 
   const calendarDays = useMemo(() => buildCalendarDays(currentMonth), [currentMonth]);
   const selectedService = services.find((service) => service.id === selectedServiceId) ?? null;
+  const eligibleProviders = useMemo(
+    () => providers.filter((provider) => selectedServiceId && provider.serviceIds.includes(selectedServiceId)),
+    [providers, selectedServiceId],
+  );
   useEffect(() => {
     if (viewOnly || !selectedDate || !selectedServiceId || !isSupabaseConfigured()) {
       setAvailableSlots([]);
@@ -104,7 +113,16 @@ export function AppointmentBooking({
     setIsLoadingAvailability(true);
     setAvailableSlots([]);
     setAvailabilityError("");
-    listPublicAppointmentAvailability(tenant.id, selectedServiceId, selectedDate)
+    if (eligibleProviders.length > 0 && !selectedProviderId) {
+      setIsLoadingAvailability(false);
+      return;
+    }
+    listPublicAppointmentAvailability(
+      tenant.id,
+      selectedServiceId,
+      selectedDate,
+      selectedProviderId || undefined,
+    )
       .then((slots) => {
         if (active) setAvailableSlots(slots);
       })
@@ -128,7 +146,7 @@ export function AppointmentBooking({
     return () => {
       active = false;
     };
-  }, [selectedDate, selectedServiceId, tenant.id, viewOnly]);
+  }, [eligibleProviders.length, selectedDate, selectedProviderId, selectedServiceId, tenant.id, viewOnly]);
 
   const timeSlots = useMemo(() => {
     if (!selectedDate) return [];
@@ -145,11 +163,14 @@ export function AppointmentBooking({
     () =>
       services.filter(
         (s) =>
-          s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (s.description ?? "").toLowerCase().includes(searchQuery.toLowerCase())
+          (!categoryFilter || s.category === categoryFilter) && (
+            s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            (s.description ?? "").toLowerCase().includes(searchQuery.toLowerCase())
+          )
       ),
-    [services, searchQuery]
+    [categoryFilter, services, searchQuery]
   );
+  const serviceCategories = useMemo(() => [...new Set(services.map((service) => service.category).filter(Boolean))], [services]);
 
   const extendedServices = filteredServices as ExtendedService[];
   const detailService = extendedServices.find((s) => s.id === selectedServiceId) ?? null;
@@ -190,6 +211,8 @@ export function AppointmentBooking({
         customerEmail: customer.email,
         customerPhone: customer.phone,
         notes: concerns,
+        providerId: selectedProviderId || undefined,
+        promotionCode: promotionCode.trim() || undefined,
       });
       setConfirmationId(appointmentId);
       setBookingOpen(false);
@@ -197,6 +220,8 @@ export function AppointmentBooking({
       setSelectedDate(null);
       setSelectedTime(null);
       setConcerns("");
+      setSelectedProviderId("");
+      setPromotionCode("");
     } catch (submitError) {
       setBookingError(
         submitError instanceof Error ? submitError.message : "Unable to create the appointment.",
@@ -206,7 +231,8 @@ export function AppointmentBooking({
     }
   };
 
-  const canBook = !!selectedServiceId && !!selectedDate && !!selectedTime;
+  const canBook = !!selectedServiceId && !!selectedDate && !!selectedTime &&
+    (eligibleProviders.length === 0 || !!selectedProviderId);
 
   return (
     <>
@@ -304,6 +330,21 @@ export function AppointmentBooking({
           </div>
         </div>
 
+        {eligibleProviders.length > 0 && (
+          <div>
+            <p className="mb-2 text-xs font-bold text-slate-700 dark:text-slate-300">Choose a provider</p>
+            <select
+              value={selectedProviderId}
+              onChange={(event) => { setSelectedProviderId(event.target.value); setSelectedTime(null); }}
+              aria-label="Choose service provider"
+              className="w-full rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-800 outline-none focus:ring-2 focus:ring-violet-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+            >
+              <option value="">Select a provider</option>
+              {eligibleProviders.map((provider) => <option key={provider.id} value={provider.id}>{provider.name}</option>)}
+            </select>
+          </div>
+        )}
+
         {/* Time slots */}
         <div>
           <p className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">
@@ -383,12 +424,10 @@ export function AppointmentBooking({
                 aria-label="Search services"
               />
             </div>
-            <button className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:border-violet-400 hover:text-violet-600 transition" aria-label="Filter services">
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
-              </svg>
-              Filter
-            </button>
+            <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)} aria-label="Filter services by department" className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 outline-none hover:border-violet-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+              <option value="">All departments</option>
+              {serviceCategories.map((category) => <option key={category} value={category}>{category}</option>)}
+            </select>
           </div>
         </div>
 
@@ -443,6 +482,7 @@ export function AppointmentBooking({
                     <button
                       onClick={() => {
                         setSelectedServiceId(service.id);
+                        setSelectedProviderId("");
                         setSelectedTime(null);
                       }}
                       className="flex-1 py-2 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold transition"
@@ -451,7 +491,7 @@ export function AppointmentBooking({
                       {viewOnly ? "Preview Service" : "Book Now"}
                     </button>
                     <button
-                      onClick={() => setSelectedServiceId(service.id)}
+                      onClick={() => { setSelectedServiceId(service.id); setSelectedProviderId(""); setSelectedTime(null); }}
                       className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:border-violet-400 hover:text-violet-600 transition"
                       aria-label={`View details of ${service.name}`}
                     >
@@ -665,6 +705,12 @@ export function AppointmentBooking({
             onChange={(event) =>
               setCustomer((current) => ({ ...current, phone: event.target.value }))
             }
+          />
+          <Input
+            label="Discount Code (optional)"
+            value={promotionCode}
+            onChange={(event) => setPromotionCode(event.target.value.toUpperCase().replace(/\s/g, ""))}
+            placeholder="WELCOME10"
           />
           {bookingError && (
             <p className="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-300">

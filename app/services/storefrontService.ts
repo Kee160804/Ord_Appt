@@ -1,7 +1,7 @@
 import "server-only";
 
 import { getSupabasePublicClient } from "@/app/lib/supabase/server";
-import type { Category, Product, Service, Tenant } from "@/app/types/index";
+import type { Category, Product, PublicServiceProvider, Service, Tenant } from "@/app/types/index";
 import type {
   BusinessHourRow,
   CategoryRow,
@@ -15,6 +15,7 @@ export interface PublicStorefrontData {
   categories: Category[];
   products: Product[];
   services: Service[];
+  providers: PublicServiceProvider[];
 }
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -80,7 +81,7 @@ export async function getPublicStorefront(slug: string): Promise<PublicStorefron
   if (!tenantData) return null;
 
   const tenantRow = tenantData as TenantRow;
-  const [hoursResult, categoriesResult, productsResult, servicesResult] = await Promise.all([
+  const [hoursResult, categoriesResult, productsResult, servicesResult, providersResult, assignmentsResult] = await Promise.all([
     supabase
       .from("business_hours")
       .select("day_of_week, open_time, close_time, is_closed")
@@ -103,6 +104,8 @@ export async function getPublicStorefront(slug: string): Promise<PublicStorefron
       .eq("tenant_id", tenantRow.id)
       .eq("available", true)
       .order("name"),
+    supabase.from("staff").select("id, tenant_id, display_name, bio, color").eq("tenant_id", tenantRow.id).eq("is_active", true).eq("accepts_appointments", true).order("display_name"),
+    supabase.from("staff_services").select("staff_id, service_id").eq("tenant_id", tenantRow.id),
   ]);
 
   const firstError =
@@ -114,6 +117,12 @@ export async function getPublicStorefront(slug: string): Promise<PublicStorefron
 
   const categoryRows = (categoriesResult.data ?? []) as CategoryRow[];
   const categoryNames = new Map(categoryRows.map((category) => [category.id, category.name]));
+
+  const assignments = new Map<string, string[]>();
+  for (const assignment of assignmentsResult.error ? [] : assignmentsResult.data ?? []) {
+    const row = assignment as { staff_id: string; service_id: string };
+    assignments.set(row.staff_id, [...(assignments.get(row.staff_id) ?? []), row.service_id]);
+  }
 
   return {
     tenant: mapTenant(tenantRow, (hoursResult.data ?? []) as BusinessHourRow[]),
@@ -154,6 +163,11 @@ export async function getPublicStorefront(slug: string): Promise<PublicStorefron
       depositAmount: row.deposit_amount == null ? undefined : Number(row.deposit_amount),
       depositType: row.deposit_type ?? undefined,
       createdAt: row.created_at,
+      departmentId: row.department_id ?? undefined,
     })),
+    providers: (providersResult.error ? [] : providersResult.data ?? []).map((raw) => {
+      const row = raw as { id: string; tenant_id: string; display_name: string | null; bio: string | null; color: string | null };
+      return { id: row.id, tenantId: row.tenant_id, name: row.display_name ?? "Service provider", bio: row.bio ?? "", color: row.color ?? "#8b5cf6", serviceIds: assignments.get(row.id) ?? [] };
+    }),
   };
 }

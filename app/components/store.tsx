@@ -21,7 +21,7 @@ import { OrderingMenu } from "../components/OrderingMenu";
 import { DemoDashboardPreview } from "../components/DemoDashboardPreview";
 import { StorefrontContact } from "../components/StorefrontContact";
 import { useTheme } from "@/app/contexts/theme";
-import type { Category, Tenant, Service, Product } from "@/app/types/index";
+import type { Category, Tenant, Service, Product, PublicServiceProvider } from "@/app/types/index";
 
 // Extend Tenant with optional fields used in this component
 interface ExtendedTenant extends Tenant {
@@ -42,6 +42,7 @@ interface StorefrontClientProps {
   initialCategories?: Category[];
   initialProducts?: Product[];
   initialServices?: Service[];
+  initialProviders?: PublicServiceProvider[];
   viewOnly?: boolean;
 }
 
@@ -50,6 +51,7 @@ export default function StorefrontClient({
   initialCategories,
   initialProducts,
   initialServices,
+  initialProviders = [],
   viewOnly = false,
 }: StorefrontClientProps) {
   // Cast to extended type to safely access optional fields
@@ -345,6 +347,7 @@ export default function StorefrontClient({
             <AppointmentBooking
               tenant={tenant}
               services={services}
+              providers={initialProviders}
               viewOnly={viewOnly}
             />
           ) : (

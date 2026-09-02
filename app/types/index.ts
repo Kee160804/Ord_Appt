@@ -108,6 +108,15 @@ export interface Service {
   depositAmount?: number;
   depositType?: "fixed" | "percentage";
   createdAt: string;
+  departmentId?: string;
+}
+export interface PublicServiceProvider {
+  id: string;
+  tenantId: string;
+  name: string;
+  bio: string;
+  color: string;
+  serviceIds: string[];
 }
 export interface Category {
   id: string;
@@ -155,6 +164,8 @@ export interface Appointment {
   notes?: string;
   depositPaid?: number;
   createdAt: string;
+  providerId?: string;
+  providerName?: string;
 }
 export interface OrderItem {
   id: string;
@@ -199,6 +210,10 @@ export interface AnalyticsSummary {
   activityChange: number;
   topItems: TopItem[];
   revenueData: RevenuePoint[];
+  returningCustomers?: number;
+  busiestDay?: string;
+  busiestTime?: string;
+  completionRate?: number;
 }
 export interface CartItem {
   product: Product;

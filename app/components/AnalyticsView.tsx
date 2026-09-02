@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Award, BarChart3, Calendar, DollarSign, ShoppingBag, TrendingUp, Users } from "lucide-react";
+import { Award, BarChart3, Calendar, Clock3, DollarSign, Repeat2, ShoppingBag, TrendingUp, Users } from "lucide-react";
 import { StatCard } from "../components/StatCard";
 import { Card, CardHeader, CardBody } from "../components/Card";
 import { mockAnalytics } from "../data/mock";
@@ -118,6 +118,12 @@ export function AnalyticsView({ tenant }: Props) {
           iconBg="bg-indigo-50"
         />
       </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {[{ label: "Returning Customers", value: String(analytics.returningCustomers ?? 0), icon: Repeat2 }, { label: "Busiest Day", value: analytics.busiestDay ?? "Not enough data", icon: Calendar }, { label: "Busiest Time", value: analytics.busiestTime ?? "Not enough data", icon: Clock3 }, { label: "Completion Rate", value: `${analytics.completionRate ?? 0}%`, icon: TrendingUp }].map(({ label, value, icon: Icon }) => <Card key={label} className="p-4"><div className="flex items-center gap-3"><span className="rounded-lg bg-violet-500/15 p-2 text-violet-400"><Icon className="h-4 w-4" /></span><div className="min-w-0"><p className="text-[10px] text-slate-400">{label}</p><p className="mt-1 truncate text-sm font-bold">{value}</p></div></div></Card>)}
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2"><Card className="p-4"><p className="text-[10px] text-slate-400">Revenue trend vs previous period</p><p className={`mt-1 text-lg font-bold ${(analytics.revenueChange ?? 0) >= 0 ? "text-emerald-400" : "text-red-400"}`}>{(analytics.revenueChange ?? 0) >= 0 ? "+" : ""}{analytics.revenueChange}%</p></Card><Card className="p-4"><p className="text-[10px] text-slate-400">{isAppt ? "Booking" : "Order"} trend vs previous period</p><p className={`mt-1 text-lg font-bold ${(analytics.activityChange ?? 0) >= 0 ? "text-emerald-400" : "text-red-400"}`}>{(analytics.activityChange ?? 0) >= 0 ? "+" : ""}{analytics.activityChange}%</p></Card></div>
 
       <div className="grid lg:grid-cols-5 gap-6">
         <Card className="lg:col-span-3">

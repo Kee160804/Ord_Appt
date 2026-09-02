@@ -9,6 +9,7 @@ import { Input, Select } from "@/app/components/input";
 import { formatCurrency } from "@/app/lib/utils";
 import { isSupabaseConfigured } from "@/app/lib/supabase/config";
 import { createPublicOrder } from "@/app/services/orderService";
+import { validatePromotion } from "@/app/services/businessToolsService";
 import { Product, Tenant } from "@/app/types/index";
 
 interface CartItem {
@@ -62,6 +63,9 @@ export function OrderingMenu({
   const [orderError, setOrderError] = useState("");
   const [orderConfirmation, setOrderConfirmation] = useState("");
   const [checkoutActionsVisible, setCheckoutActionsVisible] = useState(false);
+  const [promotionCode, setPromotionCode] = useState("");
+  const [appliedPromotion, setAppliedPromotion] = useState<{ code: string; name: string; discountAmount: number } | null>(null);
+  const [isApplyingPromotion, setIsApplyingPromotion] = useState(false);
   const orderSummaryRef = useRef<HTMLDivElement>(null);
   const checkoutActionsRef = useRef<HTMLDivElement>(null);
 
@@ -109,8 +113,27 @@ export function OrderingMenu({
   }, 0);
   const tax = subtotal * 0.1;
   const discount = subtotal > 100 ? subtotal * 0.05 : 0;
-  const grandTotal = subtotal + tax - discount;
+  const promotionDiscount = Math.min(appliedPromotion?.discountAmount ?? 0, subtotal + tax - discount);
+  const grandTotal = subtotal + tax - discount - promotionDiscount;
   const itemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+
+  useEffect(() => { setAppliedPromotion(null); }, [subtotal]);
+
+  const applyPromotion = async () => {
+    if (!promotionCode.trim() || cart.length === 0) return;
+    setIsApplyingPromotion(true); setOrderError("");
+    try {
+      const validated = await validatePromotion(tenant.id, promotionCode, subtotal, cart.map((item) => item.id));
+      const eligibleAmount = validated.applicableProductIds.length
+        ? cart.filter((item) => validated.applicableProductIds.includes(item.id)).reduce((sum, item) => sum + item.price * item.quantity + item.addons.reduce((addonSum, addon) => addonSum + addon.price * item.quantity, 0), 0)
+        : subtotal;
+      const discountAmount = Math.min(eligibleAmount, validated.discountType === "PERCENTAGE" ? eligibleAmount * validated.discountValue / 100 : validated.discountValue);
+      setAppliedPromotion({ code: validated.code, name: validated.name, discountAmount });
+    } catch (promotionError) {
+      setAppliedPromotion(null);
+      setOrderError(promotionError instanceof Error ? promotionError.message : "That discount code is not valid.");
+    } finally { setIsApplyingPromotion(false); }
+  };
 
   useEffect(() => {
     const actions = checkoutActionsRef.current;
@@ -219,6 +242,7 @@ export function OrderingMenu({
           quantity: item.quantity,
           addons: item.addons,
         })),
+        promotionCode: appliedPromotion?.code,
       });
       setOrderConfirmation(`Order ${result.orderNumber} was placed successfully.`);
       onOrderPlaced?.(cart.map((item) => ({ productId: item.id, quantity: item.quantity })));
@@ -226,6 +250,8 @@ export function OrderingMenu({
       setCustomerName("");
       setPhoneNumber("");
       setOrderType("dine_in");
+      setPromotionCode("");
+      setAppliedPromotion(null);
     } catch (placeError) {
       setOrderError(placeError instanceof Error ? placeError.message : "Unable to place order.");
     } finally {
@@ -429,6 +455,11 @@ export function OrderingMenu({
                 value={orderType}
                 onChange={(e) => setOrderType(e.target.value)}
               />
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold text-slate-700 dark:text-slate-300">Discount Code</label>
+                <div className="flex gap-2"><input value={promotionCode} onChange={(event) => { setPromotionCode(event.target.value.toUpperCase().replace(/\s/g, "")); setAppliedPromotion(null); }} placeholder="WELCOME10" className="min-w-0 flex-1 rounded-lg border border-slate-600 bg-slate-700/50 px-3 py-2.5 text-sm text-white outline-none focus:border-violet-500 light:border-[#dfe5ee] light:bg-white light:text-slate-900" /><Button type="button" size="sm" variant="outline" loading={isApplyingPromotion} onClick={() => void applyPromotion()}>Apply</Button></div>
+                {appliedPromotion && <p className="mt-1 text-[10px] text-emerald-500">{appliedPromotion.name} applied</p>}
+              </div>
             </div>
 
             {orderError && <p className="text-xs text-red-500">{orderError}</p>}
@@ -548,6 +579,7 @@ export function OrderingMenu({
                   valueClass="text-emerald-500"
                 />
               )}
+              {promotionDiscount > 0 && <TotalRow label={`Code ${appliedPromotion?.code}`} value={`-${formatCurrency(promotionDiscount)}`} valueClass="text-emerald-500" />}
               <div className="flex justify-between text-sm font-bold pt-2 border-t border-slate-100 dark:border-slate-800">
                 <span className="text-slate-900 dark:text-white">Grand Total</span>
                 <span className="text-slate-900 dark:text-white">{formatCurrency(grandTotal)}</span>

@@ -52,6 +52,74 @@ for JPG, PNG, and WebP images. Uploads and deletions are restricted to tenant
 members through the business ID folder, while the resulting cover image is
 publicly readable on that business's storefront.
 
+## Business Team & Access
+
+Apply `202609030001_business_team_access.sql` after the multi-business
+migration. It gives each business owner a separate Team & Access area with
+fixed Manager and Staff roles, email-bound invitations, single-use expiring
+tokens, database-enforced seat limits, and an audit trail.
+
+Staff allowances are enforced per tenant:
+
+- Beginner: owner only; no staff.
+- Pro: 1 included staff member, up to 4 staff total.
+- Enterprise: 2 included staff members, up to 10 staff total.
+- Extra authorized staff seats cost $2 BZD per month per business.
+
+Pending invitations reserve available capacity but are not billed. Paid-seat
+requests do not grant capacity until a SUPER_ADMIN confirms payment and
+approves the request from the tenant administration page. Deactivating a team
+member preserves the membership and audit history.
+
+Team invitations return through `/team/invite`. Add the deployed and local
+paths to **Authentication > URL Configuration > Redirect URLs** in Supabase:
+
+```text
+http://localhost:3000/team/invite**
+https://YOUR_DEPLOYED_DOMAIN/team/invite**
+```
+
+The current implementation produces a secure invitation link for the owner to
+copy and send. When a transactional email provider is connected, send that
+same generated link from a trusted server or Edge Function; never expose a
+service-role key in the browser.
+
+If Team & Access was installed on a project containing older tenant rows whose
+plan value is `beginner`, apply
+`202609030002_normalize_beginner_team_plan.sql`. It changes only that internal
+alias to `starter`; it does not change pricing, access status, subscriptions,
+memberships, or business data.
+
+## Business growth tools
+
+Apply `202609040001_business_growth_tools.sql` after both Business Team &
+Access migrations. It adds owner-managed service providers and schedules,
+service departments, tenant notifications, configurable appointment-reminder
+tracking, promotions/redemptions, provider-aware booking, and the CRM summary
+function. Existing solo booking and ordering RPCs remain in place for a safe
+rolling deployment.
+
+The migration keeps every record keyed by `tenant_id`, adds membership/owner
+RLS, limits anonymous provider reads to public display fields, and validates
+discounts and provider availability in security-definer functions. The app's
+Business Tools page also generates storefront QR codes locally in the browser;
+QR generation does not upload customer or storefront information elsewhere.
+
+Appointment reminders are placed in `appointment_reminders` only after an
+appointment is confirmed. Rows expose `PENDING`, `PROCESSING`, `SENT`,
+`FAILED`, and `CANCELLED` status so a configured email/SMS worker can claim and
+report deliveries without duplicate scheduling. Until that delivery worker is
+connected, the page accurately shows reminders as pending rather than claiming
+they were sent.
+
+This repository includes `functions/process-appointment-reminders` as the
+delivery worker. Deploy it with `--no-verify-jwt`, configure the existing
+Resend secrets plus a long random `REMINDER_CRON_SECRET`, and invoke it every
+five minutes with a Supabase scheduled function using the matching
+`x-reminder-secret` header. The worker claims due rows before sending, uses a
+per-reminder idempotency key, retries failures at most three times, and records
+the provider message ID or safe error.
+
 The live super-admin overview requires
 `202608260003_super_admin_access.sql`. It installs the database-level platform
 role check, prevents browser self-promotion, and adds cross-tenant policies for

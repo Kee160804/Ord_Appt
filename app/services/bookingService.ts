@@ -9,6 +9,8 @@ export interface PublicBookingInput {
   customerEmail: string;
   customerPhone: string;
   notes?: string;
+  providerId?: string;
+  promotionCode?: string;
 }
 
 function errorMessage(error: unknown) {
@@ -45,7 +47,8 @@ export async function createPublicAppointment(input: PublicBookingInput): Promis
   const supabase = getSupabaseBrowserClient();
   if (!supabase) throw new Error("Online booking is not configured.");
 
-  const { data, error } = await supabase.rpc("create_public_appointment", {
+  const useGrowthBooking = Boolean(input.providerId || input.promotionCode?.trim());
+  const { data, error } = await supabase.rpc(useGrowthBooking ? "create_public_appointment_with_provider" : "create_public_appointment", {
     p_tenant_id: input.tenantId,
     p_service_id: input.serviceId,
     p_appointment_date: input.date,
@@ -54,6 +57,7 @@ export async function createPublicAppointment(input: PublicBookingInput): Promis
     p_customer_email: input.customerEmail.trim().toLowerCase(),
     p_customer_phone: input.customerPhone.trim(),
     p_notes: input.notes?.trim() || null,
+    ...(useGrowthBooking ? { p_staff_id: input.providerId || null, p_promotion_code: input.promotionCode?.trim() || null } : {}),
   });
 
   if (error) throw new Error(errorMessage(error));
