@@ -12,7 +12,7 @@ export function getSupabaseAdminClient() {
 
   if (!url || !secret) {
     throw new Error(
-      "Server email processing requires NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SECRET_KEY (or SUPABASE_SERVICE_ROLE_KEY).",
+      "Server administration and email processing require NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SECRET_KEY (or SUPABASE_SERVICE_ROLE_KEY).",
     );
   }
 

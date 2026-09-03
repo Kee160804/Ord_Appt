@@ -532,31 +532,17 @@ export async function updateAdminTenantSubscription(
   status: Tenant["subscriptionStatus"],
   trialDays?: number,
 ) {
-  const { data, error } = await client().rpc("set_tenant_subscription", {
-    p_tenant_id: tenantId,
-    p_plan: plan,
-    p_subscription_status: status,
-    p_trial_days: trialDays ?? null,
+  const response = await fetch(`/api/admin/tenants/${encodeURIComponent(tenantId)}/subscription`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ plan, status, trialDays: trialDays ?? null }),
   });
-
-  if (error) {
-    if (error.code === "PGRST202") {
-      throw new Error(
-        "Subscription administration is not installed. Apply the tenant trial migration in Supabase.",
-      );
-    }
-    throw new Error(error.message);
+  const payload = await response.json() as {
+    subscription?: Pick<Tenant, "plan" | "subscriptionStatus" | "trialEndsAt">;
+    error?: string;
+  };
+  if (!response.ok || !payload.subscription) {
+    throw new Error(payload.error || "Unable to update subscription access.");
   }
-
-  const row = data as TenantRow;
-  return {
-    plan: row.plan === "pro" || row.plan === "enterprise" ? row.plan : "starter",
-    subscriptionStatus:
-      row.subscription_status === "active" ||
-      row.subscription_status === "cancelled" ||
-      row.subscription_status === "past_due"
-        ? row.subscription_status
-        : "trial",
-    trialEndsAt: row.trial_ends_at ?? undefined,
-  } satisfies Pick<Tenant, "plan" | "subscriptionStatus" | "trialEndsAt">;
+  return payload.subscription;
 }

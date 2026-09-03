@@ -152,6 +152,14 @@ Sender email: onboarding@resend.dev (testing only)
 
 Keep email confirmation enabled. When the domain is ready, replace the sender with a verified authentication subdomain and brand the Supabase Auth templates.
 
+`onboarding@resend.dev` is a test-only sender. It can send only to the email
+address that owns the Resend account; it cannot deliver password resets or
+confirmations to arbitrary customer addresses. For production, add and verify
+a domain in Resend, then use the same verified sender address in both
+`RESEND_FROM_EMAIL` and Supabase Auth SMTP. The `RESEND_API_KEY` in Vercel is
+used by the app's transactional worker; it does not configure Supabase Auth
+SMTP by itself.
+
 ## 8. Manual tests
 
 For no-domain testing, use the Resend account owner's email as the customer/business email.
@@ -227,6 +235,7 @@ order by queue,status;
 - `401`: the endpoint secret is missing, shorter than 16 characters, or does not match.
 - `RESEND_API_KEY is not configured`: add it to the invoked environment and redeploy/restart.
 - Resend validation error with `onboarding@resend.dev`: send only to the Resend account owner until a domain is verified.
+- Password recovery displays an empty `{}` error: Supabase Auth received a provider-side `5xx`, commonly because Auth SMTP uses `onboarding@resend.dev` for a recipient other than the Resend account owner. Verify a sending domain and update the Supabase Auth SMTP sender.
 - `Unable to claim email jobs`: apply the full migration and let PostgREST reload its schema.
 - Repeated `FAILED`: inspect `last_error`. Jobs stop after three attempts; after correcting the cause, reset only the intended row to `PENDING` and `attempt_count=0`.
 - A successful order/appointment with a failed email is intentional: business data remains committed while delivery is retried separately.

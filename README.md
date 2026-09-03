@@ -58,6 +58,13 @@ Redirect URL: https://ord-appt.vercel.app/auth/confirm**
 The redirect configuration is used by signup confirmation and password recovery.
 Password login itself requires the two public Supabase variables above.
 
+Password recovery and confirmation email are sent by Supabase Auth, not by the
+application's Resend SDK. Adding `RESEND_API_KEY` to Vercel does not connect
+Supabase Auth to Resend: configure Resend SMTP under **Supabase >
+Authentication > Email/SMTP**. The test sender `onboarding@resend.dev` can send
+only to the Resend account owner's address; verify a domain before sending Auth
+email to other users.
+
 When Supabase is not configured, development automatically uses the original
 mock/demo data. Production never enables the browser-password demo fallback
 unless `NEXT_PUBLIC_ENABLE_DEMO_MODE=true` is explicitly set.

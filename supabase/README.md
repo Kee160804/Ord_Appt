@@ -62,9 +62,13 @@ tokens, database-enforced seat limits, and an audit trail.
 Staff allowances are enforced per tenant:
 
 - Beginner: owner only; no staff.
-- Pro: 1 included staff member, up to 4 staff total.
-- Enterprise: 2 included staff members, up to 10 staff total.
+- Pro: owner plus 1 included staff member; up to 5 accounts total including the owner (4 staff).
+- Enterprise: owner plus 2 included staff members; up to 10 accounts total including the owner (9 staff).
 - Extra authorized staff seats cost $2 BZD per month per business.
+
+If the original Team & Access migration was already applied, also apply
+`202609030003_staff_seat_totals_include_owner.sql`. It corrects the Enterprise
+limit so the published 10-account maximum includes the owner.
 
 Pending invitations reserve available capacity but are not billed. Paid-seat
 requests do not grant capacity until a SUPER_ADMIN confirms payment and

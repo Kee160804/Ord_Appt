@@ -41,15 +41,19 @@ const tenantProvisioningByUser = new Map<string, Promise<string | null>>();
 const ACTIVE_BUSINESS_KEY_PREFIX = "yuhbusiness_active_business:";
 
 function errorMessage(error: unknown, fallback: string) {
-  const message = error instanceof Error && error.message
+  const rawMessage = error instanceof Error && error.message
     ? error.message
     : typeof error === "object" && error !== null && "message" in error && typeof error.message === "string"
       ? error.message
       : "";
+  const message = rawMessage.trim();
   if (message.includes("tenant_memberships_tenant_id_profile_id_key")) {
     return "Your account membership already exists but could not be loaded. Sign out, then sign in again. If this continues, ask the platform administrator to run the onboarding repair migration.";
   }
-  if (message) return message;
+  // AuthRetryableFetchError in some @supabase/auth-js releases serializes a
+  // failed 5xx Response as `{}`. Never expose that implementation detail as
+  // the user-facing error; the caller's contextual fallback is actionable.
+  if (message && message !== "{}" && message !== "[object Object]") return message;
   return fallback;
 }
 
@@ -424,7 +428,14 @@ export async function requestPasswordReset(email: string) {
   const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
     redirectTo,
   });
-  if (error) throw new Error(errorMessage(error, "Unable to send the password reset email."));
+  if (error) {
+    throw new Error(
+      errorMessage(
+        error,
+        "Email delivery is unavailable. Check the Supabase Auth SMTP sender and verified domain, then try again.",
+      ),
+    );
+  }
 }
 
 export async function resendSignupConfirmation(email: string) {
@@ -438,7 +449,14 @@ export async function resendSignupConfirmation(email: string) {
     email: email.trim().toLowerCase(),
     options: { emailRedirectTo },
   });
-  if (error) throw new Error(errorMessage(error, "Unable to resend the confirmation email."));
+  if (error) {
+    throw new Error(
+      errorMessage(
+        error,
+        "Email delivery is unavailable. Check the Supabase Auth SMTP sender and verified domain, then try again.",
+      ),
+    );
+  }
 }
 
 export async function updateAccountPassword(password: string) {

@@ -13,6 +13,9 @@ export interface PlanDefinition {
   name: "Beginner" | "Pro" | "Enterprise";
   price: number;
   monthlyActivityLimit: number | null;
+  includedStaffSeats: number;
+  maxStaffSeats: number;
+  additionalStaffSeatPrice: number;
   description: string;
   shortFeatures: readonly string[];
 }
@@ -24,11 +27,14 @@ export const PLAN_DEFINITIONS: Record<PlanType, PlanDefinition> = {
     name: "Beginner",
     price: 9,
     monthlyActivityLimit: 50,
+    includedStaffSeats: 0,
+    maxStaffSeats: 0,
+    additionalStaffSeatPrice: 2,
     description: "The essentials for getting your business online.",
     shortFeatures: [
       "Branded storefront",
       "Up to 50 monthly orders or bookings",
-      "Owner-only access (no staff seats)",
+      "1 account total: owner only",
     ],
   },
   pro: {
@@ -37,11 +43,15 @@ export const PLAN_DEFINITIONS: Record<PlanType, PlanDefinition> = {
     name: "Pro",
     price: 12,
     monthlyActivityLimit: 150,
+    includedStaffSeats: 1,
+    maxStaffSeats: 4,
+    additionalStaffSeatPrice: 2,
     description: "Growth tools, analytics, inventory, and booking controls.",
     shortFeatures: [
       "Up to 150 monthly activities",
       "Analytics and advanced controls",
-      "1 staff included; add up to 3 at $2 BZD each",
+      "Owner + 1 staff included; add up to 3 at $2 BZD each",
+      "Maximum 5 accounts total, including owner",
     ],
   },
   enterprise: {
@@ -50,11 +60,15 @@ export const PLAN_DEFINITIONS: Record<PlanType, PlanDefinition> = {
     name: "Enterprise",
     price: 16,
     monthlyActivityLimit: null,
+    includedStaffSeats: 2,
+    maxStaffSeats: 9,
+    additionalStaffSeatPrice: 2,
     description: "Unlimited activity and priority platform support.",
     shortFeatures: [
       "Unlimited orders or appointments",
       "Priority onboarding and support",
-      "2 staff included; add up to 8 at $2 BZD each",
+      "Owner + 2 staff included; add up to 7 at $2 BZD each",
+      "Maximum 10 accounts total, including owner",
     ],
   },
 };

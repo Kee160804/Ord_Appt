@@ -22,6 +22,25 @@ import { PLAN_DEFINITIONS } from "@/app/lib/plans";
 export default function HomePage() {
   const { theme, toggleTheme } = useTheme();
 
+  const teamAccess = (plan: keyof typeof PLAN_DEFINITIONS) => {
+    const definition = PLAN_DEFINITIONS[plan];
+    const totalIncludedAccounts = definition.includedStaffSeats + 1;
+    const totalAccountLimit = definition.maxStaffSeats + 1;
+    const paidSeatLimit = definition.maxStaffSeats - definition.includedStaffSeats;
+
+    if (paidSeatLimit === 0) {
+      return {
+        headline: `${totalIncludedAccounts} account total`,
+        detail: "Owner only · no additional staff seats",
+      };
+    }
+
+    return {
+      headline: `${totalIncludedAccounts} accounts included`,
+      detail: `Owner + ${definition.includedStaffSeats} staff · add up to ${paidSeatLimit} more at $${definition.additionalStaffSeatPrice} BZD each · ${totalAccountLimit} total max`,
+    };
+  };
+
   const features = [
     {
       icon: Calendar,
@@ -67,6 +86,7 @@ export default function HomePage() {
       color: "border-slate-700 light:border-gray-200",
       badge: null,
       cta: "Start with Beginner",
+      teamAccess: teamAccess("starter"),
       features: [
         "1 branded business storefront",
         "Online ordering or appointment booking",
@@ -86,6 +106,7 @@ export default function HomePage() {
       color: "border-violet-500 light:border-violet-300",
       badge: "Best Value · Most Popular",
       cta: "Choose Pro",
+      teamAccess: teamAccess("pro"),
       features: [
         "Everything in Beginner",
         `Up to ${PLAN_DEFINITIONS.pro.monthlyActivityLimit} orders or bookings per month`,
@@ -107,6 +128,7 @@ export default function HomePage() {
       color: "border-indigo-500/70 light:border-indigo-300",
       badge: "Maximum Scale",
       cta: "Go Enterprise",
+      teamAccess: teamAccess("enterprise"),
       features: [
         "Everything in Pro",
         "Unlimited orders or appointments",
@@ -507,6 +529,17 @@ export default function HomePage() {
                 <div className={`mt-5 rounded-xl border px-3 py-2.5 text-center text-xs font-bold ${p.name === "Pro" ? "border-violet-500/30 bg-violet-500/10 text-violet-200 light:border-violet-200 light:bg-violet-50 light:text-violet-700" : "border-slate-700 bg-slate-900/40 text-slate-300 light:border-gray-200 light:bg-gray-50 light:text-gray-700"}`}>
                   {p.priceAnchor}
                 </div>
+                <div className="mt-4 rounded-2xl border border-emerald-500/25 bg-emerald-500/[0.08] p-4 light:border-emerald-200 light:bg-emerald-50">
+                  <p className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider text-emerald-400 light:text-emerald-700">
+                    <Users className="h-4 w-4" /> Team accounts
+                  </p>
+                  <p className="mt-2 text-sm font-black text-white light:text-slate-900">
+                    {p.teamAccess.headline}
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-slate-400 light:text-slate-600">
+                    {p.teamAccess.detail}
+                  </p>
+                </div>
                 <div className="my-6 h-px bg-slate-700/70 light:bg-gray-200" />
                 <p className="mb-4 text-xs font-black uppercase tracking-wider text-slate-300 light:text-gray-700">
                   What you get
@@ -568,7 +601,7 @@ export default function HomePage() {
           </div>
 
           <p className="mt-7 text-center text-xs text-slate-500 light:text-gray-500">
-            All prices are monthly in BZD and apply per business. Each business starts its own 14-day trial.
+            All prices are monthly in BZD and apply per business. Paid staff seats are $2 BZD each per month. Account limits include the owner. Each business starts its own 14-day trial.
           </p>
         </div>
       </section>

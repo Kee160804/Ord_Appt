@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { AlertCircle, ArrowLeft, CheckCircle2, CreditCard, Eye, Users } from "lucide-react";
+import { AlertCircle, ArrowLeft, CheckCircle2, CreditCard, Eye, RefreshCw, Save, Users } from "lucide-react";
 import { Card, CardBody, CardHeader } from "@/app/components/Card";
 import { formatCurrency } from "@/app/lib/utils";
 import {
@@ -28,6 +28,7 @@ export default function TenantDetailPage() {
   const [error, setError] = useState("");
   const [selectedPlan, setSelectedPlan] = useState<Tenant["plan"]>("starter");
   const [isUpdatingSubscription, setIsUpdatingSubscription] = useState(false);
+  const [subscriptionError, setSubscriptionError] = useState("");
   const [subscriptionMessage, setSubscriptionMessage] = useState("");
   const [seatSummary, setSeatSummary] = useState<AdminSeatSummary | null>(null);
   const [paidStaffSeats, setPaidStaffSeats] = useState(0);
@@ -85,20 +86,30 @@ export default function TenantDetailPage() {
   const updateSubscription = async (
     status: Tenant["subscriptionStatus"],
     trialDays?: number,
+    plan: Tenant["plan"] = data?.tenant.plan ?? selectedPlan,
+    successMessage?: string,
   ) => {
     setIsUpdatingSubscription(true);
-    setError("");
+    setSubscriptionError("");
     setSubscriptionMessage("");
     try {
-      const updated = await updateAdminTenantSubscription(
+      await updateAdminTenantSubscription(
         tenantId,
-        selectedPlan,
+        plan,
         status,
         trialDays,
       );
-      setData((current) => current
-        ? { ...current, tenant: { ...current.tenant, ...updated } }
-        : current);
+
+      // Read the tenant back from Supabase instead of trusting optimistic UI
+      // state. A success message therefore means the change survived a reload.
+      const refreshed = await loadAdminTenantData(tenantId);
+      if (!refreshed) throw new Error("The business could not be reloaded after saving.");
+      if (refreshed.tenant.plan !== plan || refreshed.tenant.subscriptionStatus !== status) {
+        throw new Error("Supabase did not retain the requested plan and access status.");
+      }
+      setData(refreshed);
+      setSelectedPlan(refreshed.tenant.plan);
+
       try {
         const summary = await getAdminSeatSummary(tenantId);
         setSeatSummary(summary);
@@ -112,14 +123,37 @@ export default function TenantDetailPage() {
         );
       }
       setSubscriptionMessage(
-        status === "active"
-          ? "Paid access activated successfully."
-          : status === "trial"
-            ? "The trial was extended by 14 days."
-            : "Tenant access is now marked past due.",
+        successMessage ?? (
+          status === "active"
+            ? "Plan and testing access saved and verified in Supabase. The tester can now refresh their dashboard."
+            : status === "trial"
+              ? "The trial was extended by 14 days and verified in Supabase."
+              : "Tenant access is now marked past due and was verified in Supabase."
+        ),
       );
     } catch (updateError) {
-      setError(updateError instanceof Error ? updateError.message : "Unable to update subscription access.");
+      setSubscriptionError(updateError instanceof Error ? updateError.message : "Unable to update subscription access.");
+    } finally {
+      setIsUpdatingSubscription(false);
+    }
+  };
+
+  const reloadSavedSubscription = async () => {
+    setIsUpdatingSubscription(true);
+    setSubscriptionError("");
+    setSubscriptionMessage("");
+    try {
+      const refreshed = await loadAdminTenantData(tenantId);
+      if (!refreshed) throw new Error("The business could not be reloaded from Supabase.");
+      setData(refreshed);
+      setSelectedPlan(refreshed.tenant.plan);
+      const summary = await getAdminSeatSummary(tenantId);
+      setSeatSummary(summary);
+      setPaidStaffSeats(summary.paidStaffSeats);
+      setSeatError("");
+      setSubscriptionMessage("Saved plan and access status reloaded from Supabase.");
+    } catch (reloadError) {
+      setSubscriptionError(reloadError instanceof Error ? reloadError.message : "Unable to reload subscription access.");
     } finally {
       setIsUpdatingSubscription(false);
     }
@@ -143,8 +177,8 @@ export default function TenantDetailPage() {
       setSeatReviewNote("");
       setSeatMessage(
         nextSeats > (seatSummary?.paidStaffSeats ?? 0)
-          ? "Paid staff seats approved after payment confirmation."
-          : "Paid staff-seat access updated.",
+          ? "Additional staff-seat access saved for this business."
+          : "Staff-seat access saved and verified in Supabase.",
       );
     } catch (seatUpdateError) {
       setSeatError(
@@ -215,6 +249,7 @@ export default function TenantDetailPage() {
   }
 
   const { tenant, analytics } = data;
+  const hasUnsavedPlan = selectedPlan !== tenant.plan;
   return (
     <div className="pwa-page-safe min-h-dvh space-y-6 bg-[#070b14] p-4 text-white light:bg-white light:text-gray-900 sm:p-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -314,7 +349,7 @@ export default function TenantDetailPage() {
           {seatSummary ? (
             <>
               <p className="max-w-3xl text-sm leading-6 text-slate-400 light:text-slate-600">
-                Staff access belongs to this business, not the owner&apos;s account. Confirm payment before increasing paid seats. Pending requests never grant access or create a charge.
+                Staff access belongs to this business, not the owner&apos;s account. During testing, assign seats manually with an admin note. Pending requests never grant access or create a charge.
               </p>
               <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <SeatStat label="Active staff" value={seatSummary.activeStaff} />
@@ -353,11 +388,11 @@ export default function TenantDetailPage() {
                   </select>
                 </label>
                 <label>
-                  <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-400">Payment reference / review note</span>
+                  <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-400">Admin note</span>
                   <input
                     value={seatReviewNote}
                     onChange={(event) => setSeatReviewNote(event.target.value)}
-                    placeholder="Required when approving more paid seats"
+                    placeholder="Required when increasing seats, e.g. Beta tester — no payment"
                     className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2.5 text-sm text-white outline-none placeholder:text-slate-600 focus:border-violet-500 light:border-slate-300 light:bg-white light:text-slate-900"
                   />
                 </label>
@@ -369,7 +404,7 @@ export default function TenantDetailPage() {
                   onClick={() => void savePaidStaffSeats()}
                   className="rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-violet-500 disabled:opacity-50"
                 >
-                  Save approved seats
+                  Save staff-seat changes
                 </button>
                 {seatSummary.pendingRequest && (
                   <>
@@ -381,7 +416,7 @@ export default function TenantDetailPage() {
                       )}
                       className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-500 disabled:opacity-50"
                     >
-                      Confirm payment &amp; approve
+                      Approve requested seats
                     </button>
                     <button
                       disabled={isUpdatingSeats}
@@ -414,8 +449,17 @@ export default function TenantDetailPage() {
         </CardHeader>
         <CardBody>
           <p className="max-w-2xl text-sm leading-6 text-slate-400 light:text-slate-600">
-            Use these secured controls after confirming payment, to grant another trial period, or to pause access for an unpaid account.
+            Assign a plan to a tester without payment. Saving grants active access to exactly that plan&apos;s limits and features, then reloads the record from Supabase to verify it persisted. The tester should refresh their dashboard after you save.
           </p>
+          <div className="mt-4 flex flex-wrap gap-2 text-xs">
+            <span className="rounded-full bg-slate-700/70 px-3 py-1.5 text-slate-300 light:bg-slate-100 light:text-slate-700">
+              Saved plan: <strong className="capitalize">{tenant.plan === "starter" ? "Beginner" : tenant.plan}</strong>
+            </span>
+            <span className="rounded-full bg-slate-700/70 px-3 py-1.5 text-slate-300 light:bg-slate-100 light:text-slate-700">
+              Access: <strong className="capitalize">{tenant.subscriptionStatus}</strong>
+            </span>
+            {hasUnsavedPlan && <span className="rounded-full bg-amber-500/15 px-3 py-1.5 font-bold text-amber-300 light:text-amber-700">Unsaved plan change</span>}
+          </div>
           <div className="mt-5 flex flex-wrap items-end gap-3">
             <label className="w-full sm:min-w-44 sm:w-auto">
               <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-400">Plan</span>
@@ -425,16 +469,26 @@ export default function TenantDetailPage() {
                 <option value="enterprise">Enterprise — $16 BZD</option>
               </select>
             </label>
-            <button disabled={isUpdatingSubscription} onClick={() => void updateSubscription("active")} className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-500 disabled:opacity-50">
-              Activate paid access
+            <button disabled={isUpdatingSubscription} onClick={() => void updateSubscription("active", undefined, selectedPlan)} className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-500 disabled:opacity-50">
+              <Save className="h-4 w-4" /> Save changes
             </button>
-            <button disabled={isUpdatingSubscription} onClick={() => void updateSubscription("trial", 14)} className="rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-violet-500 disabled:opacity-50">
-              Extend trial 14 days
-            </button>
-            <button disabled={isUpdatingSubscription} onClick={() => void updateSubscription("past_due")} className="rounded-xl border border-rose-500/40 px-4 py-2.5 text-sm font-bold text-rose-300 hover:bg-rose-500/10 disabled:opacity-50 light:text-rose-700">
-              Mark past due
+            <button disabled={isUpdatingSubscription} onClick={() => void reloadSavedSubscription()} className="inline-flex items-center gap-2 rounded-xl border border-slate-600 px-4 py-2.5 text-sm font-bold text-slate-300 hover:bg-slate-700/50 disabled:opacity-50 light:border-slate-300 light:text-slate-700">
+              <RefreshCw className={`h-4 w-4 ${isUpdatingSubscription ? "animate-spin" : ""}`} /> Reload saved values
             </button>
           </div>
+          <div className="mt-5 border-t border-slate-700 pt-5 light:border-slate-200">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Other access actions</p>
+            <p className="mt-1 text-xs leading-5 text-slate-500">A trial unlocks the full product for evaluation, so use active testing access above when checking plan-specific restrictions.</p>
+            <div className="mt-3 flex flex-wrap gap-3">
+            <button disabled={isUpdatingSubscription} onClick={() => void updateSubscription("trial", 14, tenant.plan)} className="rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-violet-500 disabled:opacity-50">
+              Extend trial 14 days
+            </button>
+            <button disabled={isUpdatingSubscription} onClick={() => void updateSubscription("past_due", undefined, tenant.plan)} className="rounded-xl border border-rose-500/40 px-4 py-2.5 text-sm font-bold text-rose-300 hover:bg-rose-500/10 disabled:opacity-50 light:text-rose-700">
+              Mark past due
+            </button>
+            </div>
+          </div>
+          {subscriptionError && <p role="alert" className="mt-4 flex items-start gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-300 light:text-rose-700"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />{subscriptionError}</p>}
           {subscriptionMessage && <p className="mt-4 flex items-center gap-2 text-sm text-emerald-400 light:text-emerald-700"><CheckCircle2 className="h-4 w-4" />{subscriptionMessage}</p>}
         </CardBody>
       </Card>
