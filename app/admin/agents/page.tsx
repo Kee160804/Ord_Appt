@@ -2,14 +2,13 @@
 
 import { useState, useMemo } from "react";
 import { useAuth } from "@/app/contexts/auth";
-import { useRouter } from "next/navigation";
 import { Card, CardHeader, CardBody } from "@/app/components/Card";
 import { mockUsers } from "@/app/data/mock";
-import { Plus, Trash2, Edit2, Shield, User, UserCheck } from "lucide-react";
+import { Plus, Trash2, Edit2, Shield, User } from "lucide-react";
+import { createAdminAgent } from "@/app/services/adminService";
 
 export default function AgentsManagementPage() {
   const { user, logout } = useAuth();
-  const router = useRouter();
   const [showAddAgent, setShowAddAgent] = useState(false);
   const [agents, setAgents] = useState(mockUsers);
   const [editingAgent, setEditingAgent] = useState<
@@ -32,10 +31,21 @@ export default function AgentsManagementPage() {
   );
 
   // COMMENT: Handle adding new agent
-  const handleAddAgent = () => {
+  const handleAddAgent = async () => {
     if (!formData.name || !formData.email) {
       alert("Please fill in all fields");
       return;
+    }
+
+    try {
+      await createAdminAgent({
+        name: formData.name,
+        email: formData.email,
+        role: formData.role,
+        sendPasswordEmail: true,
+      });
+    } catch (err) {
+      console.warn("Could not create agent in database:", err);
     }
 
     const newAgent = {
@@ -158,14 +168,10 @@ export default function AgentsManagementPage() {
             </div>
 
             <div>
-              <label
-                htmlFor="role-select"
-                className="block text-sm font-medium text-slate-300 mb-2"
-              >
+              <label className="block text-sm font-medium text-slate-300 mb-2">
                 Role
               </label>
               <select
-                id="role-select"
                 value={formData.role}
                 onChange={(e) =>
                   setFormData({
@@ -175,25 +181,24 @@ export default function AgentsManagementPage() {
                 }
                 className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-violet-500"
               >
-                <option value="staff">Staff</option>
-                <option value="admin">Admin</option>
+                <option value="staff">Staff - Order/Booking management</option>
+                <option value="admin">Admin - Full tenant access</option>
               </select>
             </div>
 
-            <div className="flex gap-3">
+            <div className="flex gap-4">
               <button
                 onClick={handleAddAgent}
-                className="flex-1 px-4 py-2 bg-violet-600 hover:bg-violet-700 rounded-lg font-semibold transition"
+                className="px-6 py-2 bg-violet-600 hover:bg-violet-700 rounded-lg font-semibold transition"
               >
-                {editingAgent ? "Update Agent" : "Add Agent"}
+                {editingAgent ? "Update Agent" : "Save Agent"}
               </button>
               <button
                 onClick={() => {
                   setShowAddAgent(false);
                   setEditingAgent(null);
-                  setFormData({ name: "", email: "", role: "staff" });
                 }}
-                className="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg font-semibold transition"
+                className="px-6 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg font-semibold transition"
               >
                 Cancel
               </button>
@@ -202,75 +207,65 @@ export default function AgentsManagementPage() {
         </Card>
       )}
 
-      {/* AGENTS TABLE */}
-      <Card className="bg-slate-800/50 border-slate-700">
-        <CardHeader>
-          <h3 className="font-semibold">
-            All Agents ({filteredAgents.length})
-          </h3>
-        </CardHeader>
-        <div className="divide-y divide-slate-700 overflow-x-auto">
-          <div className="grid min-w-[680px] grid-cols-4 gap-4 px-4 py-4 text-sm font-semibold text-slate-400 sm:px-6">
-            <div>Name</div>
-            <div>Email</div>
-            <div>Role</div>
-            <div>Actions</div>
-          </div>
-
-          {/* COMMENT: Map through agents and display in table format */}
-          {filteredAgents.length === 0 ? (
-            <div className="px-6 py-8 text-center text-slate-400">
-              No agents yet. Create one to get started.
-            </div>
-          ) : (
-            filteredAgents.map((agent) => (
-              <div
-                key={agent.id}
-                className="grid min-w-[680px] grid-cols-4 items-center gap-4 px-4 py-4 transition hover:bg-slate-700/30 sm:px-6"
-              >
+      {/* AGENTS LIST */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filteredAgents.map((agent) => (
+          <Card key={agent.id} className="bg-slate-800/50 border-slate-700">
+            <CardBody className="space-y-4">
+              <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-violet-600 flex items-center justify-center text-sm font-bold">
+                  <div className="w-10 h-10 rounded-full bg-violet-600 flex items-center justify-center font-bold text-white">
                     {agent.avatar}
                   </div>
                   <div>
-                    <p className="font-medium">{agent.name}</p>
+                    <h3 className="font-semibold">{agent.name}</h3>
+                    <p className="text-sm text-slate-400">{agent.email}</p>
                   </div>
                 </div>
-
-                <div className="text-slate-400">{agent.email}</div>
-
-                <div>
-                  <span className="px-3 py-1 rounded-full text-xs font-semibold bg-slate-700 text-slate-200 flex items-center gap-1 w-fit">
-                    {agent.role === "admin" ? (
-                      <Shield className="w-3 h-3" />
-                    ) : (
-                      <User className="w-3 h-3" />
-                    )}
-                    {agent.role.charAt(0).toUpperCase() + agent.role.slice(1)}
-                  </span>
-                </div>
-
-                <div className="flex gap-2">
+                <div className="flex items-center gap-2">
                   <button
                     onClick={() => handleEditAgent(agent)}
-                    className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition"
+                    className="p-2 text-slate-400 hover:text-white rounded-lg transition"
                     title="Edit agent"
                   >
                     <Edit2 className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => handleDeleteAgent(agent.id)}
-                    className="p-2 text-slate-400 hover:text-red-400 hover:bg-slate-700 rounded-lg transition"
+                    className="p-2 text-red-400 hover:text-red-300 rounded-lg transition"
                     title="Delete agent"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
               </div>
-            ))
-          )}
-        </div>
-      </Card>
+
+              <div className="border-t border-slate-700/50 pt-4 flex justify-between items-center text-sm">
+                <span className="text-slate-400">Role:</span>
+                <span className="px-2 py-1 bg-violet-600/20 text-violet-400 rounded-full text-xs font-semibold capitalize flex items-center gap-1">
+                  {agent.role === "admin" ? (
+                    <Shield className="w-3 h-3" />
+                  ) : (
+                    <User className="w-3 h-3" />
+                  )}
+                  {agent.role}
+                </span>
+              </div>
+
+              <div className="border-t border-slate-700/50 pt-4 space-y-2 text-xs text-slate-400">
+                <div className="flex justify-between">
+                  <span>Created:</span>
+                  <span>{agent.createdAt}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Last Login:</span>
+                  <span>{agent.lastLogin}</span>
+                </div>
+              </div>
+            </CardBody>
+          </Card>
+        ))}
+      </div>
     </div>
   );
 }

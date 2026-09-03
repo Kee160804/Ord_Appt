@@ -88,7 +88,7 @@ export function TopBar({ title, action }: TopBarProps) {
           )}
         </div>
 
-        <NotificationCenter tenantId={tenant?.id} />
+        <NotificationCenter tenantId={tenant?.id} userId={user?.id} />
 
         <button
           onClick={toggleTheme}

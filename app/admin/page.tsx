@@ -4,22 +4,26 @@ import { useCallback, useEffect, useMemo, useState, type ComponentType } from "r
 import Link from "next/link";
 import {
   Activity, AlertCircle, ArrowRight, Bell, Building2, CalendarDays, Check,
-  ChevronLeft, ChevronRight, CircleDollarSign, CreditCard, Ellipsis, FileClock,
-  Filter, Handshake, LayoutDashboard, Menu, Moon, Plus, RefreshCw, Search,
-  Settings, Shield, ShieldCheck, ShoppingCart, Sparkles, Sun, UserCog, Users,
-  UsersRound, X,
+  CheckCheck, ChevronLeft, ChevronRight, CircleDollarSign, Copy, CreditCard,
+  Ellipsis, Eye, EyeOff, FileClock, Filter, Handshake, LayoutDashboard,
+  Menu, Moon, Plus, RefreshCw, Search, Settings, Shield, ShieldCheck,
+  ShoppingCart, Sparkles, Sun, UserCog, Users, UsersRound, X,
 } from "lucide-react";
 import { useAuth } from "@/app/contexts/auth";
 import { useTheme } from "@/app/contexts/theme";
 import { cn, formatCurrency } from "@/app/lib/utils";
 import { PLAN_DEFINITIONS } from "@/app/lib/plans";
 import {
+  createAdminAgent,
+  createAdminTenant,
   loadAdminPlatformData,
   type AdminActivityRecord,
   type AdminAgentRecord,
   type AdminPlatformData,
   type AdminRevenuePoint,
   type AdminRoleSummary,
+  type CreateAdminAgentResult,
+  type CreateAdminTenantResult,
 } from "@/app/services/adminService";
 import type { Tenant } from "@/app/types";
 
@@ -92,8 +96,8 @@ export default function AdminPage() {
         <main className="mx-auto max-w-[1600px] px-4 pb-10 pt-5 sm:px-6 lg:px-8">
           {error && <div className="mb-5 flex items-start gap-3 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300 light:text-red-700"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><span>{error}</span></div>}
           {activeView === "overview" && <OverviewView data={platformData} hasError={Boolean(error)} isLoading={isLoading} onSelect={selectView} />}
-          {activeView === "tenants" && <TenantView tenants={platformData.tenants} isLoading={isLoading} />}
-          {activeView === "agents" && <AgentView agents={platformData.agents} isLoading={isLoading} />}
+          {activeView === "tenants" && <TenantView tenants={platformData.tenants} isLoading={isLoading} onRefresh={() => void refreshPlatformData()} />}
+          {activeView === "agents" && <AgentView agents={platformData.agents} tenants={platformData.tenants} isLoading={isLoading} onRefresh={() => void refreshPlatformData()} />}
           {activeView === "roles" && <RoleView roles={platformData.roles} isLoading={isLoading} />}
           {activeView === "analytics" && <AnalyticsView data={platformData} isLoading={isLoading} />}
           {activeView === "activity" && <ActivityView activities={platformData.recentActivity} isLoading={isLoading} />}
@@ -217,20 +221,287 @@ function SystemHealth({ hasError, isLoading }: { hasError: boolean; isLoading: b
   return <div className={cn(panelClass, "p-5 sm:p-6")}><h3 className="font-bold text-white light:text-slate-950">System Health</h3><p className="mt-2 text-xs text-slate-500">Current browser and platform connection status</p><div className="mt-4 space-y-2">{checks.map(([label, status], index) => { const okay = !hasError || index > 0; return <div key={label} className="flex items-center gap-3 rounded-xl bg-slate-900/50 px-3 py-3 light:bg-slate-50"><span className={cn("flex h-5 w-5 items-center justify-center rounded-full", okay ? "bg-emerald-500/15 text-emerald-400" : "bg-rose-500/15 text-rose-400")}>{okay ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}</span><span className="flex-1 text-sm text-slate-300 light:text-slate-700">{label}</span><span className={cn("rounded-full px-2 py-1 text-[10px] font-semibold", okay ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400")}>{status}</span></div>; })}</div></div>;
 }
 
-function TenantView({ tenants, isLoading }: { tenants: Tenant[]; isLoading: boolean }) {
-  const [query, setQuery] = useState(""); const [status, setStatus] = useState("all"); const [plan, setPlan] = useState("all"); const [page, setPage] = useState(1); const pageSize = 7;
-  const filtered = useMemo(() => { const normalized = query.trim().toLowerCase(); return tenants.filter((tenant) => { const matchesSearch = !normalized || [tenant.name, tenant.email, tenant.city, tenant.slug].some((value) => value.toLowerCase().includes(normalized)); const matchesStatus = status === "all" || (status === "active" ? tenant.isActive : !tenant.isActive); return matchesSearch && matchesStatus && (plan === "all" || tenant.plan === plan); }); }, [plan, query, status, tenants]);
-  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize)); const safePage = Math.min(page, pageCount); const pageRows = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
+function TenantView({
+  tenants,
+  isLoading,
+  onRefresh,
+}: {
+  tenants: Tenant[];
+  isLoading: boolean;
+  onRefresh: () => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [status, setStatus] = useState("all");
+  const [plan, setPlan] = useState("all");
+  const [page, setPage] = useState(1);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [successData, setSuccessData] = useState<CreateAdminTenantResult | null>(null);
+  const pageSize = 7;
+
+  const filtered = useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+    return tenants.filter((tenant) => {
+      const matchesSearch =
+        !normalized ||
+        [tenant.name, tenant.email, tenant.city, tenant.slug].some((value) =>
+          value.toLowerCase().includes(normalized),
+        );
+      const matchesStatus =
+        status === "all" || (status === "active" ? tenant.isActive : !tenant.isActive);
+      return matchesSearch && matchesStatus && (plan === "all" || tenant.plan === plan);
+    });
+  }, [plan, query, status, tenants]);
+
+  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safePage = Math.min(page, pageCount);
+  const pageRows = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
   const changeQuery = (value: string) => { setQuery(value); setPage(1); };
   const changeStatus = (value: string) => { setStatus(value); setPage(1); };
   const changePlan = (value: string) => { setPlan(value); setPage(1); };
-  return <ManagementPanel action="Add Tenant" description="Create, inspect, and manage platform businesses" title="Tenant Management"><ManagementFilters query={query} onQuery={changeQuery} placeholder="Search by name, email, city, or slug..."><select className={filterClass} value={status} onChange={(event) => changeStatus(event.target.value)}><option value="all">All Status</option><option value="active">Active</option><option value="inactive">Inactive</option></select><select className={filterClass} value={plan} onChange={(event) => changePlan(event.target.value)}><option value="all">All Plans</option><option value="starter">Beginner</option><option value="pro">Pro</option><option value="enterprise">Enterprise</option></select></ManagementFilters><div className="overflow-x-auto"><table className="w-full min-w-[900px] text-left"><thead><tr className="border-b border-slate-800 text-[10px] uppercase tracking-wider text-slate-500 light:border-slate-200"><th className="px-5 py-3 font-semibold">Tenant</th><th className="px-4 py-3 font-semibold">Business</th><th className="px-4 py-3 font-semibold">Plan</th><th className="px-4 py-3 font-semibold">Status</th><th className="px-4 py-3 font-semibold">Monthly Revenue</th><th className="px-4 py-3 font-semibold">Created</th><th className="px-4 py-3 text-right font-semibold">Actions</th></tr></thead><tbody className="divide-y divide-slate-800/80 light:divide-slate-100">{isLoading && <TableLoading columns={7} rows={5} />}{!isLoading && pageRows.map((tenant) => <tr key={tenant.id} className="text-sm transition hover:bg-slate-800/30 light:hover:bg-slate-50"><td className="px-5 py-4"><div className="flex items-center gap-3"><TenantMark tenant={tenant} /><div><p className="font-semibold text-slate-100 light:text-slate-900">{tenant.name}</p><p className="text-[11px] text-slate-500">{tenant.email || `${tenant.slug} storefront`}</p></div></div></td><td className="px-4 py-4 capitalize text-slate-400 light:text-slate-600">{tenant.businessType}</td><td className="px-4 py-4"><PlanBadge plan={tenant.plan} /></td><td className="px-4 py-4"><StatusBadge active={tenant.isActive} /></td><td className="px-4 py-4 font-semibold text-slate-200 light:text-slate-800">{formatCurrency(tenant.monthlyRevenue ?? 0)}</td><td className="px-4 py-4 text-slate-500">{formatDate(tenant.createdAt)}</td><td className="px-4 py-4 text-right"><Link className="inline-flex rounded-lg p-2 text-slate-500 hover:bg-violet-500/10 hover:text-violet-400" href={`/admin/tenant/${tenant.id}`} title={`View ${tenant.name}`}><ArrowRight className="h-4 w-4" /></Link></td></tr>)}</tbody></table>{!isLoading && pageRows.length === 0 && <EmptyState message="No tenants match these filters." />}</div><Pagination count={filtered.length} page={safePage} pageCount={pageCount} pageSize={pageSize} onPage={setPage} /></ManagementPanel>;
+
+  return (
+    <>
+      <ManagementPanel
+        action="Add Tenant"
+        onAction={() => setShowAddModal(true)}
+        description="Create, inspect, and manage platform businesses"
+        title="Tenant Management"
+      >
+        <ManagementFilters
+          query={query}
+          onQuery={changeQuery}
+          placeholder="Search by name, email, city, or slug..."
+        >
+          <select className={filterClass} value={status} onChange={(event) => changeStatus(event.target.value)}>
+            <option value="all">All Status</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+          <select className={filterClass} value={plan} onChange={(event) => changePlan(event.target.value)}>
+            <option value="all">All Plans</option>
+            <option value="starter">Beginner</option>
+            <option value="pro">Pro</option>
+            <option value="enterprise">Enterprise</option>
+          </select>
+        </ManagementFilters>
+
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[900px] text-left">
+            <thead>
+              <tr className="border-b border-slate-800 text-[10px] uppercase tracking-wider text-slate-500 light:border-slate-200">
+                <th className="px-5 py-3 font-semibold">Tenant</th>
+                <th className="px-4 py-3 font-semibold">Business</th>
+                <th className="px-4 py-3 font-semibold">Plan</th>
+                <th className="px-4 py-3 font-semibold">Status</th>
+                <th className="px-4 py-3 font-semibold">Monthly Revenue</th>
+                <th className="px-4 py-3 font-semibold">Created</th>
+                <th className="px-4 py-3 text-right font-semibold">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800/80 light:divide-slate-100">
+              {isLoading && <TableLoading columns={7} rows={5} />}
+              {!isLoading &&
+                pageRows.map((tenant) => (
+                  <tr key={tenant.id} className="text-sm transition hover:bg-slate-800/30 light:hover:bg-slate-50">
+                    <td className="px-5 py-4">
+                      <div className="flex items-center gap-3">
+                        <TenantMark tenant={tenant} />
+                        <div>
+                          <p className="font-semibold text-slate-100 light:text-slate-900">{tenant.name}</p>
+                          <p className="text-[11px] text-slate-500">{tenant.email || `${tenant.slug} storefront`}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-4 capitalize text-slate-400 light:text-slate-600">{tenant.businessType}</td>
+                    <td className="px-4 py-4"><PlanBadge plan={tenant.plan} /></td>
+                    <td className="px-4 py-4"><StatusBadge active={tenant.isActive} /></td>
+                    <td className="px-4 py-4 font-semibold text-slate-200 light:text-slate-800">
+                      {formatCurrency(tenant.monthlyRevenue ?? 0)}
+                    </td>
+                    <td className="px-4 py-4 text-slate-500">{formatDate(tenant.createdAt)}</td>
+                    <td className="px-4 py-4 text-right">
+                      <Link
+                        className="inline-flex rounded-lg p-2 text-slate-500 hover:bg-violet-500/10 hover:text-violet-400"
+                        href={`/admin/tenant/${tenant.id}`}
+                        title={`View ${tenant.name}`}
+                      >
+                        <ArrowRight className="h-4 w-4" />
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+          {!isLoading && pageRows.length === 0 && <EmptyState message="No tenants match these filters." />}
+        </div>
+        <Pagination count={filtered.length} page={safePage} pageCount={pageCount} pageSize={pageSize} onPage={setPage} />
+      </ManagementPanel>
+
+      {showAddModal && (
+        <AddTenantModal
+          isOpen={showAddModal}
+          onClose={() => setShowAddModal(false)}
+          onSuccess={(result) => {
+            setShowAddModal(false);
+            setSuccessData(result);
+            onRefresh();
+          }}
+        />
+      )}
+
+      {successData && (
+        <CredentialsSuccessModal
+          isOpen={Boolean(successData)}
+          onClose={() => setSuccessData(null)}
+          title="Tenant Created Successfully"
+          badge="Business Onboarded"
+          name={successData.tenant.name}
+          email={successData.user.email}
+          roleOrType={`${successData.tenant.businessType.toUpperCase()} BUSINESS · ${successData.tenant.plan.toUpperCase()}`}
+          password={successData.user.temporaryPassword}
+          slug={successData.tenant.slug}
+          recoveryUrl={successData.recoveryUrl}
+          emailSent={successData.emailSent}
+        />
+      )}
+    </>
+  );
 }
 
-function AgentView({ agents, isLoading }: { agents: AdminAgentRecord[]; isLoading: boolean }) {
-  const [query, setQuery] = useState(""); const [role, setRole] = useState("all"); const [status, setStatus] = useState("all"); const roles = [...new Set(agents.map((agent) => agent.role))].sort();
-  const filtered = agents.filter((agent) => { const normalized = query.trim().toLowerCase(); const matchesSearch = !normalized || [agent.name, agent.email, agent.tenantName, agent.role].some((value) => value.toLowerCase().includes(normalized)); const matchesRole = role === "all" || agent.role === role; const matchesStatus = status === "all" || (status === "active" ? agent.isActive : !agent.isActive); return matchesSearch && matchesRole && matchesStatus; });
-  return <ManagementPanel action="Add Agent" description="Platform profiles joined to tenant memberships and roles" title="Agent Management"><ManagementFilters query={query} onQuery={setQuery} placeholder="Search by name, email, role, or tenant..."><select className={filterClass} value={role} onChange={(event) => setRole(event.target.value)}><option value="all">All Roles</option>{roles.map((item) => <option key={item} value={item}>{item}</option>)}</select><select className={filterClass} value={status} onChange={(event) => setStatus(event.target.value)}><option value="all">All Status</option><option value="active">Active</option><option value="inactive">Inactive</option></select></ManagementFilters><div className="overflow-x-auto"><table className="w-full min-w-[850px] text-left"><thead><tr className="border-b border-slate-800 text-[10px] uppercase tracking-wider text-slate-500 light:border-slate-200"><th className="px-5 py-3 font-semibold">Agent</th><th className="px-4 py-3 font-semibold">Role</th><th className="px-4 py-3 font-semibold">Assigned To</th><th className="px-4 py-3 font-semibold">Status</th><th className="px-4 py-3 font-semibold">Created</th><th className="px-4 py-3 text-right font-semibold">Actions</th></tr></thead><tbody className="divide-y divide-slate-800/80 light:divide-slate-100">{isLoading && <TableLoading columns={6} rows={5} />}{!isLoading && filtered.map((agent) => <tr key={agent.id} className="text-sm transition hover:bg-slate-800/30 light:hover:bg-slate-50"><td className="px-5 py-4"><div className="flex items-center gap-3"><div className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-500/15 text-xs font-bold text-violet-400">{initials(agent.name)}</div><div><p className="font-semibold text-slate-100 light:text-slate-900">{agent.name}</p><p className="text-[11px] text-slate-500">{agent.email}</p></div></div></td><td className="px-4 py-4"><RoleBadge role={agent.role} /></td><td className="px-4 py-4 text-slate-400 light:text-slate-600">{agent.tenantName}</td><td className="px-4 py-4"><StatusBadge active={agent.isActive} /></td><td className="px-4 py-4 text-slate-500">{formatDate(agent.createdAt)}</td><td className="px-4 py-4 text-right"><button className="rounded-lg p-2 text-slate-500" disabled title="Agent editing requires a secured admin action"><Ellipsis className="h-4 w-4" /></button></td></tr>)}</tbody></table>{!isLoading && filtered.length === 0 && <EmptyState message="No platform profiles match these filters." />}</div><div className="border-t border-slate-800 px-5 py-4 text-xs text-slate-500 light:border-slate-200">Showing {filtered.length} of {agents.length} profiles</div></ManagementPanel>;
+function AgentView({
+  agents,
+  tenants,
+  isLoading,
+  onRefresh,
+}: {
+  agents: AdminAgentRecord[];
+  tenants: Tenant[];
+  isLoading: boolean;
+  onRefresh: () => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [role, setRole] = useState("all");
+  const [status, setStatus] = useState("all");
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [successData, setSuccessData] = useState<CreateAdminAgentResult | null>(null);
+  const roles = [...new Set(agents.map((agent) => agent.role))].sort();
+
+  const filtered = agents.filter((agent) => {
+    const normalized = query.trim().toLowerCase();
+    const matchesSearch =
+      !normalized ||
+      [agent.name, agent.email, agent.tenantName, agent.role].some((value) =>
+        value.toLowerCase().includes(normalized),
+      );
+    const matchesRole = role === "all" || agent.role === role;
+    const matchesStatus =
+      status === "all" || (status === "active" ? agent.isActive : !agent.isActive);
+    return matchesSearch && matchesRole && matchesStatus;
+  });
+
+  return (
+    <>
+      <ManagementPanel
+        action="Add Agent"
+        onAction={() => setShowAddModal(true)}
+        description="Platform profiles joined to tenant memberships and roles"
+        title="Agent Management"
+      >
+        <ManagementFilters query={query} onQuery={setQuery} placeholder="Search by name, email, role, or tenant...">
+          <select className={filterClass} value={role} onChange={(event) => setRole(event.target.value)}>
+            <option value="all">All Roles</option>
+            {roles.map((item) => (
+              <option key={item} value={item}>{item}</option>
+            ))}
+          </select>
+          <select className={filterClass} value={status} onChange={(event) => setStatus(event.target.value)}>
+            <option value="all">All Status</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </ManagementFilters>
+
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[850px] text-left">
+            <thead>
+              <tr className="border-b border-slate-800 text-[10px] uppercase tracking-wider text-slate-500 light:border-slate-200">
+                <th className="px-5 py-3 font-semibold">Agent</th>
+                <th className="px-4 py-3 font-semibold">Role</th>
+                <th className="px-4 py-3 font-semibold">Assigned To</th>
+                <th className="px-4 py-3 font-semibold">Status</th>
+                <th className="px-4 py-3 font-semibold">Created</th>
+                <th className="px-4 py-3 text-right font-semibold">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800/80 light:divide-slate-100">
+              {isLoading && <TableLoading columns={6} rows={5} />}
+              {!isLoading &&
+                filtered.map((agent) => (
+                  <tr key={agent.id} className="text-sm transition hover:bg-slate-800/30 light:hover:bg-slate-50">
+                    <td className="px-5 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-500/15 text-xs font-bold text-violet-400">
+                          {initials(agent.name)}
+                        </div>
+                        <div>
+                          <p className="font-semibold text-slate-100 light:text-slate-900">{agent.name}</p>
+                          <p className="text-[11px] text-slate-500">{agent.email}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-4"><RoleBadge role={agent.role} /></td>
+                    <td className="px-4 py-4 text-slate-400 light:text-slate-600">{agent.tenantName}</td>
+                    <td className="px-4 py-4"><StatusBadge active={agent.isActive} /></td>
+                    <td className="px-4 py-4 text-slate-500">{formatDate(agent.createdAt)}</td>
+                    <td className="px-4 py-4 text-right">
+                      <button
+                        className="rounded-lg p-2 text-slate-500"
+                        disabled
+                        title="Agent editing requires a secured admin action"
+                      >
+                        <Ellipsis className="h-4 w-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+          {!isLoading && filtered.length === 0 && <EmptyState message="No platform profiles match these filters." />}
+        </div>
+        <div className="border-t border-slate-800 px-5 py-4 text-xs text-slate-500 light:border-slate-200">
+          Showing {filtered.length} of {agents.length} profiles
+        </div>
+      </ManagementPanel>
+
+      {showAddModal && (
+        <AddAgentModal
+          isOpen={showAddModal}
+          tenants={tenants}
+          onClose={() => setShowAddModal(false)}
+          onSuccess={(result) => {
+            setShowAddModal(false);
+            setSuccessData(result);
+            onRefresh();
+          }}
+        />
+      )}
+
+      {successData && (
+        <CredentialsSuccessModal
+          isOpen={Boolean(successData)}
+          onClose={() => setSuccessData(null)}
+          title="Agent Added Successfully"
+          badge="Agent Provisioned"
+          name={successData.agent.name}
+          email={successData.agent.email}
+          roleOrType={`${successData.agent.role} · ${successData.agent.tenantName}`}
+          password={successData.temporaryPassword}
+          recoveryUrl={successData.recoveryUrl}
+          emailSent={successData.emailSent}
+        />
+      )}
+    </>
+  );
 }
 
 function RoleView({ roles, isLoading }: { roles: AdminRoleSummary[]; isLoading: boolean }) {
@@ -255,9 +526,53 @@ function DeferredView({ icon: Icon, title, description }: { icon: ComponentType<
   return <div className={cn(panelClass, "flex min-h-[420px] flex-col items-center justify-center p-8 text-center")}><div className="rounded-2xl bg-violet-500/15 p-4 text-violet-400"><Icon className="h-8 w-8" /></div><h2 className="mt-5 text-xl font-bold text-white light:text-slate-950">{title}</h2><p className="mt-2 max-w-md text-sm leading-6 text-slate-500">{description}</p><span className="mt-5 rounded-full border border-slate-700 px-3 py-1.5 text-xs text-slate-400 light:border-slate-200 light:text-slate-600">Safe read-only placeholder</span></div>;
 }
 
-function ManagementPanel({ action, children, description, title }: { action?: string; children: React.ReactNode; description: string; title: string }) {
-  return <section className={cn(panelClass, "overflow-hidden")}><div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 px-5 py-5 light:border-slate-200 sm:px-6"><div><h2 className="text-lg font-bold text-white light:text-slate-950">{title}</h2><p className="mt-1 text-xs text-slate-500">{description}</p></div>{action && <button className="inline-flex cursor-not-allowed items-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 px-4 py-2.5 text-xs font-semibold text-white opacity-60" disabled title="Requires a secured and audited admin write action"><Plus className="h-4 w-4" />{action}</button>}</div>{children}</section>;
+function ManagementPanel({
+  action,
+  onAction,
+  children,
+  description,
+  title,
+}: {
+  action?: string;
+  onAction?: () => void;
+  children: React.ReactNode;
+  description: string;
+  title: string;
+}) {
+  return (
+    <section className={cn(panelClass, "overflow-hidden")}>
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 px-5 py-5 light:border-slate-200 sm:px-6">
+        <div>
+          <h2 className="text-lg font-bold text-white light:text-slate-950">{title}</h2>
+          <p className="mt-1 text-xs text-slate-500">{description}</p>
+        </div>
+        {action && (
+          onAction ? (
+            <button
+              onClick={onAction}
+              className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 px-4 py-2.5 text-xs font-semibold text-white shadow-md transition hover:from-violet-500 hover:to-purple-500 active:scale-95"
+              title={action}
+            >
+              <Plus className="h-4 w-4" />
+              {action}
+            </button>
+          ) : (
+            <button
+              className="inline-flex cursor-not-allowed items-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 px-4 py-2.5 text-xs font-semibold text-white opacity-60"
+              disabled
+              title="Requires a secured and audited admin write action"
+            >
+              <Plus className="h-4 w-4" />
+              {action}
+            </button>
+          )
+        )}
+      </div>
+      {children}
+    </section>
+  );
 }
+
 
 function ManagementFilters({ children, onQuery, placeholder, query }: { children: React.ReactNode; onQuery: (value: string) => void; placeholder: string; query: string }) {
   return <div className="border-b border-slate-800 p-5 light:border-slate-200"><div className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" /><input className="w-full rounded-xl border border-slate-800 bg-slate-900/60 py-3 pl-10 pr-4 text-sm text-slate-100 outline-none placeholder:text-slate-600 focus:border-violet-500 light:border-slate-200 light:bg-slate-50 light:text-slate-900 light:placeholder:text-slate-400" onChange={(event) => onQuery(event.target.value)} placeholder={placeholder} value={query} /></div><div className="mt-3 flex flex-wrap items-center gap-2">{children}<span className="ml-auto hidden items-center gap-2 rounded-lg border border-slate-800 px-3 py-2 text-xs text-slate-500 light:border-slate-200 sm:flex"><Filter className="h-3.5 w-3.5" />Filters</span></div></div>;
@@ -284,3 +599,725 @@ function initials(name: string) { return name.split(/\s+/).filter(Boolean).slice
 function formatDate(value: string) { if (!value) return "—"; const date = new Date(value); return Number.isNaN(date.getTime()) ? "—" : new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(date); }
 function formatShortDate(value: string) { if (!value) return ""; const date = new Date(`${value}T00:00:00`); return Number.isNaN(date.getTime()) ? "" : new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(date); }
 function relativeTime(value: string) { const date = new Date(value); const elapsed = Date.now() - date.getTime(); if (!Number.isFinite(elapsed)) return ""; const minutes = Math.max(0, Math.floor(elapsed / 60_000)); if (minutes < 1) return "Just now"; if (minutes < 60) return `${minutes}m ago`; const hours = Math.floor(minutes / 60); if (hours < 24) return `${hours}h ago`; return `${Math.floor(hours / 24)}d ago`; }
+
+function generateRandomPassword(length = 12): string {
+  const uppercase = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  const lowercase = "abcdefghijkmnopqrstuvwxyz";
+  const numbers = "23456789";
+  const symbols = "!@#$%&*";
+  const all = uppercase + lowercase + numbers + symbols;
+
+  let pwd =
+    uppercase[Math.floor(Math.random() * uppercase.length)] +
+    lowercase[Math.floor(Math.random() * lowercase.length)] +
+    numbers[Math.floor(Math.random() * numbers.length)] +
+    symbols[Math.floor(Math.random() * symbols.length)];
+
+  for (let i = 4; i < length; i += 1) {
+    pwd += all[Math.floor(Math.random() * all.length)];
+  }
+
+  return pwd
+    .split("")
+    .sort(() => Math.random() - 0.5)
+    .join("");
+}
+
+function AddTenantModal({
+  isOpen,
+  onClose,
+  onSuccess,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess: (result: CreateAdminTenantResult) => void;
+}) {
+  const [businessName, setBusinessName] = useState("");
+  const [businessType, setBusinessType] = useState<"appointment" | "ordering">("appointment");
+  const [ownerName, setOwnerName] = useState("");
+  const [ownerEmail, setOwnerEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [city, setCity] = useState("");
+  const [phone, setPhone] = useState("");
+  const [plan, setPlan] = useState<"starter" | "pro" | "enterprise">("starter");
+  const [subscriptionStatus, setSubscriptionStatus] = useState<"trial" | "active">("trial");
+  const [sendPasswordEmail, setSendPasswordEmail] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleGeneratePassword = () => {
+    const generated = generateRandomPassword();
+    setPassword(generated);
+    setShowPassword(true);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!businessName.trim() || !ownerName.trim() || !ownerEmail.trim()) {
+      setError("Please fill in all required fields (Business name, owner name, owner email).");
+      return;
+    }
+    setIsSubmitting(true);
+    setError("");
+
+    try {
+      const result = await createAdminTenant({
+        businessName: businessName.trim(),
+        businessType,
+        ownerName: ownerName.trim(),
+        ownerEmail: ownerEmail.trim(),
+        password: password.trim() || undefined,
+        city: city.trim() || undefined,
+        phone: phone.trim() || undefined,
+        plan,
+        subscriptionStatus,
+        sendPasswordEmail,
+      });
+      onSuccess(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to create tenant.");
+      setIsSubmitting(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/80 p-4 backdrop-blur-sm">
+      <div className="relative w-full max-w-lg rounded-2xl border border-slate-700 bg-[#0c1425] p-6 text-slate-100 shadow-2xl light:border-slate-200 light:bg-white light:text-slate-900">
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute right-4 top-4 rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white light:hover:bg-slate-100 light:hover:text-slate-900"
+        >
+          <X className="h-5 w-5" />
+        </button>
+
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/15 text-violet-400">
+            <Building2 className="h-5 w-5" />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-white light:text-slate-900">Add Business Tenant</h3>
+            <p className="text-xs text-slate-400 light:text-slate-500">
+              Manual onboarding for businesses unable to self sign up
+            </p>
+          </div>
+        </div>
+
+        {error && (
+          <div className="mt-4 flex items-start gap-2 rounded-xl bg-rose-500/10 p-3 text-xs text-rose-400">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="mt-5 space-y-4">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 light:text-slate-700">
+                Business Name <span className="text-rose-400">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                value={businessName}
+                onChange={(e) => setBusinessName(e.target.value)}
+                placeholder="e.g. Bella's Salon"
+                className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-900/80 px-3.5 py-2 text-xs text-slate-100 outline-none focus:border-violet-500 light:border-slate-300 light:bg-slate-50 light:text-slate-900"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 light:text-slate-700">
+                Business Type <span className="text-rose-400">*</span>
+              </label>
+              <select
+                value={businessType}
+                onChange={(e) => setBusinessType(e.target.value as "appointment" | "ordering")}
+                className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-900/80 px-3 py-2 text-xs text-slate-100 outline-none focus:border-violet-500 light:border-slate-300 light:bg-slate-50 light:text-slate-900"
+              >
+                <option value="appointment">Appointment / Bookings</option>
+                <option value="ordering">Ordering / Food & Retail</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 light:text-slate-700">
+                Owner Full Name <span className="text-rose-400">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                value={ownerName}
+                onChange={(e) => setOwnerName(e.target.value)}
+                placeholder="e.g. Bella Smith"
+                className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-900/80 px-3.5 py-2 text-xs text-slate-100 outline-none focus:border-violet-500 light:border-slate-300 light:bg-slate-50 light:text-slate-900"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 light:text-slate-700">
+                Owner Email <span className="text-rose-400">*</span>
+              </label>
+              <input
+                type="email"
+                required
+                value={ownerEmail}
+                onChange={(e) => setOwnerEmail(e.target.value)}
+                placeholder="owner@example.com"
+                className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-900/80 px-3.5 py-2 text-xs text-slate-100 outline-none focus:border-violet-500 light:border-slate-300 light:bg-slate-50 light:text-slate-900"
+              />
+            </div>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-semibold text-slate-300 light:text-slate-700">
+                Temporary Password
+              </label>
+              <button
+                type="button"
+                onClick={handleGeneratePassword}
+                className="text-[11px] font-medium text-violet-400 hover:text-violet-300 light:text-violet-600"
+              >
+                + Generate Random
+              </button>
+            </div>
+            <div className="relative mt-1">
+              <input
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Leave blank to auto-generate"
+                className="w-full rounded-xl border border-slate-700 bg-slate-900/80 px-3.5 py-2 pr-10 text-xs text-slate-100 outline-none focus:border-violet-500 light:border-slate-300 light:bg-slate-50 light:text-slate-900"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 light:hover:text-slate-700"
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+            <p className="mt-1 text-[10px] text-slate-500">
+              Provide this password to the client. They can sign in and change it, or use the email link.
+            </p>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 light:text-slate-700">City / District</label>
+              <input
+                type="text"
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                placeholder="e.g. Belize City"
+                className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-900/80 px-3.5 py-2 text-xs text-slate-100 outline-none focus:border-violet-500 light:border-slate-300 light:bg-slate-50 light:text-slate-900"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 light:text-slate-700">Phone</label>
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="e.g. 501-610-0000"
+                className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-900/80 px-3.5 py-2 text-xs text-slate-100 outline-none focus:border-violet-500 light:border-slate-300 light:bg-slate-50 light:text-slate-900"
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 light:text-slate-700">Plan</label>
+              <select
+                value={plan}
+                onChange={(e) => setPlan(e.target.value as "starter" | "pro" | "enterprise")}
+                className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-900/80 px-3 py-2 text-xs text-slate-100 outline-none focus:border-violet-500 light:border-slate-300 light:bg-slate-50 light:text-slate-900"
+              >
+                <option value="starter">Starter / Beginner</option>
+                <option value="pro">Pro</option>
+                <option value="enterprise">Enterprise</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 light:text-slate-700">Initial Access</label>
+              <select
+                value={subscriptionStatus}
+                onChange={(e) => setSubscriptionStatus(e.target.value as "trial" | "active")}
+                className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-900/80 px-3 py-2 text-xs text-slate-100 outline-none focus:border-violet-500 light:border-slate-300 light:bg-slate-50 light:text-slate-900"
+              >
+                <option value="trial">14-Day Free Trial</option>
+                <option value="active">Active (Paid / Approved)</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-3 light:border-slate-200 light:bg-slate-50">
+            <label className="flex cursor-pointer items-start gap-2.5">
+              <input
+                type="checkbox"
+                checked={sendPasswordEmail}
+                onChange={(e) => setSendPasswordEmail(e.target.checked)}
+                className="mt-0.5 rounded border-slate-700 text-violet-600 focus:ring-violet-500"
+              />
+              <div className="text-xs">
+                <span className="font-semibold text-white light:text-slate-900">
+                  Send password creation / reset email
+                </span>
+                <p className="mt-0.5 text-[11px] text-slate-400 light:text-slate-500">
+                  Prompts the owner with a secure email link to set or change their password for private access.
+                </p>
+              </div>
+            </label>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-xl border border-slate-700 px-4 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800 light:border-slate-300 light:text-slate-700 light:hover:bg-slate-100"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-5 py-2 text-xs font-semibold text-white shadow-md hover:bg-violet-500 disabled:opacity-50"
+            >
+              {isSubmitting ? (
+                <>
+                  <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                  <span>Provisioning...</span>
+                </>
+              ) : (
+                "Create Business Account"
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function AddAgentModal({
+  isOpen,
+  tenants,
+  onClose,
+  onSuccess,
+}: {
+  isOpen: boolean;
+  tenants: Tenant[];
+  onClose: () => void;
+  onSuccess: (result: CreateAdminAgentResult) => void;
+}) {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [tenantId, setTenantId] = useState<string>("platform");
+  const [role, setRole] = useState<"superadmin" | "owner" | "admin" | "manager" | "staff">("superadmin");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [sendPasswordEmail, setSendPasswordEmail] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleTenantChange = (target: string) => {
+    setTenantId(target);
+    if (target === "platform") {
+      setRole("superadmin");
+    } else if (role === "superadmin") {
+      setRole("staff");
+    }
+  };
+
+  const handleGeneratePassword = () => {
+    const generated = generateRandomPassword();
+    setPassword(generated);
+    setShowPassword(true);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim() || !email.trim()) {
+      setError("Please fill in agent name and email.");
+      return;
+    }
+    setIsSubmitting(true);
+    setError("");
+
+    try {
+      const result = await createAdminAgent({
+        name: name.trim(),
+        email: email.trim(),
+        role: tenantId === "platform" ? "superadmin" : role,
+        tenantId: tenantId === "platform" ? null : tenantId,
+        password: password.trim() || undefined,
+        sendPasswordEmail,
+      });
+      onSuccess(result);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to create agent.");
+      setIsSubmitting(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/80 p-4 backdrop-blur-sm">
+      <div className="relative w-full max-w-md rounded-2xl border border-slate-700 bg-[#0c1425] p-6 text-slate-100 shadow-2xl light:border-slate-200 light:bg-white light:text-slate-900">
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute right-4 top-4 rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white light:hover:bg-slate-100 light:hover:text-slate-900"
+        >
+          <X className="h-5 w-5" />
+        </button>
+
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/15 text-violet-400">
+            <UserCog className="h-5 w-5" />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-white light:text-slate-900">Add System Agent</h3>
+            <p className="text-xs text-slate-400 light:text-slate-500">
+              Create a platform administrator or business agent
+            </p>
+          </div>
+        </div>
+
+        {error && (
+          <div className="mt-4 flex items-start gap-2 rounded-xl bg-rose-500/10 p-3 text-xs text-rose-400">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="mt-5 space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 light:text-slate-700">
+              Agent Full Name <span className="text-rose-400">*</span>
+            </label>
+            <input
+              type="text"
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Alex Morgan"
+              className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-900/80 px-3.5 py-2 text-xs text-slate-100 outline-none focus:border-violet-500 light:border-slate-300 light:bg-slate-50 light:text-slate-900"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 light:text-slate-700">
+              Email Address <span className="text-rose-400">*</span>
+            </label>
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="agent@example.com"
+              className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-900/80 px-3.5 py-2 text-xs text-slate-100 outline-none focus:border-violet-500 light:border-slate-300 light:bg-slate-50 light:text-slate-900"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 light:text-slate-700">Assignment</label>
+            <select
+              value={tenantId}
+              onChange={(e) => handleTenantChange(e.target.value)}
+              className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-900/80 px-3 py-2 text-xs text-slate-100 outline-none focus:border-violet-500 light:border-slate-300 light:bg-slate-50 light:text-slate-900"
+            >
+              <option value="platform">Platform (Super Admin / Global)</option>
+              <optgroup label="Assign to Business Tenant">
+                {tenants.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </optgroup>
+            </select>
+          </div>
+
+          {tenantId !== "platform" && (
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 light:text-slate-700">Tenant Role</label>
+              <select
+                value={role}
+                onChange={(e) => setRole(e.target.value as "owner" | "admin" | "manager" | "staff")}
+                className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-900/80 px-3 py-2 text-xs text-slate-100 outline-none focus:border-violet-500 light:border-slate-300 light:bg-slate-50 light:text-slate-900"
+              >
+                <option value="staff">Staff (Daily orders/appointments)</option>
+                <option value="manager">Manager (Operations & records)</option>
+                <option value="admin">Admin (Business administrator)</option>
+                <option value="owner">Owner (Full business ownership)</option>
+              </select>
+            </div>
+          )}
+
+          <div>
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-semibold text-slate-300 light:text-slate-700">
+                Initial Password
+              </label>
+              <button
+                type="button"
+                onClick={handleGeneratePassword}
+                className="text-[11px] font-medium text-violet-400 hover:text-violet-300 light:text-violet-600"
+              >
+                + Generate
+              </button>
+            </div>
+            <div className="relative mt-1">
+              <input
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Leave blank to auto-generate"
+                className="w-full rounded-xl border border-slate-700 bg-slate-900/80 px-3.5 py-2 pr-10 text-xs text-slate-100 outline-none focus:border-violet-500 light:border-slate-300 light:bg-slate-50 light:text-slate-900"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 light:hover:text-slate-700"
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-3 light:border-slate-200 light:bg-slate-50">
+            <label className="flex cursor-pointer items-start gap-2.5">
+              <input
+                type="checkbox"
+                checked={sendPasswordEmail}
+                onChange={(e) => setSendPasswordEmail(e.target.checked)}
+                className="mt-0.5 rounded border-slate-700 text-violet-600 focus:ring-violet-500"
+              />
+              <div className="text-xs">
+                <span className="font-semibold text-white light:text-slate-900">
+                  Send password setup email
+                </span>
+                <p className="mt-0.5 text-[11px] text-slate-400 light:text-slate-500">
+                  Allows the agent to immediately choose their private password.
+                </p>
+              </div>
+            </label>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-xl border border-slate-700 px-4 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800 light:border-slate-300 light:text-slate-700 light:hover:bg-slate-100"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="inline-flex items-center gap-2 rounded-xl bg-violet-600 px-5 py-2 text-xs font-semibold text-white shadow-md hover:bg-violet-500 disabled:opacity-50"
+            >
+              {isSubmitting ? (
+                <>
+                  <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                  <span>Creating...</span>
+                </>
+              ) : (
+                "Create Agent"
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function CredentialsSuccessModal({
+  isOpen,
+  onClose,
+  title,
+  badge,
+  name,
+  email,
+  roleOrType,
+  password,
+  slug,
+  recoveryUrl,
+  emailSent,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  title: string;
+  badge: string;
+  name: string;
+  email: string;
+  roleOrType: string;
+  password?: string;
+  slug?: string;
+  recoveryUrl?: string | null;
+  emailSent?: boolean;
+}) {
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  const copyToClipboard = (text: string, label: string) => {
+    void navigator.clipboard.writeText(text);
+    setCopiedField(label);
+    setTimeout(() => setCopiedField(null), 2500);
+  };
+
+  const copyAllSummary = () => {
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const lines = [
+      `=== YuhBusiness Account Credentials ===`,
+      `Name: ${name}`,
+      `Email: ${email}`,
+      `Role / Business: ${roleOrType}`,
+      password ? `Temporary Password: ${password}` : "",
+      `Sign In: ${origin}/login`,
+      recoveryUrl ? `Password Setup Link: ${recoveryUrl}` : "",
+      slug ? `Storefront: ${origin}/store-front/${slug}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    copyToClipboard(lines, "all");
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/85 p-4 backdrop-blur-sm">
+      <div className="relative w-full max-w-lg rounded-2xl border border-emerald-500/40 bg-[#0c1425] p-6 text-slate-100 shadow-2xl light:border-emerald-500/30 light:bg-white light:text-slate-900">
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute right-4 top-4 rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white light:hover:bg-slate-100 light:hover:text-slate-900"
+        >
+          <X className="h-5 w-5" />
+        </button>
+
+        <div className="flex items-center gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-500/15 text-emerald-400">
+            <Check className="h-6 w-6" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="text-lg font-bold text-white light:text-slate-900">{title}</h3>
+              <span className="rounded-full bg-emerald-500/20 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-400 light:bg-emerald-100 light:text-emerald-700">
+                {badge}
+              </span>
+            </div>
+            <p className="text-xs text-slate-400 light:text-slate-500">
+              The account has been provisioned and is ready for use.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-5 space-y-3 rounded-xl border border-slate-800 bg-slate-900/60 p-4 text-xs light:border-slate-200 light:bg-slate-50">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-2.5 light:border-slate-200">
+            <span className="text-slate-400 light:text-slate-500">Name / Business:</span>
+            <span className="font-semibold text-white light:text-slate-900">{name}</span>
+          </div>
+
+          <div className="flex items-center justify-between border-b border-slate-800 pb-2.5 light:border-slate-200">
+            <span className="text-slate-400 light:text-slate-500">Login Email:</span>
+            <span className="font-mono font-medium text-white light:text-slate-900">{email}</span>
+          </div>
+
+          <div className="flex items-center justify-between border-b border-slate-800 pb-2.5 light:border-slate-200">
+            <span className="text-slate-400 light:text-slate-500">Role / Type:</span>
+            <span className="text-slate-300 light:text-slate-700">{roleOrType}</span>
+          </div>
+
+          {password && (
+            <div className="rounded-lg border border-violet-500/30 bg-violet-500/10 p-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-medium text-violet-300 light:text-violet-700">
+                  Temporary Password:
+                </span>
+                <button
+                  type="button"
+                  onClick={() => copyToClipboard(password, "password")}
+                  className="flex items-center gap-1 rounded bg-violet-600 px-2 py-0.5 text-[10px] font-semibold text-white transition hover:bg-violet-500"
+                >
+                  {copiedField === "password" ? (
+                    <>
+                      <CheckCheck className="h-3 w-3" />
+                      <span>Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-3 w-3" />
+                      <span>Copy</span>
+                    </>
+                  )}
+                </button>
+              </div>
+              <p className="mt-1 font-mono text-sm font-bold tracking-wider text-white light:text-slate-950">
+                {password}
+              </p>
+            </div>
+          )}
+
+          {recoveryUrl && (
+            <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-2.5 light:border-slate-200 light:bg-white">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-medium text-slate-400">Direct Password Setup Link:</span>
+                <button
+                  type="button"
+                  onClick={() => copyToClipboard(recoveryUrl, "link")}
+                  className="flex items-center gap-1 text-[10px] text-violet-400 hover:underline"
+                >
+                  {copiedField === "link" ? "Copied!" : "Copy link"}
+                </button>
+              </div>
+              <p className="mt-1 truncate font-mono text-[10px] text-slate-400">{recoveryUrl}</p>
+            </div>
+          )}
+
+          {emailSent && (
+            <div className="flex items-center gap-2 text-[11px] text-emerald-400">
+              <Check className="h-3.5 w-3.5" />
+              <span>Password setup email dispatched to {email}.</span>
+            </div>
+          )}
+        </div>
+
+        <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:justify-between">
+          <button
+            type="button"
+            onClick={copyAllSummary}
+            className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800 px-4 py-2.5 text-xs font-semibold text-white transition hover:bg-slate-700 light:border-slate-300 light:bg-slate-100 light:text-slate-800 light:hover:bg-slate-200"
+          >
+            {copiedField === "all" ? (
+              <>
+                <CheckCheck className="h-4 w-4 text-emerald-400" />
+                <span>Copied All Details!</span>
+              </>
+            ) : (
+              <>
+                <Copy className="h-4 w-4" />
+                <span>Copy All Credentials</span>
+              </>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-xl bg-violet-600 px-6 py-2.5 text-xs font-semibold text-white shadow-md transition hover:bg-violet-500"
+          >
+            Done
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+

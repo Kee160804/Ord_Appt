@@ -546,3 +546,93 @@ export async function updateAdminTenantSubscription(
   }
   return payload.subscription;
 }
+
+export interface CreateAdminTenantInput {
+  businessName: string;
+  businessType: "appointment" | "ordering";
+  ownerName: string;
+  ownerEmail: string;
+  password?: string;
+  city?: string;
+  phone?: string;
+  slug?: string;
+  plan?: "starter" | "pro" | "enterprise";
+  subscriptionStatus?: "trial" | "active";
+  trialDays?: number;
+  sendPasswordEmail?: boolean;
+}
+
+export interface CreateAdminTenantResult {
+  success: boolean;
+  tenant: {
+    id: string;
+    name: string;
+    slug: string;
+    businessType: "appointment" | "ordering";
+    plan: "starter" | "pro" | "enterprise";
+    subscriptionStatus: string;
+  };
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    temporaryPassword?: string;
+  };
+  recoveryUrl?: string | null;
+  emailSent?: boolean;
+}
+
+export interface CreateAdminAgentInput {
+  name: string;
+  email: string;
+  role: "superadmin" | "owner" | "admin" | "manager" | "staff";
+  tenantId?: string | null;
+  password?: string;
+  sendPasswordEmail?: boolean;
+}
+
+export interface CreateAdminAgentResult {
+  success: boolean;
+  agent: {
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+    tenantId: string | null;
+    tenantName: string;
+    isActive: boolean;
+  };
+  temporaryPassword?: string;
+  recoveryUrl?: string | null;
+  emailSent?: boolean;
+}
+
+export async function createAdminTenant(
+  input: CreateAdminTenantInput,
+): Promise<CreateAdminTenantResult> {
+  const response = await fetch("/api/admin/tenants", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  const data = (await response.json()) as CreateAdminTenantResult & { error?: string };
+  if (!response.ok || !data.success) {
+    throw new Error(data.error || "Unable to create tenant.");
+  }
+  return data;
+}
+
+export async function createAdminAgent(
+  input: CreateAdminAgentInput,
+): Promise<CreateAdminAgentResult> {
+  const response = await fetch("/api/admin/agents", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  const data = (await response.json()) as CreateAdminAgentResult & { error?: string };
+  if (!response.ok || !data.success) {
+    throw new Error(data.error || "Unable to create agent.");
+  }
+  return data;
+}
