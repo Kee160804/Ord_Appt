@@ -40,6 +40,7 @@ interface ExtendedTenant extends Tenant {
 
 interface CartItem {
   id: string;
+  variantId?: string;
   name: string;
   price: number;
   quantity: number;
@@ -97,7 +98,9 @@ export default function StorefrontClient({
 
   const handleAddToCart = (item: CartItem) => {
     setCart((prev) => {
-      const existing = prev.find((i) => i.id === item.id);
+      const existing = prev.find(
+        (i) => i.id === item.id && i.variantId === item.variantId,
+      );
       if (existing) {
         const mergedAddons = [...existing.addons];
         item.addons.forEach((addon) => {
@@ -105,7 +108,7 @@ export default function StorefrontClient({
           if (!found) mergedAddons.push(addon);
         });
         return prev.map((i) =>
-          i.id === item.id
+          i.id === item.id && i.variantId === item.variantId
             ? {
                 ...i,
                 quantity: i.quantity + item.quantity,

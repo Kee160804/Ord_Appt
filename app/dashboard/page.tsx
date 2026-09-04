@@ -41,7 +41,7 @@ export default function DashboardPage() {
     <>
       <TopBar
         title="Dashboard"
-        subtitle={`${tenant.name} — ${tenant.businessType === "appointment" ? "Appointment" : "Ordering"} Business`}
+        subtitle={`${tenant.name} — ${tenant.businessType === "appointment" ? "Appointment" : tenant.businessType === "retail" ? "Retail" : "Ordering"} Business`}
       />
       <DashboardOverview tenant={tenant} />
     </>

@@ -30,7 +30,7 @@ SET business_type = CASE
   ELSE 'appointment'
 END
 WHERE business_type IS NULL
-   OR LOWER(business_type) NOT IN ('appointment', 'ordering');
+  OR LOWER(business_type) NOT IN ('appointment', 'ordering', 'retail');
 
 ALTER TABLE public.tenants
   ALTER COLUMN business_type SET DEFAULT 'appointment',

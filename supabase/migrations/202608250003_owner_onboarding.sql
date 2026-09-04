@@ -21,7 +21,7 @@ DECLARE
 BEGIN
   IF v_user_id IS NULL THEN RAISE EXCEPTION 'You must be signed in.' USING ERRCODE = '28000'; END IF;
   IF LENGTH(BTRIM(COALESCE(p_business_name, ''))) < 2 THEN RAISE EXCEPTION 'Business name is required.' USING ERRCODE = '22023'; END IF;
-  IF LOWER(COALESCE(p_business_type, '')) NOT IN ('appointment', 'ordering') THEN RAISE EXCEPTION 'Choose a valid business type.' USING ERRCODE = '22023'; END IF;
+  IF LOWER(COALESCE(p_business_type, '')) NOT IN ('appointment', 'ordering', 'retail') THEN RAISE EXCEPTION 'Choose a valid business type.' USING ERRCODE = '22023'; END IF;
   v_slug := REGEXP_REPLACE(v_slug, '(^-+|-+$)', '', 'g');
   IF v_slug = '' THEN v_slug := 'business-' || LEFT(REPLACE(v_user_id::TEXT, '-', ''), 12); END IF;
 
@@ -74,11 +74,11 @@ BEGIN
   END IF;
 
   UPDATE public.business_modules
-  SET appointments = LOWER(p_business_type) = 'appointment', ordering = LOWER(p_business_type) = 'ordering', inventory = LOWER(p_business_type) = 'ordering'
+  SET appointments = LOWER(p_business_type) = 'appointment', ordering = LOWER(p_business_type) = 'ordering', inventory = LOWER(p_business_type) IN ('ordering', 'retail')
   WHERE tenant_id = v_tenant_id;
   IF NOT FOUND THEN
     INSERT INTO public.business_modules (tenant_id, appointments, ordering, inventory)
-    VALUES (v_tenant_id, LOWER(p_business_type) = 'appointment', LOWER(p_business_type) = 'ordering', LOWER(p_business_type) = 'ordering');
+    VALUES (v_tenant_id, LOWER(p_business_type) = 'appointment', LOWER(p_business_type) = 'ordering', LOWER(p_business_type) IN ('ordering', 'retail'));
   END IF;
   RETURN v_tenant_id;
 END;

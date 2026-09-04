@@ -7,6 +7,7 @@ import {
   Check,
   Calendar,
   ShoppingBag,
+  Store,
   ArrowRight,
   ArrowLeft,
 } from "lucide-react";
@@ -195,7 +196,7 @@ export default function RegisterPage() {
                   Start with your personal details
                 </p>
               </div>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <Field
                   label="First Name"
                   placeholder="Jane"
@@ -273,10 +274,23 @@ export default function RegisterPage() {
                     color: "orange",
                     examples: ["🍕 Restaurants", "🥐 Bakeries", "☕ Cafes"],
                   },
+                  {
+                    type: "retail" as BusinessType,
+                    icon: Store,
+                    label: "Retail Stores",
+                    desc: "Clothing, shoes, gifts, products",
+                    color: "emerald",
+                    examples: [
+                      "👕 Boutiques",
+                      "👟 Shoe stores",
+                      "🎁 Gift shops",
+                    ],
+                  },
                 ].map((opt) => {
                   const Icon = opt.icon;
                   const sel = bType === opt.type;
                   const isViolet = opt.color === "violet";
+                  const isEmerald = opt.color === "emerald";
                   return (
                     <button
                       key={opt.type}
@@ -286,20 +300,30 @@ export default function RegisterPage() {
                         sel
                           ? isViolet
                             ? "border-violet-500 bg-violet-900/30"
-                            : "border-orange-500 bg-orange-900/30"
+                            : isEmerald
+                              ? "border-emerald-500 bg-emerald-900/30"
+                              : "border-orange-500 bg-orange-900/30"
                           : "border-slate-700 hover:border-slate-500 bg-slate-800/30",
                       )}
                     >
                       <div
                         className={cn(
                           "w-10 h-10 rounded-xl flex items-center justify-center",
-                          isViolet ? "bg-violet-500/20" : "bg-orange-500/20",
+                          isViolet
+                            ? "bg-violet-500/20"
+                            : isEmerald
+                              ? "bg-emerald-500/20"
+                              : "bg-orange-500/20",
                         )}
                       >
                         <Icon
                           className={cn(
                             "w-5 h-5",
-                            isViolet ? "text-violet-400" : "text-orange-400",
+                            isViolet
+                              ? "text-violet-400"
+                              : isEmerald
+                                ? "text-emerald-400"
+                                : "text-orange-400",
                           )}
                         />
                       </div>
@@ -322,7 +346,11 @@ export default function RegisterPage() {
                         <p
                           className={cn(
                             "text-xs font-bold flex items-center gap-1",
-                            isViolet ? "text-violet-400" : "text-orange-400",
+                            isViolet
+                              ? "text-violet-400"
+                              : isEmerald
+                                ? "text-emerald-400"
+                                : "text-orange-400",
                           )}
                         >
                           <Check className="w-3 h-3" /> Selected

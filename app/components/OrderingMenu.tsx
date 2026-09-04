@@ -21,6 +21,7 @@ import { Product, Tenant } from "@/app/types/index";
 
 interface CartItem {
   id: string;
+  variantId?: string;
   name: string;
   price: number;
   quantity: number;
@@ -63,6 +64,7 @@ export function OrderingMenu({
   const [currentProduct, setCurrentProduct] = useState<Product | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [selectedAddons, setSelectedAddons] = useState<AddonOption[]>([]);
+  const [selectedVariantId, setSelectedVariantId] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
@@ -282,26 +284,41 @@ export function OrderingMenu({
     setCurrentProduct(product);
     setQuantity(1);
     setSelectedAddons([]);
+    setSelectedVariantId(
+      product.variants?.find((variant) => variant.isActive && variant.stock > 0)
+        ?.id ?? "",
+    );
     setModalOpen(true);
   };
 
   const handleAddToCart = () => {
     if (!currentProduct) return;
+    const selectedVariant = currentProduct.variants?.find(
+      (variant) => variant.id === selectedVariantId,
+    );
+    if (currentProduct.variants?.length && !selectedVariant) {
+      setOrderError("Choose an available product variant.");
+      return;
+    }
     const existingQuantity =
-      cart.find((item) => item.id === currentProduct.id)?.quantity ?? 0;
+      cart.find(
+        (item) =>
+          item.id === currentProduct.id && item.variantId === selectedVariantId,
+      )?.quantity ?? 0;
+    const availableStock =
+      selectedVariant?.stock ?? currentProduct.inventory ?? 0;
     if (
-      currentProduct.trackInventory !== false &&
-      existingQuantity + quantity > (currentProduct.inventory ?? 0)
+      (selectedVariant || currentProduct.trackInventory !== false) &&
+      existingQuantity + quantity > availableStock
     ) {
-      setOrderError(
-        `Only ${currentProduct.inventory ?? 0} ${currentProduct.name} available.`,
-      );
+      setOrderError(`Only ${availableStock} ${currentProduct.name} available.`);
       return;
     }
     onAddToCart({
       id: currentProduct.id,
+      variantId: selectedVariant?.id,
       name: currentProduct.name,
-      price: currentProduct.price,
+      price: selectedVariant?.price ?? currentProduct.price,
       quantity,
       addons: selectedAddons.map(({ id, name, price }) => ({
         id,
@@ -397,6 +414,7 @@ export function OrderingMenu({
           productId: item.id,
           quantity: item.quantity,
           addons: item.addons,
+          variantId: item.variantId,
         })),
         promotionCode: appliedPromotion?.code,
         requestedTime: requestedTime
@@ -1019,34 +1037,65 @@ export function OrderingMenu({
               </div>
             </div>
             <div>
-              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
-                Quantity
-              </label>
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                  className="w-8 h-8 rounded-lg border border-slate-200 dark:border-slate-600 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-700 transition"
-                  aria-label="Decrease quantity"
-                >
-                  <Minus className="w-4 h-4" />
-                </button>
-                <span className="text-lg font-bold w-10 text-center text-slate-900 dark:text-white">
-                  {quantity}
-                </span>
-                <button
-                  onClick={() => setQuantity(quantity + 1)}
-                  disabled={
-                    currentProduct.trackInventory !== false &&
-                    quantity +
-                      (cart.find((item) => item.id === currentProduct.id)
-                        ?.quantity ?? 0) >=
-                      (currentProduct.inventory ?? 0)
-                  }
-                  className="w-8 h-8 rounded-lg border border-slate-200 dark:border-slate-600 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-30 transition"
-                  aria-label="Increase quantity"
-                >
-                  <Plus className="w-4 h-4" />
-                </button>
+              {currentProduct.variants &&
+                currentProduct.variants.length > 0 && (
+                  <div className="mb-4">
+                    <label className="mb-2 block text-sm font-semibold text-slate-700 dark:text-slate-300">
+                      Choose an option
+                    </label>
+                    <select
+                      value={selectedVariantId}
+                      onChange={(event) =>
+                        setSelectedVariantId(event.target.value)
+                      }
+                      className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+                    >
+                      <option value="">Select size, color, or style...</option>
+                      {currentProduct.variants.map((variant) => (
+                        <option
+                          key={variant.id}
+                          value={variant.id}
+                          disabled={!variant.isActive || variant.stock < 1}
+                        >
+                          {Object.entries(variant.attributes)
+                            .map(([key, value]) => `${key}: ${value}`)
+                            .join(" · ")}{" "}
+                          · {variant.stock} available
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                  Quantity
+                </label>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                    className="w-8 h-8 rounded-lg border border-slate-200 dark:border-slate-600 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+                    aria-label="Decrease quantity"
+                  >
+                    <Minus className="w-4 h-4" />
+                  </button>
+                  <span className="text-lg font-bold w-10 text-center text-slate-900 dark:text-white">
+                    {quantity}
+                  </span>
+                  <button
+                    onClick={() => setQuantity(quantity + 1)}
+                    disabled={
+                      currentProduct.trackInventory !== false &&
+                      quantity +
+                        (cart.find((item) => item.id === currentProduct.id)
+                          ?.quantity ?? 0) >=
+                        (currentProduct.inventory ?? 0)
+                    }
+                    className="w-8 h-8 rounded-lg border border-slate-200 dark:border-slate-600 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-30 transition"
+                    aria-label="Increase quantity"
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             </div>
             <div>
@@ -1088,6 +1137,10 @@ export function OrderingMenu({
               Add to Cart —{" "}
               {formatCurrency(
                 (currentProduct.price +
+                  (currentProduct.variants?.find(
+                    (variant) => variant.id === selectedVariantId,
+                  )?.price ?? 0) -
+                  (currentProduct.variants?.length ? currentProduct.price : 0) +
                   selectedAddons.reduce((s, a) => s + a.price, 0)) *
                   quantity,
               )}

@@ -31,8 +31,15 @@ import {
   setProductAvailability,
   updateCategory,
   updateProduct,
+  saveProductVariants,
 } from "../services/productService";
-import type { Category, Product, ProductAddon, Tenant } from "../types/index";
+import type {
+  Category,
+  Product,
+  ProductAddon,
+  ProductVariant,
+  Tenant,
+} from "../types/index";
 
 interface Props {
   tenant: Tenant;
@@ -61,6 +68,7 @@ export function ProductsView({ tenant }: Props) {
   const [categoryName, setCategoryName] = useState("");
   const [categorySortOrder, setCategorySortOrder] = useState("");
   const [isSavingCategory, setIsSavingCategory] = useState(false);
+  const [variants, setVariants] = useState<ProductVariant[]>([]);
 
   useEffect(() => {
     if (!isSupabaseConfigured()) {
@@ -182,6 +190,7 @@ export function ProductsView({ tenant }: Props) {
       tags: [],
       addons: [],
     });
+    setVariants([]);
     setError("");
     setShowAdd(true);
   };
@@ -199,6 +208,7 @@ export function ProductsView({ tenant }: Props) {
       tags: product.tags,
       addons: product.addons ?? [],
     });
+    setVariants(product.variants ?? []);
     setError("");
     setShowAdd(true);
   };
@@ -240,6 +250,29 @@ export function ProductsView({ tenant }: Props) {
       )
     ) {
       setError("Enter a name and valid price for each add-on.");
+      return;
+    }
+
+    if (
+      tenant.businessType === "retail" &&
+      variants.some(
+        (variant) =>
+          !variant.sku.trim() ||
+          !Number.isInteger(variant.stock) ||
+          variant.stock < 0,
+      )
+    ) {
+      setError(
+        "Each retail variant needs a SKU and a whole-number stock value.",
+      );
+      return;
+    }
+    if (
+      tenant.businessType === "retail" &&
+      new Set(variants.map((variant) => variant.sku.trim().toLowerCase()))
+        .size !== variants.length
+    ) {
+      setError("Retail variant SKUs must be unique.");
       return;
     }
 
@@ -302,6 +335,26 @@ export function ProductsView({ tenant }: Props) {
             )
           : [...products, product];
         setStoredProducts(tenant.id, nextProducts);
+      }
+
+      if (
+        tenant.businessType === "retail" &&
+        product.id &&
+        isSupabaseConfigured()
+      ) {
+        await saveProductVariants(
+          tenant.id,
+          product.id,
+          variants.map((variant) => ({
+            id: variant.id,
+            sku: variant.sku,
+            attributes: variant.attributes,
+            price: variant.price,
+            stock: variant.stock,
+            isActive: variant.isActive,
+          })),
+        );
+        product = { ...product, variants };
       }
 
       setProducts((current) =>
@@ -790,6 +843,146 @@ export function ProductsView({ tenant }: Props) {
                           (item) => item.id !== addon.id,
                         ),
                       })
+                    }
+                  >
+                    <Trash2 className="h-4 w-4 text-red-400" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+          {tenant.businessType === "retail" && canUseAdvancedCatalog && (
+            <div className="space-y-3 rounded-lg border border-emerald-500/25 p-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <label className="text-sm font-semibold">
+                    Product variants
+                  </label>
+                  <p className="text-[10px] text-slate-400">
+                    Track size, color, style, or other stock separately.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="xs"
+                  onClick={() =>
+                    setVariants((current) => [
+                      ...current,
+                      {
+                        id: `variant-${Date.now()}`,
+                        productId: editingProduct?.id ?? "",
+                        sku: "",
+                        attributes: { size: "" },
+                        stock: 0,
+                        isActive: true,
+                      },
+                    ])
+                  }
+                >
+                  <Plus className="h-3.5 w-3.5" /> Add variant
+                </Button>
+              </div>
+              {variants.map((variant, index) => (
+                <div
+                  key={variant.id}
+                  className="grid gap-2 rounded-lg border border-slate-700 p-2 sm:grid-cols-[1fr_1fr_90px_80px_auto]"
+                >
+                  <Input
+                    label={index === 0 ? "SKU" : undefined}
+                    placeholder="SKU-001"
+                    value={variant.sku}
+                    onChange={(event) =>
+                      setVariants((current) =>
+                        current.map((item) =>
+                          item.id === variant.id
+                            ? { ...item, sku: event.target.value }
+                            : item,
+                        ),
+                      )
+                    }
+                  />
+                  <Input
+                    label={index === 0 ? "Options" : undefined}
+                    placeholder="size:M,color:Red"
+                    value={Object.entries(variant.attributes)
+                      .map(([key, value]) => `${key}:${value}`)
+                      .join(",")}
+                    onChange={(event) =>
+                      setVariants((current) =>
+                        current.map((item) =>
+                          item.id === variant.id
+                            ? {
+                                ...item,
+                                attributes: Object.fromEntries(
+                                  event.target.value
+                                    .split(",")
+                                    .map((entry) => entry.split(":"))
+                                    .filter(
+                                      ([key, value]) =>
+                                        key?.trim() && value?.trim(),
+                                    )
+                                    .map(([key, value]) => [
+                                      key.trim(),
+                                      value.trim(),
+                                    ]),
+                                ),
+                              }
+                            : item,
+                        ),
+                      )
+                    }
+                  />
+                  <Input
+                    label={index === 0 ? "Price" : undefined}
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="Base"
+                    value={variant.price ?? ""}
+                    onChange={(event) =>
+                      setVariants((current) =>
+                        current.map((item) =>
+                          item.id === variant.id
+                            ? {
+                                ...item,
+                                price: event.target.value
+                                  ? Number(event.target.value)
+                                  : undefined,
+                              }
+                            : item,
+                        ),
+                      )
+                    }
+                  />
+                  <Input
+                    label={index === 0 ? "Stock" : undefined}
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={variant.stock}
+                    onChange={(event) =>
+                      setVariants((current) =>
+                        current.map((item) =>
+                          item.id === variant.id
+                            ? {
+                                ...item,
+                                stock: Number(event.target.value) || 0,
+                              }
+                            : item,
+                        ),
+                      )
+                    }
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="xs"
+                    aria-label="Remove variant"
+                    onClick={() =>
+                      setVariants((current) =>
+                        current.filter((item) => item.id !== variant.id),
+                      )
                     }
                   >
                     <Trash2 className="h-4 w-4 text-red-400" />

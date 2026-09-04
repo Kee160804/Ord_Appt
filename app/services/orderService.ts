@@ -15,6 +15,7 @@ export interface PublicOrderItemInput {
   productId: string;
   quantity: number;
   addons: { id: string; name: string; price: number }[];
+  variantId?: string;
 }
 
 export interface PublicOrderInput {
@@ -79,6 +80,8 @@ function normalizeOrderStatus(value: string): OrderStatus {
       return "preparing";
     case "READY":
       return "ready";
+    case "OUT_FOR_DELIVERY":
+      return "out_for_delivery";
     case "DELIVERED":
     case "COMPLETED":
       return "delivered";

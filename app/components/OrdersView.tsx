@@ -22,14 +22,13 @@ import {
 } from "../services/orderService";
 import type { Order, OrderStatus, Tenant } from "../types/index";
 
-const STATUS_FLOW: OrderStatus[] = [
+const BASE_STATUS_FLOW: OrderStatus[] = [
   "pending",
   "confirmed",
   "preparing",
   "ready",
   "delivered",
 ];
-const STATUS_TABS: OrderStatus[] = [...STATUS_FLOW, "cancelled"];
 
 // Status background colors – default dark, light overrides
 const STATUS_BG: Record<string, string> = {
@@ -43,6 +42,8 @@ const STATUS_BG: Record<string, string> = {
     "bg-green-500/20 light:bg-green-50 border-green-500/30 light:border-green-200",
   delivered:
     "bg-slate-700/50 light:bg-slate-50 border-slate-600 light:border-slate-200",
+  out_for_delivery:
+    "bg-cyan-500/20 light:bg-cyan-50 border-cyan-500/30 light:border-cyan-200",
   cancelled:
     "bg-red-500/20 light:bg-red-50 border-red-500/30 light:border-red-200",
 };
@@ -52,6 +53,11 @@ interface Props {
 }
 
 export function OrdersView({ tenant }: Props) {
+  const statusFlow: OrderStatus[] =
+    tenant.businessType === "retail"
+      ? [...BASE_STATUS_FLOW.slice(0, -1), "out_for_delivery", "delivered"]
+      : BASE_STATUS_FLOW;
+  const statusTabs: OrderStatus[] = [...statusFlow, "cancelled"];
   const [orders, setOrders] = useState<Order[]>(
     isSupabaseConfigured() ? [] : getOrdersByTenant(tenant.id),
   );
@@ -161,7 +167,7 @@ export function OrdersView({ tenant }: Props) {
     <div className="min-h-full space-y-4 bg-[#08111f] light:bg-[#f8fafc] p-4 text-white light:text-[#14213a] md:p-5">
       {/* Status summary */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-        {STATUS_FLOW.map((status) => (
+        {statusFlow.map((status) => (
           <button
             key={status}
             onClick={() => setFilter(status)}
@@ -200,7 +206,7 @@ export function OrdersView({ tenant }: Props) {
 
       {/* Filter strip */}
       <div className="flex w-fit max-w-full items-center gap-1 overflow-x-auto rounded-lg border border-slate-700/60 light:border-[#e5e9f1] bg-slate-900/70 light:bg-white p-1">
-        {(["all", ...STATUS_TABS] as (OrderStatus | "all")[]).map((tab) => (
+        {(["all", ...statusTabs] as (OrderStatus | "all")[]).map((tab) => (
           <button
             key={tab}
             onClick={() => setFilter(tab)}
@@ -332,10 +338,11 @@ export function OrdersView({ tenant }: Props) {
                         Update Status
                       </p>
                       <div className="grid grid-cols-2 gap-2">
-                        {STATUS_FLOW.slice(
-                          STATUS_FLOW.indexOf(selected.status as OrderStatus) +
-                            1,
-                        )
+                        {statusFlow
+                          .slice(
+                            statusFlow.indexOf(selected.status as OrderStatus) +
+                              1,
+                          )
                           .slice(0, 2)
                           .map((next) => (
                             <Button

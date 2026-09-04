@@ -596,7 +596,7 @@ export async function updateAdminTenantSubscription(
 
 export interface CreateAdminTenantInput {
   businessName: string;
-  businessType: "appointment" | "ordering";
+  businessType: "appointment" | "ordering" | "retail";
   ownerName: string;
   ownerEmail: string;
   password?: string;
@@ -615,7 +615,7 @@ export interface CreateAdminTenantResult {
     id: string;
     name: string;
     slug: string;
-    businessType: "appointment" | "ordering";
+    businessType: "appointment" | "ordering" | "retail";
     plan: "starter" | "pro" | "enterprise";
     subscriptionStatus: string;
   };

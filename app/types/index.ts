@@ -1,9 +1,15 @@
 // ─── Business / Tenant ────────────────────────────────────────
-export type BusinessType = "appointment" | "ordering";
+export type BusinessType = "appointment" | "ordering" | "retail";
 export type UserRole = "owner" | "admin" | "manager" | "staff" | "superadmin";
 export type PlanType = "starter" | "pro" | "enterprise";
 export type OrderStatus =
-  "pending" | "confirmed" | "preparing" | "ready" | "delivered" | "cancelled";
+  | "pending"
+  | "confirmed"
+  | "preparing"
+  | "ready"
+  | "out_for_delivery"
+  | "delivered"
+  | "cancelled";
 export type AppointmentStatus =
   "pending" | "confirmed" | "cancelled" | "completed" | "no_show";
 export type PaymentStatus = "unpaid" | "partial" | "paid" | "refunded";
@@ -147,7 +153,18 @@ export interface Product {
   trackInventory?: boolean;
   tags: string[];
   addons?: ProductAddon[];
+  variants?: ProductVariant[];
   createdAt: string;
+}
+
+export interface ProductVariant {
+  id: string;
+  productId: string;
+  sku: string;
+  attributes: Record<string, string>;
+  price?: number;
+  stock: number;
+  isActive: boolean;
 }
 export interface ProductAddon {
   id: string;

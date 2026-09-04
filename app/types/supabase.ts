@@ -74,6 +74,17 @@ export interface ProductRow {
   available: boolean;
   addons: { id: string; name: string; price: number | string }[] | null;
   created_at: string;
+  product_variants?: ProductVariantRow[] | null;
+}
+
+export interface ProductVariantRow {
+  id: string;
+  product_id: string;
+  sku: string;
+  attributes: Record<string, string>;
+  price: number | string | null;
+  stock: number;
+  available: boolean;
 }
 
 export interface ServiceRow {

@@ -152,7 +152,7 @@ BEGIN
     RAISE EXCEPTION 'Business name is required.' USING ERRCODE = '22023';
   END IF;
 
-  IF LOWER(COALESCE(p_business_type, '')) NOT IN ('appointment', 'ordering') THEN
+  IF LOWER(COALESCE(p_business_type, '')) NOT IN ('appointment', 'ordering', 'retail') THEN
     RAISE EXCEPTION 'Choose a valid business type.' USING ERRCODE = '22023';
   END IF;
 
@@ -247,7 +247,7 @@ BEGIN
   UPDATE public.business_modules
   SET appointments = LOWER(p_business_type) = 'appointment',
       ordering = LOWER(p_business_type) = 'ordering',
-      inventory = LOWER(p_business_type) = 'ordering'
+      inventory = LOWER(p_business_type) IN ('ordering', 'retail')
   WHERE tenant_id = v_tenant_id;
 
   IF NOT FOUND THEN
@@ -256,7 +256,7 @@ BEGIN
       v_tenant_id,
       LOWER(p_business_type) = 'appointment',
       LOWER(p_business_type) = 'ordering',
-      LOWER(p_business_type) = 'ordering'
+      LOWER(p_business_type) IN ('ordering', 'retail')
     );
   END IF;
 

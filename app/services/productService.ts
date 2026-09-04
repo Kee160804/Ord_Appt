@@ -1,6 +1,15 @@
 import { getSupabaseBrowserClient } from "@/app/lib/supabase/client";
-import type { Category, Product, ProductAddon } from "@/app/types/index";
-import type { CategoryRow, ProductRow } from "@/app/types/supabase";
+import type {
+  Category,
+  Product,
+  ProductAddon,
+  ProductVariant,
+} from "@/app/types/index";
+import type {
+  CategoryRow,
+  ProductRow,
+  ProductVariantRow,
+} from "@/app/types/supabase";
 
 export interface CreateProductInput {
   name: string;
@@ -11,6 +20,15 @@ export interface CreateProductInput {
   inventory: number | null;
   trackInventory: boolean;
   addons: ProductAddon[];
+}
+
+export interface ProductVariantInput {
+  id?: string;
+  sku: string;
+  attributes: Record<string, string>;
+  price?: number;
+  stock: number;
+  isActive: boolean;
 }
 
 function client() {
@@ -47,7 +65,20 @@ function mapProduct(row: ProductRow, categoryName = "Uncategorized"): Product {
       ...addon,
       price: Number(addon.price),
     })),
+    variants: (row.product_variants ?? []).map(mapVariant),
     createdAt: row.created_at,
+  };
+}
+
+function mapVariant(row: ProductVariantRow): ProductVariant {
+  return {
+    id: row.id,
+    productId: row.product_id,
+    sku: row.sku,
+    attributes: row.attributes ?? {},
+    price: row.price == null ? undefined : Number(row.price),
+    stock: Number(row.stock),
+    isActive: row.available,
   };
 }
 
@@ -124,6 +155,7 @@ export async function listProducts(tenantId: string): Promise<Product[]> {
   const [
     { data: products, error: productsError },
     { data: categories, error: categoriesError },
+    { data: variants, error: variantsError },
   ] = await Promise.all([
     supabase
       .from("products")
@@ -131,10 +163,21 @@ export async function listProducts(tenantId: string): Promise<Product[]> {
       .eq("tenant_id", tenantId)
       .order("created_at"),
     supabase.from("categories").select("*").eq("tenant_id", tenantId),
+    supabase.from("product_variants").select("*").eq("tenant_id", tenantId),
   ]);
 
   if (productsError) throw new Error(productsError.message);
   if (categoriesError) throw new Error(categoriesError.message);
+  const variantRows = variantsError
+    ? []
+    : ((variants ?? []) as ProductVariantRow[]);
+
+  const variantsByProduct = new Map<string, ProductVariantRow[]>();
+  for (const variant of variantRows) {
+    const current = variantsByProduct.get(variant.product_id) ?? [];
+    current.push(variant);
+    variantsByProduct.set(variant.product_id, current);
+  }
 
   const categoryNames = new Map(
     ((categories ?? []) as CategoryRow[]).map((category) => [
@@ -143,7 +186,10 @@ export async function listProducts(tenantId: string): Promise<Product[]> {
     ]),
   );
   return ((products ?? []) as ProductRow[]).map((product) =>
-    mapProduct(product, categoryNames.get(product.category_id ?? "")),
+    mapProduct(
+      { ...product, product_variants: variantsByProduct.get(product.id) ?? [] },
+      categoryNames.get(product.category_id ?? ""),
+    ),
   );
 }
 
@@ -198,6 +244,38 @@ export async function updateProduct(
 
   if (error) throw new Error(error.message);
   return mapProduct(data as ProductRow, categoryName);
+}
+
+export async function saveProductVariants(
+  tenantId: string,
+  productId: string,
+  variants: ProductVariantInput[],
+) {
+  const supabase = client();
+  const { error: deleteError } = await supabase
+    .from("product_variants")
+    .delete()
+    .eq("tenant_id", tenantId)
+    .eq("product_id", productId);
+  if (deleteError) throw new Error(deleteError.message);
+
+  if (variants.length === 0) return [];
+  const { data, error } = await supabase
+    .from("product_variants")
+    .insert(
+      variants.map((variant) => ({
+        tenant_id: tenantId,
+        product_id: productId,
+        sku: variant.sku.trim(),
+        attributes: variant.attributes,
+        price: variant.price ?? null,
+        stock: variant.stock,
+        available: variant.isActive,
+      })),
+    )
+    .select("*");
+  if (error) throw new Error(error.message);
+  return (data ?? []) as ProductVariantRow[];
 }
 
 export async function setProductAvailability(

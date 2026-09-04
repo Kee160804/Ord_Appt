@@ -8,6 +8,7 @@ import {
   Loader2,
   Plus,
   Store,
+  Package,
 } from "lucide-react";
 import { useAuth } from "@/app/contexts/auth";
 import { PLAN_DEFINITIONS } from "@/app/lib/plans";
@@ -123,7 +124,9 @@ export function BusinessSwitcher({
               <span className="mt-1 inline-flex rounded-full bg-violet-600 px-2 py-0.5 text-[7px] font-bold uppercase tracking-wide text-white">
                 {tenant.businessType === "appointment"
                   ? "Appointments"
-                  : "Ordering"}
+                  : tenant.businessType === "retail"
+                    ? "Retail"
+                    : "Ordering"}
               </span>
             </span>
             <ChevronRight className="h-3.5 w-3.5 flex-shrink-0 text-slate-500 transition group-hover:text-violet-300" />
@@ -161,7 +164,7 @@ export function BusinessSwitcher({
               <legend className="text-xs font-semibold text-slate-200 light:text-slate-700">
                 Business type
               </legend>
-              <div className="mt-2 grid grid-cols-2 gap-2">
+              <div className="mt-2 grid grid-cols-3 gap-2">
                 {[
                   {
                     id: "appointment" as const,
@@ -169,6 +172,7 @@ export function BusinessSwitcher({
                     icon: Building2,
                   },
                   { id: "ordering" as const, label: "Ordering", icon: Store },
+                  { id: "retail" as const, label: "Retail", icon: Package },
                 ].map((option) => {
                   const Icon = option.icon;
                   return (

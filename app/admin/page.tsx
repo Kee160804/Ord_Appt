@@ -1910,9 +1910,9 @@ function AddTenantModal({
   onSuccess: (result: CreateAdminTenantResult) => void;
 }) {
   const [businessName, setBusinessName] = useState("");
-  const [businessType, setBusinessType] = useState<"appointment" | "ordering">(
-    "appointment",
-  );
+  const [businessType, setBusinessType] = useState<
+    "appointment" | "ordering" | "retail"
+  >("appointment");
   const [ownerName, setOwnerName] = useState("");
   const [ownerEmail, setOwnerEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -2020,12 +2020,15 @@ function AddTenantModal({
               <select
                 value={businessType}
                 onChange={(e) =>
-                  setBusinessType(e.target.value as "appointment" | "ordering")
+                  setBusinessType(
+                    e.target.value as "appointment" | "ordering" | "retail",
+                  )
                 }
                 className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-900/80 px-3 py-2 text-xs text-slate-100 outline-none focus:border-violet-500 light:border-slate-300 light:bg-slate-50 light:text-slate-900"
               >
                 <option value="appointment">Appointment / Bookings</option>
                 <option value="ordering">Ordering / Food & Retail</option>
+                <option value="retail">Retail / Product Store</option>
               </select>
             </div>
           </div>

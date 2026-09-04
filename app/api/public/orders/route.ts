@@ -20,6 +20,7 @@ interface OrderRequest {
   items?: Array<{
     productId?: string;
     quantity?: number;
+    variantId?: string;
     addons?: Array<{ id?: string }>;
   }>;
   requestedTime?: string;
@@ -64,6 +65,7 @@ export async function POST(request: Request) {
       ? body.items.slice(0, 100).map((item) => ({
           product_id: item.productId,
           quantity: item.quantity,
+          variant_id: item.variantId,
           addons: (item.addons || [])
             .slice(0, 30)
             .map((addon) => ({ id: addon.id })),
@@ -95,7 +97,30 @@ export async function POST(request: Request) {
         { status: 503 },
       );
     }
-    let { data, error } = await supabase.rpc("create_public_order_v3", payload);
+    const { data: tenant, error: tenantError } = await supabase
+      .from("tenants")
+      .select("business_type")
+      .eq("id", tenantId)
+      .maybeSingle();
+    if (tenantError || !tenant) {
+      return Response.json(
+        { error: "Storefront was not found." },
+        { status: 404 },
+      );
+    }
+
+    let { data, error } =
+      tenant.business_type === "retail"
+        ? await supabase.rpc("create_public_retail_order", {
+            p_tenant_id: payload.p_tenant_id,
+            p_customer_name: payload.p_customer_name,
+            p_customer_email: payload.p_customer_email,
+            p_customer_phone: payload.p_customer_phone,
+            p_items: payload.p_items,
+            p_notes: payload.p_notes,
+            p_payment_method: payload.p_payment_method,
+          })
+        : await supabase.rpc("create_public_order_v3", payload);
     if (error?.code === "PGRST202") {
       const fallback = await supabase.rpc("create_public_order_with_email", {
         p_tenant_id: payload.p_tenant_id,

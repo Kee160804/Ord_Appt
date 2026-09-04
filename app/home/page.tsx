@@ -5,6 +5,7 @@ import {
   Sparkles,
   Calendar,
   ShoppingBag,
+  Store,
   ArrowRight,
   Check,
   Zap,
@@ -175,6 +176,14 @@ export default function HomePage() {
       color: "#f472b6",
       city: "Portland, OR",
     },
+    {
+      name: "Maya Streetwear",
+      slug: "maya-streetwear",
+      type: "Retail",
+      emoji: "👟",
+      color: "#10b981",
+      city: "Brooklyn, NY",
+    },
   ];
 
   return (
@@ -265,6 +274,7 @@ export default function HomePage() {
           <span className="bg-gradient-to-r from-violet-400 to-indigo-400 light:from-violet-600 light:to-indigo-600 bg-clip-text text-transparent">
             Tek Yuh Business Online Eena minutes.
           </span>
+          ``{" "}
         </h1>
 
         <p className="mx-auto mb-8 max-w-2xl text-base leading-relaxed text-slate-400 light:text-gray-600 sm:mb-10 sm:text-lg md:text-xl">
@@ -303,7 +313,7 @@ export default function HomePage() {
 
       {/* Business Types */}
       <section className="max-w-6xl mx-auto px-6 md:px-12 pb-24">
-        <div className="grid md:grid-cols-2 gap-6">
+        <div className="grid gap-6 lg:grid-cols-3">
           {/* Appointment card */}
           <div className="bg-violet-900/20 light:bg-violet-50 border border-violet-500/20 light:border-violet-200 rounded-3xl p-8 hover:border-violet-500/40 light:hover:border-violet-300 transition-colors">
             <div className="w-12 h-12 bg-violet-500/20 light:bg-violet-100 rounded-2xl flex items-center justify-center mb-5">
@@ -365,6 +375,37 @@ export default function HomePage() {
               ))}
             </div>
           </div>
+
+          {/* Retail card */}
+          <div className="bg-emerald-900/20 light:bg-emerald-50 border border-emerald-500/20 light:border-emerald-200 rounded-3xl p-8 hover:border-emerald-500/40 light:hover:border-emerald-300 transition-colors">
+            <div className="w-12 h-12 bg-emerald-500/20 light:bg-emerald-100 rounded-2xl flex items-center justify-center mb-5">
+              <Store className="w-6 h-6 text-emerald-400 light:text-emerald-600" />
+            </div>
+            <h3 className="text-xl font-black text-white light:text-gray-900 mb-2">
+              Retail &amp; Product Stores
+            </h3>
+            <p className="text-slate-400 light:text-gray-600 text-sm mb-5">
+              Sell products online with a branded catalog, inventory tracking,
+              and customer orders.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {[
+                "Clothing Boutiques",
+                "Shoe Stores",
+                "Accessories",
+                "Beauty Products",
+                "Gift Shops",
+                "Specialty Retail",
+              ].map((e) => (
+                <span
+                  key={e}
+                  className="text-xs font-semibold px-3 py-1.5 bg-emerald-500/10 light:bg-emerald-100 border border-emerald-500/20 light:border-emerald-200 rounded-full text-emerald-300 light:text-emerald-700"
+                >
+                  {e}
+                </span>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
 
@@ -420,12 +461,12 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
             {demos.map((d) => (
               <Link
                 key={d.slug}
                 href={`/store-front/${d.slug}?demo=1`}
-                className="bg-slate-800/60 light:bg-white border border-slate-700/50 light:border-gray-200 rounded-2xl p-5 hover:border-slate-500 light:hover:border-gray-300 hover:-translate-y-1 transition-all group text-center space-y-4"
+                className="group space-y-3 rounded-2xl border border-slate-700/50 bg-slate-800/60 p-4 text-center transition-all hover:-translate-y-1 hover:border-slate-500 light:border-gray-200 light:bg-white light:hover:border-gray-300"
               >
                 <div
                   className="w-14 h-14 rounded-2xl flex items-center justify-center text-2xl mx-auto shadow-lg light:shadow-sm"

@@ -12,6 +12,7 @@ import type {
   BusinessHourRow,
   CategoryRow,
   ProductRow,
+  ProductVariantRow,
   ServiceRow,
   TenantRow,
 } from "@/app/types/supabase";
@@ -59,7 +60,9 @@ function mapTenant(row: TenantRow, hours: BusinessHourRow[]): Tenant {
     businessType:
       row.business_type?.toLowerCase() === "ordering"
         ? "ordering"
-        : "appointment",
+        : row.business_type?.toLowerCase() === "retail"
+          ? "retail"
+          : "appointment",
     logo: row.logo ?? businessName.charAt(0).toUpperCase(),
     logoBg: row.logo_bg ?? row.primary_color ?? "#8b5cf6",
     description: row.description ?? `Welcome to ${businessName}.`,
@@ -121,6 +124,7 @@ export async function getPublicStorefront(
     hoursResult,
     categoriesResult,
     productsResult,
+    variantsResult,
     servicesResult,
     providersResult,
     assignmentsResult,
@@ -142,6 +146,11 @@ export async function getPublicStorefront(
       .eq("tenant_id", tenantRow.id)
       .eq("available", true)
       .order("name"),
+    supabase
+      .from("product_variants")
+      .select("*")
+      .eq("tenant_id", tenantRow.id)
+      .eq("available", true),
     supabase
       .from("services")
       .select("*")
@@ -176,6 +185,14 @@ export async function getPublicStorefront(
   if (firstError) throw firstError;
 
   const categoryRows = (categoriesResult.data ?? []) as CategoryRow[];
+  const variantsByProduct = new Map<string, ProductVariantRow[]>();
+  for (const variant of (variantsResult.error
+    ? []
+    : (variantsResult.data ?? [])) as ProductVariantRow[]) {
+    const current = variantsByProduct.get(variant.product_id) ?? [];
+    current.push(variant);
+    variantsByProduct.set(variant.product_id, current);
+  }
   const categoryNames = new Map(
     categoryRows.map((category) => [category.id, category.name]),
   );
@@ -242,6 +259,15 @@ export async function getPublicStorefront(
       addons: (row.addons ?? []).map((addon) => ({
         ...addon,
         price: Number(addon.price),
+      })),
+      variants: (variantsByProduct.get(row.id) ?? []).map((variant) => ({
+        id: variant.id,
+        productId: variant.product_id,
+        sku: variant.sku,
+        attributes: variant.attributes ?? {},
+        price: variant.price == null ? undefined : Number(variant.price),
+        stock: Number(variant.stock),
+        isActive: variant.available,
       })),
       createdAt: row.created_at,
     })),

@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS public.tenants (
   created_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  CHECK (LOWER(business_type) IN ('appointment','ordering'))
+  CHECK (LOWER(business_type) IN ('appointment','ordering','retail'))
 );
 ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS profiles_tenant_id_fkey;
 ALTER TABLE public.profiles ADD CONSTRAINT profiles_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE SET NULL;
@@ -189,7 +189,7 @@ DECLARE v_role UUID; v_day INTEGER;
 BEGIN
   INSERT INTO public.business_settings (tenant_id) VALUES (NEW.id) ON CONFLICT DO NOTHING;
   INSERT INTO public.business_modules (tenant_id,appointments,ordering,inventory)
-    VALUES (NEW.id,LOWER(NEW.business_type)='appointment',LOWER(NEW.business_type)='ordering',LOWER(NEW.business_type)='ordering') ON CONFLICT DO NOTHING;
+    VALUES (NEW.id,LOWER(NEW.business_type)='appointment',LOWER(NEW.business_type)='ordering',LOWER(NEW.business_type) IN ('ordering','retail')) ON CONFLICT DO NOTHING;
   FOR v_day IN 0..6 LOOP INSERT INTO public.business_hours (tenant_id,day_of_week,open_time,close_time,is_closed)
     VALUES (NEW.id,v_day,'09:00','17:00',v_day IN (0,6)) ON CONFLICT DO NOTHING; END LOOP;
   INSERT INTO public.roles (tenant_id,name,description,is_system_role) VALUES (NEW.id,'OWNER','Business owner',TRUE)

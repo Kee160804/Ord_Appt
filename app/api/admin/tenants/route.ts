@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 interface CreateTenantRequest {
   businessName: string;
-  businessType: "appointment" | "ordering";
+  businessType: "appointment" | "ordering" | "retail";
   ownerName: string;
   ownerEmail: string;
   password?: string;
@@ -75,7 +75,9 @@ export async function POST(request: Request) {
     const businessType =
       body.businessType?.toLowerCase() === "ordering"
         ? "ordering"
-        : "appointment";
+        : body.businessType?.toLowerCase() === "retail"
+          ? "retail"
+          : "appointment";
     const ownerName = body.ownerName?.trim();
     const ownerEmail = body.ownerEmail?.trim().toLowerCase();
     const city = body.city?.trim() ?? "";
@@ -264,7 +266,7 @@ export async function POST(request: Request) {
       tenant_id: newTenant.id,
       appointments: businessType === "appointment",
       ordering: businessType === "ordering",
-      inventory: businessType === "ordering",
+      inventory: businessType === "ordering" || businessType === "retail",
     });
 
     // 7. Handle password setup / reset email or recovery link

@@ -1,0 +1,15 @@
+# Personal GitHub
+Host github.com-personal
+  HostName github.com
+  User git
+  Port 443
+  IdentityFile C:/Users/kmclaughlin/.ssh/id_ed25519_personal
+  IdentitiesOnly yes
+
+# Work GitHub
+Host github.com-work
+  HostName github.com
+  User git
+  Port 443
+  IdentityFile C:/Users/kmclaughlin/.ssh/id_ed25519_work
+  IdentitiesOnly yes

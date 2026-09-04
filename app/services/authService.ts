@@ -119,6 +119,7 @@ function mapUser(profile: ProfileRow, membership: MembershipRow | null): User {
 }
 
 function normalizeBusinessType(value: string | null | undefined): BusinessType {
+  if (value?.toLowerCase() === "retail") return "retail";
   return value?.toLowerCase() === "ordering" ? "ordering" : "appointment";
 }
 
