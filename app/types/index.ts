@@ -3,18 +3,9 @@ export type BusinessType = "appointment" | "ordering";
 export type UserRole = "owner" | "admin" | "manager" | "staff" | "superadmin";
 export type PlanType = "starter" | "pro" | "enterprise";
 export type OrderStatus =
-  | "pending"
-  | "confirmed"
-  | "preparing"
-  | "ready"
-  | "delivered"
-  | "cancelled";
+  "pending" | "confirmed" | "preparing" | "ready" | "delivered" | "cancelled";
 export type AppointmentStatus =
-  | "pending"
-  | "confirmed"
-  | "cancelled"
-  | "completed"
-  | "no_show";
+  "pending" | "confirmed" | "cancelled" | "completed" | "no_show";
 export type PaymentStatus = "unpaid" | "partial" | "paid" | "refunded";
 export type TenantStatus = "active" | "inactive" | "suspended";
 export type PermissionType =
@@ -36,6 +27,22 @@ export interface SocialLinks {
   facebook?: string;
   twitter?: string;
   website?: string;
+}
+
+export interface OrderingSettings {
+  enabled: boolean;
+  paused: boolean;
+  orderTypes: Array<"dine_in" | "pickup" | "delivery">;
+  taxRate: number;
+  discountEnabled: boolean;
+  discountThreshold: number;
+  discountRate: number;
+  minimumOrder: number;
+  deliveryFee: number;
+  deliveryAreas: string[];
+  preparationMinutes: number;
+  openTime?: string;
+  closeTime?: string;
 }
 
 export interface Tenant {
@@ -63,6 +70,7 @@ export interface Tenant {
   subscriptionStatus: "active" | "trial" | "cancelled" | "past_due";
   trialEndsAt?: string;
   monthlyRevenue?: number;
+  orderingSettings?: OrderingSettings;
 }
 export interface User {
   id: string;

@@ -28,7 +28,9 @@ function mapCustomer(row: {
 }): CustomerRecord {
   return {
     id: row.id,
-    name: [row.first_name, row.last_name].filter(Boolean).join(" ").trim() || "Customer",
+    name:
+      [row.first_name, row.last_name].filter(Boolean).join(" ").trim() ||
+      "Customer",
     email: row.email ?? "",
     phone: row.phone ?? "",
     notes: row.notes ?? "",
@@ -37,12 +39,22 @@ function mapCustomer(row: {
   };
 }
 
-export async function listCustomers(tenantId: string): Promise<CustomerRecord[]> {
+export async function listCustomers(
+  tenantId: string,
+  page = 0,
+  pageSize = 250,
+): Promise<CustomerRecord[]> {
+  const safePage = Math.max(0, Math.floor(page));
+  const safePageSize = Math.min(500, Math.max(1, Math.floor(pageSize)));
+  const from = safePage * safePageSize;
   const { data, error } = await client()
     .from("customers")
-    .select("id, first_name, last_name, email, phone, notes, is_active, created_at")
+    .select(
+      "id, first_name, last_name, email, phone, notes, is_active, created_at",
+    )
     .eq("tenant_id", tenantId)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .range(from, from + safePageSize - 1);
   if (error) throw error;
   return (data ?? []).map(mapCustomer);
 }
@@ -72,7 +84,9 @@ export async function createCustomer(
       notes: input.notes.trim() || null,
       is_active: true,
     })
-    .select("id, first_name, last_name, email, phone, notes, is_active, created_at")
+    .select(
+      "id, first_name, last_name, email, phone, notes, is_active, created_at",
+    )
     .single();
   if (error) throw error;
   return mapCustomer(data);
@@ -95,13 +109,19 @@ export async function updateCustomer(
     })
     .eq("tenant_id", tenantId)
     .eq("id", customerId)
-    .select("id, first_name, last_name, email, phone, notes, is_active, created_at")
+    .select(
+      "id, first_name, last_name, email, phone, notes, is_active, created_at",
+    )
     .single();
   if (error) throw error;
   return mapCustomer(data);
 }
 
-export async function setCustomerActive(tenantId: string, customerId: string, isActive: boolean) {
+export async function setCustomerActive(
+  tenantId: string,
+  customerId: string,
+  isActive: boolean,
+) {
   const { error } = await client()
     .from("customers")
     .update({ is_active: isActive })

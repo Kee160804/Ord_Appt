@@ -35,31 +35,52 @@ export function Sidebar({ tenant, user }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const isAppointmentBusiness = tenant.businessType === "appointment";
-  const canManageBusiness = user.role === "owner" || user.role === "manager" || user.role === "admin";
+  const canManageBusiness =
+    user.role === "owner" || user.role === "manager" || user.role === "admin";
   const isOwner = user.role === "owner";
   const base = "/dashboard";
   const navItems = [
     { href: base, label: "Overview", icon: LayoutDashboard },
     ...(isAppointmentBusiness
       ? [
-          { href: `${base}/appointments`, label: "Appointments", icon: Calendar },
-          ...(canManageBusiness ? [{ href: `${base}/services`, label: "Services", icon: Scissors }] : []),
+          {
+            href: `${base}/appointments`,
+            label: "Appointments",
+            icon: Calendar,
+          },
+          ...(canManageBusiness
+            ? [{ href: `${base}/services`, label: "Services", icon: Scissors }]
+            : []),
         ]
       : [
           { href: `${base}/orders`, label: "Orders", icon: ShoppingBag },
-          ...(canManageBusiness ? [{ href: `${base}/products`, label: "Products", icon: Package }] : []),
+          ...(canManageBusiness
+            ? [{ href: `${base}/products`, label: "Products", icon: Package }]
+            : []),
         ]),
-    ...(canManageBusiness ? [{ href: `${base}/customers`, label: "Customers", icon: Users }] : []),
-    ...(canManageBusiness ? [{
-      href: `${base}/analytics`,
-      label: "Analytics",
-      icon: BarChart3,
-      locked: !tenantHasFeature(tenant, "detailed_analytics"),
-    }] : []),
-    ...(isOwner ? [
-      { href: `${base}/tools`, label: "Business Tools", icon: BriefcaseBusiness },
-      { href: `${base}/settings`, label: "Settings", icon: Settings },
-    ] : []),
+    ...(canManageBusiness
+      ? [{ href: `${base}/customers`, label: "Customers", icon: Users }]
+      : []),
+    ...(canManageBusiness
+      ? [
+          {
+            href: `${base}/analytics`,
+            label: "Analytics",
+            icon: BarChart3,
+            locked: !tenantHasFeature(tenant, "detailed_analytics"),
+          },
+        ]
+      : []),
+    ...(isOwner
+      ? [
+          {
+            href: `${base}/tools`,
+            label: "Business Tools",
+            icon: BriefcaseBusiness,
+          },
+          { href: `${base}/settings`, label: "Settings", icon: Settings },
+        ]
+      : []),
   ];
 
   useEffect(() => {
@@ -101,100 +122,136 @@ export function Sidebar({ tenant, user }: SidebarProps) {
           collapsed ? "md:w-[72px]" : "md:w-[216px]",
         )}
       >
-      <div className={cn("flex h-[66px] items-center gap-3 border-b border-white/[0.06] px-5 pt-[max(0.25rem,env(safe-area-inset-top))]", collapsed && "justify-center px-3")}>
-        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-purple-700 shadow-lg shadow-violet-950/30">
-          <Sparkles className="h-4 w-4 text-white" />
-        </div>
-        {!collapsed && (
-          <div className="leading-none">
-            <p className="text-[13px] font-bold tracking-tight text-white">YuhBusiness</p>
-            <p className="mt-1 text-[7px] font-semibold uppercase tracking-[0.2em] text-slate-400">Platform</p>
-          </div>
-        )}
-      </div>
-
-      <div className={cn("border-b border-white/[0.06] px-4 py-4", collapsed && "px-3")}>
-        <BusinessSwitcher
-          tenant={tenant}
-          collapsed={collapsed}
-          onBusinessSelected={() => setMobileOpen(false)}
-        />
-      </div>
-
-      <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const active = pathname === item.href || (item.href !== base && pathname.startsWith(item.href));
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={() => setMobileOpen(false)}
-              title={collapsed ? item.label : undefined}
-              className={cn(
-                "group flex h-10 items-center gap-3 rounded-lg px-3 text-[12px] font-medium transition-colors",
-                active
-                  ? "bg-violet-500/20 text-white"
-                  : "text-slate-300 hover:bg-white/[0.06] hover:text-white",
-                collapsed && "justify-center px-2",
-              )}
-            >
-              <Icon className={cn("h-[15px] w-[15px] flex-shrink-0", active ? "text-violet-300" : "text-slate-400 group-hover:text-white")} />
-              {!collapsed && <span className="flex-1">{item.label}</span>}
-              {!collapsed && item.locked && <LockKeyhole className="h-3 w-3 text-violet-300" />}
-            </Link>
-          );
-        })}
-      </nav>
-
-      <div className="border-t border-white/[0.06] px-3 py-2">
-        <Link
-          href={`/store-front/${tenant.slug}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          title={collapsed ? "View Storefront" : undefined}
+        <div
           className={cn(
-            "flex h-9 items-center gap-3 rounded-lg px-3 text-[11px] font-medium text-slate-400 transition-colors hover:bg-white/[0.06] hover:text-white",
-            collapsed && "justify-center px-2",
+            "flex h-[66px] items-center gap-3 border-b border-white/[0.06] px-5 pt-[max(0.25rem,env(safe-area-inset-top))]",
+            collapsed && "justify-center px-3",
           )}
         >
-          <ExternalLink className="h-3.5 w-3.5" />
-          {!collapsed && "View Storefront"}
-        </Link>
-      </div>
-
-      <div className={cn("border-t border-white/[0.06] p-3", collapsed && "px-2") }>
-        <div className={cn(
-          "flex items-center justify-between gap-3 rounded-2xl border border-white/[0.04] bg-white/[0.02] px-3 py-2.5",
-          collapsed && "justify-center px-2 py-2.5"
-        )}>
-          <div className="flex min-w-0 items-center gap-3">
-            {!collapsed && (
-              <div
-                className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-violet-400/30 bg-violet-500/15 text-[10px] font-bold text-violet-100"
-                title={user.name}
-              >
-                {user.avatar}
-              </div>
-            )}
-            {!collapsed && (
-              <div className="min-w-0">
-                <p className="truncate text-[11px] font-semibold text-white">{user.name}</p>
-                <p className="mt-0.5 text-[9px] capitalize text-slate-400">{user.role}</p>
-              </div>
-            )}
+          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-purple-700 shadow-lg shadow-violet-950/30">
+            <Sparkles className="h-4 w-4 text-white" />
           </div>
-
-          <button
-            onClick={() => void logout()}
-            aria-label="Sign out"
-            title="Sign out"
-            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-slate-300 transition-colors hover:bg-white/[0.06] hover:text-white"
-          >
-            <ArrowRight className="h-3.5 w-3.5" />
-          </button>
+          {!collapsed && (
+            <div className="leading-none">
+              <p className="text-[13px] font-bold tracking-tight text-white">
+                YuhBusiness
+              </p>
+              <p className="mt-1 text-[7px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+                Platform
+              </p>
+            </div>
+          )}
         </div>
-      </div>
+
+        <div
+          className={cn(
+            "border-b border-white/[0.06] px-4 py-4",
+            collapsed && "px-3",
+          )}
+        >
+          <BusinessSwitcher
+            tenant={tenant}
+            collapsed={collapsed}
+            onBusinessSelected={() => setMobileOpen(false)}
+          />
+        </div>
+
+        <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const active =
+              pathname === item.href ||
+              (item.href !== base && pathname.startsWith(item.href));
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setMobileOpen(false)}
+                title={collapsed ? item.label : undefined}
+                className={cn(
+                  "group flex h-10 items-center gap-3 rounded-lg px-3 text-[12px] font-medium transition-colors",
+                  active
+                    ? "bg-violet-500/20 text-white"
+                    : "text-slate-300 hover:bg-white/[0.06] hover:text-white",
+                  collapsed && "justify-center px-2",
+                )}
+              >
+                <Icon
+                  className={cn(
+                    "h-[15px] w-[15px] flex-shrink-0",
+                    active
+                      ? "text-violet-300"
+                      : "text-slate-400 group-hover:text-white",
+                  )}
+                />
+                {!collapsed && <span className="flex-1">{item.label}</span>}
+                {!collapsed && item.locked && (
+                  <LockKeyhole className="h-3 w-3 text-violet-300" />
+                )}
+              </Link>
+            );
+          })}
+        </nav>
+
+        <div className="border-t border-white/[0.06] px-3 py-2">
+          <Link
+            href={`/store-front/${tenant.slug}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            title={collapsed ? "View Storefront" : undefined}
+            className={cn(
+              "flex h-9 items-center gap-3 rounded-lg px-3 text-[11px] font-medium text-slate-400 transition-colors hover:bg-white/[0.06] hover:text-white",
+              collapsed && "justify-center px-2",
+            )}
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+            {!collapsed && "View Storefront"}
+          </Link>
+        </div>
+
+        <div
+          className={cn(
+            "border-t border-white/[0.06] p-3",
+            collapsed && "px-2",
+          )}
+        >
+          <div
+            className={cn(
+              "flex items-center justify-between gap-3 rounded-2xl border border-white/[0.04] bg-white/[0.02] px-3 py-2.5",
+              collapsed && "justify-center px-2 py-2.5",
+            )}
+          >
+            <div className="flex min-w-0 items-center gap-3">
+              {!collapsed && (
+                <div
+                  className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-violet-400/30 bg-violet-500/15 text-[10px] font-bold text-violet-100"
+                  title={user.name}
+                >
+                  {user.avatar}
+                </div>
+              )}
+              {!collapsed && (
+                <div className="min-w-0">
+                  <p className="truncate text-[11px] font-semibold text-white">
+                    {user.name}
+                  </p>
+                  <p className="mt-0.5 text-[9px] capitalize text-slate-400">
+                    {user.role}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={() => void logout()}
+              aria-label="Sign out"
+              title="Sign out"
+              className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-slate-300 transition-colors hover:bg-white/[0.06] hover:text-white"
+            >
+              <ArrowRight className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
       </aside>
     </>
   );

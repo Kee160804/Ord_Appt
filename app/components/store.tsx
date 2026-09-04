@@ -13,7 +13,11 @@ import {
   ChevronRight,
   Store,
 } from "lucide-react";
-import { getServicesByTenant, getProductsByTenant, getCategoriesByTenant } from "@/app/data/mock";
+import {
+  getServicesByTenant,
+  getProductsByTenant,
+  getCategoriesByTenant,
+} from "@/app/data/mock";
 import { getStoredProducts, getStoredServices } from "@/app/lib/storage";
 import { isSupabaseConfigured } from "@/app/lib/supabase/config";
 import { AppointmentBooking } from "../components/AppointmentBooking";
@@ -21,7 +25,13 @@ import { OrderingMenu } from "../components/OrderingMenu";
 import { DemoDashboardPreview } from "../components/DemoDashboardPreview";
 import { StorefrontContact } from "../components/StorefrontContact";
 import { useTheme } from "@/app/contexts/theme";
-import type { Category, Tenant, Service, Product, PublicServiceProvider } from "@/app/types/index";
+import type {
+  Category,
+  Tenant,
+  Service,
+  Product,
+  PublicServiceProvider,
+} from "@/app/types/index";
 
 // Extend Tenant with optional fields used in this component
 interface ExtendedTenant extends Tenant {
@@ -60,19 +70,27 @@ export default function StorefrontClient({
 
   const [services, setServices] = useState<Service[]>(() => {
     if (isAppt) {
-      return initialServices ?? getServicesByTenant(tenant.id).filter((s) => s.isActive);
+      return (
+        initialServices ??
+        getServicesByTenant(tenant.id).filter((s) => s.isActive)
+      );
     }
     return [];
   });
 
   const [products, setProducts] = useState<Product[]>(() => {
     if (!isAppt) {
-      return initialProducts ?? getProductsByTenant(tenant.id).filter((p) => p.isActive);
+      return (
+        initialProducts ??
+        getProductsByTenant(tenant.id).filter((p) => p.isActive)
+      );
     }
     return [];
   });
 
-  const categories = !isAppt ? initialCategories ?? getCategoriesByTenant(tenant.id) : [];
+  const categories = !isAppt
+    ? (initialCategories ?? getCategoriesByTenant(tenant.id))
+    : [];
 
   // Cart state (for ordering)
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -93,23 +111,30 @@ export default function StorefrontClient({
                 quantity: i.quantity + item.quantity,
                 addons: mergedAddons,
               }
-            : i
+            : i,
         );
       }
       return [...prev, item];
     });
   };
 
-  const handleOrderPlaced = (orderedItems: { productId: string; quantity: number }[]) => {
-    const quantities = new Map(orderedItems.map((item) => [item.productId, item.quantity]));
-    setProducts((current) => current.map((product) => {
-      const orderedQuantity = quantities.get(product.id);
-      if (!orderedQuantity || product.trackInventory === false) return product;
-      return {
-        ...product,
-        inventory: Math.max(0, (product.inventory ?? 0) - orderedQuantity),
-      };
-    }));
+  const handleOrderPlaced = (
+    orderedItems: { productId: string; quantity: number }[],
+  ) => {
+    const quantities = new Map(
+      orderedItems.map((item) => [item.productId, item.quantity]),
+    );
+    setProducts((current) =>
+      current.map((product) => {
+        const orderedQuantity = quantities.get(product.id);
+        if (!orderedQuantity || product.trackInventory === false)
+          return product;
+        return {
+          ...product,
+          inventory: Math.max(0, (product.inventory ?? 0) - orderedQuantity),
+        };
+      }),
+    );
   };
 
   // Storage event listener
@@ -121,10 +146,12 @@ export default function StorefrontClient({
     const frame = window.requestAnimationFrame(() => {
       if (isAppt) {
         const storedServices = getStoredServices(tenant.id);
-        if (storedServices) setServices(storedServices.filter((service) => service.isActive));
+        if (storedServices)
+          setServices(storedServices.filter((service) => service.isActive));
       } else {
         const storedProducts = getStoredProducts(tenant.id);
-        if (storedProducts) setProducts(storedProducts.filter((product) => product.isActive));
+        if (storedProducts)
+          setProducts(storedProducts.filter((product) => product.isActive));
       }
     });
 
@@ -144,13 +171,11 @@ export default function StorefrontClient({
     };
   }, [tenant.id, isAppt, viewOnly]);
 
-
-
   // ---------- Tab Navigation ----------
   const [activeTab, setActiveTab] = useState<"home" | "contact">("home");
-  const [activeDemoView, setActiveDemoView] = useState<"dashboard" | "storefront">(
-    viewOnly ? "dashboard" : "storefront",
-  );
+  const [activeDemoView, setActiveDemoView] = useState<
+    "dashboard" | "storefront"
+  >(viewOnly ? "dashboard" : "storefront");
 
   const { theme, toggleTheme } = useTheme();
 
@@ -164,7 +189,9 @@ export default function StorefrontClient({
   const nextImage = () =>
     setCurrentImageIndex((prev) => (prev + 1) % galleryImages.length);
   const prevImage = () =>
-    setCurrentImageIndex((prev) => (prev - 1 + galleryImages.length) % galleryImages.length);
+    setCurrentImageIndex(
+      (prev) => (prev - 1 + galleryImages.length) % galleryImages.length,
+    );
 
   return (
     <div className="min-h-dvh bg-white transition-colors duration-200 dark:bg-[#070b14]">
@@ -190,13 +217,21 @@ export default function StorefrontClient({
                 {tenant.logo}
               </div>
               <div className={viewOnly ? "hidden min-w-0 sm:block" : "min-w-0"}>
-                <h1 className="truncate font-bold text-slate-900 dark:text-white">{tenant.name}</h1>
-                <p className="text-xs text-slate-500 dark:text-slate-400">{tenant.city}</p>
+                <h1 className="truncate font-bold text-slate-900 dark:text-white">
+                  {tenant.name}
+                </h1>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  {tenant.city}
+                </p>
               </div>
             </div>
 
             {viewOnly && (
-              <div className="order-last mx-auto flex w-full items-center justify-center rounded-xl border border-slate-200 bg-slate-100 p-1 dark:border-slate-700 dark:bg-slate-900 sm:w-auto lg:order-none" role="tablist" aria-label="Demo view">
+              <div
+                className="order-last mx-auto flex w-full items-center justify-center rounded-xl border border-slate-200 bg-slate-100 p-1 dark:border-slate-700 dark:bg-slate-900 sm:w-auto lg:order-none"
+                role="tablist"
+                aria-label="Demo view"
+              >
                 <button
                   type="button"
                   role="tab"
@@ -232,30 +267,30 @@ export default function StorefrontClient({
             <div className="ml-auto flex items-center gap-3">
               {/* Navigation Tabs */}
               {(!viewOnly || activeDemoView === "storefront") && (
-              <div className="hidden gap-2 text-sm font-medium lg:flex">
-                <button
-                  onClick={() => setActiveTab("home")}
-                  className={`px-3 py-1.5 rounded-lg transition ${
-                    activeTab === "home"
-                      ? "bg-violet-600 text-white"
-                      : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-                  }`}
-                  aria-label="Home"
-                >
-                  Home
-                </button>
-                <button
-                  onClick={() => setActiveTab("contact")}
-                  className={`px-3 py-1.5 rounded-lg transition ${
-                    activeTab === "contact"
-                      ? "bg-violet-600 text-white"
-                      : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-                  }`}
-                  aria-label="Contact"
-                >
-                  Contact
-                </button>
-              </div>
+                <div className="hidden gap-2 text-sm font-medium lg:flex">
+                  <button
+                    onClick={() => setActiveTab("home")}
+                    className={`px-3 py-1.5 rounded-lg transition ${
+                      activeTab === "home"
+                        ? "bg-violet-600 text-white"
+                        : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                    }`}
+                    aria-label="Home"
+                  >
+                    Home
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("contact")}
+                    className={`px-3 py-1.5 rounded-lg transition ${
+                      activeTab === "contact"
+                        ? "bg-violet-600 text-white"
+                        : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                    }`}
+                    aria-label="Contact"
+                  >
+                    Contact
+                  </button>
+                </div>
               )}
               {/* Theme Toggle */}
               <button
@@ -263,12 +298,20 @@ export default function StorefrontClient({
                 className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition"
                 aria-label="Toggle dark mode"
               >
-                {theme === "light" ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+                {theme === "light" ? (
+                  <Moon className="w-4 h-4" />
+                ) : (
+                  <Sun className="w-4 h-4" />
+                )}
               </button>
             </div>
           </div>
           {(!viewOnly || activeDemoView === "storefront") && (
-            <div className="mt-3 grid grid-cols-2 gap-2 lg:hidden" role="tablist" aria-label="Storefront pages">
+            <div
+              className="mt-3 grid grid-cols-2 gap-2 lg:hidden"
+              role="tablist"
+              aria-label="Storefront pages"
+            >
               <button
                 type="button"
                 role="tab"
@@ -302,7 +345,8 @@ export default function StorefrontClient({
 
       {viewOnly && (
         <div className="border-b border-violet-200 bg-violet-50 px-4 py-3 text-center text-sm font-medium text-violet-800 dark:border-violet-900/60 dark:bg-violet-950/40 dark:text-violet-200">
-          Demo experience — sample data only. Nothing here changes your account, Supabase data, orders, or appointments.
+          Demo experience — sample data only. Nothing here changes your account,
+          Supabase data, orders, or appointments.
         </div>
       )}
 
@@ -311,61 +355,68 @@ export default function StorefrontClient({
       )}
 
       {/* Hero (clickable, only on home tab) */}
-      {(!viewOnly || activeDemoView === "storefront") && activeTab === "home" && (
-        <div
-          className="relative h-64 md:h-80 overflow-hidden cursor-pointer"
-          onClick={() => {
-            setCurrentImageIndex(0);
-            setGalleryOpen(true);
-          }}
-        >
-          <Image
-            src={tenant.coverImage || "/fallback-product.png"}
-            alt={tenant.name}
-            fill
-            sizes="100vw"
-            className="object-cover"
-            unoptimized
-            onError={(e) => {
-              (e.target as HTMLImageElement).src = "/fallback-product.png";
+      {(!viewOnly || activeDemoView === "storefront") &&
+        activeTab === "home" && (
+          <div
+            className="relative h-64 md:h-80 overflow-hidden cursor-pointer"
+            onClick={() => {
+              setCurrentImageIndex(0);
+              setGalleryOpen(true);
             }}
-          />
-          <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-            <div className="text-center text-white">
-              <h2 className="text-3xl md:text-4xl font-bold">{tenant.name}</h2>
-              <p className="mt-2 max-w-xl mx-auto px-4">{tenant.description}</p>
+          >
+            <Image
+              src={tenant.coverImage || "/fallback-product.png"}
+              alt={tenant.name}
+              fill
+              sizes="100vw"
+              className="object-cover"
+              unoptimized
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = "/fallback-product.png";
+              }}
+            />
+            <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+              <div className="text-center text-white">
+                <h2 className="text-3xl md:text-4xl font-bold">
+                  {tenant.name}
+                </h2>
+                <p className="mt-2 max-w-xl mx-auto px-4">
+                  {tenant.description}
+                </p>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
       {/* Main content */}
       {(!viewOnly || activeDemoView === "storefront") && (
-      <main className={`${activeTab === "contact" ? "max-w-[1500px]" : "max-w-6xl"} mx-auto px-3 py-8 sm:px-4 sm:py-12`}>
-        {activeTab === "home" ? (
-          isAppt ? (
-            <AppointmentBooking
-              tenant={tenant}
-              services={services}
-              providers={initialProviders}
-              viewOnly={viewOnly}
-            />
+        <main
+          className={`${activeTab === "contact" ? "max-w-[1500px]" : "max-w-6xl"} mx-auto px-3 py-8 sm:px-4 sm:py-12`}
+        >
+          {activeTab === "home" ? (
+            isAppt ? (
+              <AppointmentBooking
+                tenant={tenant}
+                services={services}
+                providers={initialProviders}
+                viewOnly={viewOnly}
+              />
+            ) : (
+              <OrderingMenu
+                tenant={tenant}
+                products={products}
+                categories={categories}
+                onAddToCart={handleAddToCart}
+                cart={cart}
+                updateCart={setCart}
+                onOrderPlaced={handleOrderPlaced}
+                viewOnly={viewOnly}
+              />
+            )
           ) : (
-            <OrderingMenu
-              tenant={tenant}
-              products={products}
-              categories={categories}
-              onAddToCart={handleAddToCart}
-              cart={cart}
-              updateCart={setCart}
-              onOrderPlaced={handleOrderPlaced}
-              viewOnly={viewOnly}
-            />
-          )
-        ) : (
-          <StorefrontContact tenant={tenant} viewOnly={viewOnly} />
-        )}
-      </main>
+            <StorefrontContact tenant={tenant} viewOnly={viewOnly} />
+          )}
+        </main>
       )}
 
       {/* Image Gallery Modal */}

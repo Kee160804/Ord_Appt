@@ -1,5 +1,3 @@
-import { getSupabaseBrowserClient } from "@/app/lib/supabase/client";
-
 export interface PublicBookingInput {
   tenantId: string;
   serviceId: string;
@@ -11,6 +9,13 @@ export interface PublicBookingInput {
   notes?: string;
   providerId?: string;
   promotionCode?: string;
+  paymentMethod?: "pay_later" | "mock_card";
+}
+
+export interface PublicBookingResult {
+  appointmentId: string;
+  paymentStatus: string;
+  paymentReference?: string;
 }
 
 function errorMessage(error: unknown) {
@@ -43,24 +48,31 @@ function errorMessage(error: unknown) {
   return message || fallback;
 }
 
-export async function createPublicAppointment(input: PublicBookingInput): Promise<string> {
-  const supabase = getSupabaseBrowserClient();
-  if (!supabase) throw new Error("Online booking is not configured.");
-
-  const useGrowthBooking = Boolean(input.providerId || input.promotionCode?.trim());
-  const { data, error } = await supabase.rpc(useGrowthBooking ? "create_public_appointment_with_provider" : "create_public_appointment", {
-    p_tenant_id: input.tenantId,
-    p_service_id: input.serviceId,
-    p_appointment_date: input.date,
-    p_appointment_time: input.time,
-    p_customer_name: input.customerName.trim(),
-    p_customer_email: input.customerEmail.trim().toLowerCase(),
-    p_customer_phone: input.customerPhone.trim(),
-    p_notes: input.notes?.trim() || null,
-    ...(useGrowthBooking ? { p_staff_id: input.providerId || null, p_promotion_code: input.promotionCode?.trim() || null } : {}),
+export async function createPublicAppointment(
+  input: PublicBookingInput,
+): Promise<PublicBookingResult> {
+  const response = await fetch("/api/public/bookings", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
   });
-
-  if (error) throw new Error(errorMessage(error));
-  if (typeof data !== "string") throw new Error("The booking was created without a confirmation ID.");
-  return data;
+  const result = (await response.json()) as {
+    appointmentId?: string;
+    paymentStatus?: string;
+    paymentReference?: string | null;
+    error?: string;
+  };
+  if (!response.ok)
+    throw new Error(
+      errorMessage(
+        new Error(result.error || "Unable to create the appointment."),
+      ),
+    );
+  if (!result.appointmentId)
+    throw new Error("The booking was created without a confirmation ID.");
+  return {
+    appointmentId: result.appointmentId,
+    paymentStatus: result.paymentStatus || "UNPAID",
+    paymentReference: result.paymentReference || undefined,
+  };
 }

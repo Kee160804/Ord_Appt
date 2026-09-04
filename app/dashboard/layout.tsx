@@ -9,23 +9,34 @@ import { PlanUsageBanner } from "@/app/components/PlanUsageBanner";
 import { useAuth } from "@/app/contexts/auth";
 import { getTenantEntitlement } from "@/app/lib/subscription";
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const { user, tenant, isLoading, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
-  const isStaffRouteBlocked = user?.role === "staff" && tenant
-    ? ![
-        "/dashboard",
-        tenant.businessType === "appointment" ? "/dashboard/appointments" : "/dashboard/orders",
-      ].some((allowedPath) => pathname === allowedPath || (
-        allowedPath !== "/dashboard" && pathname.startsWith(`${allowedPath}/`)
-      ))
-    : false;
+  const isStaffRouteBlocked =
+    user?.role === "staff" && tenant
+      ? ![
+          "/dashboard",
+          tenant.businessType === "appointment"
+            ? "/dashboard/appointments"
+            : "/dashboard/orders",
+        ].some(
+          (allowedPath) =>
+            pathname === allowedPath ||
+            (allowedPath !== "/dashboard" &&
+              pathname.startsWith(`${allowedPath}/`)),
+        )
+      : false;
   const isOwnerRouteBlocked = Boolean(
-    user && user.role !== "owner" && (
-      pathname.startsWith("/dashboard/settings") || pathname.startsWith("/dashboard/tools")
-    ),
+    user &&
+    user.role !== "owner" &&
+    (pathname.startsWith("/dashboard/settings") ||
+      pathname.startsWith("/dashboard/tools")),
   );
 
   useEffect(() => {
@@ -48,7 +59,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, [user, isLoading, router, isStaffRouteBlocked, isOwnerRouteBlocked]);
 
   if (isLoading || !user) {
-    return <div className="flex min-h-dvh items-center justify-center">Loading...</div>;
+    return (
+      <div className="flex min-h-dvh items-center justify-center">
+        Loading...
+      </div>
+    );
   }
 
   if (!tenant) return null;
@@ -57,7 +72,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const entitlement = getTenantEntitlement(tenant);
   if (!entitlement.hasAccess) {
-    return <SubscriptionRequired tenant={tenant} user={user} onLogout={logout} />;
+    return (
+      <SubscriptionRequired tenant={tenant} user={user} onLogout={logout} />
+    );
   }
 
   return (

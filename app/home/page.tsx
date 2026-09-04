@@ -26,7 +26,8 @@ export default function HomePage() {
     const definition = PLAN_DEFINITIONS[plan];
     const totalIncludedAccounts = definition.includedStaffSeats + 1;
     const totalAccountLimit = definition.maxStaffSeats + 1;
-    const paidSeatLimit = definition.maxStaffSeats - definition.includedStaffSeats;
+    const paidSeatLimit =
+      definition.maxStaffSeats - definition.includedStaffSeats;
 
     if (paidSeatLimit === 0) {
       return {
@@ -99,7 +100,8 @@ export default function HomePage() {
       name: PLAN_DEFINITIONS.pro.name,
       price: String(PLAN_DEFINITIONS.pro.price),
       audience: "For growing local businesses",
-      description: "Unlock the controls and insights that help you grow faster.",
+      description:
+        "Unlock the controls and insights that help you grow faster.",
       dailyPrice: "Less than $0.40 a day",
       priceAnchor: "Only $3 more than Beginner",
       checkoutUrl: process.env.NEXT_PUBLIC_PRO_CHECKOUT_URL,
@@ -202,16 +204,16 @@ export default function HomePage() {
             Features
           </a>
           <a
-            href="#pricing"
-            className="hover:text-white light:hover:text-gray-900 transition-colors"
-          >
-            Pricing
-          </a>
-          <a
             href="#demos"
             className="hover:text-white light:hover:text-gray-900 transition-colors"
           >
             Live Demos
+          </a>
+          <a
+            href="#pricing"
+            className="hover:text-white light:hover:text-gray-900 transition-colors"
+          >
+            Pricing
           </a>
         </div>
 
@@ -258,10 +260,10 @@ export default function HomePage() {
         </div>
 
         <h1 className="mb-5 text-[3rem] font-black leading-[0.96] tracking-tight text-white light:text-gray-900 sm:mb-6 sm:text-6xl lg:text-7xl">
-          Tek Yuh Business Online.
+          Ready fi grow yuh business?
           <br />
           <span className="bg-gradient-to-r from-violet-400 to-indigo-400 light:from-violet-600 light:to-indigo-600 bg-clip-text text-transparent">
-            Eena minutes.
+            Tek Yuh Business Online Eena minutes.
           </span>
         </h1>
 
@@ -293,7 +295,9 @@ export default function HomePage() {
             14 days free fi true
           </strong>
           <span className="hidden h-4 w-px bg-violet-400/35 sm:block" />
-          <span className="font-bold text-white light:text-slate-800">No card needed</span>
+          <span className="font-bold text-white light:text-slate-800">
+            No card needed
+          </span>
         </div>
       </section>
 
@@ -411,7 +415,8 @@ export default function HomePage() {
               Si how ih look
             </h2>
             <p className="text-slate-400 light:text-gray-600">
-              Sample storefront previews — see what your business could look like
+              Sample storefront previews — see what your business could look
+              like
             </p>
           </div>
 
@@ -476,21 +481,34 @@ export default function HomePage() {
               <span className="flex h-7 w-7 items-center justify-center rounded-full bg-violet-600 text-white shadow-md shadow-violet-950/30">
                 <Check className="h-4 w-4 stroke-[3]" />
               </span>
-              <span className="text-sm font-black uppercase tracking-wide text-violet-300 light:text-violet-700">Yuh 14-day free trial</span>
+              <span className="text-sm font-black uppercase tracking-wide text-violet-300 light:text-violet-700">
+                Yuh 14-day free trial
+              </span>
               <span className="hidden h-5 w-px bg-violet-400/35 sm:block" />
-              <span className="text-sm font-bold text-white light:text-slate-800">No card needed</span>
+              <span className="text-sm font-bold text-white light:text-slate-800">
+                No card needed
+              </span>
             </div>
             <h2 className="text-3xl md:text-4xl font-black text-white light:text-gray-900 mb-3">
               One customer could pay fi yuh whole month
             </h2>
             <p className="mx-auto max-w-2xl text-slate-400 light:text-gray-600">
               Start with the essentials, add growth tools when you need them,
-              and keep every order, appointment, customer, and insight in one place.
+              and keep every order, appointment, customer, and insight in one
+              place.
             </p>
             <div className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs font-semibold text-slate-500 light:text-gray-500">
-              <span className="flex items-center gap-1.5"><Check className="h-3.5 w-3.5 text-violet-400" /> Ordering or appointments</span>
-              <span className="flex items-center gap-1.5"><Check className="h-3.5 w-3.5 text-violet-400" /> Branded storefront included</span>
-              <span className="flex items-center gap-1.5"><Check className="h-3.5 w-3.5 text-violet-400" /> Cancel anytime</span>
+              <span className="flex items-center gap-1.5">
+                <Check className="h-3.5 w-3.5 text-violet-400" /> Ordering or
+                appointments
+              </span>
+              <span className="flex items-center gap-1.5">
+                <Check className="h-3.5 w-3.5 text-violet-400" /> Branded
+                storefront included
+              </span>
+              <span className="flex items-center gap-1.5">
+                <Check className="h-3.5 w-3.5 text-violet-400" /> Cancel anytime
+              </span>
             </div>
           </div>
 
@@ -501,7 +519,9 @@ export default function HomePage() {
                 className={`group relative flex flex-col rounded-3xl border-2 bg-slate-800/70 p-7 shadow-xl shadow-black/10 transition duration-300 hover:-translate-y-1 light:bg-white light:shadow-slate-200/60 ${p.color} ${p.name === "Pro" ? "md:-mt-3 md:mb-[-12px] md:p-8 shadow-violet-950/20 light:shadow-violet-200/60" : ""}`}
               >
                 {p.badge && (
-                  <div className={`absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full px-4 py-1 text-[11px] font-black uppercase tracking-wide text-white ${p.name === "Pro" ? "bg-violet-600" : "bg-indigo-600"}`}>
+                  <div
+                    className={`absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full px-4 py-1 text-[11px] font-black uppercase tracking-wide text-white ${p.name === "Pro" ? "bg-violet-600" : "bg-indigo-600"}`}
+                  >
                     {p.badge}
                   </div>
                 )}
@@ -515,7 +535,9 @@ export default function HomePage() {
                   {p.description}
                 </p>
                 <div className="mt-6 flex items-end gap-1">
-                  <span className="mb-1 text-xl font-black text-white light:text-gray-900">$</span>
+                  <span className="mb-1 text-xl font-black text-white light:text-gray-900">
+                    $
+                  </span>
                   <span className="text-5xl font-black tracking-tight text-white light:text-gray-900">
                     {p.price}
                   </span>
@@ -526,7 +548,9 @@ export default function HomePage() {
                 <p className="mt-2 text-xs font-semibold text-emerald-400 light:text-emerald-700">
                   {p.dailyPrice}
                 </p>
-                <div className={`mt-5 rounded-xl border px-3 py-2.5 text-center text-xs font-bold ${p.name === "Pro" ? "border-violet-500/30 bg-violet-500/10 text-violet-200 light:border-violet-200 light:bg-violet-50 light:text-violet-700" : "border-slate-700 bg-slate-900/40 text-slate-300 light:border-gray-200 light:bg-gray-50 light:text-gray-700"}`}>
+                <div
+                  className={`mt-5 rounded-xl border px-3 py-2.5 text-center text-xs font-bold ${p.name === "Pro" ? "border-violet-500/30 bg-violet-500/10 text-violet-200 light:border-violet-200 light:bg-violet-50 light:text-violet-700" : "border-slate-700 bg-slate-900/40 text-slate-300 light:border-gray-200 light:bg-gray-50 light:text-gray-700"}`}
+                >
                   {p.priceAnchor}
                 </div>
                 <div className="mt-4 rounded-2xl border border-emerald-500/25 bg-emerald-500/[0.08] p-4 light:border-emerald-200 light:bg-emerald-50">
@@ -579,7 +603,11 @@ export default function HomePage() {
                         : "bg-slate-700 light:bg-gray-200 hover:bg-slate-600 light:hover:bg-gray-300 text-white light:text-gray-900"
                     }`}
                   >
-                    {p.name === "Pro" ? "Choose Pro — di best value" : p.name === "Enterprise" ? "Go big wid Enterprise" : "Start wid Beginner"}
+                    {p.name === "Pro"
+                      ? "Choose Pro — di best value"
+                      : p.name === "Enterprise"
+                        ? "Go big wid Enterprise"
+                        : "Start wid Beginner"}
                   </Link>
                 )}
               </div>
@@ -591,7 +619,9 @@ export default function HomePage() {
               <Zap className="h-5 w-5" />
             </div>
             <div>
-              <p className="font-black text-white light:text-gray-900">Why Pro da di smartest place fi start</p>
+              <p className="font-black text-white light:text-gray-900">
+                Why Pro da di smartest place fi start
+              </p>
               <p className="mt-1 text-sm leading-6 text-slate-400 light:text-gray-600">
                 For only $3 more than Beginner, you get 5× the monthly activity,
                 live analytics, and advanced ordering or booking controls—while
@@ -601,13 +631,15 @@ export default function HomePage() {
           </div>
 
           <p className="mt-7 text-center text-xs text-slate-500 light:text-gray-500">
-            All prices are monthly in BZD and apply per business. Paid staff seats are $2 BZD each per month. Account limits include the owner. Each business starts its own 14-day trial.
+            All prices are monthly in BZD and apply per business. Paid staff
+            seats are $2 BZD each per month. Account limits include the owner.
+            Each business starts its own 14-day trial.
           </p>
         </div>
       </section>
 
       {/* Social Proof */}
-      <section className="py-20">
+      {/* <section className="py-20">
         <div className="max-w-4xl mx-auto px-6 md:px-12">
           <div className="grid md:grid-cols-3 gap-8 text-center">
             {[
@@ -626,7 +658,7 @@ export default function HomePage() {
             ))}
           </div>
         </div>
-      </section>
+      </section> */}
 
       {/* CTA */}
       <section className="py-20 bg-gradient-to-r from-violet-900/40 to-indigo-900/40 light:from-violet-100 light:to-indigo-100 border-y border-violet-500/20 light:border-violet-200">
@@ -644,14 +676,12 @@ export default function HomePage() {
             Mek yuh free account <ArrowRight className="w-5 h-5" />
           </Link>
           <div className="flex items-center justify-center gap-6 mt-8 text-sm text-slate-500 light:text-gray-600">
-            {["No card needed", "14 days free", "Cancel anytime"].map(
-              (t) => (
-                <span key={t} className="flex items-center gap-1.5">
-                  <Check className="w-3.5 h-3.5 text-emerald-500 light:text-emerald-600" />{" "}
-                  {t}
-                </span>
-              ),
-            )}
+            {["No card needed", "14 days free", "Cancel anytime"].map((t) => (
+              <span key={t} className="flex items-center gap-1.5">
+                <Check className="w-3.5 h-3.5 text-emerald-500 light:text-emerald-600" />{" "}
+                {t}
+              </span>
+            ))}
           </div>
         </div>
       </section>

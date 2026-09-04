@@ -54,4 +54,3 @@ export function getTenantEntitlement(
     daysRemaining: 0,
   };
 }
-

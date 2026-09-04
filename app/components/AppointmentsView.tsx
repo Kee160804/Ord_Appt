@@ -10,6 +10,7 @@ import {
   CheckCircle,
   XCircle,
   ChevronRight,
+  Download,
   Trash2,
 } from "lucide-react";
 import { Card } from "./Card";
@@ -25,7 +26,10 @@ import {
   listAppointments,
   setAppointmentStatus,
 } from "../services/appointmentService";
-import { listServiceProviders, type ServiceProvider } from "../services/businessToolsService";
+import {
+  listServiceProviders,
+  type ServiceProvider,
+} from "../services/businessToolsService";
 import { useAuth } from "../contexts/auth";
 import {
   formatCurrency,
@@ -34,8 +38,6 @@ import {
   formatDuration,
   cn,
 } from "../lib/utils";
-// NEW: Import useRealtime for emitting appointment events
-import { useRealtime } from "../contexts/realtime";
 import type { Appointment, AppointmentStatus, Tenant } from "../types/index";
 
 type Filter = "all" | AppointmentStatus;
@@ -45,10 +47,8 @@ interface Props {
 }
 
 export function AppointmentsView({ tenant }: Props) {
-  // NEW: Get realtime context to emit appointment events
-  const realtime = useRealtime();
   const { user } = useAuth();
-  
+
   const [apts, setApts] = useState<Appointment[]>(
     isSupabaseConfigured() ? [] : getAppointmentsByTenant(tenant.id),
   );
@@ -73,19 +73,30 @@ export function AppointmentsView({ tenant }: Props) {
         if (!active) return;
         setApts(loaded);
         setSelected((current) =>
-          current ? loaded.find((appointment) => appointment.id === current.id) ?? null : null,
+          current
+            ? (loaded.find((appointment) => appointment.id === current.id) ??
+              null)
+            : null,
         );
         setError("");
       } catch (loadError) {
         if (!active) return;
-        setError(loadError instanceof Error ? loadError.message : "Unable to load appointments.");
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load appointments.",
+        );
       } finally {
         if (active) setIsLoading(false);
       }
     };
 
     if (user?.role === "owner") {
-      void listServiceProviders(tenant.id).then((value) => { if (active) setProviders(value); }).catch(() => undefined);
+      void listServiceProviders(tenant.id)
+        .then((value) => {
+          if (active) setProviders(value);
+        })
+        .catch(() => undefined);
     }
 
     void load();
@@ -131,14 +142,15 @@ export function AppointmentsView({ tenant }: Props) {
   const filtered =
     filter === "all" ? apts : apts.filter((a) => a.status === filter);
 
-  // ENHANCED: Emit real-time event when appointment status changes
   const updateStatus = async (id: string, status: AppointmentStatus) => {
     const appointment = apts.find((candidate) => candidate.id === id);
     if (!appointment) return;
 
     const updatedAppointment = { ...appointment, status };
     setApts((previous) =>
-      previous.map((candidate) => (candidate.id === id ? updatedAppointment : candidate)),
+      previous.map((candidate) =>
+        candidate.id === id ? updatedAppointment : candidate,
+      ),
     );
     setSelected((prev) => (prev?.id === id ? { ...prev, status } : prev));
     setUpdatingId(id);
@@ -146,19 +158,21 @@ export function AppointmentsView({ tenant }: Props) {
     setNotice("");
 
     try {
-      if (isSupabaseConfigured()) await setAppointmentStatus(tenant.id, id, status);
-      realtime.addEvent({
-        type: "appointment_updated",
-        tenantId: tenant.id,
-        appointment: updatedAppointment,
-      });
+      if (isSupabaseConfigured())
+        await setAppointmentStatus(tenant.id, id, status);
       setNotice(`Appointment marked ${status.replace("_", "-")}.`);
     } catch (updateError) {
       setApts((previous) =>
-        previous.map((candidate) => (candidate.id === id ? appointment : candidate)),
+        previous.map((candidate) =>
+          candidate.id === id ? appointment : candidate,
+        ),
       );
       setSelected((current) => (current?.id === id ? appointment : current));
-      setError(updateError instanceof Error ? updateError.message : "Unable to update appointment.");
+      setError(
+        updateError instanceof Error
+          ? updateError.message
+          : "Unable to update appointment.",
+      );
     } finally {
       setUpdatingId(null);
     }
@@ -175,13 +189,21 @@ export function AppointmentsView({ tenant }: Props) {
       if (isSupabaseConfigured()) {
         await deleteAppointment(tenant.id, appointment.id);
       }
-      setApts((current) => current.filter((candidate) => candidate.id !== appointment.id));
-      setSelected((current) => (current?.id === appointment.id ? null : current));
+      setApts((current) =>
+        current.filter((candidate) => candidate.id !== appointment.id),
+      );
+      setSelected((current) =>
+        current?.id === appointment.id ? null : current,
+      );
       setDeleteTarget(null);
-      setNotice(`Appointment for ${appointment.customerName} was permanently deleted.`);
+      setNotice(
+        `Appointment for ${appointment.customerName} was permanently deleted.`,
+      );
     } catch (deleteError) {
       setError(
-        deleteError instanceof Error ? deleteError.message : "Unable to delete the appointment.",
+        deleteError instanceof Error
+          ? deleteError.message
+          : "Unable to delete the appointment.",
       );
     } finally {
       setIsDeleting(false);
@@ -191,15 +213,83 @@ export function AppointmentsView({ tenant }: Props) {
   const today = new Date().toLocaleDateString("en-CA");
   const assignProvider = async (providerId: string) => {
     if (!selected) return;
-    setUpdatingId(selected.id); setError("");
+    setUpdatingId(selected.id);
+    setError("");
     try {
-      await assignAppointmentProvider(tenant.id, selected.id, providerId || undefined);
+      await assignAppointmentProvider(
+        tenant.id,
+        selected.id,
+        providerId || undefined,
+      );
       const provider = providers.find((item) => item.id === providerId);
-      const next = { ...selected, providerId: providerId || undefined, providerName: provider?.name };
-      setSelected(next); setApts((current) => current.map((item) => item.id === next.id ? next : item));
-      setNotice(provider ? `Appointment assigned to ${provider.name}.` : "Provider assignment removed.");
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to assign provider."); }
-    finally { setUpdatingId(null); }
+      const next = {
+        ...selected,
+        providerId: providerId || undefined,
+        providerName: provider?.name,
+      };
+      setSelected(next);
+      setApts((current) =>
+        current.map((item) => (item.id === next.id ? next : item)),
+      );
+      setNotice(
+        provider
+          ? `Appointment assigned to ${provider.name}.`
+          : "Provider assignment removed.",
+      );
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : "Unable to assign provider.",
+      );
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const downloadCalendarEvent = (appointment: Appointment) => {
+    const start = new Date(`${appointment.date}T${appointment.time}:00`);
+    const end = new Date(start.getTime() + appointment.duration * 60_000);
+    const localStamp = (value: Date) =>
+      [
+        value.getFullYear(),
+        String(value.getMonth() + 1).padStart(2, "0"),
+        String(value.getDate()).padStart(2, "0"),
+        "T",
+        String(value.getHours()).padStart(2, "0"),
+        String(value.getMinutes()).padStart(2, "0"),
+        "00",
+      ].join("");
+    const escape = (value: string) =>
+      value
+        .replaceAll("\\", "\\\\")
+        .replaceAll(";", "\\;")
+        .replaceAll(",", "\\,")
+        .replaceAll("\n", "\\n");
+    const body = [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//YuhBusiness//Appointment//EN",
+      "CALSCALE:GREGORIAN",
+      "BEGIN:VEVENT",
+      `UID:${appointment.id}@yuhbusiness`,
+      `DTSTAMP:${new Date()
+        .toISOString()
+        .replaceAll(/[-:]/g, "")
+        .replace(/\.\d{3}Z$/, "Z")}`,
+      `DTSTART;TZID=America/Belize:${localStamp(start)}`,
+      `DTEND;TZID=America/Belize:${localStamp(end)}`,
+      `SUMMARY:${escape(`${appointment.serviceName} at ${tenant.name}`)}`,
+      `DESCRIPTION:${escape(`Customer: ${appointment.customerName}${appointment.providerName ? `; Provider: ${appointment.providerName}` : ""}`)}`,
+      "END:VEVENT",
+      "END:VCALENDAR",
+    ].join("\r\n");
+    const url = URL.createObjectURL(
+      new Blob([body], { type: "text/calendar;charset=utf-8" }),
+    );
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${tenant.slug}-${appointment.date}.ics`;
+    link.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -232,14 +322,11 @@ export function AppointmentsView({ tenant }: Props) {
             text: "text-slate-300 light:text-slate-700",
           },
         ].map((s) => (
-          <div
-            key={s.label}
-            className={cn("rounded-xl border p-3.5", s.bg)}
-          >
-            <p className="text-[10px] font-medium text-slate-400 light:text-[#61708a]">{s.label}</p>
-            <p className={cn("mt-1 text-xl font-black", s.text)}>
-              {s.value}
+          <div key={s.label} className={cn("rounded-xl border p-3.5", s.bg)}>
+            <p className="text-[10px] font-medium text-slate-400 light:text-[#61708a]">
+              {s.label}
             </p>
+            <p className={cn("mt-1 text-xl font-black", s.text)}>{s.value}</p>
           </div>
         ))}
       </div>
@@ -254,7 +341,11 @@ export function AppointmentsView({ tenant }: Props) {
           {notice}
         </div>
       )}
-      {isLoading && <p className="text-xs text-slate-400 light:text-slate-500">Loading appointments from Supabase...</p>}
+      {isLoading && (
+        <p className="text-xs text-slate-400 light:text-slate-500">
+          Loading appointments from Supabase...
+        </p>
+      )}
 
       {/* Filter tabs */}
       <div className="flex w-fit max-w-full items-center gap-1 overflow-x-auto rounded-lg border border-slate-700/60 light:border-[#e5e9f1] bg-slate-900/70 light:bg-white p-1">
@@ -281,11 +372,13 @@ export function AppointmentsView({ tenant }: Props) {
       <Card>
         <div className="divide-y divide-slate-700 light:divide-slate-100">
           {filtered.length === 0 && (
-              <div className="py-20 text-center text-slate-400 light:text-gray-500">
+            <div className="py-20 text-center text-slate-400 light:text-gray-500">
               <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-violet-500/15 text-violet-400 light:bg-violet-50 light:text-violet-600">
                 <Calendar className="h-5 w-5" />
               </div>
-              <p className="text-xs font-semibold text-white light:text-[#17223a]">No appointments found</p>
+              <p className="text-xs font-semibold text-white light:text-[#17223a]">
+                No appointments found
+              </p>
             </div>
           )}
           {filtered.map((apt) => (
@@ -300,9 +393,12 @@ export function AppointmentsView({ tenant }: Props) {
                   {apt.date.split("-")[2]}
                 </span>
                 <span className="text-[10px] text-violet-400 light:text-violet-500 uppercase">
-                  {new Date(`${apt.date}T12:00:00`).toLocaleDateString("en-US", {
-                    month: "short",
-                  })}
+                  {new Date(`${apt.date}T12:00:00`).toLocaleDateString(
+                    "en-BZ",
+                    {
+                      month: "short",
+                    },
+                  )}
                 </span>
               </div>
               <div className="flex-1 min-w-0">
@@ -313,7 +409,8 @@ export function AppointmentsView({ tenant }: Props) {
                   <StatusBadge status={apt.status} />
                 </div>
                 <p className="mt-1 truncate text-[10px] text-slate-400 light:text-[#71809a]">
-                  {apt.serviceName} · {formatTime(apt.time)}{apt.providerName ? ` · ${apt.providerName}` : ""} ·{" "}
+                  {apt.serviceName} · {formatTime(apt.time)}
+                  {apt.providerName ? ` · ${apt.providerName}` : ""} ·{" "}
                   {formatDuration(apt.duration)}
                 </p>
               </div>
@@ -380,7 +477,8 @@ export function AppointmentsView({ tenant }: Props) {
                 Complete
               </Button>
             </div>
-          ) : selected && ["completed", "cancelled", "no_show"].includes(selected.status) ? (
+          ) : selected &&
+            ["completed", "cancelled", "no_show"].includes(selected.status) ? (
             <Button
               variant="danger"
               className="w-full"
@@ -414,6 +512,14 @@ export function AppointmentsView({ tenant }: Props) {
                   {formatCurrency(selected.servicePrice)}
                 </span>
               </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full justify-center"
+                onClick={() => downloadCalendarEvent(selected)}
+              >
+                <Download className="h-3.5 w-3.5" /> Add to calendar (.ics)
+              </Button>
             </div>
 
             <div className="space-y-2">
@@ -440,27 +546,63 @@ export function AppointmentsView({ tenant }: Props) {
               </div>
             </div>
 
-            {user?.role === "owner" && providers.some((provider) => provider.serviceIds.includes(selected.serviceId)) && (
-              <div><label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-400 light:text-gray-500">Service Provider</label><select value={selected.providerId ?? ""} disabled={updatingId === selected.id} onChange={(event) => void assignProvider(event.target.value)} className="w-full rounded-xl border border-slate-600 bg-slate-800 px-3 py-2.5 text-sm light:border-slate-200 light:bg-white"><option value="">Unassigned</option>{providers.filter((provider) => provider.isActive && provider.serviceIds.includes(selected.serviceId)).map((provider) => <option key={provider.id} value={provider.id}>{provider.name}</option>)}</select></div>
-            )}
+            {user?.role === "owner" &&
+              providers.some((provider) =>
+                provider.serviceIds.includes(selected.serviceId),
+              ) && (
+                <div>
+                  <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-400 light:text-gray-500">
+                    Service Provider
+                  </label>
+                  <select
+                    value={selected.providerId ?? ""}
+                    disabled={updatingId === selected.id}
+                    onChange={(event) =>
+                      void assignProvider(event.target.value)
+                    }
+                    className="w-full rounded-xl border border-slate-600 bg-slate-800 px-3 py-2.5 text-sm light:border-slate-200 light:bg-white"
+                  >
+                    <option value="">Unassigned</option>
+                    {providers
+                      .filter(
+                        (provider) =>
+                          provider.isActive &&
+                          provider.serviceIds.includes(selected.serviceId),
+                      )
+                      .map((provider) => (
+                        <option key={provider.id} value={provider.id}>
+                          {provider.name}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              )}
 
             <div className="bg-slate-800 light:bg-gray-50 rounded-xl p-4 space-y-2 text-sm">
               <div className="flex justify-between">
-                <span className="text-slate-400 light:text-gray-600">Payment Status</span>
+                <span className="text-slate-400 light:text-gray-600">
+                  Payment Status
+                </span>
                 <StatusBadge status={selected.paymentStatus} />
               </div>
               {selected.depositPaid && (
                 <>
                   <div className="flex justify-between">
-                    <span className="text-slate-400 light:text-gray-600">Deposit Paid</span>
+                    <span className="text-slate-400 light:text-gray-600">
+                      Deposit Paid
+                    </span>
                     <span className="font-semibold text-white light:text-gray-900">
                       {formatCurrency(selected.depositPaid)}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-400 light:text-gray-600">Remaining</span>
+                    <span className="text-slate-400 light:text-gray-600">
+                      Remaining
+                    </span>
                     <span className="font-semibold text-amber-400 light:text-amber-700">
-                      {formatCurrency(selected.servicePrice - selected.depositPaid)}
+                      {formatCurrency(
+                        selected.servicePrice - selected.depositPaid,
+                      )}
                     </span>
                   </div>
                 </>
@@ -503,8 +645,9 @@ export function AppointmentsView({ tenant }: Props) {
         }
       >
         <p className="text-sm leading-6 text-slate-300 light:text-slate-700">
-          This permanently removes the appointment for {deleteTarget?.customerName}, including its
-          service and email-delivery records. This action cannot be undone.
+          This permanently removes the appointment for{" "}
+          {deleteTarget?.customerName}, including its service and email-delivery
+          records. This action cannot be undone.
         </p>
       </Modal>
     </div>

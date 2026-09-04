@@ -28,14 +28,27 @@ export function StatCard({
       )}
     >
       <div className="flex items-center gap-2">
-        <div className={cn("flex h-8 w-8 items-center justify-center rounded-full", iconBg)}>
+        <div
+          className={cn(
+            "flex h-8 w-8 items-center justify-center rounded-full",
+            iconBg,
+          )}
+        >
           {icon}
         </div>
-        <p className="truncate text-xs font-medium text-slate-400 light:text-[#61708a]">{label}</p>
+        <p className="truncate text-xs font-medium text-slate-400 light:text-[#61708a]">
+          {label}
+        </p>
       </div>
       <div className="mt-3 flex items-end justify-between gap-3">
-        <p className="text-2xl font-bold tracking-tight text-white light:text-[#101a2f]">{value}</p>
-        <svg aria-hidden="true" viewBox="0 0 68 28" className={cn("hidden h-7 w-[68px] sm:block", chartColor)}>
+        <p className="text-2xl font-bold tracking-tight text-white light:text-[#101a2f]">
+          {value}
+        </p>
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 68 28"
+          className={cn("hidden h-7 w-[68px] sm:block", chartColor)}
+        >
           <path
             d="M2 23 L12 18 L20 20 L29 7 L38 22 L48 13 L57 19 L66 5"
             fill="none"

@@ -1,5 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { processTransactionalEmailQueue } from "@/app/lib/email/worker";
+import { safeServerError } from "@/app/lib/server/security";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -8,7 +9,10 @@ export const maxDuration = 60;
 function safeEqual(left: string, right: string) {
   const leftBuffer = Buffer.from(left);
   const rightBuffer = Buffer.from(right);
-  return leftBuffer.length === rightBuffer.length && timingSafeEqual(leftBuffer, rightBuffer);
+  return (
+    leftBuffer.length === rightBuffer.length &&
+    timingSafeEqual(leftBuffer, rightBuffer)
+  );
 }
 
 function authorized(request: Request, expectedSecret: string | undefined) {
@@ -35,9 +39,11 @@ export async function GET(request: Request) {
     const result = await processTransactionalEmailQueue(requestedLimit);
     return response({ ok: true, ...result });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unable to process transactional emails.";
-    console.error("[email-process]", message);
-    return response({ ok: false, error: message }, 500);
+    return safeServerError(
+      "email-process",
+      error,
+      "Unable to process transactional emails.",
+    );
   }
 }
 
@@ -54,8 +60,10 @@ export async function POST(request: Request) {
     const result = await processTransactionalEmailQueue(10);
     return response({ ok: true, ...result }, 202);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unable to process transactional emails.";
-    console.error("[email-webhook]", message);
-    return response({ ok: false, error: message }, 500);
+    return safeServerError(
+      "email-webhook",
+      error,
+      "Unable to process transactional emails.",
+    );
   }
 }

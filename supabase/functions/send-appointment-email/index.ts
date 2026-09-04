@@ -85,7 +85,7 @@ function formatAppointmentTime(payload: AppointmentEmailPayload) {
     const date = new Date(payload.starts_at);
     if (!Number.isNaN(date.getTime())) {
       try {
-        return new Intl.DateTimeFormat("en-US", {
+        return new Intl.DateTimeFormat("en-BZ", {
           dateStyle: "full",
           timeStyle: "short",
           timeZone: payload.timezone || "America/Belize",
@@ -107,8 +107,12 @@ function buildEmail(delivery: DeliveryRow) {
   const serviceName = escapeHtml(payload.service_name);
   const appointmentTime = escapeHtml(formatAppointmentTime(payload));
   const confirmationCode = escapeHtml(payload.confirmation_code);
-  const location = [payload.business_address, payload.business_city].filter(Boolean).join(", ");
-  const contactItems = [payload.business_phone, payload.business_email].filter(Boolean);
+  const location = [payload.business_address, payload.business_city]
+    .filter(Boolean)
+    .join(", ");
+  const contactItems = [payload.business_phone, payload.business_email].filter(
+    Boolean,
+  );
 
   const details = [
     `<tr><td style="padding:8px 0;color:#64748b">Service</td><td style="padding:8px 0;text-align:right;font-weight:600;color:#0f172a">${serviceName}</td></tr>`,
@@ -147,7 +151,9 @@ function buildEmail(delivery: DeliveryRow) {
     `Date & time: ${formatAppointmentTime(payload)}`,
     location ? `Location: ${location}` : "",
     `Confirmation: ${payload.confirmation_code}`,
-    contactItems.length ? `Questions? Contact ${contactItems.join(" or ")}.` : "",
+    contactItems.length
+      ? `Questions? Contact ${contactItems.join(" or ")}.`
+      : "",
   ]
     .filter(Boolean)
     .join("\n");
@@ -157,7 +163,8 @@ function buildEmail(delivery: DeliveryRow) {
 
 export default {
   async fetch(request: Request): Promise<Response> {
-    if (request.method !== "POST") return json({ error: "Method not allowed." }, 405);
+    if (request.method !== "POST")
+      return json({ error: "Method not allowed." }, 405);
 
     try {
       const webhookSecret = requiredEnv("NOTIFICATION_WEBHOOK_SECRET");
@@ -176,9 +183,13 @@ export default {
         return json({ error: "Unsupported webhook payload." }, 400);
       }
 
-      const supabase = createClient(requiredEnv("SUPABASE_URL"), getSupabaseSecretKey(), {
-        auth: { persistSession: false, autoRefreshToken: false },
-      });
+      const supabase = createClient(
+        requiredEnv("SUPABASE_URL"),
+        getSupabaseSecretKey(),
+        {
+          auth: { persistSession: false, autoRefreshToken: false },
+        },
+      );
 
       const { data: currentData, error: readError } = await supabase
         .from("appointment_email_deliveries")
@@ -189,8 +200,10 @@ export default {
         .single();
 
       const current = currentData as DeliveryRow | null;
-      if (readError || !current) throw readError ?? new Error("Email delivery was not found.");
-      if (current.status === "SENT") return json({ delivered: true, duplicate: true });
+      if (readError || !current)
+        throw readError ?? new Error("Email delivery was not found.");
+      if (current.status === "SENT")
+        return json({ delivered: true, duplicate: true });
 
       const { data: deliveryData, error: claimError } = await supabase
         .from("appointment_email_deliveries")
@@ -231,12 +244,19 @@ export default {
         }),
       });
 
-      const resendResult = (await resendResponse.json()) as { id?: string; message?: string };
+      const resendResult = (await resendResponse.json()) as {
+        id?: string;
+        message?: string;
+      };
       if (!resendResponse.ok || !resendResult.id) {
-        const providerError = resendResult.message || `Resend returned ${resendResponse.status}.`;
+        const providerError =
+          resendResult.message || `Resend returned ${resendResponse.status}.`;
         await supabase
           .from("appointment_email_deliveries")
-          .update({ status: "FAILED", last_error: providerError.slice(0, 1000) })
+          .update({
+            status: "FAILED",
+            last_error: providerError.slice(0, 1000),
+          })
           .eq("id", delivery.id);
         return json({ error: providerError }, 502);
       }
@@ -254,7 +274,10 @@ export default {
       if (sentError) throw sentError;
       return json({ delivered: true, id: resendResult.id });
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unable to send confirmation email.";
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Unable to send confirmation email.";
       console.error(message);
       return json({ error: message }, 500);
     }

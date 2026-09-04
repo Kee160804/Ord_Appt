@@ -1,6 +1,15 @@
 import { getSupabaseBrowserClient } from "@/app/lib/supabase/client";
-import type { Order, OrderItem, OrderStatus, PaymentStatus } from "@/app/types/index";
-import type { OrderItemRow, OrderProductRow, OrderRow } from "@/app/types/supabase";
+import type {
+  Order,
+  OrderItem,
+  OrderStatus,
+  PaymentStatus,
+} from "@/app/types/index";
+import type {
+  OrderItemRow,
+  OrderProductRow,
+  OrderRow,
+} from "@/app/types/supabase";
 
 export interface PublicOrderItemInput {
   productId: string;
@@ -16,12 +25,21 @@ export interface PublicOrderInput {
   orderType: "dine_in" | "pickup" | "delivery";
   items: PublicOrderItemInput[];
   promotionCode?: string;
+  requestedTime?: string;
+  deliveryAddress?: string;
+  deliveryArea?: string;
+  deliveryInstructions?: string;
+  tableNumber?: string;
+  notes?: string;
+  paymentMethod?: "pay_later" | "mock_card";
 }
 
 export interface PublicOrderResult {
   orderId: string;
   orderNumber: string;
   total: number;
+  paymentStatus: PaymentStatus;
+  paymentReference?: string;
 }
 
 function client() {
@@ -119,62 +137,56 @@ function mapOrder(row: OrderRow): Order {
   };
 }
 
-export async function listOrders(tenantId: string): Promise<Order[]> {
+export async function listOrders(
+  tenantId: string,
+  page = 0,
+  pageSize = 250,
+): Promise<Order[]> {
+  const safePage = Math.max(0, Math.floor(page));
+  const safePageSize = Math.min(500, Math.max(1, Math.floor(pageSize)));
+  const from = safePage * safePageSize;
   const { data, error } = await client()
     .from("orders")
     .select(
       "id, tenant_id, customer_id, order_number, customer_name, customer_email, customer_phone, status, payment_status, total, notes, created_at, order_items(id, product_id, product_name, quantity, unit_price, subtotal, products(image_url))",
     )
     .eq("tenant_id", tenantId)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .range(from, from + safePageSize - 1);
 
   if (error) throw error;
   return ((data ?? []) as unknown as OrderRow[]).map(mapOrder);
 }
 
-export async function createPublicOrder(input: PublicOrderInput): Promise<PublicOrderResult> {
-  const payload = {
-    p_tenant_id: input.tenantId,
-    p_customer_name: input.customerName.trim(),
-    p_customer_email: input.customerEmail.trim().toLowerCase(),
-    p_customer_phone: input.customerPhone.trim(),
-    p_order_type: input.orderType,
-    p_notes: null,
-    p_items: input.items.map((item) => ({
-      product_id: item.productId,
-      quantity: item.quantity,
-      addons: item.addons.map(({ id }) => ({ id })),
-    })),
-    p_promotion_code: input.promotionCode?.trim() || null,
+export async function createPublicOrder(
+  input: PublicOrderInput,
+): Promise<PublicOrderResult> {
+  const response = await fetch("/api/public/orders", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  const result = (await response.json()) as {
+    orderId?: string;
+    orderNumber?: string;
+    total?: number;
+    paymentStatus?: string;
+    paymentReference?: string | null;
+    error?: string;
   };
-  let { data, error } = await client().rpc("create_public_order_with_email", payload);
-
-  // Rolling-deploy safety: storefront orders remain usable if the application
-  // reaches Vercel before the additive email migration reaches Supabase.
-  if (error?.code === "PGRST202") {
-    const usePromotion = Boolean(input.promotionCode?.trim());
-    const fallback = await client().rpc(usePromotion ? "create_public_order_with_promotion" : "create_public_order", {
-      p_tenant_id: input.tenantId,
-      p_customer_name: input.customerName.trim(),
-      p_customer_phone: input.customerPhone.trim(),
-      p_order_type: input.orderType,
-      p_notes: null,
-      p_items: payload.p_items,
-      ...(usePromotion ? { p_promotion_code: input.promotionCode?.trim() || null } : {}),
-    });
-    data = fallback.data;
-    error = fallback.error;
-  }
-
-  if (error) throw orderCreationError(error);
-  const result = Array.isArray(data) ? data[0] : data;
-  if (!result?.order_id || !result.order_number) {
+  if (!response.ok)
+    throw orderCreationError(
+      new Error(result.error || "Unable to place order."),
+    );
+  if (!result.orderId || !result.orderNumber) {
     throw new Error("The order was created without a confirmation number.");
   }
   return {
-    orderId: result.order_id as string,
-    orderNumber: result.order_number as string,
+    orderId: result.orderId,
+    orderNumber: result.orderNumber,
     total: Number(result.total),
+    paymentStatus: normalizePaymentStatus(result.paymentStatus || "UNPAID"),
+    paymentReference: result.paymentReference || undefined,
   };
 }
 

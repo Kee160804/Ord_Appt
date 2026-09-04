@@ -1,6 +1,9 @@
 import { listAppointments } from "@/app/services/appointmentService";
 import { listOrders } from "@/app/services/orderService";
-import { listCustomers, type CustomerRecord } from "@/app/services/customerService";
+import {
+  listCustomers,
+  type CustomerRecord,
+} from "@/app/services/customerService";
 import type {
   AnalyticsSummary,
   Appointment,
@@ -34,6 +37,7 @@ function dateKey(value: string) {
 }
 
 function lastTenDateKeys() {
+  // Keep the dashboard chart window consistent across both business types.
   const dates: string[] = [];
   const today = new Date();
   today.setHours(12, 0, 0, 0);
@@ -46,7 +50,11 @@ function lastTenDateKeys() {
 }
 
 function customerKey(email: string, phone: string, name: string) {
-  return email.trim().toLowerCase() || phone.replace(/\D/g, "") || name.trim().toLowerCase();
+  return (
+    email.trim().toLowerCase() ||
+    phone.replace(/\D/g, "") ||
+    name.trim().toLowerCase()
+  );
 }
 
 function mostCommon(values: string[], fallback = "Not enough data") {
@@ -65,16 +73,22 @@ function mergePersistedCustomers(
   records: CustomerRecord[],
   activity: CustomerSummary[],
 ): CustomerSummary[] {
-  const activityByContact = new Map(
-    activity.map((customer) => [
-      customer.id ?? customerKey(customer.email, customer.phone, customer.name),
+  const activityByContact = new Map<string, CustomerSummary>();
+  for (const customer of activity) {
+    if (customer.id) activityByContact.set(customer.id, customer);
+    activityByContact.set(
+      customerKey(customer.email, customer.phone, customer.name),
       customer,
-    ]),
-  );
+    );
+  }
 
   return records
     .map((record) => {
-      const match = activityByContact.get(customerKey(record.email, record.phone, record.name));
+      const match =
+        activityByContact.get(record.id) ??
+        activityByContact.get(
+          customerKey(record.email, record.phone, record.name),
+        );
       return {
         id: record.id,
         isActive: record.isActive,
@@ -90,65 +104,103 @@ function mergePersistedCustomers(
     .sort((a, b) => b.lastActivity.localeCompare(a.lastActivity));
 }
 
+function addCustomerActivity(
+  customers: Map<string, CustomerSummary>,
+  key: string,
+  activity: Omit<
+    CustomerSummary,
+    "key" | "lastActivity" | "activityCount" | "totalValue"
+  >,
+  activityDate: string,
+  value: number,
+) {
+  const current = customers.get(key);
+  customers.set(key, {
+    ...activity,
+    key,
+    lastActivity:
+      !current || activityDate > current.lastActivity
+        ? activityDate
+        : current.lastActivity,
+    activityCount: (current?.activityCount ?? 0) + 1,
+    totalValue: (current?.totalValue ?? 0) + value,
+  });
+}
+
+function sortCustomers(customers: Map<string, CustomerSummary>) {
+  return [...customers.values()].sort((a, b) =>
+    b.lastActivity.localeCompare(a.lastActivity),
+  );
+}
+
 function buildAppointmentCustomers(appointments: Appointment[]) {
   const customers = new Map<string, CustomerSummary>();
   for (const appointment of appointments) {
-    const key = appointment.customerId ?? customerKey(
-      appointment.customerEmail,
-      appointment.customerPhone,
-      appointment.customerName,
-    );
-    const current = customers.get(key);
-    const activityDate = appointment.date || dateKey(appointment.createdAt);
-    const value = appointment.status === "completed" ? appointment.servicePrice : 0;
-    customers.set(key, {
-      id: appointment.customerId,
+    const key =
+      appointment.customerId ??
+      customerKey(
+        appointment.customerEmail,
+        appointment.customerPhone,
+        appointment.customerName,
+      );
+    addCustomerActivity(
+      customers,
       key,
-      name: appointment.customerName,
-      email: appointment.customerEmail,
-      phone: appointment.customerPhone,
-      lastActivity:
-        !current || activityDate > current.lastActivity ? activityDate : current.lastActivity,
-      activityCount: (current?.activityCount ?? 0) + 1,
-      totalValue: (current?.totalValue ?? 0) + value,
-    });
+      {
+        id: appointment.customerId,
+        name: appointment.customerName,
+        email: appointment.customerEmail,
+        phone: appointment.customerPhone,
+      },
+      appointment.date || dateKey(appointment.createdAt),
+      appointment.status === "completed" ? appointment.servicePrice : 0,
+    );
   }
-  return [...customers.values()].sort((a, b) => b.lastActivity.localeCompare(a.lastActivity));
+  return sortCustomers(customers);
 }
 
 function buildOrderCustomers(orders: Order[]) {
   const customers = new Map<string, CustomerSummary>();
   for (const order of orders) {
-    const key = order.customerId ?? customerKey(order.customerEmail, order.customerPhone, order.customerName);
-    const current = customers.get(key);
-    const activityDate = dateKey(order.createdAt);
-    const value = order.status === "delivered" ? order.totalAmount : 0;
-    customers.set(key, {
-      id: order.customerId,
+    const key =
+      order.customerId ??
+      customerKey(order.customerEmail, order.customerPhone, order.customerName);
+    addCustomerActivity(
+      customers,
       key,
-      name: order.customerName,
-      email: order.customerEmail,
-      phone: order.customerPhone,
-      lastActivity:
-        !current || activityDate > current.lastActivity ? activityDate : current.lastActivity,
-      activityCount: (current?.activityCount ?? 0) + 1,
-      totalValue: (current?.totalValue ?? 0) + value,
-    });
+      {
+        id: order.customerId,
+        name: order.customerName,
+        email: order.customerEmail,
+        phone: order.customerPhone,
+      },
+      dateKey(order.createdAt),
+      order.status === "delivered" ? order.totalAmount : 0,
+    );
   }
-  return [...customers.values()].sort((a, b) => b.lastActivity.localeCompare(a.lastActivity));
+  return sortCustomers(customers);
 }
 
-function aggregateAppointments(appointments: Appointment[], customers: CustomerSummary[]) {
-  const completed = appointments.filter((appointment) => appointment.status === "completed");
-  const active = appointments.filter((appointment) => appointment.status !== "cancelled");
+function aggregateAppointments(
+  appointments: Appointment[],
+  customers: CustomerSummary[],
+) {
+  const completed = appointments.filter(
+    (appointment) => appointment.status === "completed",
+  );
+  const active = appointments.filter(
+    (appointment) => appointment.status !== "cancelled",
+  );
   const revenueByDate = new Map<string, RevenuePoint>();
-  for (const key of lastTenDateKeys()) revenueByDate.set(key, { date: key, revenue: 0, count: 0 });
+  for (const key of lastTenDateKeys())
+    revenueByDate.set(key, { date: key, revenue: 0, count: 0 });
 
   for (const appointment of appointments) {
     const point = revenueByDate.get(appointment.date);
     if (!point) continue;
     point.count += 1;
-    if (appointment.status === "completed") point.revenue += appointment.servicePrice;
+    if (appointment.status === "completed")
+      point.revenue += appointment.servicePrice;
   }
 
   const items = new Map<string, TopItem>();
@@ -159,29 +211,56 @@ function aggregateAppointments(appointments: Appointment[], customers: CustomerS
       revenue: 0,
     };
     item.count += 1;
-    if (appointment.status === "completed") item.revenue += appointment.servicePrice;
+    if (appointment.status === "completed")
+      item.revenue += appointment.servicePrice;
     items.set(item.name, item);
   }
 
-  const completedValue = completed.reduce((sum, appointment) => sum + appointment.servicePrice, 0);
-  const midpoint = new Date(); midpoint.setDate(midpoint.getDate() - 5);
-  const currentValue = completed.filter((item) => new Date(item.date) >= midpoint).reduce((sum, item) => sum + item.servicePrice, 0);
+  const completedValue = completed.reduce(
+    (sum, appointment) => sum + appointment.servicePrice,
+    0,
+  );
+  const midpoint = new Date();
+  midpoint.setDate(midpoint.getDate() - 5);
+  const currentValue = completed
+    .filter((item) => new Date(item.date) >= midpoint)
+    .reduce((sum, item) => sum + item.servicePrice, 0);
   const previousValue = completedValue - currentValue;
   return {
     totalRevenue: completedValue,
     totalActivity: appointments.length,
     newCustomers: customers.length,
-    avgOrderValue: completed.length
-      ? completedValue / completed.length
-      : 0,
+    avgOrderValue: completed.length ? completedValue / completed.length : 0,
     revenueChange: percentageChange(currentValue, previousValue),
-    activityChange: percentageChange(active.filter((item) => new Date(item.date) >= midpoint).length, active.filter((item) => new Date(item.date) < midpoint).length),
+    activityChange: percentageChange(
+      active.filter((item) => new Date(item.date) >= midpoint).length,
+      active.filter((item) => new Date(item.date) < midpoint).length,
+    ),
     topItems: [...items.values()].sort((a, b) => b.count - a.count).slice(0, 5),
     revenueData: [...revenueByDate.values()],
-    returningCustomers: customers.filter((customer) => customer.activityCount > 1).length,
-    busiestDay: mostCommon(active.map((item) => new Date(`${item.date}T12:00:00`).toLocaleDateString(undefined, { weekday: "long" }))),
-    busiestTime: mostCommon(active.map((item) => { const hour = Number(item.time.slice(0, 2)); return Number.isFinite(hour) ? `${String(hour).padStart(2, "0")}:00` : ""; }).filter(Boolean)),
-    completionRate: appointments.length ? Math.round((completed.length / appointments.length) * 100) : 0,
+    returningCustomers: customers.filter(
+      (customer) => customer.activityCount > 1,
+    ).length,
+    busiestDay: mostCommon(
+      active.map((item) =>
+        new Date(`${item.date}T12:00:00`).toLocaleDateString(undefined, {
+          weekday: "long",
+        }),
+      ),
+    ),
+    busiestTime: mostCommon(
+      active
+        .map((item) => {
+          const hour = Number(item.time.slice(0, 2));
+          return Number.isFinite(hour)
+            ? `${String(hour).padStart(2, "0")}:00`
+            : "";
+        })
+        .filter(Boolean),
+    ),
+    completionRate: appointments.length
+      ? Math.round((completed.length / appointments.length) * 100)
+      : 0,
   } satisfies AnalyticsSummary;
 }
 
@@ -189,7 +268,8 @@ function aggregateOrders(orders: Order[], customers: CustomerSummary[]) {
   const delivered = orders.filter((order) => order.status === "delivered");
   const active = orders.filter((order) => order.status !== "cancelled");
   const revenueByDate = new Map<string, RevenuePoint>();
-  for (const key of lastTenDateKeys()) revenueByDate.set(key, { date: key, revenue: 0, count: 0 });
+  for (const key of lastTenDateKeys())
+    revenueByDate.set(key, { date: key, revenue: 0, count: 0 });
 
   for (const order of orders) {
     const point = revenueByDate.get(dateKey(order.createdAt));
@@ -207,34 +287,59 @@ function aggregateOrders(orders: Order[], customers: CustomerSummary[]) {
         revenue: 0,
       };
       item.count += orderItem.quantity;
-      if (order.status === "delivered") item.revenue += orderItem.price * orderItem.quantity;
+      if (order.status === "delivered")
+        item.revenue += orderItem.price * orderItem.quantity;
       items.set(item.name, item);
     }
   }
 
-  const deliveredValue = delivered.reduce((sum, order) => sum + order.totalAmount, 0);
-  const midpoint = new Date(); midpoint.setDate(midpoint.getDate() - 5);
-  const currentValue = delivered.filter((item) => new Date(item.createdAt) >= midpoint).reduce((sum, item) => sum + item.totalAmount, 0);
+  const deliveredValue = delivered.reduce(
+    (sum, order) => sum + order.totalAmount,
+    0,
+  );
+  const midpoint = new Date();
+  midpoint.setDate(midpoint.getDate() - 5);
+  const currentValue = delivered
+    .filter((item) => new Date(item.createdAt) >= midpoint)
+    .reduce((sum, item) => sum + item.totalAmount, 0);
   const previousValue = deliveredValue - currentValue;
   return {
     totalRevenue: deliveredValue,
     totalActivity: orders.length,
     newCustomers: customers.length,
-    avgOrderValue: delivered.length
-      ? deliveredValue / delivered.length
-      : 0,
+    avgOrderValue: delivered.length ? deliveredValue / delivered.length : 0,
     revenueChange: percentageChange(currentValue, previousValue),
-    activityChange: percentageChange(active.filter((item) => new Date(item.createdAt) >= midpoint).length, active.filter((item) => new Date(item.createdAt) < midpoint).length),
+    activityChange: percentageChange(
+      active.filter((item) => new Date(item.createdAt) >= midpoint).length,
+      active.filter((item) => new Date(item.createdAt) < midpoint).length,
+    ),
     topItems: [...items.values()].sort((a, b) => b.count - a.count).slice(0, 5),
     revenueData: [...revenueByDate.values()],
-    returningCustomers: customers.filter((customer) => customer.activityCount > 1).length,
-    busiestDay: mostCommon(active.map((item) => new Date(item.createdAt).toLocaleDateString(undefined, { weekday: "long" }))),
-    busiestTime: mostCommon(active.map((item) => `${String(new Date(item.createdAt).getHours()).padStart(2, "0")}:00`)),
-    completionRate: orders.length ? Math.round((delivered.length / orders.length) * 100) : 0,
+    returningCustomers: customers.filter(
+      (customer) => customer.activityCount > 1,
+    ).length,
+    busiestDay: mostCommon(
+      active.map((item) =>
+        new Date(item.createdAt).toLocaleDateString(undefined, {
+          weekday: "long",
+        }),
+      ),
+    ),
+    busiestTime: mostCommon(
+      active.map(
+        (item) =>
+          `${String(new Date(item.createdAt).getHours()).padStart(2, "0")}:00`,
+      ),
+    ),
+    completionRate: orders.length
+      ? Math.round((delivered.length / orders.length) * 100)
+      : 0,
   } satisfies AnalyticsSummary;
 }
 
-export async function loadDashboardData(tenant: Tenant): Promise<DashboardData> {
+export async function loadDashboardData(
+  tenant: Tenant,
+): Promise<DashboardData> {
   if (tenant.businessType === "appointment") {
     const [appointments, customerRecords] = await Promise.all([
       listAppointments(tenant.id),
@@ -256,7 +361,10 @@ export async function loadDashboardData(tenant: Tenant): Promise<DashboardData> 
     listOrders(tenant.id),
     listCustomers(tenant.id),
   ]);
-  const customers = mergePersistedCustomers(customerRecords, buildOrderCustomers(orders));
+  const customers = mergePersistedCustomers(
+    customerRecords,
+    buildOrderCustomers(orders),
+  );
   return {
     appointments: [],
     orders,

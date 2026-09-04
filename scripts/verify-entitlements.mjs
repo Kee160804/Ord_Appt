@@ -22,7 +22,9 @@ const required = [
 ];
 const missing = required.filter((name) => !process.env[name]);
 if (missing.length) {
-  throw new Error(`Missing entitlement test environment variables: ${missing.join(", ")}`);
+  throw new Error(
+    `Missing entitlement test environment variables: ${missing.join(", ")}`,
+  );
 }
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -52,19 +54,30 @@ async function tenantIdFor(client) {
 async function expectRejected(label, promise, messagePart) {
   const { error } = await promise;
   if (!error) throw new Error(`${label} unexpectedly succeeded.`);
-  if (messagePart && !error.message.toLowerCase().includes(messagePart.toLowerCase())) {
+  if (
+    messagePart &&
+    !error.message.toLowerCase().includes(messagePart.toLowerCase())
+  ) {
     throw new Error(`${label} failed for the wrong reason: ${error.message}`);
   }
 }
 
-await signIn(owner, process.env.ENTITLEMENT_TEST_OWNER_EMAIL, process.env.ENTITLEMENT_TEST_OWNER_PASSWORD);
+await signIn(
+  owner,
+  process.env.ENTITLEMENT_TEST_OWNER_EMAIL,
+  process.env.ENTITLEMENT_TEST_OWNER_PASSWORD,
+);
 const ownerTenantId = await tenantIdFor(owner);
-const { data: usageRows, error: usageError } = await owner.rpc("get_tenant_monthly_usage", {
-  p_tenant_id: ownerTenantId,
-});
+const { data: usageRows, error: usageError } = await owner.rpc(
+  "get_tenant_monthly_usage",
+  {
+    p_tenant_id: ownerTenantId,
+  },
+);
 if (usageError) throw usageError;
 const usage = Array.isArray(usageRows) ? usageRows[0] : usageRows;
-const expectedLimit = usage.plan === "enterprise" ? null : usage.plan === "pro" ? 150 : 50;
+const expectedLimit =
+  usage.plan === "enterprise" ? null : usage.plan === "pro" ? 150 : 50;
 if (!usage || usage.activity_limit !== expectedLimit) {
   throw new Error(`Unexpected ${usage?.plan ?? "unknown"} activity limit.`);
 }
@@ -91,12 +104,24 @@ const { data: accessAllowed, error: accessError } = await expiredOwner.rpc(
   { p_tenant_id: expiredTenantId },
 );
 if (accessError) throw accessError;
-if (accessAllowed !== false) throw new Error("Expired tenant still has subscription access.");
+if (accessAllowed !== false)
+  throw new Error("Expired tenant still has subscription access.");
 
-for (const table of ["products", "services", "customers", "orders", "appointments"]) {
-  const { data, error } = await expiredOwner.from(table).select("tenant_id").eq("tenant_id", expiredTenantId).limit(1);
+for (const table of [
+  "products",
+  "services",
+  "customers",
+  "orders",
+  "appointments",
+]) {
+  const { data, error } = await expiredOwner
+    .from(table)
+    .select("tenant_id")
+    .eq("tenant_id", expiredTenantId)
+    .limit(1);
   if (error) throw error;
-  if (data.length !== 0) throw new Error(`Expired tenant can still read ${table}.`);
+  if (data.length !== 0)
+    throw new Error(`Expired tenant can still read ${table}.`);
 }
 
 await expectRejected(
@@ -106,7 +131,13 @@ await expectRejected(
     p_customer_name: "Expired Trial Verification",
     p_customer_phone: "+15555550131",
     p_order_type: "pickup",
-    p_items: [{ product_id: process.env.ENTITLEMENT_TEST_EXPIRED_PRODUCT_ID, quantity: 1, addons: [] }],
+    p_items: [
+      {
+        product_id: process.env.ENTITLEMENT_TEST_EXPIRED_PRODUCT_ID,
+        quantity: 1,
+        addons: [],
+      },
+    ],
     p_notes: "Entitlement verification",
   }),
   "subscription is inactive",
@@ -143,5 +174,6 @@ await expectRejected(
   "valid subscription plan",
 );
 
-console.log("Entitlement verification passed for plan limits, expired access, public activity blocking, and SUPER_ADMIN authorization.");
-
+console.log(
+  "Entitlement verification passed for plan limits, expired access, public activity blocking, and SUPER_ADMIN authorization.",
+);

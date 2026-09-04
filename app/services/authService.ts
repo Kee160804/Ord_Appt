@@ -1,4 +1,7 @@
-import type { SupabaseClient, User as SupabaseUser } from "@supabase/supabase-js";
+import type {
+  SupabaseClient,
+  User as SupabaseUser,
+} from "@supabase/supabase-js";
 import { getSupabaseBrowserClient } from "@/app/lib/supabase/client";
 import type { BusinessType, Tenant, User, UserRole } from "@/app/types/index";
 import type {
@@ -36,16 +39,28 @@ export interface CreateBusinessInput {
   slug: string;
 }
 
-const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const DAYS = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+];
 const tenantProvisioningByUser = new Map<string, Promise<string | null>>();
 const ACTIVE_BUSINESS_KEY_PREFIX = "yuhbusiness_active_business:";
 
 function errorMessage(error: unknown, fallback: string) {
-  const rawMessage = error instanceof Error && error.message
-    ? error.message
-    : typeof error === "object" && error !== null && "message" in error && typeof error.message === "string"
+  const rawMessage =
+    error instanceof Error && error.message
       ? error.message
-      : "";
+      : typeof error === "object" &&
+          error !== null &&
+          "message" in error &&
+          typeof error.message === "string"
+        ? error.message
+        : "";
   const message = rawMessage.trim();
   if (message.includes("tenant_memberships_tenant_id_profile_id_key")) {
     return "Your account membership already exists but could not be loaded. Sign out, then sign in again. If this continues, ask the platform administrator to run the onboarding repair migration.";
@@ -53,19 +68,24 @@ function errorMessage(error: unknown, fallback: string) {
   // AuthRetryableFetchError in some @supabase/auth-js releases serializes a
   // failed 5xx Response as `{}`. Never expose that implementation detail as
   // the user-facing error; the caller's contextual fallback is actionable.
-  if (message && message !== "{}" && message !== "[object Object]") return message;
+  if (message && message !== "{}" && message !== "[object Object]")
+    return message;
   return fallback;
 }
 
 function roleName(membership: MembershipRow | null) {
   if (!membership?.roles) return "STAFF";
   return Array.isArray(membership.roles)
-    ? membership.roles[0]?.name ?? "STAFF"
+    ? (membership.roles[0]?.name ?? "STAFF")
     : membership.roles.name;
 }
 
-function mapRole(profile: ProfileRow, membership: MembershipRow | null): UserRole {
-  if (profile.platform_role?.toUpperCase() === "SUPER_ADMIN") return "superadmin";
+function mapRole(
+  profile: ProfileRow,
+  membership: MembershipRow | null,
+): UserRole {
+  if (profile.platform_role?.toUpperCase() === "SUPER_ADMIN")
+    return "superadmin";
 
   switch (roleName(membership).toUpperCase()) {
     case "OWNER":
@@ -80,7 +100,8 @@ function mapRole(profile: ProfileRow, membership: MembershipRow | null): UserRol
 }
 
 function mapUser(profile: ProfileRow, membership: MembershipRow | null): User {
-  const name = profile.full_name?.trim() || profile.email?.split("@")[0] || "User";
+  const name =
+    profile.full_name?.trim() || profile.email?.split("@")[0] || "User";
   return {
     id: profile.id,
     tenantId: membership?.tenant_id ?? null,
@@ -133,7 +154,8 @@ function mapTenant(row: TenantRow, hours: BusinessHourRow[]): Tenant {
     accentColor: row.accent_color ?? "#a78bfa",
     createdAt: row.created_at ?? new Date().toISOString(),
     isActive: row.is_active && row.status.toUpperCase() === "ACTIVE",
-    plan: row.plan === "pro" || row.plan === "enterprise" ? row.plan : "starter",
+    plan:
+      row.plan === "pro" || row.plan === "enterprise" ? row.plan : "starter",
     stripeConnected: row.stripe_connected ?? false,
     subscriptionStatus:
       row.subscription_status === "active" ||
@@ -195,7 +217,10 @@ function slugify(value: string) {
     .replace(/^-|-$/g, "");
 }
 
-async function createTenantFromMetadata(supabase: SupabaseClient, authUser: SupabaseUser) {
+async function createTenantFromMetadata(
+  supabase: SupabaseClient,
+  authUser: SupabaseUser,
+) {
   const metadata = metadataFromUser(authUser);
   if (!metadata) return null;
 
@@ -219,7 +244,10 @@ async function createTenantFromMetadata(supabase: SupabaseClient, authUser: Supa
   return data as string;
 }
 
-async function provisionTenantFromMetadata(supabase: SupabaseClient, authUser: SupabaseUser) {
+async function provisionTenantFromMetadata(
+  supabase: SupabaseClient,
+  authUser: SupabaseUser,
+) {
   const inFlightProvisioning = tenantProvisioningByUser.get(authUser.id);
   if (inFlightProvisioning) return inFlightProvisioning;
 
@@ -244,7 +272,8 @@ export async function loadAuthenticatedAppSession(
     let authUser = suppliedAuthUser;
     if (!authUser) {
       const { data, error } = await supabase.auth.getUser();
-      if (error || !data.user) return { error: error?.message ?? "Not authenticated." };
+      if (error || !data.user)
+        return { error: error?.message ?? "Not authenticated." };
       authUser = data.user;
     }
 
@@ -269,14 +298,21 @@ export async function loadAuthenticatedAppSession(
     }
 
     if (profileError || !profileData) {
-      return { error: profileError?.message ?? "Your application profile was not found." };
+      return {
+        error:
+          profileError?.message ?? "Your application profile was not found.",
+      };
     }
 
     const profile = profileData as ProfileRow;
-    if (!profile.is_active) return { error: "This account has been deactivated." };
+    if (!profile.is_active)
+      return { error: "This account has been deactivated." };
 
     let memberships = await getMemberships(supabase, profile.id);
-    if (memberships.length === 0 && profile.platform_role?.toUpperCase() !== "SUPER_ADMIN") {
+    if (
+      memberships.length === 0 &&
+      profile.platform_role?.toUpperCase() !== "SUPER_ADMIN"
+    ) {
       const tenantId = await provisionTenantFromMetadata(supabase, authUser);
       if (tenantId) memberships = await getMemberships(supabase, profile.id);
     }
@@ -287,24 +323,31 @@ export async function loadAuthenticatedAppSession(
 
     const tenantIds = memberships.map((membership) => membership.tenant_id);
 
-    const [{ data: tenantData, error: tenantError }, { data: hoursData, error: hoursError }] =
-      await Promise.all([
-        supabase.from("tenants").select("*").in("id", tenantIds),
-        supabase
-          .from("business_hours")
-          .select("tenant_id, day_of_week, open_time, close_time, is_closed")
-          .in("tenant_id", tenantIds),
-      ]);
+    const [
+      { data: tenantData, error: tenantError },
+      { data: hoursData, error: hoursError },
+    ] = await Promise.all([
+      supabase.from("tenants").select("*").in("id", tenantIds),
+      supabase
+        .from("business_hours")
+        .select("tenant_id, day_of_week, open_time, close_time, is_closed")
+        .in("tenant_id", tenantIds),
+    ]);
 
     if (tenantError) return { error: tenantError.message };
     if (hoursError) return { error: hoursError.message };
 
     const tenantRows = (tenantData ?? []) as TenantRow[];
-    const hourRows = (hoursData ?? []) as (BusinessHourRow & { tenant_id: string })[];
+    const hourRows = (hoursData ?? []) as (BusinessHourRow & {
+      tenant_id: string;
+    })[];
     const tenantById = new Map(
       tenantRows.map((row) => [
         row.id,
-        mapTenant(row, hourRows.filter((hour) => hour.tenant_id === row.id)),
+        mapTenant(
+          row,
+          hourRows.filter((hour) => hour.tenant_id === row.id),
+        ),
       ]),
     );
     const businesses = tenantIds
@@ -312,13 +355,19 @@ export async function loadAuthenticatedAppSession(
       .filter((business): business is Tenant => Boolean(business));
 
     if (businesses.length === 0) {
-      return { error: "None of your active business memberships could be loaded." };
+      return {
+        error: "None of your active business memberships could be loaded.",
+      };
     }
 
     const storedTenantId = getStoredActiveBusiness(profile.id);
     const desiredTenantId = requestedTenantId ?? storedTenantId;
-    const tenant = businesses.find((business) => business.id === desiredTenantId) ?? businesses[0];
-    const membership = memberships.find((candidate) => candidate.tenant_id === tenant.id) ?? null;
+    const tenant =
+      businesses.find((business) => business.id === desiredTenantId) ??
+      businesses[0];
+    const membership =
+      memberships.find((candidate) => candidate.tenant_id === tenant.id) ??
+      null;
     const user = mapUser(profile, membership);
     storeActiveBusiness(profile.id, tenant.id);
 
@@ -332,7 +381,9 @@ export async function loadAuthenticatedAppSession(
   }
 }
 
-export async function createAdditionalBusiness(input: CreateBusinessInput): Promise<AuthResult> {
+export async function createAdditionalBusiness(
+  input: CreateBusinessInput,
+): Promise<AuthResult> {
   const supabase = getSupabaseBrowserClient();
   if (!supabase) return { error: "Supabase is not configured." };
 
@@ -340,13 +391,16 @@ export async function createAdditionalBusiness(input: CreateBusinessInput): Prom
   if (businessName.length < 2) return { error: "Business name is required." };
 
   try {
-    const { data, error } = await supabase.rpc("create_additional_owner_business", {
-      p_business_name: businessName,
-      p_business_type: input.businessType,
-      p_city: input.city.trim(),
-      p_phone: input.phone.trim(),
-      p_slug: slugify(input.slug || businessName),
-    });
+    const { data, error } = await supabase.rpc(
+      "create_additional_owner_business",
+      {
+        p_business_name: businessName,
+        p_business_type: input.businessType,
+        p_city: input.city.trim(),
+        p_phone: input.phone.trim(),
+        p_slug: slugify(input.slug || businessName),
+      },
+    );
 
     if (error) {
       if (error.code === "PGRST202") {
@@ -363,12 +417,19 @@ export async function createAdditionalBusiness(input: CreateBusinessInput): Prom
   }
 }
 
-export async function supabaseLogin(email: string, password: string): Promise<AuthResult> {
+export async function supabaseLogin(
+  email: string,
+  password: string,
+): Promise<AuthResult> {
   const supabase = getSupabaseBrowserClient();
   if (!supabase) return { error: "Supabase is not configured." };
 
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error || !data.user) return { error: error?.message ?? "Invalid email or password." };
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
+  if (error || !data.user)
+    return { error: error?.message ?? "Invalid email or password." };
 
   const result = await loadAuthenticatedAppSession(data.user);
   if (!result.user) {
@@ -398,16 +459,18 @@ export async function supabaseSignup(
     business_phone: phone.trim(),
     business_slug: slugify(slug || businessName),
   };
-  const emailRedirectTo = typeof window === "undefined"
-    ? undefined
-    : `${window.location.origin}/auth/confirm?next=/dashboard`;
+  const emailRedirectTo =
+    typeof window === "undefined"
+      ? undefined
+      : `${window.location.origin}/auth/confirm?next=/dashboard`;
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: { data: metadata, emailRedirectTo },
   });
 
-  if (error || !data.user) return { error: error?.message ?? "Unable to create account." };
+  if (error || !data.user)
+    return { error: error?.message ?? "Unable to create account." };
   if (!data.session) return { requiresEmailConfirmation: true };
 
   return loadAuthenticatedAppSession(data.user);
@@ -420,14 +483,19 @@ export async function supabaseLogout() {
 
 export async function requestPasswordReset(email: string) {
   const supabase = getSupabaseBrowserClient();
-  if (!supabase) throw new Error("Password recovery is not configured for this deployment.");
+  if (!supabase)
+    throw new Error("Password recovery is not configured for this deployment.");
 
-  const redirectTo = typeof window === "undefined"
-    ? undefined
-    : `${window.location.origin}/auth/confirm?next=/reset-password`;
-  const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
-    redirectTo,
-  });
+  const redirectTo =
+    typeof window === "undefined"
+      ? undefined
+      : `${window.location.origin}/auth/confirm?next=/reset-password`;
+  const { error } = await supabase.auth.resetPasswordForEmail(
+    email.trim().toLowerCase(),
+    {
+      redirectTo,
+    },
+  );
   if (error) {
     throw new Error(
       errorMessage(
@@ -440,10 +508,14 @@ export async function requestPasswordReset(email: string) {
 
 export async function resendSignupConfirmation(email: string) {
   const supabase = getSupabaseBrowserClient();
-  if (!supabase) throw new Error("Email confirmation is not configured for this deployment.");
-  const emailRedirectTo = typeof window === "undefined"
-    ? undefined
-    : `${window.location.origin}/auth/confirm?next=/dashboard`;
+  if (!supabase)
+    throw new Error(
+      "Email confirmation is not configured for this deployment.",
+    );
+  const emailRedirectTo =
+    typeof window === "undefined"
+      ? undefined
+      : `${window.location.origin}/auth/confirm?next=/dashboard`;
   const { error } = await supabase.auth.resend({
     type: "signup",
     email: email.trim().toLowerCase(),
@@ -460,15 +532,21 @@ export async function resendSignupConfirmation(email: string) {
 }
 
 export async function updateAccountPassword(password: string) {
-  if (password.length < 8) throw new Error("Password must be at least 8 characters.");
+  if (password.length < 8)
+    throw new Error("Password must be at least 8 characters.");
   const supabase = getSupabaseBrowserClient();
-  if (!supabase) throw new Error("Password recovery is not configured for this deployment.");
+  if (!supabase)
+    throw new Error("Password recovery is not configured for this deployment.");
 
-  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+  const { data: sessionData, error: sessionError } =
+    await supabase.auth.getSession();
   if (sessionError || !sessionData.session) {
-    throw new Error("This password reset link is invalid or has expired. Request a new link.");
+    throw new Error(
+      "This password reset link is invalid or has expired. Request a new link.",
+    );
   }
 
   const { error } = await supabase.auth.updateUser({ password });
-  if (error) throw new Error(errorMessage(error, "Unable to update your password."));
+  if (error)
+    throw new Error(errorMessage(error, "Unable to update your password."));
 }

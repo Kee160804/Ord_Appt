@@ -6,7 +6,8 @@ export async function GET(request: NextRequest) {
   const tokenHash = request.nextUrl.searchParams.get("token_hash");
   const code = request.nextUrl.searchParams.get("code");
   const type = request.nextUrl.searchParams.get("type") as EmailOtpType | null;
-  const requestedNext = request.nextUrl.searchParams.get("next") ?? "/dashboard";
+  const requestedNext =
+    request.nextUrl.searchParams.get("next") ?? "/dashboard";
   const next = requestedNext.startsWith("/") ? requestedNext : "/dashboard";
 
   if ((tokenHash && type) || code) {
@@ -14,16 +15,27 @@ export async function GET(request: NextRequest) {
     if (supabase) {
       const { error } = code
         ? await supabase.auth.exchangeCodeForSession(code)
-        : await supabase.auth.verifyOtp({ type: type!, token_hash: tokenHash! });
+        : await supabase.auth.verifyOtp({
+            type: type!,
+            token_hash: tokenHash!,
+          });
       if (!error) {
         const destination = new URL(next, request.url);
-        destination.searchParams.set(type === "recovery" || next.startsWith("/reset-password") ? "recovery" : "confirmed", "1");
+        destination.searchParams.set(
+          type === "recovery" || next.startsWith("/reset-password")
+            ? "recovery"
+            : "confirmed",
+          "1",
+        );
         return NextResponse.redirect(destination);
       }
     }
   }
 
-  const errorDestination = new URL(next.startsWith("/reset-password") ? "/reset-password" : "/login", request.url);
+  const errorDestination = new URL(
+    next.startsWith("/reset-password") ? "/reset-password" : "/login",
+    request.url,
+  );
   errorDestination.searchParams.set(
     "error",
     next.startsWith("/reset-password")

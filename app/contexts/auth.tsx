@@ -1,6 +1,12 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react";
 import { useRouter } from "next/navigation";
 import { demoAccounts } from "@/app/data/mock";
 import {
@@ -42,7 +48,11 @@ interface AuthContextType {
   updateTenant: (updatedTenant: Tenant) => void;
   switchBusiness: (tenantId: string) => Promise<AuthActionResult>;
   addBusiness: (input: CreateBusinessInput) => Promise<AuthActionResult>;
-  login: (email: string, password: string, rememberMe?: boolean) => Promise<AuthActionResult>;
+  login: (
+    email: string,
+    password: string,
+    rememberMe?: boolean,
+  ) => Promise<AuthActionResult>;
   signup: (
     email: string,
     password: string,
@@ -65,13 +75,17 @@ const SESSION_TAB_KEY = "ls_session_tab_active";
 
 function getDemoSessionUser() {
   if (!isDemoModeEnabled()) return null;
-  const userId = window.sessionStorage.getItem(DEMO_SESSION_KEY)
-    ?? window.localStorage.getItem(DEMO_SESSION_KEY);
+  const userId =
+    window.sessionStorage.getItem(DEMO_SESSION_KEY) ??
+    window.localStorage.getItem(DEMO_SESSION_KEY);
   return userId ? getUserById(userId) : null;
 }
 
 function saveSessionPreference(rememberMe: boolean) {
-  window.localStorage.setItem(SESSION_PREFERENCE_KEY, rememberMe ? "persistent" : "session");
+  window.localStorage.setItem(
+    SESSION_PREFERENCE_KEY,
+    rememberMe ? "persistent" : "session",
+  );
   if (rememberMe) window.sessionStorage.removeItem(SESSION_TAB_KEY);
   else window.sessionStorage.setItem(SESSION_TAB_KEY, "true");
 }
@@ -111,10 +125,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const demoUser = getDemoSessionUser();
         setUser(demoUser);
         setTenant(
-          demoUser?.tenantId ? getTenantById(demoUser.tenantId) ?? null : null,
+          demoUser?.tenantId
+            ? (getTenantById(demoUser.tenantId) ?? null)
+            : null,
         );
         setBusinesses(
-          demoUser?.tenantId ? [getTenantById(demoUser.tenantId)].filter((item): item is Tenant => Boolean(item)) : [],
+          demoUser?.tenantId
+            ? [getTenantById(demoUser.tenantId)].filter(
+                (item): item is Tenant => Boolean(item),
+              )
+            : [],
         );
         setIsLoading(false);
       });
@@ -130,8 +150,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let active = true;
 
     const hydrate = async () => {
-      const sessionOnly = window.localStorage.getItem(SESSION_PREFERENCE_KEY) === "session";
-      const sameTabSession = window.sessionStorage.getItem(SESSION_TAB_KEY) === "true";
+      const sessionOnly =
+        window.localStorage.getItem(SESSION_PREFERENCE_KEY) === "session";
+      const sameTabSession =
+        window.sessionStorage.getItem(SESSION_TAB_KEY) === "true";
       if (sessionOnly && !sameTabSession) {
         await supabase.auth.signOut({ scope: "local" });
         if (!active) return;
@@ -159,7 +181,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      if (event === "SIGNED_IN" || event === "USER_UPDATED" || event === "TOKEN_REFRESHED") {
+      if (
+        event === "SIGNED_IN" ||
+        event === "USER_UPDATED" ||
+        event === "TOKEN_REFRESHED"
+      ) {
         window.setTimeout(() => void hydrate(), 0);
       }
     });
@@ -170,14 +196,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const login = async (email: string, password: string, rememberMe = true): Promise<AuthActionResult> => {
+  const login = async (
+    email: string,
+    password: string,
+    rememberMe = true,
+  ): Promise<AuthActionResult> => {
     setIsLoading(true);
     const normalizedEmail = email.trim().toLowerCase();
 
     if (isSupabaseConfigured()) {
       const result = await supabaseLogin(normalizedEmail, password);
       setIsLoading(false);
-      if (!result.user) return { success: false, error: result.error ?? "Unable to sign in." };
+      if (!result.user)
+        return { success: false, error: result.error ?? "Unable to sign in." };
 
       saveSessionPreference(rememberMe);
       setUser(result.user);
@@ -193,7 +224,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const account = demoAccounts.find(
       (candidate) =>
-        candidate.email.toLowerCase() === normalizedEmail && candidate.password === password,
+        candidate.email.toLowerCase() === normalizedEmail &&
+        candidate.password === password,
     );
     const demoUser = account ? getUserByEmail(account.email) : null;
     if (!demoUser) {
@@ -207,7 +239,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     setUser(demoUser);
-    const demoTenant = demoUser.tenantId ? getTenantById(demoUser.tenantId) ?? null : null;
+    const demoTenant = demoUser.tenantId
+      ? (getTenantById(demoUser.tenantId) ?? null)
+      : null;
     setTenant(demoTenant);
     setBusinesses(demoTenant ? [demoTenant] : []);
     saveDemoSession(demoUser, rememberMe);
@@ -230,7 +264,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (password.length < 8) {
       setIsLoading(false);
-      return { success: false, error: "Password must be at least 8 characters." };
+      return {
+        success: false,
+        error: "Password must be at least 8 characters.",
+      };
     }
 
     if (isSupabaseConfigured()) {
@@ -249,7 +286,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (result.requiresEmailConfirmation) {
         return { success: true, requiresEmailConfirmation: true };
       }
-      if (!result.user) return { success: false, error: result.error ?? "Unable to sign up." };
+      if (!result.user)
+        return { success: false, error: result.error ?? "Unable to sign up." };
 
       setUser(result.user);
       setTenant(result.tenant ?? null);
@@ -281,7 +319,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email: normalizedEmail,
       address: "",
       city: city.trim(),
-      coverImage: "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=1200&q=80",
+      coverImage:
+        "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=1200&q=80",
       businessHours: [],
       socialLinks: {},
       primaryColor: "#8b5cf6",
@@ -331,21 +370,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const updateTenant = (updatedTenant: Tenant) => {
-    setTenant((current) => (current?.id === updatedTenant.id ? updatedTenant : current));
-    setBusinesses((current) => current.map((business) => (
-      business.id === updatedTenant.id ? updatedTenant : business
-    )));
+    setTenant((current) =>
+      current?.id === updatedTenant.id ? updatedTenant : current,
+    );
+    setBusinesses((current) =>
+      current.map((business) =>
+        business.id === updatedTenant.id ? updatedTenant : business,
+      ),
+    );
   };
 
-  const switchBusiness = async (tenantId: string): Promise<AuthActionResult> => {
-    if (tenant?.id === tenantId) return { success: true, user: user ?? undefined };
+  const switchBusiness = async (
+    tenantId: string,
+  ): Promise<AuthActionResult> => {
+    if (tenant?.id === tenantId)
+      return { success: true, user: user ?? undefined };
     setIsSwitchingBusiness(true);
 
     if (isSupabaseConfigured()) {
       const result = await loadAuthenticatedAppSession(undefined, tenantId);
       setIsSwitchingBusiness(false);
       if (!result.user || !result.tenant || result.tenant.id !== tenantId) {
-        return { success: false, error: result.error ?? "You do not have access to that business." };
+        return {
+          success: false,
+          error: result.error ?? "You do not have access to that business.",
+        };
       }
       setUser(result.user);
       setTenant(result.tenant);
@@ -356,23 +405,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const selected = businesses.find((business) => business.id === tenantId);
     setIsSwitchingBusiness(false);
-    if (!selected || !user) return { success: false, error: "Business not found." };
+    if (!selected || !user)
+      return { success: false, error: "Business not found." };
     setTenant(selected);
     setUser({ ...user, tenantId: selected.id });
     router.push("/dashboard");
     return { success: true, user };
   };
 
-  const addBusiness = async (input: CreateBusinessInput): Promise<AuthActionResult> => {
+  const addBusiness = async (
+    input: CreateBusinessInput,
+  ): Promise<AuthActionResult> => {
     if (!isSupabaseConfigured()) {
-      return { success: false, error: "Adding another business requires a connected Supabase project." };
+      return {
+        success: false,
+        error: "Adding another business requires a connected Supabase project.",
+      };
     }
 
     setIsSwitchingBusiness(true);
     const result = await createAdditionalBusiness(input);
     setIsSwitchingBusiness(false);
     if (!result.user || !result.tenant) {
-      return { success: false, error: result.error ?? "Unable to add this business." };
+      return {
+        success: false,
+        error: result.error ?? "Unable to add this business.",
+      };
     }
     setUser(result.user);
     setTenant(result.tenant);
@@ -382,19 +440,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{
-      user,
-      tenant,
-      businesses,
-      updateTenant,
-      switchBusiness,
-      addBusiness,
-      login,
-      signup,
-      logout,
-      isLoading,
-      isSwitchingBusiness,
-    }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        tenant,
+        businesses,
+        updateTenant,
+        switchBusiness,
+        addBusiness,
+        login,
+        signup,
+        logout,
+        isLoading,
+        isSwitchingBusiness,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

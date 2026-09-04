@@ -78,7 +78,6 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/app/contexts/theme";
 import { AuthProvider } from "@/app/contexts/auth";
-import { RealtimeProvider } from "@/app/contexts/realtime";
 import { PwaRegister } from "@/components/PwaRegister";
 import "@/app/styles/global.css";
 
@@ -146,10 +145,8 @@ export default function RootLayout({
       >
         <ThemeProvider>
           <AuthProvider>
-            <RealtimeProvider>
-              <PwaRegister />
-              {children}
-            </RealtimeProvider>
+            <PwaRegister />
+            {children}
           </AuthProvider>
         </ThemeProvider>
       </body>

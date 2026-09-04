@@ -8,6 +8,10 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
+    "test": "node --test tests",
+    "format": "prettier --write \"app/**/*.{ts,tsx}\" \"scripts/**/*.mjs\" \"supabase/functions/**/*.ts\" \"tests/**/*.mjs\" \"next.config.ts\" \"proxy.ts\" \"eslint.config.mjs\" \"postcss.config.mjs\" \"tsconfig.json\"",
+    "format:check": "prettier --check \"app/**/*.{ts,tsx}\" \"scripts/**/*.mjs\" \"supabase/functions/**/*.ts\" \"tests/**/*.mjs\" \"next.config.ts\" \"proxy.ts\" \"eslint.config.mjs\" \"postcss.config.mjs\" \"tsconfig.json\"",
+    "test:ci": "npm run lint && npm run typecheck && npm test && npm run build",
     "test:rls": "node scripts/verify-rls.mjs",
     "test:onboarding": "node scripts/verify-onboarding.mjs",
     "test:entitlements": "node scripts/verify-entitlements.mjs"
@@ -33,6 +37,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
+    "prettier": "^3.9.6",
     "tailwindcss": "^4.2.2",
     "typescript": "^5"
   }

@@ -4,10 +4,14 @@ The database is the source of truth for production. Keep every SQL change in
 `supabase/migrations` and apply migrations in order to development, staging,
 and production projects.
 
-The large schema supplied with this project is the baseline evolution script.
-Save that exact script as the migration immediately before
-`202608240001_app_compatibility.sql` so a new environment can be reproduced
-without relying on SQL Editor history.
+`202608230001_baseline_schema.sql` is the canonical baseline. A blank Supabase
+project can be reproduced by applying every file in `supabase/migrations` in
+filename order; no SQL Editor history or external schema file is required.
+
+The final mock-payment migration adds a provider-neutral BZD ledger, invoices,
+full-model public checkout functions, and distributed rate-limit storage. Mock
+transactions are always labelled `MOCK` and never collect payment credentials
+or move money. Replace the adapter only after the bank supplies sandbox APIs.
 
 After connecting the Supabase CLI, generate the canonical TypeScript database
 types whenever the schema changes:
@@ -42,7 +46,7 @@ or password. Every new business receives its own OWNER membership, Beginner
 plan, 14-day trial, storefront slug, modules, and tenant-level subscription.
 The internal database plan value remains `starter` for backward compatibility;
 the application displays it as Beginner at $9 BZD per month. Pro is $12 BZD
-and Enterprise is $16 BZD, charged independently for each tenant.
+and Enterprise is $15 BZD, charged independently for each tenant.
 
 ## Storefront cover photo uploads
 
@@ -108,6 +112,23 @@ RLS, limits anonymous provider reads to public display fields, and validates
 discounts and provider availability in security-definer functions. The app's
 Business Tools page also generates storefront QR codes locally in the browser;
 QR generation does not upload customer or storefront information elsewhere.
+
+### Realtime in-app notifications
+
+Apply `202609060002_recipient_realtime_notifications.sql` after the growth and
+transactional-email migrations. It upgrades `business_notifications` into a
+strict per-recipient delivery table, backfills existing tenant notifications,
+adds event triggers for orders, appointments, cancellations, reschedules, new
+customers, low inventory, promotions, subscriptions, and trials, and publishes
+the table through Supabase Realtime.
+
+The browser subscribes with `recipient_id = auth.uid()` and always queries with
+both `tenant_id` and `recipient_id`. RLS repeats both checks, so switching
+businesses or adding staff cannot expose another tenant's or staff member's
+notifications. Read state and mark-all-read are therefore personal to each
+recipient. The migration also removes the old notification-to-email trigger:
+in-app notifications do not require Resend, SMTP, a domain, or an email worker.
+Transactional emails continue to use their own domain event triggers.
 
 Appointment reminders are placed in `appointment_reminders` only after an
 appointment is confirmed. Rows expose `PENDING`, `PROCESSING`, `SENT`,

@@ -41,9 +41,12 @@ function mapProduct(row: ProductRow, categoryName = "Uncategorized"): Product {
     categoryName,
     isActive: row.available,
     inventory: row.stock ?? undefined,
-    trackInventory: row.track_inventory ?? (row.stock !== null),
+    trackInventory: row.track_inventory ?? row.stock !== null,
     tags: [],
-    addons: (row.addons ?? []).map((addon) => ({ ...addon, price: Number(addon.price) })),
+    addons: (row.addons ?? []).map((addon) => ({
+      ...addon,
+      price: Number(addon.price),
+    })),
     createdAt: row.created_at,
   };
 }
@@ -64,7 +67,11 @@ export async function listCategories(
   return ((data ?? []) as CategoryRow[]).map(mapCategory);
 }
 
-export async function createCategory(tenantId: string, name: string, sortOrder: number) {
+export async function createCategory(
+  tenantId: string,
+  name: string,
+  sortOrder: number,
+) {
   const { data, error } = await client()
     .from("categories")
     .insert({
@@ -114,17 +121,26 @@ export async function setCategoryActive(
 
 export async function listProducts(tenantId: string): Promise<Product[]> {
   const supabase = client();
-  const [{ data: products, error: productsError }, { data: categories, error: categoriesError }] =
-    await Promise.all([
-      supabase.from("products").select("*").eq("tenant_id", tenantId).order("created_at"),
-      supabase.from("categories").select("*").eq("tenant_id", tenantId),
-    ]);
+  const [
+    { data: products, error: productsError },
+    { data: categories, error: categoriesError },
+  ] = await Promise.all([
+    supabase
+      .from("products")
+      .select("*")
+      .eq("tenant_id", tenantId)
+      .order("created_at"),
+    supabase.from("categories").select("*").eq("tenant_id", tenantId),
+  ]);
 
   if (productsError) throw new Error(productsError.message);
   if (categoriesError) throw new Error(categoriesError.message);
 
   const categoryNames = new Map(
-    ((categories ?? []) as CategoryRow[]).map((category) => [category.id, category.name]),
+    ((categories ?? []) as CategoryRow[]).map((category) => [
+      category.id,
+      category.name,
+    ]),
   );
   return ((products ?? []) as ProductRow[]).map((product) =>
     mapProduct(product, categoryNames.get(product.category_id ?? "")),

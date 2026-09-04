@@ -1,7 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, Edit2, Trash2, Search, Package, ToggleLeft, ToggleRight, FolderTree } from "lucide-react";
+import {
+  Plus,
+  Edit2,
+  Trash2,
+  Search,
+  Package,
+  ToggleLeft,
+  ToggleRight,
+  FolderTree,
+} from "lucide-react";
 import { Card } from "../components/Card";
 import { Button } from "../components/Button";
 import { Badge } from "../components/Badge";
@@ -11,8 +20,6 @@ import { getProductsByTenant, getCategoriesByTenant } from "../data/mock";
 import { formatCurrency, cn } from "../lib/utils";
 import { tenantHasFeature } from "../lib/plans";
 import { getStoredProducts, setStoredProducts } from "../lib/storage";
-// NEW: Import useRealtime for emitting product events
-import { useRealtime } from "../contexts/realtime";
 import { isSupabaseConfigured } from "../lib/supabase/config";
 import {
   createCategory,
@@ -27,13 +34,13 @@ import {
 } from "../services/productService";
 import type { Category, Product, ProductAddon, Tenant } from "../types/index";
 
-interface Props { tenant: Tenant }
+interface Props {
+  tenant: Tenant;
+}
 
 export function ProductsView({ tenant }: Props) {
-  // NEW: Get realtime context to emit events
-  const realtime = useRealtime();
   const canUseAdvancedCatalog = tenantHasFeature(tenant, "advanced_catalog");
-  
+
   const [products, setProducts] = useState<Product[]>(
     isSupabaseConfigured() ? [] : getProductsByTenant(tenant.id),
   );
@@ -76,7 +83,11 @@ export function ProductsView({ tenant }: Props) {
       })
       .catch((loadError: unknown) => {
         if (!active) return;
-        setError(loadError instanceof Error ? loadError.message : "Unable to load products.");
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load products.",
+        );
       })
       .finally(() => {
         if (active) setIsLoading(false);
@@ -100,10 +111,13 @@ export function ProductsView({ tenant }: Props) {
     addons: [] as ProductAddon[],
   });
 
-  const activeCategories = categories.filter((category) => category.isActive !== false);
+  const activeCategories = categories.filter(
+    (category) => category.isActive !== false,
+  );
 
-  const filtered = products.filter(p => {
-    const matchSearch = search === "" || p.name.toLowerCase().includes(search.toLowerCase());
+  const filtered = products.filter((p) => {
+    const matchSearch =
+      search === "" || p.name.toLowerCase().includes(search.toLowerCase());
     const matchCat = cat === "All" || p.categoryName === cat;
     return matchSearch && matchCat;
   });
@@ -121,17 +135,14 @@ export function ProductsView({ tenant }: Props) {
     try {
       if (isSupabaseConfigured()) {
         await setProductAvailability(tenant.id, id, !current.isActive);
-      }
-      else setStoredProducts(tenant.id, updated);
-
-      realtime.addEvent({
-        type: "product_updated",
-        tenantId: tenant.id,
-        product: { ...current, isActive: !current.isActive },
-      });
+      } else setStoredProducts(tenant.id, updated);
     } catch (updateError) {
       setProducts(products);
-      setError(updateError instanceof Error ? updateError.message : "Unable to update product.");
+      setError(
+        updateError instanceof Error
+          ? updateError.message
+          : "Unable to update product.",
+      );
     }
   };
 
@@ -145,11 +156,14 @@ export function ProductsView({ tenant }: Props) {
     try {
       if (isSupabaseConfigured()) await deleteProduct(tenant.id, id);
       else setStoredProducts(tenant.id, updated);
-      realtime.addEvent({ type: "product_deleted", tenantId: tenant.id, productId: id });
       setDeleteTarget(null);
     } catch (deleteError) {
       setProducts(previous);
-      setError(deleteError instanceof Error ? deleteError.message : "Unable to delete product.");
+      setError(
+        deleteError instanceof Error
+          ? deleteError.message
+          : "Unable to delete product.",
+      );
     } finally {
       setIsDeleting(false);
     }
@@ -157,7 +171,17 @@ export function ProductsView({ tenant }: Props) {
 
   const openAdd = () => {
     setEditingProduct(null);
-    setNewProduct({ name: "", price: "", description: "", categoryId: "", inventory: "", trackInventory: canUseAdvancedCatalog, image: "", tags: [], addons: [] });
+    setNewProduct({
+      name: "",
+      price: "",
+      description: "",
+      categoryId: "",
+      inventory: "",
+      trackInventory: canUseAdvancedCatalog,
+      image: "",
+      tags: [],
+      addons: [],
+    });
     setError("");
     setShowAdd(true);
   };
@@ -191,7 +215,9 @@ export function ProductsView({ tenant }: Props) {
       return;
     }
 
-    const inventory = newProduct.trackInventory ? Number(newProduct.inventory) : null;
+    const inventory = newProduct.trackInventory
+      ? Number(newProduct.inventory)
+      : null;
     if (
       newProduct.trackInventory &&
       (newProduct.inventory.trim() === "" ||
@@ -199,18 +225,29 @@ export function ProductsView({ tenant }: Props) {
         inventory === null ||
         inventory < 0)
     ) {
-      setError("Enter a whole-number inventory of zero or more, or turn off inventory tracking.");
+      setError(
+        "Enter a whole-number inventory of zero or more, or turn off inventory tracking.",
+      );
       return;
     }
 
-    if (newProduct.addons.some((addon) => !addon.name.trim() || !Number.isFinite(addon.price) || addon.price < 0)) {
+    if (
+      newProduct.addons.some(
+        (addon) =>
+          !addon.name.trim() ||
+          !Number.isFinite(addon.price) ||
+          addon.price < 0,
+      )
+    ) {
       setError("Enter a name and valid price for each add-on.");
       return;
     }
 
     setIsSaving(true);
     setError("");
-    const category = categories.find((candidate) => candidate.id === newProduct.categoryId);
+    const category = categories.find(
+      (candidate) => candidate.id === newProduct.categoryId,
+    );
 
     try {
       let product: Product;
@@ -222,7 +259,10 @@ export function ProductsView({ tenant }: Props) {
         categoryId: newProduct.categoryId,
         inventory,
         trackInventory: newProduct.trackInventory,
-        addons: newProduct.addons.map((addon) => ({ ...addon, name: addon.name.trim() })),
+        addons: newProduct.addons.map((addon) => ({
+          ...addon,
+          name: addon.name.trim(),
+        })),
       };
       if (isSupabaseConfigured()) {
         product = editingProduct
@@ -239,7 +279,9 @@ export function ProductsView({ tenant }: Props) {
             );
       } else {
         product = {
-          id: editingProduct?.id ?? `p${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+          id:
+            editingProduct?.id ??
+            `p${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
           tenantId: tenant.id,
           name: newProduct.name,
           description: newProduct.description,
@@ -255,32 +297,46 @@ export function ProductsView({ tenant }: Props) {
           createdAt: editingProduct?.createdAt ?? new Date().toISOString(),
         };
         const nextProducts = editingProduct
-          ? products.map((candidate) => (candidate.id === product.id ? product : candidate))
+          ? products.map((candidate) =>
+              candidate.id === product.id ? product : candidate,
+            )
           : [...products, product];
         setStoredProducts(tenant.id, nextProducts);
       }
 
       setProducts((current) =>
         editingProduct
-          ? current.map((candidate) => (candidate.id === product.id ? product : candidate))
+          ? current.map((candidate) =>
+              candidate.id === product.id ? product : candidate,
+            )
           : [...current, product],
       );
-      realtime.addEvent({
-        type: editingProduct ? "product_updated" : "product_added",
-        tenantId: tenant.id,
-        product,
+      setNewProduct({
+        name: "",
+        price: "",
+        description: "",
+        categoryId: "",
+        inventory: "",
+        trackInventory: canUseAdvancedCatalog,
+        image: "",
+        tags: [],
+        addons: [],
       });
-      setNewProduct({ name: "", price: "", description: "", categoryId: "", inventory: "", trackInventory: canUseAdvancedCatalog, image: "", tags: [], addons: [] });
       setEditingProduct(null);
       setShowAdd(false);
     } catch (createError) {
-      const message = createError instanceof Error ? createError.message : "Unable to save product.";
+      const message =
+        createError instanceof Error
+          ? createError.message
+          : "Unable to save product.";
       setError(
-        message.toLowerCase().includes("track_inventory") && message.toLowerCase().includes("column")
+        message.toLowerCase().includes("track_inventory") &&
+          message.toLowerCase().includes("column")
           ? `${message} Apply supabase/migrations/202608260001_product_inventory_management.sql, then try again.`
-          : message.toLowerCase().includes("addons") && message.toLowerCase().includes("column")
+          : message.toLowerCase().includes("addons") &&
+              message.toLowerCase().includes("column")
             ? `${message} Apply supabase/migrations/202608250001_product_addons.sql to your Supabase project, then try again.`
-          : message,
+            : message,
       );
     } finally {
       setIsSaving(false);
@@ -289,12 +345,18 @@ export function ProductsView({ tenant }: Props) {
 
   const openCategoryManager = () => {
     if (!canUseAdvancedCatalog) {
-      setError("Categories, inventory tracking, and product add-ons are available on the Pro plan.");
+      setError(
+        "Categories, inventory tracking, and product add-ons are available on the Pro plan.",
+      );
       return;
     }
     setEditingCategory(null);
     setCategoryName("");
-    setCategorySortOrder(String(Math.max(0, ...categories.map((category) => category.sortOrder)) + 1));
+    setCategorySortOrder(
+      String(
+        Math.max(0, ...categories.map((category) => category.sortOrder)) + 1,
+      ),
+    );
     setShowCategories(true);
     setError("");
   };
@@ -308,7 +370,11 @@ export function ProductsView({ tenant }: Props) {
   const resetCategoryForm = () => {
     setEditingCategory(null);
     setCategoryName("");
-    setCategorySortOrder(String(Math.max(0, ...categories.map((category) => category.sortOrder)) + 1));
+    setCategorySortOrder(
+      String(
+        Math.max(0, ...categories.map((category) => category.sortOrder)) + 1,
+      ),
+    );
   };
 
   const saveCategory = async () => {
@@ -322,9 +388,13 @@ export function ProductsView({ tenant }: Props) {
       setError("Category position must be a whole number of zero or more.");
       return;
     }
-    if (categories.some((category) =>
-      category.id !== editingCategory?.id && category.name.toLowerCase() === name.toLowerCase()
-    )) {
+    if (
+      categories.some(
+        (category) =>
+          category.id !== editingCategory?.id &&
+          category.name.toLowerCase() === name.toLowerCase(),
+      )
+    ) {
       setError("A category with that name already exists.");
       return;
     }
@@ -345,19 +415,31 @@ export function ProductsView({ tenant }: Props) {
           };
       setCategories((current) => {
         const next = editingCategory
-          ? current.map((category) => category.id === saved.id ? saved : category)
+          ? current.map((category) =>
+              category.id === saved.id ? saved : category,
+            )
           : [...current, saved];
-        return next.sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
+        return next.sort(
+          (a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name),
+        );
       });
       if (editingCategory) {
-        setProducts((current) => current.map((product) => product.categoryId === saved.id
-          ? { ...product, categoryName: saved.name }
-          : product));
+        setProducts((current) =>
+          current.map((product) =>
+            product.categoryId === saved.id
+              ? { ...product, categoryName: saved.name }
+              : product,
+          ),
+        );
         if (cat === editingCategory.name) setCat(saved.name);
       }
       resetCategoryForm();
     } catch (categoryError) {
-      setError(categoryError instanceof Error ? categoryError.message : "Unable to save category.");
+      setError(
+        categoryError instanceof Error
+          ? categoryError.message
+          : "Unable to save category.",
+      );
     } finally {
       setIsSavingCategory(false);
     }
@@ -367,12 +449,24 @@ export function ProductsView({ tenant }: Props) {
     setError("");
     try {
       const saved = isSupabaseConfigured()
-        ? await setCategoryActive(tenant.id, category.id, category.isActive === false)
+        ? await setCategoryActive(
+            tenant.id,
+            category.id,
+            category.isActive === false,
+          )
         : { ...category, isActive: category.isActive === false };
-      setCategories((current) => current.map((candidate) => candidate.id === saved.id ? saved : candidate));
+      setCategories((current) =>
+        current.map((candidate) =>
+          candidate.id === saved.id ? saved : candidate,
+        ),
+      );
       if (saved.isActive === false && cat === saved.name) setCat("All");
     } catch (categoryError) {
-      setError(categoryError instanceof Error ? categoryError.message : "Unable to update category.");
+      setError(
+        categoryError instanceof Error
+          ? categoryError.message
+          : "Unable to update category.",
+      );
     }
   };
 
@@ -380,9 +474,12 @@ export function ProductsView({ tenant }: Props) {
     <div className="min-h-full space-y-4 bg-[#08111f] light:bg-[#f8fafc] p-4 text-white light:text-[#14213a] md:p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-sm font-bold text-white light:text-[#17223a]">Products</h2>
+          <h2 className="text-sm font-bold text-white light:text-[#17223a]">
+            Products
+          </h2>
           <p className="mt-0.5 text-[10px] text-slate-400 light:text-[#71809a]">
-            {products.filter(p => p.isActive).length} active · {products.length} total
+            {products.filter((p) => p.isActive).length} active ·{" "}
+            {products.length} total
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -391,11 +488,19 @@ export function ProductsView({ tenant }: Props) {
             size="sm"
             variant="outline"
             disabled={!canUseAdvancedCatalog}
-            title={canUseAdvancedCatalog ? "Manage storefront categories" : "Available on the Pro plan"}
+            title={
+              canUseAdvancedCatalog
+                ? "Manage storefront categories"
+                : "Available on the Pro plan"
+            }
           >
             <FolderTree className="w-4 h-4" /> Manage Categories
           </Button>
-          <Button onClick={openAdd} size="sm" className="bg-violet-600 hover:bg-violet-700 text-white">
+          <Button
+            onClick={openAdd}
+            size="sm"
+            className="bg-violet-600 hover:bg-violet-700 text-white"
+          >
             <Plus className="w-4 h-4" /> Add Product
           </Button>
         </div>
@@ -407,14 +512,19 @@ export function ProductsView({ tenant }: Props) {
         </div>
       )}
 
-      {isLoading && <p className="text-xs text-slate-400">Loading products from Supabase...</p>}
+      {isLoading && (
+        <p className="text-xs text-slate-400">
+          Loading products from Supabase...
+        </p>
+      )}
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 light:text-gray-500" />
           <input
-            value={search} onChange={e => setSearch(e.target.value)}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
             placeholder="Search products..."
             className="h-8 w-full rounded-lg border border-slate-700 light:border-[#e3e8f0] bg-slate-800 light:bg-white pl-9 pr-3 text-[10px]
                        focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500
@@ -422,7 +532,7 @@ export function ProductsView({ tenant }: Props) {
           />
         </div>
         <div className="flex gap-1.5 flex-wrap">
-          {["All", ...activeCategories.map(c => c.name)].map(c => (
+          {["All", ...activeCategories.map((c) => c.name)].map((c) => (
             <button
               key={c}
               onClick={() => setCat(c)}
@@ -430,7 +540,7 @@ export function ProductsView({ tenant }: Props) {
                 "rounded-lg px-3 py-1.5 text-[10px] font-medium transition-colors",
                 cat === c
                   ? "bg-violet-600 text-white"
-                  : "bg-slate-800 light:bg-gray-100 text-slate-300 light:text-gray-700 hover:bg-slate-700 light:hover:bg-gray-200"
+                  : "bg-slate-800 light:bg-gray-100 text-slate-300 light:text-gray-700 hover:bg-slate-700 light:hover:bg-gray-200",
               )}
             >
               {c}
@@ -447,7 +557,7 @@ export function ProductsView({ tenant }: Props) {
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {filtered.map(p => (
+          {filtered.map((p) => (
             <ProductCard
               key={p.id}
               product={p}
@@ -466,11 +576,23 @@ export function ProductsView({ tenant }: Props) {
         title={editingProduct ? "Edit Product" : "Add New Product"}
         footer={
           <div className="flex gap-3">
-            <Button variant="outline" onClick={() => setShowAdd(false)} className="flex-1 border-slate-600 light:border-gray-300 text-white light:text-gray-800 hover:bg-slate-700 light:hover:bg-gray-100">
+            <Button
+              variant="outline"
+              onClick={() => setShowAdd(false)}
+              className="flex-1 border-slate-600 light:border-gray-300 text-white light:text-gray-800 hover:bg-slate-700 light:hover:bg-gray-100"
+            >
               Cancel
             </Button>
-            <Button disabled={isSaving} className="flex-1 bg-violet-600 hover:bg-violet-500 light:bg-violet-600 light:hover:bg-violet-700 text-white" onClick={handleSaveProduct}>
-              {isSaving ? "Saving..." : editingProduct ? "Update Product" : "Save Product"}
+            <Button
+              disabled={isSaving}
+              className="flex-1 bg-violet-600 hover:bg-violet-500 light:bg-violet-600 light:hover:bg-violet-700 text-white"
+              onClick={handleSaveProduct}
+            >
+              {isSaving
+                ? "Saving..."
+                : editingProduct
+                  ? "Update Product"
+                  : "Save Product"}
             </Button>
           </div>
         }
@@ -480,7 +602,9 @@ export function ProductsView({ tenant }: Props) {
             label="Product Name"
             placeholder="e.g. Sourdough Loaf"
             value={newProduct.name}
-            onChange={e => setNewProduct({ ...newProduct, name: e.target.value })}
+            onChange={(e) =>
+              setNewProduct({ ...newProduct, name: e.target.value })
+            }
           />
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Input
@@ -488,68 +612,96 @@ export function ProductsView({ tenant }: Props) {
               type="number"
               placeholder="0.00"
               value={newProduct.price}
-              onChange={e => setNewProduct({ ...newProduct, price: e.target.value })}
+              onChange={(e) =>
+                setNewProduct({ ...newProduct, price: e.target.value })
+              }
             />
-            {canUseAdvancedCatalog && <Select
-              label="Category"
-              options={[
-                { value: "", label: "Select category..." },
-                ...categories
-                  .filter((category) => category.isActive !== false || category.id === newProduct.categoryId)
-                  .map((category) => ({
-                    value: category.id,
-                    label: category.isActive === false ? `${category.name} (hidden)` : category.name,
-                  })),
-              ]}
-              value={newProduct.categoryId}
-              onChange={e => setNewProduct({ ...newProduct, categoryId: e.target.value })}
-            />}
+            {canUseAdvancedCatalog && (
+              <Select
+                label="Category"
+                options={[
+                  { value: "", label: "Select category..." },
+                  ...categories
+                    .filter(
+                      (category) =>
+                        category.isActive !== false ||
+                        category.id === newProduct.categoryId,
+                    )
+                    .map((category) => ({
+                      value: category.id,
+                      label:
+                        category.isActive === false
+                          ? `${category.name} (hidden)`
+                          : category.name,
+                    })),
+                ]}
+                value={newProduct.categoryId}
+                onChange={(e) =>
+                  setNewProduct({ ...newProduct, categoryId: e.target.value })
+                }
+              />
+            )}
           </div>
           <Textarea
             label="Description"
             rows={3}
             placeholder="Describe the product..."
             value={newProduct.description}
-            onChange={e => setNewProduct({ ...newProduct, description: e.target.value })}
+            onChange={(e) =>
+              setNewProduct({ ...newProduct, description: e.target.value })
+            }
           />
-          {canUseAdvancedCatalog ? <div className="rounded-lg border border-slate-700 light:border-slate-200 p-3 space-y-3">
-            <label className="flex cursor-pointer items-start gap-3">
-              <input
-                type="checkbox"
-                checked={newProduct.trackInventory}
-                onChange={(event) => setNewProduct({
-                  ...newProduct,
-                  trackInventory: event.target.checked,
-                  inventory: event.target.checked ? newProduct.inventory : "",
-                })}
-                className="mt-0.5 h-4 w-4 accent-violet-600"
-              />
-              <span>
-                <span className="block text-xs font-semibold">Track inventory</span>
-                <span className="block text-[10px] text-slate-400 light:text-slate-500">
-                  Checkout subtracts stock and the storefront shows Sold Out at zero.
+          {canUseAdvancedCatalog ? (
+            <div className="rounded-lg border border-slate-700 light:border-slate-200 p-3 space-y-3">
+              <label className="flex cursor-pointer items-start gap-3">
+                <input
+                  type="checkbox"
+                  checked={newProduct.trackInventory}
+                  onChange={(event) =>
+                    setNewProduct({
+                      ...newProduct,
+                      trackInventory: event.target.checked,
+                      inventory: event.target.checked
+                        ? newProduct.inventory
+                        : "",
+                    })
+                  }
+                  className="mt-0.5 h-4 w-4 accent-violet-600"
+                />
+                <span>
+                  <span className="block text-xs font-semibold">
+                    Track inventory
+                  </span>
+                  <span className="block text-[10px] text-slate-400 light:text-slate-500">
+                    Checkout subtracts stock and the storefront shows Sold Out
+                    at zero.
+                  </span>
                 </span>
-              </span>
-            </label>
-            {newProduct.trackInventory && (
-              <Input
-                label="Units currently in stock"
-                type="number"
-                min="0"
-                step="1"
-                placeholder="e.g. 20"
-                value={newProduct.inventory}
-                onChange={e => setNewProduct({ ...newProduct, inventory: e.target.value })}
-              />
-            )}
-            {!newProduct.trackInventory && (
-              <p className="text-xs text-emerald-400 light:text-emerald-700">
-                Unlimited inventory — orders will not reduce a stock count.
-              </p>
-            )}
-          </div> : (
+              </label>
+              {newProduct.trackInventory && (
+                <Input
+                  label="Units currently in stock"
+                  type="number"
+                  min="0"
+                  step="1"
+                  placeholder="e.g. 20"
+                  value={newProduct.inventory}
+                  onChange={(e) =>
+                    setNewProduct({ ...newProduct, inventory: e.target.value })
+                  }
+                />
+              )}
+              {!newProduct.trackInventory && (
+                <p className="text-xs text-emerald-400 light:text-emerald-700">
+                  Unlimited inventory — orders will not reduce a stock count.
+                </p>
+              )}
+            </div>
+          ) : (
             <div className="rounded-lg border border-violet-500/25 bg-violet-500/10 p-3 text-xs text-violet-200 light:border-violet-200 light:bg-violet-50 light:text-violet-800">
-              Upgrade to Pro to organize products into categories, track inventory, and configure add-ons. Basic product details remain available on Beginner.
+              Upgrade to Pro to organize products into categories, track
+              inventory, and configure add-ons. Basic product details remain
+              available on Beginner.
             </div>
           )}
           <div>
@@ -557,62 +709,95 @@ export function ProductsView({ tenant }: Props) {
               label="Image URL"
               placeholder="https://..."
               value={newProduct.image}
-              onChange={e => setNewProduct({ ...newProduct, image: e.target.value })}
+              onChange={(e) =>
+                setNewProduct({ ...newProduct, image: e.target.value })
+              }
             />
           </div>
-          {canUseAdvancedCatalog && <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="text-sm font-semibold">Add-ons</label>
-              <Button
-                type="button"
-                variant="outline"
-                size="xs"
-                onClick={() => setNewProduct({
-                  ...newProduct,
-                  addons: [...newProduct.addons, { id: `addon-${Date.now()}`, name: "", price: 0 }],
-                })}
-              >
-                <Plus className="h-3.5 w-3.5" /> Add add-on
-              </Button>
-            </div>
-            {newProduct.addons.length === 0 && (
-              <p className="text-xs text-slate-400">No add-ons configured for this product.</p>
-            )}
-            {newProduct.addons.map((addon, index) => (
-              <div key={addon.id} className="flex items-end gap-2">
-                <Input
-                  label={index === 0 ? "Name" : undefined}
-                  placeholder="e.g. Extra cheese"
-                  value={addon.name}
-                  onChange={(event) => setNewProduct({
-                    ...newProduct,
-                    addons: newProduct.addons.map((item) => item.id === addon.id ? { ...item, name: event.target.value } : item),
-                  })}
-                />
-                <Input
-                  label={index === 0 ? "Price ($)" : undefined}
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="0.00"
-                  value={addon.price}
-                  onChange={(event) => setNewProduct({
-                    ...newProduct,
-                    addons: newProduct.addons.map((item) => item.id === addon.id ? { ...item, price: Number(event.target.value) || 0 } : item),
-                  })}
-                />
+          {canUseAdvancedCatalog && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-semibold">Add-ons</label>
                 <Button
                   type="button"
-                  variant="ghost"
+                  variant="outline"
                   size="xs"
-                  aria-label={`Remove ${addon.name || "add-on"}`}
-                  onClick={() => setNewProduct({ ...newProduct, addons: newProduct.addons.filter((item) => item.id !== addon.id) })}
+                  onClick={() =>
+                    setNewProduct({
+                      ...newProduct,
+                      addons: [
+                        ...newProduct.addons,
+                        { id: `addon-${Date.now()}`, name: "", price: 0 },
+                      ],
+                    })
+                  }
                 >
-                  <Trash2 className="h-4 w-4 text-red-400" />
+                  <Plus className="h-3.5 w-3.5" /> Add add-on
                 </Button>
               </div>
-            ))}
-          </div>}
+              {newProduct.addons.length === 0 && (
+                <p className="text-xs text-slate-400">
+                  No add-ons configured for this product.
+                </p>
+              )}
+              {newProduct.addons.map((addon, index) => (
+                <div key={addon.id} className="flex items-end gap-2">
+                  <Input
+                    label={index === 0 ? "Name" : undefined}
+                    placeholder="e.g. Extra cheese"
+                    value={addon.name}
+                    onChange={(event) =>
+                      setNewProduct({
+                        ...newProduct,
+                        addons: newProduct.addons.map((item) =>
+                          item.id === addon.id
+                            ? { ...item, name: event.target.value }
+                            : item,
+                        ),
+                      })
+                    }
+                  />
+                  <Input
+                    label={index === 0 ? "Price ($)" : undefined}
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={addon.price}
+                    onChange={(event) =>
+                      setNewProduct({
+                        ...newProduct,
+                        addons: newProduct.addons.map((item) =>
+                          item.id === addon.id
+                            ? {
+                                ...item,
+                                price: Number(event.target.value) || 0,
+                              }
+                            : item,
+                        ),
+                      })
+                    }
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="xs"
+                    aria-label={`Remove ${addon.name || "add-on"}`}
+                    onClick={() =>
+                      setNewProduct({
+                        ...newProduct,
+                        addons: newProduct.addons.filter(
+                          (item) => item.id !== addon.id,
+                        ),
+                      })
+                    }
+                  >
+                    <Trash2 className="h-4 w-4 text-red-400" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </Modal>
 
@@ -630,7 +815,9 @@ export function ProductsView({ tenant }: Props) {
           )}
           <div className="rounded-lg border border-slate-700 light:border-slate-200 p-4">
             <h3 className="mb-3 text-sm font-semibold">
-              {editingCategory ? `Edit ${editingCategory.name}` : "Create a category"}
+              {editingCategory
+                ? `Edit ${editingCategory.name}`
+                : "Create a category"}
             </h3>
             <div className="grid gap-3 sm:grid-cols-[1fr_120px_auto] sm:items-end">
               <Input
@@ -649,10 +836,16 @@ export function ProductsView({ tenant }: Props) {
               />
               <div className="flex gap-2">
                 {editingCategory && (
-                  <Button variant="outline" onClick={resetCategoryForm}>Cancel</Button>
+                  <Button variant="outline" onClick={resetCategoryForm}>
+                    Cancel
+                  </Button>
                 )}
                 <Button disabled={isSavingCategory} onClick={saveCategory}>
-                  {isSavingCategory ? "Saving..." : editingCategory ? "Update" : "Add"}
+                  {isSavingCategory
+                    ? "Saving..."
+                    : editingCategory
+                      ? "Update"
+                      : "Add"}
                 </Button>
               </div>
             </div>
@@ -660,7 +853,9 @@ export function ProductsView({ tenant }: Props) {
 
           <div className="space-y-2">
             {categories.length === 0 && (
-              <p className="py-6 text-center text-xs text-slate-400">No categories yet.</p>
+              <p className="py-6 text-center text-xs text-slate-400">
+                No categories yet.
+              </p>
             )}
             {categories.map((category) => (
               <div
@@ -670,19 +865,37 @@ export function ProductsView({ tenant }: Props) {
                 <div>
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-semibold">{category.name}</p>
-                    <Badge variant={category.isActive === false ? "default" : "success"}>
+                    <Badge
+                      variant={
+                        category.isActive === false ? "default" : "success"
+                      }
+                    >
                       {category.isActive === false ? "Hidden" : "Visible"}
                     </Badge>
                   </div>
                   <p className="mt-1 text-[10px] text-slate-400">
-                    Position {category.sortOrder} · {products.filter((product) => product.categoryId === category.id).length} products
+                    Position {category.sortOrder} ·{" "}
+                    {
+                      products.filter(
+                        (product) => product.categoryId === category.id,
+                      ).length
+                    }{" "}
+                    products
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button size="xs" variant="ghost" onClick={() => beginCategoryEdit(category)}>
+                  <Button
+                    size="xs"
+                    variant="ghost"
+                    onClick={() => beginCategoryEdit(category)}
+                  >
                     <Edit2 className="h-3.5 w-3.5" /> Edit
                   </Button>
-                  <Button size="xs" variant="outline" onClick={() => void toggleCategory(category)}>
+                  <Button
+                    size="xs"
+                    variant="outline"
+                    onClick={() => void toggleCategory(category)}
+                  >
                     {category.isActive === false ? "Show" : "Hide"}
                   </Button>
                 </div>
@@ -698,7 +911,11 @@ export function ProductsView({ tenant }: Props) {
         title="Delete Product"
         footer={
           <div className="flex gap-3">
-            <Button variant="outline" className="flex-1" onClick={() => setDeleteTarget(null)}>
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => setDeleteTarget(null)}
+            >
               Keep Product
             </Button>
             <Button
@@ -713,14 +930,20 @@ export function ProductsView({ tenant }: Props) {
         }
       >
         <p className="text-sm text-slate-300 light:text-gray-700">
-          This permanently removes <strong>{deleteTarget?.name}</strong> from the dashboard and storefront.
+          This permanently removes <strong>{deleteTarget?.name}</strong> from
+          the dashboard and storefront.
         </p>
       </Modal>
     </div>
   );
 }
 
-function ProductCard({ product, onEdit, onToggle, onDelete }: {
+function ProductCard({
+  product,
+  onEdit,
+  onToggle,
+  onDelete,
+}: {
   product: Product;
   onEdit: (product: Product) => void;
   onToggle: (id: string) => void;
@@ -736,7 +959,8 @@ function ProductCard({ product, onEdit, onToggle, onDelete }: {
       <div className="relative h-40 overflow-hidden bg-slate-700 light:bg-slate-100">
         {product.image ? (
           <img
-            src={product.image} alt={product.name}
+            src={product.image}
+            alt={product.name}
             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
           />
         ) : (
@@ -745,15 +969,21 @@ function ProductCard({ product, onEdit, onToggle, onDelete }: {
           </div>
         )}
         <div className="absolute top-3 left-3 flex gap-1.5 flex-wrap">
-          {product.tags.map(tag => (
-            <span key={tag}
-              className="px-2 py-0.5 bg-black/60 light:bg-white/90 text-white light:text-gray-800 text-[10px] font-semibold rounded-full backdrop-blur-sm capitalize">
+          {product.tags.map((tag) => (
+            <span
+              key={tag}
+              className="px-2 py-0.5 bg-black/60 light:bg-white/90 text-white light:text-gray-800 text-[10px] font-semibold rounded-full backdrop-blur-sm capitalize"
+            >
               {tag}
             </span>
           ))}
         </div>
         <div className="absolute top-3 right-3">
-          <Badge variant={!product.isActive ? "default" : isSoldOut ? "danger" : "success"}>
+          <Badge
+            variant={
+              !product.isActive ? "default" : isSoldOut ? "danger" : "success"
+            }
+          >
             {!product.isActive ? "Paused" : isSoldOut ? "Sold Out" : "Live"}
           </Badge>
         </div>
@@ -761,19 +991,29 @@ function ProductCard({ product, onEdit, onToggle, onDelete }: {
       <div className="p-4 space-y-3">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
-            <h4 className="font-semibold text-white light:text-gray-900 text-sm truncate">{product.name}</h4>
-            <p className="text-xs text-slate-400 light:text-gray-600 mt-0.5 line-clamp-2">{product.description}</p>
+            <h4 className="font-semibold text-white light:text-gray-900 text-sm truncate">
+              {product.name}
+            </h4>
+            <p className="text-xs text-slate-400 light:text-gray-600 mt-0.5 line-clamp-2">
+              {product.description}
+            </p>
           </div>
-          <span className="text-sm font-black text-white light:text-gray-900 flex-shrink-0">{formatCurrency(product.price)}</span>
+          <span className="text-sm font-black text-white light:text-gray-900 flex-shrink-0">
+            {formatCurrency(product.price)}
+          </span>
         </div>
         <div className="flex items-center justify-between">
-          <span className="text-xs text-slate-400 light:text-gray-500 bg-slate-700 light:bg-gray-100 px-2 py-1 rounded-lg">{product.categoryName}</span>
-          <span className={cn(
-            "text-xs font-semibold",
-            isSoldOut || isLowStock
-              ? "text-red-400 light:text-red-600"
-              : "text-slate-400 light:text-gray-500",
-          )}>
+          <span className="text-xs text-slate-400 light:text-gray-500 bg-slate-700 light:bg-gray-100 px-2 py-1 rounded-lg">
+            {product.categoryName}
+          </span>
+          <span
+            className={cn(
+              "text-xs font-semibold",
+              isSoldOut || isLowStock
+                ? "text-red-400 light:text-red-600"
+                : "text-slate-400 light:text-gray-500",
+            )}
+          >
             {!tracksInventory
               ? "Unlimited"
               : isSoldOut
@@ -784,24 +1024,44 @@ function ProductCard({ product, onEdit, onToggle, onDelete }: {
           </span>
         </div>
         <div className="flex items-center gap-1 pt-1 border-t border-slate-700 light:border-slate-100">
-          <Button variant="ghost" size="xs" className="flex-1 justify-center text-white light:text-gray-800 hover:bg-slate-700 light:hover:bg-slate-100" onClick={() => onEdit(product)}>
-            <Edit2 className="w-3.5 h-3.5 mr-1" /> {tracksInventory && stock <= 5 ? "Restock" : "Edit"}
+          <Button
+            variant="ghost"
+            size="xs"
+            className="flex-1 justify-center text-white light:text-gray-800 hover:bg-slate-700 light:hover:bg-slate-100"
+            onClick={() => onEdit(product)}
+          >
+            <Edit2 className="w-3.5 h-3.5 mr-1" />{" "}
+            {tracksInventory && stock <= 5 ? "Restock" : "Edit"}
           </Button>
           <div className="w-px h-5 bg-slate-700 light:bg-slate-200" />
-          <Button variant="ghost" size="xs" className="text-red-400 light:text-red-600 hover:text-red-300 light:hover:text-red-800 hover:bg-red-500/10 light:hover:bg-red-50"
-            onClick={() => onDelete(product)}>
+          <Button
+            variant="ghost"
+            size="xs"
+            className="text-red-400 light:text-red-600 hover:text-red-300 light:hover:text-red-800 hover:bg-red-500/10 light:hover:bg-red-50"
+            onClick={() => onDelete(product)}
+          >
             <Trash2 className="w-3.5 h-3.5" />
           </Button>
           <div className="w-px h-5 bg-slate-700 light:bg-slate-200" />
           <button
             onClick={() => onToggle(product.id)}
             className="text-slate-400 light:text-gray-500 hover:text-white light:hover:text-gray-900 transition-colors"
-            aria-label={product.isActive ? `Pause ${product.name}` : `Publish ${product.name}`}
-            title={product.isActive ? "Pause storefront listing" : "Publish storefront listing"}
+            aria-label={
+              product.isActive
+                ? `Pause ${product.name}`
+                : `Publish ${product.name}`
+            }
+            title={
+              product.isActive
+                ? "Pause storefront listing"
+                : "Publish storefront listing"
+            }
           >
-            {product.isActive
-              ? <ToggleRight className="w-5 h-5 text-emerald-400 light:text-emerald-600" />
-              : <ToggleLeft className="w-5 h-5" />}
+            {product.isActive ? (
+              <ToggleRight className="w-5 h-5 text-emerald-400 light:text-emerald-600" />
+            ) : (
+              <ToggleLeft className="w-5 h-5" />
+            )}
           </button>
         </div>
       </div>

@@ -24,7 +24,11 @@ export default function SettingsPage() {
   return (
     <>
       <TopBar title="Settings" />
-      <SettingsView tenant={tenant} user={user} onTenantUpdated={updateTenant} />
+      <SettingsView
+        tenant={tenant}
+        user={user}
+        onTenantUpdated={updateTenant}
+      />
     </>
   );
 }

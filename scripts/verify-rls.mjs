@@ -17,7 +17,9 @@ const required = [
 ];
 const missing = required.filter((name) => !process.env[name]);
 if (missing.length) {
-  throw new Error(`Missing RLS test environment variables: ${missing.join(", ")}`);
+  throw new Error(
+    `Missing RLS test environment variables: ${missing.join(", ")}`,
+  );
 }
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -55,7 +57,8 @@ async function fixture(client, table, tenantId, columns = "*") {
 async function expectHidden(client, table, id) {
   const { data, error } = await client.from(table).select("id").eq("id", id);
   if (error) throw error;
-  if (data.length !== 0) throw new Error(`RLS failure: Business A can read Business B ${table}.`);
+  if (data.length !== 0)
+    throw new Error(`RLS failure: Business A can read Business B ${table}.`);
 }
 
 async function expectRpcRejected(label, promise) {
@@ -73,15 +76,18 @@ const tenantB = await signIn(
   process.env.RLS_TEST_B_EMAIL,
   process.env.RLS_TEST_B_PASSWORD,
 );
-if (tenantA === tenantB) throw new Error("RLS test accounts must belong to different tenants.");
+if (tenantA === tenantB)
+  throw new Error("RLS test accounts must belong to different tenants.");
 
-const [productB, orderB, customerB, appointmentB, serviceB] = await Promise.all([
-  fixture(businessB, "products", tenantB, "id,stock,available"),
-  fixture(businessB, "orders", tenantB, "id,status"),
-  fixture(businessB, "customers", tenantB, "id"),
-  fixture(businessB, "appointments", tenantB, "id"),
-  fixture(businessB, "services", tenantB, "id"),
-]);
+const [productB, orderB, customerB, appointmentB, serviceB] = await Promise.all(
+  [
+    fixture(businessB, "products", tenantB, "id,stock,available"),
+    fixture(businessB, "orders", tenantB, "id,status"),
+    fixture(businessB, "customers", tenantB, "id"),
+    fixture(businessB, "appointments", tenantB, "id"),
+    fixture(businessB, "services", tenantB, "id"),
+  ],
+);
 
 await Promise.all([
   expectHidden(businessA, "products", productB.id),
@@ -105,6 +111,7 @@ const tenantScopedTables = [
   "appointments",
   "appointment_services",
   "appointment_email_deliveries",
+  "business_notifications",
   "business_reviews",
 ];
 for (const table of tenantScopedTables) {
@@ -135,7 +142,8 @@ const { data: inactiveTenant, error: inactiveReadError } = await anonymous
   .select("id")
   .eq("id", inactiveTenantId);
 if (inactiveReadError) throw inactiveReadError;
-if (inactiveTenant.length !== 0) throw new Error("RLS failure: anon can read an inactive tenant.");
+if (inactiveTenant.length !== 0)
+  throw new Error("RLS failure: anon can read an inactive tenant.");
 
 const [publicTenants, publicProducts, publicServices] = await Promise.all([
   anonymous.from("tenants").select("id,is_active,status"),
@@ -145,7 +153,11 @@ const [publicTenants, publicProducts, publicServices] = await Promise.all([
 for (const result of [publicTenants, publicProducts, publicServices]) {
   if (result.error) throw result.error;
 }
-if (publicTenants.data.some((tenant) => !tenant.is_active || tenant.status !== "ACTIVE")) {
+if (
+  publicTenants.data.some(
+    (tenant) => !tenant.is_active || tenant.status !== "ACTIVE",
+  )
+) {
   throw new Error("RLS failure: anon can read inactive storefront tenants.");
 }
 if (publicProducts.data.some((product) => !product.available)) {
@@ -155,7 +167,9 @@ if (publicServices.data.some((service) => !service.available)) {
   throw new Error("RLS failure: anon can read unavailable services.");
 }
 
-const futureDate = new Date(Date.now() + 366 * 86_400_000).toISOString().slice(0, 10);
+const futureDate = new Date(Date.now() + 366 * 86_400_000)
+  .toISOString()
+  .slice(0, 10);
 const bookingInput = {
   p_appointment_date: futureDate,
   p_appointment_time: "12:00",
@@ -173,7 +187,10 @@ await expectRpcRejected(
   }),
 );
 
-const [{ data: tenantARecord, error: tenantAError }, { data: tenantBRecord, error: tenantBError }] = await Promise.all([
+const [
+  { data: tenantARecord, error: tenantAError },
+  { data: tenantBRecord, error: tenantBError },
+] = await Promise.all([
   businessA.from("tenants").select("business_type").eq("id", tenantA).single(),
   businessB.from("tenants").select("business_type").eq("id", tenantB).single(),
 ]);
@@ -192,13 +209,12 @@ if (tenantARecord.business_type?.toLowerCase() === "ordering") {
       p_notes: "Cross-tenant verification",
     }),
   );
-
 }
 
 if (
-  tenantBRecord.business_type?.toLowerCase() === "ordering"
-  && productB.available
-  && (productB.stock == null || productB.stock > 0)
+  tenantBRecord.business_type?.toLowerCase() === "ordering" &&
+  productB.available &&
+  (productB.stock == null || productB.stock > 0)
 ) {
   const invalidProductId = crypto.randomUUID();
   await expectRpcRejected(
@@ -223,7 +239,9 @@ if (
     .single();
   if (productAfterError) throw productAfterError;
   if (productAfter.stock !== productB.stock) {
-    throw new Error("Transaction failure: inventory changed after a rejected public order.");
+    throw new Error(
+      "Transaction failure: inventory changed after a rejected public order.",
+    );
   }
 }
 await expectRpcRejected(
@@ -235,4 +253,6 @@ await expectRpcRejected(
   }),
 );
 
-console.log("RLS verification passed for tenant tables, public RPC isolation, and order rollback safety.");
+console.log(
+  "RLS verification passed for tenant tables, public RPC isolation, and order rollback safety.",
+);

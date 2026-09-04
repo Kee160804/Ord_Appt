@@ -14,10 +14,19 @@ interface ModalProps {
   footer?: React.ReactNode;
 }
 
-export function Modal({ open, onClose, title, children, maxWidth = "max-w-lg", footer }: ModalProps) {
+export function Modal({
+  open,
+  onClose,
+  title,
+  children,
+  maxWidth = "max-w-lg",
+  footer,
+}: ModalProps) {
   useEffect(() => {
     if (!open) return;
-    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     window.addEventListener("keydown", handler);
@@ -50,8 +59,12 @@ export function Modal({ open, onClose, title, children, maxWidth = "max-w-lg", f
       >
         {title && (
           <div className="flex flex-shrink-0 items-center justify-between gap-3 border-b border-slate-700 px-4 py-4 light:border-[#e8ecf3] sm:px-6">
-            <h2 className="min-w-0 truncate text-base font-bold text-white light:text-slate-900">{title}</h2>
-            <button title="Close" aria-label="Close dialog"
+            <h2 className="min-w-0 truncate text-base font-bold text-white light:text-slate-900">
+              {title}
+            </h2>
+            <button
+              title="Close"
+              aria-label="Close dialog"
               onClick={onClose}
               className="p-1.5 rounded-lg text-slate-400 hover:text-white light:hover:text-slate-900 hover:bg-slate-700 light:hover:bg-slate-100 transition-colors"
             >
@@ -59,9 +72,13 @@ export function Modal({ open, onClose, title, children, maxWidth = "max-w-lg", f
             </button>
           </div>
         )}
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6">
+          {children}
+        </div>
         {footer && (
-          <div className="flex-shrink-0 border-t border-slate-700 px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] light:border-[#e8ecf3] sm:px-6">{footer}</div>
+          <div className="flex-shrink-0 border-t border-slate-700 px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] light:border-[#e8ecf3] sm:px-6">
+            {footer}
+          </div>
         )}
       </div>
     </div>,

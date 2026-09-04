@@ -120,7 +120,8 @@ export interface AppointmentRow {
   created_at: string;
   appointment_services?: AppointmentServiceRow[] | null;
   staff_id?: string | null;
-  staff?: { display_name: string | null } | { display_name: string | null }[] | null;
+  staff?:
+    { display_name: string | null } | { display_name: string | null }[] | null;
 }
 
 export interface CategoryRow {

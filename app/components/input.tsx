@@ -9,7 +9,9 @@ export function Input({ label, error, className, ...rest }: InputProps) {
   return (
     <div className="flex flex-col gap-1.5">
       {label && (
-        <label className="text-xs font-semibold text-slate-300 light:text-slate-700">{label}</label>
+        <label className="text-xs font-semibold text-slate-300 light:text-slate-700">
+          {label}
+        </label>
       )}
       <input
         className={cn(
@@ -34,7 +36,9 @@ export function Textarea({ label, error, className, ...rest }: TextareaProps) {
   return (
     <div className="flex flex-col gap-1.5">
       {label && (
-        <label className="text-xs font-semibold text-slate-300 light:text-slate-700">{label}</label>
+        <label className="text-xs font-semibold text-slate-300 light:text-slate-700">
+          {label}
+        </label>
       )}
       <textarea
         className={cn(
@@ -56,11 +60,19 @@ interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
   options: { value: string; label: string }[];
   error?: string;
 }
-export function Select({ label, options, error, className, ...rest }: SelectProps) {
+export function Select({
+  label,
+  options,
+  error,
+  className,
+  ...rest
+}: SelectProps) {
   return (
     <div className="flex flex-col gap-1.5">
       {label && (
-        <label className="text-xs font-semibold text-slate-300 light:text-slate-700">{label}</label>
+        <label className="text-xs font-semibold text-slate-300 light:text-slate-700">
+          {label}
+        </label>
       )}
       <select
         className={cn(
@@ -70,8 +82,14 @@ export function Select({ label, options, error, className, ...rest }: SelectProp
         )}
         {...rest}
       >
-        {options.map(o => (
-          <option key={o.value} value={o.value} className="bg-slate-800 light:bg-white">{o.label}</option>
+        {options.map((o) => (
+          <option
+            key={o.value}
+            value={o.value}
+            className="bg-slate-800 light:bg-white"
+          >
+            {o.label}
+          </option>
         ))}
       </select>
       {error && <p className="text-xs text-red-400">{error}</p>}

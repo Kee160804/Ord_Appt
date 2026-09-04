@@ -1,5 +1,10 @@
 import { getSupabaseAdminClient } from "@/app/lib/supabase/admin";
 import { getSupabaseServerClient } from "@/app/lib/supabase/server";
+import {
+  generateSecurePassword,
+  isValidEmail,
+  safeServerError,
+} from "@/app/lib/server/security";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,34 +18,14 @@ interface CreateAgentRequest {
   sendPasswordEmail?: boolean;
 }
 
-function generatePassword(length = 12): string {
-  const uppercase = "ABCDEFGHJKLMNPQRSTUVWXYZ";
-  const lowercase = "abcdefghijkmnopqrstuvwxyz";
-  const numbers = "23456789";
-  const symbols = "!@#$%&*";
-  const all = uppercase + lowercase + numbers + symbols;
-
-  let pwd =
-    uppercase[Math.floor(Math.random() * uppercase.length)] +
-    lowercase[Math.floor(Math.random() * lowercase.length)] +
-    numbers[Math.floor(Math.random() * numbers.length)] +
-    symbols[Math.floor(Math.random() * symbols.length)];
-
-  for (let i = 4; i < length; i += 1) {
-    pwd += all[Math.floor(Math.random() * all.length)];
-  }
-
-  return pwd
-    .split("")
-    .sort(() => Math.random() - 0.5)
-    .join("");
-}
-
 export async function POST(request: Request) {
   try {
     const supabase = await getSupabaseServerClient();
     if (!supabase) {
-      return Response.json({ error: "Supabase is not configured." }, { status: 503 });
+      return Response.json(
+        { error: "Supabase is not configured." },
+        { status: 503 },
+      );
     }
 
     // Verify session
@@ -59,7 +44,10 @@ export async function POST(request: Request) {
       .maybeSingle();
 
     if (profileError) throw profileError;
-    if (!profile?.is_active || profile.platform_role?.toUpperCase() !== "SUPER_ADMIN") {
+    if (
+      !profile?.is_active ||
+      profile.platform_role?.toUpperCase() !== "SUPER_ADMIN"
+    ) {
       return Response.json(
         { error: "Only a platform super admin can add agents." },
         { status: 403 },
@@ -70,17 +58,27 @@ export async function POST(request: Request) {
     const name = body.name?.trim();
     const email = body.email?.trim().toLowerCase();
     const role = body.role?.toLowerCase() || "staff";
-    const tenantId = body.tenantId && body.tenantId !== "platform" ? body.tenantId : null;
+    const tenantId =
+      body.tenantId && body.tenantId !== "platform" ? body.tenantId : null;
     const sendPasswordEmail = body.sendPasswordEmail !== false;
 
     if (!name || name.length < 2) {
-      return Response.json({ error: "Agent full name is required." }, { status: 400 });
+      return Response.json(
+        { error: "Agent full name is required." },
+        { status: 400 },
+      );
     }
-    if (!email || !email.includes("@")) {
-      return Response.json({ error: "A valid email address is required." }, { status: 400 });
+    if (!email || !isValidEmail(email)) {
+      return Response.json(
+        { error: "A valid email address is required." },
+        { status: 400 },
+      );
     }
 
-    const password = body.password && body.password.length >= 8 ? body.password : generatePassword();
+    const password =
+      body.password && body.password.length >= 12
+        ? body.password
+        : generateSecurePassword();
     const isSuperAdmin = role === "superadmin" || !tenantId;
 
     // Verify tenant if assigned
@@ -93,21 +91,26 @@ export async function POST(request: Request) {
         .maybeSingle();
 
       if (tenantQueryError || !tenantRow) {
-        return Response.json({ error: "Selected business tenant not found." }, { status: 400 });
+        return Response.json(
+          { error: "Selected business tenant not found." },
+          { status: 400 },
+        );
       }
       tenantName = tenantRow.business_name;
     }
 
     // 1. Create or retrieve auth user
     let userId: string;
-    const { data: createdAuth, error: createAuthError } = await admin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: {
-        full_name: name,
-      },
-    });
+    let createdNewUser = false;
+    const { data: createdAuth, error: createAuthError } =
+      await admin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: {
+          full_name: name,
+        },
+      });
 
     if (createAuthError) {
       const { data: existingProfile } = await admin
@@ -117,8 +120,9 @@ export async function POST(request: Request) {
         .maybeSingle();
 
       if (existingProfile) {
+        // Existing credentials belong to that user. Assigning access must never
+        // silently rotate their password.
         userId = existingProfile.id;
-        await admin.auth.admin.updateUserById(userId, { password });
       } else {
         return Response.json(
           { error: createAuthError.message || "Failed to create agent user." },
@@ -127,19 +131,18 @@ export async function POST(request: Request) {
       }
     } else {
       userId = createdAuth.user.id;
+      createdNewUser = true;
     }
 
     // 2. Upsert profile
-    const { error: profileUpsertError } = await admin
-      .from("profiles")
-      .upsert({
-        id: userId,
-        email,
-        full_name: name,
-        platform_role: isSuperAdmin ? "SUPER_ADMIN" : null,
-        is_active: true,
-        updated_at: new Date().toISOString(),
-      });
+    const { error: profileUpsertError } = await admin.from("profiles").upsert({
+      id: userId,
+      email,
+      full_name: name,
+      platform_role: isSuperAdmin ? "SUPER_ADMIN" : null,
+      is_active: true,
+      updated_at: new Date().toISOString(),
+    });
 
     if (profileUpsertError) throw profileUpsertError;
 
@@ -190,34 +193,30 @@ export async function POST(request: Request) {
     }
 
     // 4. Handle password setup / reset email or recovery link
-    let recoveryUrl: string | null = null;
     let emailSent = false;
 
-    const origin = request.headers.get("origin") || request.headers.get("referer") || "http://localhost:3000";
+    const origin =
+      request.headers.get("origin") ||
+      request.headers.get("referer") ||
+      "http://localhost:3000";
     const cleanOrigin = origin.replace(/\/+$/, "");
     const redirectTo = `${cleanOrigin}/auth/confirm?next=/reset-password`;
 
     if (sendPasswordEmail) {
       try {
-        const { data: linkData } = await admin.auth.admin.generateLink({
-          type: "recovery",
-          email,
-          options: { redirectTo },
-        });
-
-        if (linkData?.properties?.action_link) {
-          recoveryUrl = linkData.properties.action_link;
-        }
-
-        const { error: resetEmailError } = await admin.auth.resetPasswordForEmail(email, {
-          redirectTo,
-        });
+        const { error: resetEmailError } =
+          await admin.auth.resetPasswordForEmail(email, {
+            redirectTo,
+          });
 
         if (!resetEmailError) {
           emailSent = true;
         }
       } catch (emailErr) {
-        console.warn("Could not dispatch password reset email to agent:", emailErr);
+        console.warn(
+          "Could not dispatch password reset email to agent:",
+          emailErr,
+        );
       }
     }
 
@@ -250,13 +249,14 @@ export async function POST(request: Request) {
         tenantName,
         isActive: true,
       },
-      temporaryPassword: password,
-      recoveryUrl,
       emailSent,
+      createdNewUser,
     });
   } catch (error) {
-    console.error("Error creating agent:", error);
-    const message = error instanceof Error ? error.message : "Unable to create agent.";
-    return Response.json({ error: message }, { status: 500 });
+    return safeServerError(
+      "admin-agent-create",
+      error,
+      "Unable to create agent. Please try again.",
+    );
   }
 }

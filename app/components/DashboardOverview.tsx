@@ -16,14 +16,23 @@ import {
 import { StatCard } from "../components/StatCard";
 import { Card, CardBody, CardHeader } from "../components/Card";
 import { StatusBadge } from "../components/Badge";
-import { getAppointmentsByTenant, getOrdersByTenant, mockAnalytics } from "../data/mock";
+import {
+  getAppointmentsByTenant,
+  getOrdersByTenant,
+  mockAnalytics,
+} from "../data/mock";
 import { isSupabaseConfigured } from "../lib/supabase/config";
 import { cn, formatCurrency, formatDate, formatTime } from "../lib/utils";
-import { loadDashboardData, type DashboardData } from "../services/dashboardService";
+import {
+  loadDashboardData,
+  type DashboardData,
+} from "../services/dashboardService";
 import { useAuth } from "../contexts/auth";
 import type { AnalyticsSummary, Tenant } from "../types/index";
 
-interface OverviewProps { tenant: Tenant }
+interface OverviewProps {
+  tenant: Tenant;
+}
 
 const EMPTY_ANALYTICS: AnalyticsSummary = {
   totalRevenue: 0,
@@ -38,7 +47,12 @@ const EMPTY_ANALYTICS: AnalyticsSummary = {
 
 function initialData(tenant: Tenant): DashboardData {
   if (isSupabaseConfigured()) {
-    return { analytics: EMPTY_ANALYTICS, appointments: [], orders: [], customers: [] };
+    return {
+      analytics: EMPTY_ANALYTICS,
+      appointments: [],
+      orders: [],
+      customers: [],
+    };
   }
   return {
     analytics: mockAnalytics[tenant.id] ?? EMPTY_ANALYTICS,
@@ -55,20 +69,23 @@ export function DashboardOverview({ tenant }: OverviewProps) {
   const [error, setError] = useState("");
   const isAppt = tenant.businessType === "appointment";
   const activity = isAppt ? data.appointments : data.orders;
-  const pendingCount = activity.filter((record) => record.status === "pending").length;
+  const pendingCount = activity.filter(
+    (record) => record.status === "pending",
+  ).length;
   const todayKey = new Date().toLocaleDateString("en-CA");
   const recentAppointments = data.appointments
     .filter(
       (appointment) =>
         appointment.date >= todayKey &&
-        (appointment.status === "pending" || appointment.status === "confirmed"),
+        (appointment.status === "pending" ||
+          appointment.status === "confirmed"),
     )
     .slice(0, 4);
   const recentOrders = data.orders.slice(0, 4);
   const chartData = data.analytics.revenueData.slice(-7);
   const maxRevenue = Math.max(1, ...chartData.map((point) => point.revenue));
   const firstName = user?.name.split(" ")[0] || "there";
-  const todayLabel = new Date().toLocaleDateString("en-US", {
+  const todayLabel = new Date().toLocaleDateString("en-BZ", {
     weekday: "long",
     month: "long",
     day: "numeric",
@@ -85,7 +102,11 @@ export function DashboardOverview({ tenant }: OverviewProps) {
       })
       .catch((loadError: unknown) => {
         if (!active) return;
-        setError(loadError instanceof Error ? loadError.message : "Unable to load the dashboard.");
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load the dashboard.",
+        );
       })
       .finally(() => {
         if (active) setIsLoading(false);
@@ -130,7 +151,11 @@ export function DashboardOverview({ tenant }: OverviewProps) {
           {error}
         </div>
       )}
-      {isLoading && <p className="text-xs text-slate-400 light:text-slate-500">Loading your business activity...</p>}
+      {isLoading && (
+        <p className="text-xs text-slate-400 light:text-slate-500">
+          Loading your business activity...
+        </p>
+      )}
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
@@ -143,10 +168,18 @@ export function DashboardOverview({ tenant }: OverviewProps) {
         <StatCard
           label={isAppt ? "Total Bookings" : "Total Orders"}
           value={String(data.analytics.totalActivity)}
-          icon={isAppt
-            ? <Calendar className="h-4 w-4 text-blue-600" />
-            : <ShoppingBag className="h-4 w-4 text-orange-600" />}
-          iconBg={isAppt ? "bg-blue-500/15 light:bg-blue-50" : "bg-orange-500/15 light:bg-orange-50"}
+          icon={
+            isAppt ? (
+              <Calendar className="h-4 w-4 text-blue-600" />
+            ) : (
+              <ShoppingBag className="h-4 w-4 text-orange-600" />
+            )
+          }
+          iconBg={
+            isAppt
+              ? "bg-blue-500/15 light:bg-blue-50"
+              : "bg-orange-500/15 light:bg-orange-50"
+          }
           chartColor="text-blue-500"
         />
         <StatCard
@@ -169,8 +202,12 @@ export function DashboardOverview({ tenant }: OverviewProps) {
         <Card className="lg:col-span-3">
           <CardHeader className="py-3">
             <div>
-              <h3 className="text-xs font-bold text-white light:text-[#17223a]">Revenue Overview</h3>
-              <p className="mt-1 text-[10px] text-slate-400 light:text-[#7b879d]">Last 7 days</p>
+              <h3 className="text-xs font-bold text-white light:text-[#17223a]">
+                Revenue Overview
+              </h3>
+              <p className="mt-1 text-[10px] text-slate-400 light:text-[#7b879d]">
+                Last 7 days
+              </p>
             </div>
             <div className="rounded-lg border border-slate-700 light:border-[#e3e8f0] px-3 py-2 text-[10px] text-slate-400 light:text-[#5f6d85]">
               Last 7 days <ChevronDown className="ml-2 inline h-3 w-3" />
@@ -186,10 +223,15 @@ export function DashboardOverview({ tenant }: OverviewProps) {
             ) : (
               <div className="flex h-44 items-end gap-3 border-b border-l border-slate-700/70 light:border-[#e8ecf3] px-3">
                 {chartData.map((point) => (
-                  <div key={point.date} className="group relative flex h-full flex-1 items-end justify-center">
+                  <div
+                    key={point.date}
+                    className="group relative flex h-full flex-1 items-end justify-center"
+                  >
                     <div
                       className="w-full max-w-8 rounded-t bg-violet-500 transition-colors group-hover:bg-violet-600"
-                      style={{ height: `${Math.max((point.revenue / maxRevenue) * 100, 4)}%` }}
+                      style={{
+                        height: `${Math.max((point.revenue / maxRevenue) * 100, 4)}%`,
+                      }}
                     />
                     <span className="absolute top-full mt-2 text-[9px] text-slate-400 light:text-[#78859b]">
                       {point.date.slice(5)}
@@ -218,7 +260,11 @@ export function DashboardOverview({ tenant }: OverviewProps) {
               <EmptyState
                 icon={<TrendingUp className="h-5 w-5" />}
                 title={isAppt ? "No services yet" : "No products yet"}
-                description={isAppt ? "Add services to see your top performers here." : "Add products to see your top performers here."}
+                description={
+                  isAppt
+                    ? "Add services to see your top performers here."
+                    : "Add products to see your top performers here."
+                }
               />
             ) : (
               <div className="space-y-4">
@@ -228,10 +274,16 @@ export function DashboardOverview({ tenant }: OverviewProps) {
                       {index + 1}
                     </span>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-xs font-semibold text-white light:text-[#17223a]">{item.name}</p>
-                      <p className="mt-0.5 text-[10px] text-slate-400 light:text-[#7b879d]">{item.count} bookings</p>
+                      <p className="truncate text-xs font-semibold text-white light:text-[#17223a]">
+                        {item.name}
+                      </p>
+                      <p className="mt-0.5 text-[10px] text-slate-400 light:text-[#7b879d]">
+                        {item.count} bookings
+                      </p>
                     </div>
-                    <p className="text-xs font-bold text-white light:text-[#17223a]">{formatCurrency(item.revenue)}</p>
+                    <p className="text-xs font-bold text-white light:text-[#17223a]">
+                      {formatCurrency(item.revenue)}
+                    </p>
                   </div>
                 ))}
               </div>
@@ -250,51 +302,88 @@ export function DashboardOverview({ tenant }: OverviewProps) {
               href={isAppt ? "/dashboard/appointments" : "/dashboard/orders"}
               className="flex items-center gap-1 text-[10px] font-semibold text-violet-400 light:text-violet-600"
             >
-              View all {isAppt ? "appointments" : "orders"} <ArrowRight className="h-3 w-3" />
+              View all {isAppt ? "appointments" : "orders"}{" "}
+              <ArrowRight className="h-3 w-3" />
             </Link>
           </CardHeader>
           <div className="min-h-[172px] divide-y divide-slate-700/60 light:divide-[#edf0f5]">
-            {!isLoading && (isAppt ? recentAppointments.length === 0 : recentOrders.length === 0) && (
-              <EmptyState
-                icon={isAppt ? <Calendar className="h-5 w-5" /> : <ShoppingBag className="h-5 w-5" />}
-                iconBg={isAppt ? "bg-blue-500/15 text-blue-400 light:bg-blue-50 light:text-blue-600" : "bg-orange-500/15 text-orange-400 light:bg-orange-50 light:text-orange-600"}
-                title={isAppt ? "No upcoming appointments" : "No recent orders"}
-                description={isAppt ? "When you get bookings, they’ll show up here." : "When customers order, they’ll show up here."}
-                action={
-                  isAppt ? (
-                    <Link
-                      href="/dashboard/appointments"
-                      className="mt-3 inline-flex items-center justify-center rounded-lg bg-violet-600 px-3.5 py-2 text-[11px] font-semibold text-white shadow-sm transition-colors hover:bg-violet-700"
-                    >
-                      Create Appointment
-                    </Link>
-                  ) : undefined
-                }
-              />
-            )}
+            {!isLoading &&
+              (isAppt
+                ? recentAppointments.length === 0
+                : recentOrders.length === 0) && (
+                <EmptyState
+                  icon={
+                    isAppt ? (
+                      <Calendar className="h-5 w-5" />
+                    ) : (
+                      <ShoppingBag className="h-5 w-5" />
+                    )
+                  }
+                  iconBg={
+                    isAppt
+                      ? "bg-blue-500/15 text-blue-400 light:bg-blue-50 light:text-blue-600"
+                      : "bg-orange-500/15 text-orange-400 light:bg-orange-50 light:text-orange-600"
+                  }
+                  title={
+                    isAppt ? "No upcoming appointments" : "No recent orders"
+                  }
+                  description={
+                    isAppt
+                      ? "When you get bookings, they’ll show up here."
+                      : "When customers order, they’ll show up here."
+                  }
+                  action={
+                    isAppt ? (
+                      <Link
+                        href="/dashboard/appointments"
+                        className="mt-3 inline-flex items-center justify-center rounded-lg bg-violet-600 px-3.5 py-2 text-[11px] font-semibold text-white shadow-sm transition-colors hover:bg-violet-700"
+                      >
+                        Create Appointment
+                      </Link>
+                    ) : undefined
+                  }
+                />
+              )}
             {isAppt
               ? recentAppointments.map((appointment) => (
-                  <div key={appointment.id} className="flex items-center gap-3 px-5 py-3">
+                  <div
+                    key={appointment.id}
+                    className="flex items-center gap-3 px-5 py-3"
+                  >
                     <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-500/15 text-blue-400 light:bg-blue-50 light:text-blue-600">
                       <Clock className="h-4 w-4" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-xs font-semibold text-white light:text-[#17223a]">{appointment.customerName}</p>
+                      <p className="truncate text-xs font-semibold text-white light:text-[#17223a]">
+                        {appointment.customerName}
+                      </p>
                       <p className="mt-0.5 truncate text-[10px] text-slate-400 light:text-[#7b879d]">
-                        {appointment.serviceName} · {formatDate(appointment.date)} at {formatTime(appointment.time)}
+                        {appointment.serviceName} ·{" "}
+                        {formatDate(appointment.date)} at{" "}
+                        {formatTime(appointment.time)}
                       </p>
                     </div>
-                    <StatusBadge status={appointment.status} className="text-[9px]" />
+                    <StatusBadge
+                      status={appointment.status}
+                      className="text-[9px]"
+                    />
                   </div>
                 ))
               : recentOrders.map((order) => (
-                  <div key={order.id} className="flex items-center gap-3 px-5 py-3">
+                  <div
+                    key={order.id}
+                    className="flex items-center gap-3 px-5 py-3"
+                  >
                     <div className="flex h-9 w-9 items-center justify-center rounded-full bg-orange-500/15 text-orange-400 light:bg-orange-50 light:text-orange-600">
                       <ShoppingBag className="h-4 w-4" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-xs font-semibold text-white light:text-[#17223a]">{order.customerName}</p>
-                      <p className="mt-0.5 text-[10px] text-slate-400 light:text-[#7b879d]">{order.orderNumber}</p>
+                      <p className="truncate text-xs font-semibold text-white light:text-[#17223a]">
+                        {order.customerName}
+                      </p>
+                      <p className="mt-0.5 text-[10px] text-slate-400 light:text-[#7b879d]">
+                        {order.orderNumber}
+                      </p>
                     </div>
                     <StatusBadge status={order.status} className="text-[9px]" />
                   </div>
@@ -304,8 +393,13 @@ export function DashboardOverview({ tenant }: OverviewProps) {
 
         <Card>
           <CardHeader className="py-3">
-            <h3 className="text-xs font-bold text-white light:text-[#17223a]">Recent Customers</h3>
-            <Link href="/dashboard/customers" className="text-[10px] font-semibold text-violet-400 light:text-violet-600">
+            <h3 className="text-xs font-bold text-white light:text-[#17223a]">
+              Recent Customers
+            </h3>
+            <Link
+              href="/dashboard/customers"
+              className="text-[10px] font-semibold text-violet-400 light:text-violet-600"
+            >
               View all
             </Link>
           </CardHeader>
@@ -319,15 +413,28 @@ export function DashboardOverview({ tenant }: OverviewProps) {
               />
             )}
             {data.customers.slice(0, 4).map((customer) => (
-              <div key={customer.key} className="flex items-center gap-3 px-5 py-3">
+              <div
+                key={customer.key}
+                className="flex items-center gap-3 px-5 py-3"
+              >
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500/15 text-[10px] font-bold text-emerald-400 light:bg-emerald-50 light:text-emerald-700">
-                  {customer.name.split(" ").map((part) => part[0]).join("").slice(0, 2)}
+                  {customer.name
+                    .split(" ")
+                    .map((part) => part[0])
+                    .join("")
+                    .slice(0, 2)}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-xs font-semibold text-white light:text-[#17223a]">{customer.name}</p>
-                  <p className="truncate text-[10px] text-slate-400 light:text-[#7b879d]">{customer.email || customer.phone}</p>
+                  <p className="truncate text-xs font-semibold text-white light:text-[#17223a]">
+                    {customer.name}
+                  </p>
+                  <p className="truncate text-[10px] text-slate-400 light:text-[#7b879d]">
+                    {customer.email || customer.phone}
+                  </p>
                 </div>
-                <p className="text-[10px] font-semibold text-slate-300 light:text-[#526079]">{formatCurrency(customer.totalValue)}</p>
+                <p className="text-[10px] font-semibold text-slate-300 light:text-[#526079]">
+                  {formatCurrency(customer.totalValue)}
+                </p>
               </div>
             ))}
           </div>
@@ -352,11 +459,20 @@ function EmptyState({
 }) {
   return (
     <div className="flex min-h-[170px] flex-col items-center justify-center px-6 py-4 text-center">
-      <div className={cn("flex h-12 w-12 items-center justify-center rounded-full", iconBg)}>
+      <div
+        className={cn(
+          "flex h-12 w-12 items-center justify-center rounded-full",
+          iconBg,
+        )}
+      >
         {icon}
       </div>
-      <p className="mt-3 text-xs font-bold text-white light:text-[#17223a]">{title}</p>
-      <p className="mt-1 max-w-56 text-[10px] leading-4 text-slate-400 light:text-[#7b879d]">{description}</p>
+      <p className="mt-3 text-xs font-bold text-white light:text-[#17223a]">
+        {title}
+      </p>
+      <p className="mt-1 max-w-56 text-[10px] leading-4 text-slate-400 light:text-[#7b879d]">
+        {description}
+      </p>
       {action}
     </div>
   );

@@ -15,14 +15,25 @@ interface StorePageProps {
   searchParams?: Promise<{ demo?: string }> | { demo?: string };
 }
 
-export default async function StorePage({ params, searchParams }: StorePageProps) {
+export default async function StorePage({
+  params,
+  searchParams,
+}: StorePageProps) {
   const resolvedParams = await params;
   const resolvedSearchParams = searchParams ? await searchParams : {};
   const slug = resolvedParams.slug;
   if (resolvedSearchParams.demo === "1") {
     const demoTenant = getDemoTenantBySlug(slug);
     if (!demoTenant) notFound();
-    const dayOrder = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    const dayOrder = [
+      "Sunday",
+      "Monday",
+      "Tuesday",
+      "Wednesday",
+      "Thursday",
+      "Friday",
+      "Saturday",
+    ];
     const previewTenant = {
       ...demoTenant,
       businessHours: [...demoTenant.businessHours].sort(
@@ -34,8 +45,12 @@ export default async function StorePage({ params, searchParams }: StorePageProps
       <StorefrontClient
         tenant={previewTenant}
         initialCategories={getCategoriesByTenant(demoTenant.id)}
-        initialProducts={getProductsByTenant(demoTenant.id).filter((product) => product.isActive)}
-        initialServices={getServicesByTenant(demoTenant.id).filter((service) => service.isActive)}
+        initialProducts={getProductsByTenant(demoTenant.id).filter(
+          (product) => product.isActive,
+        )}
+        initialServices={getServicesByTenant(demoTenant.id).filter(
+          (service) => service.isActive,
+        )}
         viewOnly
       />
     );

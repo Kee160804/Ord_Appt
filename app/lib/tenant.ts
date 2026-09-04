@@ -8,7 +8,11 @@ export function normalizeHost(hostname: string) {
 }
 
 export function isLocalHost(hostname: string) {
-  return hostname === "localhost" || hostname.endsWith(".localhost") || hostname === "127.0.0.1";
+  return (
+    hostname === "localhost" ||
+    hostname.endsWith(".localhost") ||
+    hostname === "127.0.0.1"
+  );
 }
 
 export function getTenantSlugFromHost(hostname: string): string | null {

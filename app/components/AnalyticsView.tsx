@@ -2,7 +2,17 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Award, BarChart3, Calendar, Clock3, DollarSign, Repeat2, ShoppingBag, TrendingUp, Users } from "lucide-react";
+import {
+  Award,
+  BarChart3,
+  Calendar,
+  Clock3,
+  DollarSign,
+  Repeat2,
+  ShoppingBag,
+  TrendingUp,
+  Users,
+} from "lucide-react";
 import { StatCard } from "../components/StatCard";
 import { Card, CardHeader, CardBody } from "../components/Card";
 import { mockAnalytics } from "../data/mock";
@@ -11,7 +21,9 @@ import { formatCurrency } from "../lib/utils";
 import { loadDashboardData } from "../services/dashboardService";
 import type { AnalyticsSummary, Tenant } from "../types/index";
 
-interface Props { tenant: Tenant }
+interface Props {
+  tenant: Tenant;
+}
 
 const EMPTY_ANALYTICS: AnalyticsSummary = {
   totalRevenue: 0,
@@ -26,7 +38,9 @@ const EMPTY_ANALYTICS: AnalyticsSummary = {
 
 export function AnalyticsView({ tenant }: Props) {
   const [analytics, setAnalytics] = useState<AnalyticsSummary>(
-    isSupabaseConfigured() ? EMPTY_ANALYTICS : mockAnalytics[tenant.id] ?? EMPTY_ANALYTICS,
+    isSupabaseConfigured()
+      ? EMPTY_ANALYTICS
+      : (mockAnalytics[tenant.id] ?? EMPTY_ANALYTICS),
   );
   const [isLoading, setIsLoading] = useState(isSupabaseConfigured());
   const [error, setError] = useState("");
@@ -43,7 +57,11 @@ export function AnalyticsView({ tenant }: Props) {
       })
       .catch((loadError: unknown) => {
         if (!active) return;
-        setError(loadError instanceof Error ? loadError.message : "Unable to load analytics.");
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load analytics.",
+        );
       })
       .finally(() => {
         if (active) setIsLoading(false);
@@ -53,7 +71,10 @@ export function AnalyticsView({ tenant }: Props) {
     };
   }, [tenant]);
 
-  const maxRevenue = Math.max(1, ...analytics.revenueData.map((point) => point.revenue));
+  const maxRevenue = Math.max(
+    1,
+    ...analytics.revenueData.map((point) => point.revenue),
+  );
 
   if (!isLoading && !error && analytics.totalRevenue === 0) {
     return (
@@ -62,11 +83,17 @@ export function AnalyticsView({ tenant }: Props) {
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-violet-500/15 text-violet-400 light:bg-violet-50 light:text-violet-600">
             <BarChart3 className="h-7 w-7" />
           </div>
-          <h2 className="mt-4 text-sm font-bold text-white light:text-[#17223a]">No analytics data available</h2>
+          <h2 className="mt-4 text-sm font-bold text-white light:text-[#17223a]">
+            No analytics data available
+          </h2>
           <p className="mt-2 text-[11px] leading-5 text-slate-400 light:text-[#71809a]">
-            Start making bookings and completing appointments to see your analytics here.
+            Start making bookings and completing appointments to see your
+            analytics here.
           </p>
-          <Link href="/dashboard" className="mt-5 rounded-lg bg-violet-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-violet-700">
+          <Link
+            href="/dashboard"
+            className="mt-5 rounded-lg bg-violet-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-violet-700"
+          >
             View Overview
           </Link>
         </div>
@@ -77,9 +104,12 @@ export function AnalyticsView({ tenant }: Props) {
   return (
     <div className="min-h-full space-y-4 bg-[#08111f] light:bg-[#f8fafc] p-4 text-white light:text-[#14213a] md:p-5">
       <div>
-        <h2 className="text-sm font-bold text-white light:text-[#17223a]">Analytics</h2>
+        <h2 className="text-sm font-bold text-white light:text-[#17223a]">
+          Analytics
+        </h2>
         <p className="mt-0.5 text-[10px] text-slate-400 light:text-[#71809a]">
-          Live performance from your Supabase {isAppt ? "appointments" : "orders"}
+          Live performance from your Supabase{" "}
+          {isAppt ? "appointments" : "orders"}
         </p>
       </div>
 
@@ -88,7 +118,9 @@ export function AnalyticsView({ tenant }: Props) {
           {error}
         </div>
       )}
-      {isLoading && <p className="text-xs text-slate-400">Calculating analytics...</p>}
+      {isLoading && (
+        <p className="text-xs text-slate-400">Calculating analytics...</p>
+      )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
@@ -100,9 +132,13 @@ export function AnalyticsView({ tenant }: Props) {
         <StatCard
           label={isAppt ? "Total Bookings" : "Total Orders"}
           value={String(analytics.totalActivity)}
-          icon={isAppt
-            ? <Calendar className="w-5 h-5 text-blue-600" />
-            : <ShoppingBag className="w-5 h-5 text-orange-600" />}
+          icon={
+            isAppt ? (
+              <Calendar className="w-5 h-5 text-blue-600" />
+            ) : (
+              <ShoppingBag className="w-5 h-5 text-orange-600" />
+            )
+          }
           iconBg={isAppt ? "bg-blue-50" : "bg-orange-50"}
         />
         <StatCard
@@ -120,16 +156,74 @@ export function AnalyticsView({ tenant }: Props) {
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {[{ label: "Returning Customers", value: String(analytics.returningCustomers ?? 0), icon: Repeat2 }, { label: "Busiest Day", value: analytics.busiestDay ?? "Not enough data", icon: Calendar }, { label: "Busiest Time", value: analytics.busiestTime ?? "Not enough data", icon: Clock3 }, { label: "Completion Rate", value: `${analytics.completionRate ?? 0}%`, icon: TrendingUp }].map(({ label, value, icon: Icon }) => <Card key={label} className="p-4"><div className="flex items-center gap-3"><span className="rounded-lg bg-violet-500/15 p-2 text-violet-400"><Icon className="h-4 w-4" /></span><div className="min-w-0"><p className="text-[10px] text-slate-400">{label}</p><p className="mt-1 truncate text-sm font-bold">{value}</p></div></div></Card>)}
+        {[
+          {
+            label: "Returning Customers",
+            value: String(analytics.returningCustomers ?? 0),
+            icon: Repeat2,
+          },
+          {
+            label: "Busiest Day",
+            value: analytics.busiestDay ?? "Not enough data",
+            icon: Calendar,
+          },
+          {
+            label: "Busiest Time",
+            value: analytics.busiestTime ?? "Not enough data",
+            icon: Clock3,
+          },
+          {
+            label: "Completion Rate",
+            value: `${analytics.completionRate ?? 0}%`,
+            icon: TrendingUp,
+          },
+        ].map(({ label, value, icon: Icon }) => (
+          <Card key={label} className="p-4">
+            <div className="flex items-center gap-3">
+              <span className="rounded-lg bg-violet-500/15 p-2 text-violet-400">
+                <Icon className="h-4 w-4" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-[10px] text-slate-400">{label}</p>
+                <p className="mt-1 truncate text-sm font-bold">{value}</p>
+              </div>
+            </div>
+          </Card>
+        ))}
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2"><Card className="p-4"><p className="text-[10px] text-slate-400">Revenue trend vs previous period</p><p className={`mt-1 text-lg font-bold ${(analytics.revenueChange ?? 0) >= 0 ? "text-emerald-400" : "text-red-400"}`}>{(analytics.revenueChange ?? 0) >= 0 ? "+" : ""}{analytics.revenueChange}%</p></Card><Card className="p-4"><p className="text-[10px] text-slate-400">{isAppt ? "Booking" : "Order"} trend vs previous period</p><p className={`mt-1 text-lg font-bold ${(analytics.activityChange ?? 0) >= 0 ? "text-emerald-400" : "text-red-400"}`}>{(analytics.activityChange ?? 0) >= 0 ? "+" : ""}{analytics.activityChange}%</p></Card></div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Card className="p-4">
+          <p className="text-[10px] text-slate-400">
+            Revenue trend vs previous period
+          </p>
+          <p
+            className={`mt-1 text-lg font-bold ${(analytics.revenueChange ?? 0) >= 0 ? "text-emerald-400" : "text-red-400"}`}
+          >
+            {(analytics.revenueChange ?? 0) >= 0 ? "+" : ""}
+            {analytics.revenueChange}%
+          </p>
+        </Card>
+        <Card className="p-4">
+          <p className="text-[10px] text-slate-400">
+            {isAppt ? "Booking" : "Order"} trend vs previous period
+          </p>
+          <p
+            className={`mt-1 text-lg font-bold ${(analytics.activityChange ?? 0) >= 0 ? "text-emerald-400" : "text-red-400"}`}
+          >
+            {(analytics.activityChange ?? 0) >= 0 ? "+" : ""}
+            {analytics.activityChange}%
+          </p>
+        </Card>
+      </div>
 
       <div className="grid lg:grid-cols-5 gap-6">
         <Card className="lg:col-span-3">
           <CardHeader>
             <div>
-              <h3 className="text-xs font-bold text-white light:text-[#17223a]">Last 10 Days</h3>
+              <h3 className="text-xs font-bold text-white light:text-[#17223a]">
+                Last 10 Days
+              </h3>
               <p className="text-xs text-slate-400 light:text-gray-600 mt-0.5">
                 Completed value and activity
               </p>
@@ -137,24 +231,37 @@ export function AnalyticsView({ tenant }: Props) {
           </CardHeader>
           <CardBody>
             {analytics.revenueData.length === 0 ? (
-              <p className="py-16 text-center text-sm text-slate-400">No activity yet.</p>
+              <p className="py-16 text-center text-sm text-slate-400">
+                No activity yet.
+              </p>
             ) : (
               <div className="flex items-end gap-1.5 h-52">
                 {analytics.revenueData.map((point) => {
                   const percentage = (point.revenue / maxRevenue) * 100;
                   return (
-                    <div key={point.date} className="flex-1 flex flex-col items-center gap-1.5 group relative">
+                    <div
+                      key={point.date}
+                      className="flex-1 flex flex-col items-center gap-1.5 group relative"
+                    >
                       <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-10 hidden group-hover:block">
                         <div className="bg-slate-950 light:bg-white text-white light:text-slate-900 text-xs rounded-xl px-2.5 py-1.5 whitespace-nowrap shadow-xl light:border light:border-gray-200">
-                          <p className="font-bold">{formatCurrency(point.revenue)}</p>
-                          <p className="text-slate-400">{point.count} {isAppt ? "bookings" : "orders"}</p>
+                          <p className="font-bold">
+                            {formatCurrency(point.revenue)}
+                          </p>
+                          <p className="text-slate-400">
+                            {point.count} {isAppt ? "bookings" : "orders"}
+                          </p>
                         </div>
                       </div>
                       <div
                         className="w-full rounded-t-xl bg-gradient-to-t from-violet-600 to-violet-400 transition-all duration-200"
-                        style={{ height: `${Math.max(percentage, point.count ? 6 : 2)}%` }}
+                        style={{
+                          height: `${Math.max(percentage, point.count ? 6 : 2)}%`,
+                        }}
                       />
-                      <span className="text-[9px] text-slate-400">{point.date.slice(5)}</span>
+                      <span className="text-[9px] text-slate-400">
+                        {point.date.slice(5)}
+                      </span>
                     </div>
                   );
                 })}
@@ -174,7 +281,9 @@ export function AnalyticsView({ tenant }: Props) {
           </CardHeader>
           <CardBody className="space-y-5">
             {analytics.topItems.length === 0 && (
-              <p className="py-10 text-center text-sm text-slate-400">No activity yet.</p>
+              <p className="py-10 text-center text-sm text-slate-400">
+                No activity yet.
+              </p>
             )}
             {analytics.topItems.map((item, index) => {
               const maximum = analytics.topItems[0]?.count || 1;
@@ -185,9 +294,13 @@ export function AnalyticsView({ tenant }: Props) {
                       <span className="w-5 h-5 rounded-md bg-slate-700 light:bg-slate-200 text-white light:text-slate-700 text-xs font-bold flex items-center justify-center flex-shrink-0">
                         {index + 1}
                       </span>
-                      <span className="font-medium text-white light:text-gray-800 truncate">{item.name}</span>
+                      <span className="font-medium text-white light:text-gray-800 truncate">
+                        {item.name}
+                      </span>
                     </div>
-                    <span className="text-slate-400 text-xs ml-2 flex-shrink-0">{item.count}x</span>
+                    <span className="text-slate-400 text-xs ml-2 flex-shrink-0">
+                      {item.count}x
+                    </span>
                   </div>
                   <div className="h-1.5 bg-slate-700 light:bg-slate-200 rounded-full overflow-hidden">
                     <div
@@ -195,7 +308,9 @@ export function AnalyticsView({ tenant }: Props) {
                       style={{ width: `${(item.count / maximum) * 100}%` }}
                     />
                   </div>
-                  <p className="text-xs text-right text-slate-400 font-medium">{formatCurrency(item.revenue)}</p>
+                  <p className="text-xs text-right text-slate-400 font-medium">
+                    {formatCurrency(item.revenue)}
+                  </p>
                 </div>
               );
             })}
@@ -205,12 +320,16 @@ export function AnalyticsView({ tenant }: Props) {
 
       <Card>
         <CardHeader>
-          <h3 className="font-semibold text-white light:text-gray-900">Daily Breakdown</h3>
+          <h3 className="font-semibold text-white light:text-gray-900">
+            Daily Breakdown
+          </h3>
         </CardHeader>
         <div className="divide-y divide-slate-700 light:divide-slate-100">
           {analytics.revenueData.map((point) => (
             <div key={point.date} className="px-6 py-3 flex items-center gap-4">
-              <span className="text-sm text-slate-400 w-24 flex-shrink-0">{point.date}</span>
+              <span className="text-sm text-slate-400 w-24 flex-shrink-0">
+                {point.date}
+              </span>
               <div className="flex-1 bg-slate-700 light:bg-slate-200 rounded-full h-2 overflow-hidden">
                 <div
                   className="h-full bg-slate-400 light:bg-slate-600 rounded-full"

@@ -154,7 +154,10 @@ function mapTenant(row: TenantRow): Tenant {
     id: row.id,
     name: businessName,
     slug: row.slug,
-    businessType: row.business_type?.toLowerCase() === "ordering" ? "ordering" : "appointment",
+    businessType:
+      row.business_type?.toLowerCase() === "ordering"
+        ? "ordering"
+        : "appointment",
     logo: row.logo ?? (businessName.charAt(0).toUpperCase() || "B"),
     logoBg: row.logo_bg ?? row.primary_color ?? "#8b5cf6",
     description: row.description ?? "",
@@ -211,8 +214,9 @@ function addTopItem(
 
 async function loadData(tenantId?: string): Promise<AdminPlatformData> {
   const supabase = client();
-  const tenantFilter = <T extends { eq: (column: string, value: string) => T }>(query: T) =>
-    tenantId ? query.eq("tenant_id", tenantId) : query;
+  const tenantFilter = <T extends { eq: (column: string, value: string) => T }>(
+    query: T,
+  ) => (tenantId ? query.eq("tenant_id", tenantId) : query);
 
   const [
     tenantRows,
@@ -224,7 +228,10 @@ async function loadData(tenantId?: string): Promise<AdminPlatformData> {
     roleRows,
   ] = await Promise.all([
     collectPages<TenantRow>(async (from, to) => {
-      let query = supabase.from("tenants").select("*").order("created_at", { ascending: false });
+      let query = supabase
+        .from("tenants")
+        .select("*")
+        .order("created_at", { ascending: false });
       if (tenantId) query = query.eq("id", tenantId);
       const { data, error } = await query.range(from, to);
       return { data: data as TenantRow[] | null, error };
@@ -232,7 +239,9 @@ async function loadData(tenantId?: string): Promise<AdminPlatformData> {
     collectPages<AdminOrderRow>(async (from, to) => {
       let query = supabase
         .from("orders")
-        .select("id, tenant_id, status, total, created_at, order_items(product_name, quantity, subtotal)")
+        .select(
+          "id, tenant_id, status, total, created_at, order_items(product_name, quantity, subtotal)",
+        )
         .order("created_at", { ascending: false });
       query = tenantFilter(query);
       const { data, error } = await query.range(from, to);
@@ -241,16 +250,21 @@ async function loadData(tenantId?: string): Promise<AdminPlatformData> {
     collectPages<AdminAppointmentRow>(async (from, to) => {
       let query = supabase
         .from("appointments")
-        .select("id, tenant_id, status, total, subtotal, created_at, appointment_services(service_name, price)")
+        .select(
+          "id, tenant_id, status, total, subtotal, created_at, appointment_services(service_name, price)",
+        )
         .order("created_at", { ascending: false });
       query = tenantFilter(query);
       const { data, error } = await query.range(from, to);
       return { data: data as unknown as AdminAppointmentRow[] | null, error };
     }),
     collectPages<AdminCustomerRow>(async (from, to) => {
-      let query = supabase.from("customers").select("id, tenant_id").order("created_at", {
-        ascending: false,
-      });
+      let query = supabase
+        .from("customers")
+        .select("id, tenant_id")
+        .order("created_at", {
+          ascending: false,
+        });
       query = tenantFilter(query);
       const { data, error } = await query.range(from, to);
       return { data: data as AdminCustomerRow[] | null, error };
@@ -287,7 +301,8 @@ async function loadData(tenantId?: string): Promise<AdminPlatformData> {
   const monthlyRevenue = new Map<string, number>();
   const monthCutoff = Date.now() - 30 * 86_400_000;
 
-  for (const tenant of tenantRows) analyticsByTenant.set(tenant.id, emptyAnalytics());
+  for (const tenant of tenantRows)
+    analyticsByTenant.set(tenant.id, emptyAnalytics());
 
   for (const customer of customerRows) {
     const analytics = analyticsByTenant.get(customer.tenant_id);
@@ -303,9 +318,15 @@ async function loadData(tenantId?: string): Promise<AdminPlatformData> {
     const orderTotal = Number(order.total) || 0;
     if (recognized) {
       analytics.totalRevenue += orderTotal;
-      recognizedActivity.set(order.tenant_id, (recognizedActivity.get(order.tenant_id) ?? 0) + 1);
+      recognizedActivity.set(
+        order.tenant_id,
+        (recognizedActivity.get(order.tenant_id) ?? 0) + 1,
+      );
       if (new Date(order.created_at).getTime() >= monthCutoff) {
-        monthlyRevenue.set(order.tenant_id, (monthlyRevenue.get(order.tenant_id) ?? 0) + orderTotal);
+        monthlyRevenue.set(
+          order.tenant_id,
+          (monthlyRevenue.get(order.tenant_id) ?? 0) + orderTotal,
+        );
       }
     }
     if (status === "CANCELLED") continue;
@@ -327,7 +348,8 @@ async function loadData(tenantId?: string): Promise<AdminPlatformData> {
     const status = appointment.status.toUpperCase();
     const recognized = status === "COMPLETED";
     const services = appointment.appointment_services ?? [];
-    const appointmentTotal = Number(appointment.total ?? appointment.subtotal) ||
+    const appointmentTotal =
+      Number(appointment.total ?? appointment.subtotal) ||
       services.reduce((sum, service) => sum + (Number(service.price) || 0), 0);
     if (recognized) {
       analytics.totalRevenue += appointmentTotal;
@@ -356,7 +378,9 @@ async function loadData(tenantId?: string): Promise<AdminPlatformData> {
 
   for (const [id, analytics] of analyticsByTenant) {
     const recognizedCount = recognizedActivity.get(id) ?? 0;
-    analytics.avgOrderValue = recognizedCount ? analytics.totalRevenue / recognizedCount : 0;
+    analytics.avgOrderValue = recognizedCount
+      ? analytics.totalRevenue / recognizedCount
+      : 0;
     analytics.topItems = [...(itemsByTenant.get(id)?.values() ?? [])]
       .sort((a, b) => b.count - a.count || b.revenue - a.revenue)
       .slice(0, 5);
@@ -367,7 +391,9 @@ async function loadData(tenantId?: string): Promise<AdminPlatformData> {
     monthlyRevenue: monthlyRevenue.get(row.id) ?? 0,
   }));
   const analyticsRecord = Object.fromEntries(analyticsByTenant);
-  const tenantNameById = new Map(tenants.map((tenant) => [tenant.id, tenant.name]));
+  const tenantNameById = new Map(
+    tenants.map((tenant) => [tenant.id, tenant.name]),
+  );
   const roleById = new Map(roleRows.map((role) => [role.id, role]));
   const membershipsByProfile = new Map<string, AdminMembershipRow[]>();
 
@@ -380,16 +406,20 @@ async function loadData(tenantId?: string): Promise<AdminPlatformData> {
   const agents = profileRows
     .map<AdminAgentRecord>((profile) => {
       const membership = membershipsByProfile.get(profile.id)?.[0];
-      const isSuperAdmin = profile.platform_role?.toUpperCase() === "SUPER_ADMIN";
+      const isSuperAdmin =
+        profile.platform_role?.toUpperCase() === "SUPER_ADMIN";
       const role = membership ? roleById.get(membership.role_id) : undefined;
       return {
         id: profile.id,
-        name: profile.full_name?.trim() || profile.email?.split("@")[0] || "Unnamed user",
+        name:
+          profile.full_name?.trim() ||
+          profile.email?.split("@")[0] ||
+          "Unnamed user",
         email: profile.email ?? "No email",
-        role: isSuperAdmin ? "Super Admin" : role?.name ?? "Unassigned",
+        role: isSuperAdmin ? "Super Admin" : (role?.name ?? "Unassigned"),
         tenantId: membership?.tenant_id ?? null,
         tenantName: membership
-          ? tenantNameById.get(membership.tenant_id) ?? "Unknown tenant"
+          ? (tenantNameById.get(membership.tenant_id) ?? "Unknown tenant")
           : isSuperAdmin
             ? "Platform"
             : "Unassigned",
@@ -416,13 +446,19 @@ async function loadData(tenantId?: string): Promise<AdminPlatformData> {
 
   for (const [key, summary] of roleGroups) {
     const matchingRoles = new Set(
-      roleRows.filter((role) => role.name.trim().toUpperCase() === key).map((role) => role.id),
+      roleRows
+        .filter((role) => role.name.trim().toUpperCase() === key)
+        .map((role) => role.id),
     );
     const matchingMemberships = membershipRows.filter((membership) =>
       matchingRoles.has(membership.role_id),
     );
-    summary.userCount = new Set(matchingMemberships.map((membership) => membership.profile_id)).size;
-    summary.tenantCount = new Set(matchingMemberships.map((membership) => membership.tenant_id)).size;
+    summary.userCount = new Set(
+      matchingMemberships.map((membership) => membership.profile_id),
+    ).size;
+    summary.tenantCount = new Set(
+      matchingMemberships.map((membership) => membership.tenant_id),
+    ).size;
   }
 
   const superAdmins = profileRows.filter(
@@ -464,7 +500,10 @@ async function loadData(tenantId?: string): Promise<AdminPlatformData> {
       const services = appointment.appointment_services ?? [];
       point.revenue +=
         Number(appointment.total ?? appointment.subtotal) ||
-        services.reduce((sum, service) => sum + (Number(service.price) || 0), 0);
+        services.reduce(
+          (sum, service) => sum + (Number(service.price) || 0),
+          0,
+        );
     }
   }
 
@@ -519,11 +558,16 @@ export function loadAdminPlatformData() {
   return loadData();
 }
 
-export async function loadAdminTenantData(tenantId: string): Promise<AdminTenantData | null> {
+export async function loadAdminTenantData(
+  tenantId: string,
+): Promise<AdminTenantData | null> {
   const data = await loadData(tenantId);
   const tenant = data.tenants[0];
   if (!tenant) return null;
-  return { tenant, analytics: data.analyticsByTenant[tenant.id] ?? emptyAnalytics() };
+  return {
+    tenant,
+    analytics: data.analyticsByTenant[tenant.id] ?? emptyAnalytics(),
+  };
 }
 
 export async function updateAdminTenantSubscription(
@@ -532,12 +576,15 @@ export async function updateAdminTenantSubscription(
   status: Tenant["subscriptionStatus"],
   trialDays?: number,
 ) {
-  const response = await fetch(`/api/admin/tenants/${encodeURIComponent(tenantId)}/subscription`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ plan, status, trialDays: trialDays ?? null }),
-  });
-  const payload = await response.json() as {
+  const response = await fetch(
+    `/api/admin/tenants/${encodeURIComponent(tenantId)}/subscription`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ plan, status, trialDays: trialDays ?? null }),
+    },
+  );
+  const payload = (await response.json()) as {
     subscription?: Pick<Tenant, "plan" | "subscriptionStatus" | "trialEndsAt">;
     error?: string;
   };
@@ -576,10 +623,9 @@ export interface CreateAdminTenantResult {
     id: string;
     name: string;
     email: string;
-    temporaryPassword?: string;
   };
-  recoveryUrl?: string | null;
   emailSent?: boolean;
+  createdNewUser?: boolean;
 }
 
 export interface CreateAdminAgentInput {
@@ -602,9 +648,8 @@ export interface CreateAdminAgentResult {
     tenantName: string;
     isActive: boolean;
   };
-  temporaryPassword?: string;
-  recoveryUrl?: string | null;
   emailSent?: boolean;
+  createdNewUser?: boolean;
 }
 
 export async function createAdminTenant(
@@ -615,7 +660,9 @@ export async function createAdminTenant(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   });
-  const data = (await response.json()) as CreateAdminTenantResult & { error?: string };
+  const data = (await response.json()) as CreateAdminTenantResult & {
+    error?: string;
+  };
   if (!response.ok || !data.success) {
     throw new Error(data.error || "Unable to create tenant.");
   }
@@ -630,7 +677,9 @@ export async function createAdminAgent(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   });
-  const data = (await response.json()) as CreateAdminAgentResult & { error?: string };
+  const data = (await response.json()) as CreateAdminAgentResult & {
+    error?: string;
+  };
   if (!response.ok || !data.success) {
     throw new Error(data.error || "Unable to create agent.");
   }

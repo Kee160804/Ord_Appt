@@ -21,13 +21,19 @@ export function PlanFeatureRequired({
         <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-500/15 text-violet-400 light:text-violet-700">
           <LockKeyhole className="h-6 w-6" />
         </div>
-        <h2 className="mt-5 text-xl font-black text-white light:text-slate-950">{title}</h2>
-        <p className="mt-3 text-sm leading-6 text-slate-400 light:text-slate-600">{description}</p>
-        <Link href="/home#pricing" className="mt-6 inline-flex items-center gap-2 rounded-xl bg-violet-600 px-5 py-3 text-xs font-bold text-white hover:bg-violet-500">
+        <h2 className="mt-5 text-xl font-black text-white light:text-slate-950">
+          {title}
+        </h2>
+        <p className="mt-3 text-sm leading-6 text-slate-400 light:text-slate-600">
+          {description}
+        </p>
+        <Link
+          href="/home#pricing"
+          className="mt-6 inline-flex items-center gap-2 rounded-xl bg-violet-600 px-5 py-3 text-xs font-bold text-white hover:bg-violet-500"
+        >
           <Sparkles className="h-4 w-4" /> Available on {requiredPlan.name}
         </Link>
       </div>
     </div>
   );
 }
-

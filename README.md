@@ -1,6 +1,6 @@
-# LocalSpace
+# YuhBusiness
 
-LocalSpace is a multi-tenant platform for appointment-based and ordering-based
+YuhBusiness is a multi-tenant platform for appointment-based and ordering-based
 local businesses. It uses Next.js 16 and Supabase Auth/Postgres with row-level
 security.
 
@@ -79,5 +79,10 @@ unless `NEXT_PUBLIC_ENABLE_DEMO_MODE=true` is explicitly set.
 - Public storefront tenant, category, product, and service reads through RLS.
 - Transactional public appointment booking and ordering checkout.
 - Database-backed dashboard appointments, orders, customers, products, services, and analytics.
+- Recipient-scoped Supabase Realtime in-app notifications with personal read state and tenant-isolated links.
+- Full public ordering checkout for dine-in, pickup, and delivery, including server-authoritative taxes, discounts, fees, minimums, and inventory.
+- Protected public order, booking, promotion, and contact APIs with distributed throttling and abuse controls.
+- Provider-neutral BZD payment and invoice ledger with an explicitly labelled mock gateway for bank-integration testing.
+- Reproducible baseline schema for new Supabase projects.
 
-Payments, storage uploads, and staff management remain future integrations.
+Real-money payments remain disabled until bank sandbox and production credentials are configured. Mock payments never collect card details or move money.

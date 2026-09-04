@@ -7,5 +7,10 @@ import { useAuth } from "@/app/contexts/auth";
 export default function BusinessToolsPage() {
   const { tenant, user } = useAuth();
   if (!tenant || !user || user.role !== "owner") return null;
-  return <><TopBar title="Business Tools" /><BusinessToolsView tenant={tenant} /></>;
+  return (
+    <>
+      <TopBar title="Business Tools" />
+      <BusinessToolsView tenant={tenant} />
+    </>
+  );
 }

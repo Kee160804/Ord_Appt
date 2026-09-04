@@ -68,7 +68,10 @@ function compactHours(hours: BusinessHours[]) {
   });
 }
 
-function socialHref(platform: "facebook" | "instagram" | "twitter", value: string) {
+function socialHref(
+  platform: "facebook" | "instagram" | "twitter",
+  value: string,
+) {
   if (/^https?:\/\//i.test(value)) return value;
   const handle = value.replace(/^@/, "");
   const host = platform === "twitter" ? "x.com" : `${platform}.com`;
@@ -83,13 +86,19 @@ function displayWebsite(value: string) {
   return value.replace(/^https?:\/\//i, "").replace(/\/$/, "");
 }
 
-export function StorefrontContact({ tenant, viewOnly = false }: StorefrontContactProps) {
+export function StorefrontContact({
+  tenant,
+  viewOnly = false,
+}: StorefrontContactProps) {
   const [form, setForm] = useState<ContactFormState>(EMPTY_FORM);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
   const [isSending, setIsSending] = useState(false);
   const canSendMessage = planHasFeature(tenant.plan, "storefront_contact_form");
-  const hours = useMemo(() => compactHours(tenant.businessHours), [tenant.businessHours]);
+  const hours = useMemo(
+    () => compactHours(tenant.businessHours),
+    [tenant.businessHours],
+  );
   const location = [tenant.address, tenant.city].filter(Boolean).join(", ");
   const website = tenant.socialLinks.website || tenant.domain || "";
   const locationHref = location
@@ -117,12 +126,23 @@ export function StorefrontContact({ tenant, viewOnly = false }: StorefrontContac
       setForm(EMPTY_FORM);
       setStatus("Your message was received successfully.");
     } catch (submitError) {
-      const message = submitError instanceof Error ? submitError.message : "Unable to send your message.";
+      const message =
+        submitError instanceof Error
+          ? submitError.message
+          : "Unable to send your message.";
       if (message.includes("not installed yet") && tenant.email) {
-        const subject = form.subject.trim() || `Storefront message from ${form.name.trim()}`;
-        const body = [`Name: ${form.name.trim()}`, `Email: ${form.email.trim()}`, "", form.message.trim()].join("\n");
+        const subject =
+          form.subject.trim() || `Storefront message from ${form.name.trim()}`;
+        const body = [
+          `Name: ${form.name.trim()}`,
+          `Email: ${form.email.trim()}`,
+          "",
+          form.message.trim(),
+        ].join("\n");
         window.location.href = `mailto:${tenant.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-        setStatus("Storefront email is still being deployed, so your email app was opened as a safe fallback.");
+        setStatus(
+          "Storefront email is still being deployed, so your email app was opened as a safe fallback.",
+        );
       } else {
         setError(message);
       }
@@ -172,13 +192,25 @@ export function StorefrontContact({ tenant, viewOnly = false }: StorefrontContac
 
   const socials = [
     tenant.socialLinks.facebook
-      ? { label: "Facebook", href: socialHref("facebook", tenant.socialLinks.facebook), icon: Facebook }
+      ? {
+          label: "Facebook",
+          href: socialHref("facebook", tenant.socialLinks.facebook),
+          icon: Facebook,
+        }
       : null,
     tenant.socialLinks.instagram
-      ? { label: "Instagram", href: socialHref("instagram", tenant.socialLinks.instagram), icon: Instagram }
+      ? {
+          label: "Instagram",
+          href: socialHref("instagram", tenant.socialLinks.instagram),
+          icon: Instagram,
+        }
       : null,
     tenant.socialLinks.twitter
-      ? { label: "X / Twitter", href: socialHref("twitter", tenant.socialLinks.twitter), icon: Twitter }
+      ? {
+          label: "X / Twitter",
+          href: socialHref("twitter", tenant.socialLinks.twitter),
+          icon: Twitter,
+        }
       : null,
   ].filter((social): social is NonNullable<typeof social> => Boolean(social));
 
@@ -193,13 +225,21 @@ export function StorefrontContact({ tenant, viewOnly = false }: StorefrontContac
             <p className="mb-4 text-xs font-black uppercase tracking-[0.2em] text-violet-300">
               Contact {tenant.name}
             </p>
-            <h2 id="contact-heading" className="max-w-xl text-4xl font-black leading-tight tracking-tight sm:text-5xl">
+            <h2
+              id="contact-heading"
+              className="max-w-xl text-4xl font-black leading-tight tracking-tight sm:text-5xl"
+            >
               We&apos;d love to hear from{" "}
-              <span style={{ color: tenant.accentColor || tenant.primaryColor }}>you</span>{" "}
+              <span
+                style={{ color: tenant.accentColor || tenant.primaryColor }}
+              >
+                you
+              </span>{" "}
               <span aria-hidden="true">👋</span>
             </h2>
             <p className="mt-5 max-w-xl text-sm leading-7 text-slate-300 sm:text-base">
-              Have a question, feedback, or need support? Reach out to us — we&apos;re here to help.
+              Have a question, feedback, or need support? Reach out to us —
+              we&apos;re here to help.
             </p>
 
             <div className="mt-9 grid gap-5 sm:grid-cols-3">
@@ -224,7 +264,10 @@ export function StorefrontContact({ tenant, viewOnly = false }: StorefrontContac
             </div>
           </div>
 
-          <div className="relative mx-auto flex min-h-64 w-full max-w-md items-center justify-center" aria-hidden="true">
+          <div
+            className="relative mx-auto flex min-h-64 w-full max-w-md items-center justify-center"
+            aria-hidden="true"
+          >
             <div className="absolute h-56 w-56 rounded-full border border-violet-400/15" />
             <div className="absolute h-40 w-40 rounded-full bg-violet-500/20 blur-2xl" />
             <div className="relative mt-10 h-40 w-56 rounded-b-3xl bg-gradient-to-br from-violet-500 to-violet-700 shadow-[0_30px_80px_rgba(124,58,237,0.4)]">
@@ -241,16 +284,21 @@ export function StorefrontContact({ tenant, viewOnly = false }: StorefrontContac
         </div>
       </div>
 
-      <div className={`grid items-stretch gap-5 ${canSendMessage ? "lg:grid-cols-[1.08fr_0.92fr]" : "lg:grid-cols-1"}`}>
+      <div
+        className={`grid items-stretch gap-5 ${canSendMessage ? "lg:grid-cols-[1.08fr_0.92fr]" : "lg:grid-cols-1"}`}
+      >
         {canSendMessage && (
           <form
             onSubmit={submitMessage}
             className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-8"
           >
             <div className="mb-6">
-              <h3 className="text-xl font-black text-slate-950 dark:text-white">Send us a message</h3>
+              <h3 className="text-xl font-black text-slate-950 dark:text-white">
+                Send us a message
+              </h3>
               <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                Fill out the form below and we&apos;ll get back to you as soon as possible.
+                Fill out the form below and we&apos;ll get back to you as soon
+                as possible.
               </p>
             </div>
 
@@ -259,7 +307,9 @@ export function StorefrontContact({ tenant, viewOnly = false }: StorefrontContac
                 icon={UserRound}
                 label="Your Name"
                 value={form.name}
-                onChange={(value) => setForm((current) => ({ ...current, name: value }))}
+                onChange={(value) =>
+                  setForm((current) => ({ ...current, name: value }))
+                }
                 autoComplete="name"
               />
               <ContactInput
@@ -267,14 +317,18 @@ export function StorefrontContact({ tenant, viewOnly = false }: StorefrontContac
                 label="Email Address"
                 type="email"
                 value={form.email}
-                onChange={(value) => setForm((current) => ({ ...current, email: value }))}
+                onChange={(value) =>
+                  setForm((current) => ({ ...current, email: value }))
+                }
                 autoComplete="email"
               />
               <ContactInput
                 icon={MessageSquareText}
                 label="Subject"
                 value={form.subject}
-                onChange={(value) => setForm((current) => ({ ...current, subject: value }))}
+                onChange={(value) =>
+                  setForm((current) => ({ ...current, subject: value }))
+                }
                 className="sm:col-span-2"
               />
               <label className="relative sm:col-span-2">
@@ -282,7 +336,12 @@ export function StorefrontContact({ tenant, viewOnly = false }: StorefrontContac
                 <MessageSquareText className="pointer-events-none absolute left-4 top-4 h-4 w-4 text-slate-400" />
                 <textarea
                   value={form.message}
-                  onChange={(event) => setForm((current) => ({ ...current, message: event.target.value }))}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      message: event.target.value,
+                    }))
+                  }
                   placeholder="Your Message"
                   rows={7}
                   className="w-full resize-y rounded-xl border border-slate-200 bg-slate-50 py-3.5 pl-11 pr-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-500 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/10 dark:border-slate-700 dark:bg-slate-950/50 dark:text-white dark:placeholder:text-slate-400"
@@ -290,33 +349,49 @@ export function StorefrontContact({ tenant, viewOnly = false }: StorefrontContac
               </label>
             </div>
 
-            {error && <p className="mt-4 text-sm font-medium text-red-500">{error}</p>}
-            {status && <p className="mt-4 text-sm font-medium text-emerald-600 dark:text-emerald-400">{status}</p>}
+            {error && (
+              <p className="mt-4 text-sm font-medium text-red-500">{error}</p>
+            )}
+            {status && (
+              <p className="mt-4 text-sm font-medium text-emerald-600 dark:text-emerald-400">
+                {status}
+              </p>
+            )}
 
             <button
               type="submit"
               disabled={isSending}
               className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl px-5 py-3.5 text-sm font-black text-white shadow-lg transition hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-violet-500/40"
-              style={{ background: `linear-gradient(90deg, ${tenant.primaryColor}, ${tenant.accentColor})` }}
+              style={{
+                background: `linear-gradient(90deg, ${tenant.primaryColor}, ${tenant.accentColor})`,
+              }}
             >
-              <Send className="h-4 w-4" /> {isSending ? "Sending..." : "Send Message"}
+              <Send className="h-4 w-4" />{" "}
+              {isSending ? "Sending..." : "Send Message"}
             </button>
 
             <p className="mt-4 flex items-center justify-center gap-2 text-center text-xs text-slate-400">
-              <LockKeyhole className="h-3.5 w-3.5" /> Your information stays between you and {tenant.name}.
+              <LockKeyhole className="h-3.5 w-3.5" /> Your information stays
+              between you and {tenant.name}.
             </p>
           </form>
         )}
 
-        <div className={`rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-8 ${canSendMessage ? "" : "mx-auto w-full max-w-4xl"}`}>
+        <div
+          className={`rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-8 ${canSendMessage ? "" : "mx-auto w-full max-w-4xl"}`}
+        >
           <div className="mb-6">
-            <h3 className="text-xl font-black text-slate-950 dark:text-white">Contact Information</h3>
+            <h3 className="text-xl font-black text-slate-950 dark:text-white">
+              Contact Information
+            </h3>
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
               You can also reach us directly using the details below.
             </p>
           </div>
 
-          <div className={`grid gap-3 ${canSendMessage ? "" : "md:grid-cols-2"}`}>
+          <div
+            className={`grid gap-3 ${canSendMessage ? "" : "md:grid-cols-2"}`}
+          >
             {infoRows.map((row) => {
               const Icon = row.icon;
               const external = row.href.startsWith("http");
@@ -335,8 +410,12 @@ export function StorefrontContact({ tenant, viewOnly = false }: StorefrontContac
                     <Icon className="h-4 w-4" />
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block text-xs font-bold text-slate-900 dark:text-white">{row.label}</span>
-                    <span className="mt-0.5 block truncate text-xs text-slate-500 dark:text-slate-400">{row.value}</span>
+                    <span className="block text-xs font-bold text-slate-900 dark:text-white">
+                      {row.label}
+                    </span>
+                    <span className="mt-0.5 block truncate text-xs text-slate-500 dark:text-slate-400">
+                      {row.value}
+                    </span>
                   </span>
                   <span className="hidden items-center gap-1 text-xs font-bold text-violet-600 group-hover:text-violet-500 sm:flex">
                     {row.action} <ArrowUpRight className="h-3.5 w-3.5" />
@@ -362,7 +441,9 @@ export function StorefrontContact({ tenant, viewOnly = false }: StorefrontContac
                 </span>
                 <span className="mt-3 rounded-xl border border-white/10 bg-slate-950/90 px-4 py-2 text-center text-xs text-white shadow-xl">
                   <strong className="block">{tenant.name}</strong>
-                  <span className="mt-0.5 block text-slate-300">{location}</span>
+                  <span className="mt-0.5 block text-slate-300">
+                    {location}
+                  </span>
                 </span>
               </span>
             </a>
@@ -372,8 +453,12 @@ export function StorefrontContact({ tenant, viewOnly = false }: StorefrontContac
 
       <div className="grid gap-5 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 md:grid-cols-[1fr_auto_1fr] md:items-center sm:p-7">
         <div>
-          <h3 className="font-black text-slate-950 dark:text-white">Other ways to connect</h3>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Follow us on social media or visit us in person.</p>
+          <h3 className="font-black text-slate-950 dark:text-white">
+            Other ways to connect
+          </h3>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+            Follow us on social media or visit us in person.
+          </p>
         </div>
 
         <div className="flex items-center gap-3 md:border-x md:border-slate-200 md:px-8 dark:md:border-slate-700">
@@ -392,25 +477,40 @@ export function StorefrontContact({ tenant, viewOnly = false }: StorefrontContac
               </a>
             );
           })}
-          {socials.length === 0 && <span className="text-xs text-slate-400">Social links coming soon</span>}
+          {socials.length === 0 && (
+            <span className="text-xs text-slate-400">
+              Social links coming soon
+            </span>
+          )}
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 sm:items-center">
           {location && (
-            <a href={locationHref} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 group">
+            <a
+              href={locationHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-3 group"
+            >
               <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/15 text-violet-600 dark:text-violet-300">
                 <Store className="h-4 w-4" />
               </span>
               <span>
-                <strong className="block text-sm text-slate-900 group-hover:text-violet-600 dark:text-white">Visit our store</strong>
-                <span className="text-xs text-slate-500 dark:text-slate-400">Come by and say hello!</span>
+                <strong className="block text-sm text-slate-900 group-hover:text-violet-600 dark:text-white">
+                  Visit our store
+                </strong>
+                <span className="text-xs text-slate-500 dark:text-slate-400">
+                  Come by and say hello!
+                </span>
               </span>
             </a>
           )}
           <div className="space-y-1 text-xs text-slate-600 dark:text-slate-300">
-            {(hours.length ? hours : ["Hours available on request"]).slice(0, 3).map((line) => (
-              <p key={line}>{line}</p>
-            ))}
+            {(hours.length ? hours : ["Hours available on request"])
+              .slice(0, 3)
+              .map((line) => (
+                <p key={line}>{line}</p>
+              ))}
           </div>
         </div>
       </div>
@@ -431,12 +531,17 @@ function ContactHighlight({
 }) {
   return (
     <div className="flex items-start gap-3 sm:border-r sm:border-white/10 sm:pr-4 sm:last:border-r-0">
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white" style={{ backgroundColor: color }}>
+      <span
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white"
+        style={{ backgroundColor: color }}
+      >
         <Icon className="h-4 w-4" />
       </span>
       <span>
         <strong className="block text-xs font-black text-white">{title}</strong>
-        <span className="mt-1 block text-xs leading-5 text-slate-300">{description}</span>
+        <span className="mt-1 block text-xs leading-5 text-slate-300">
+          {description}
+        </span>
       </span>
     </div>
   );

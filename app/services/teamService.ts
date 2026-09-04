@@ -72,10 +72,15 @@ function client() {
   return supabase;
 }
 
-function rpcError(error: { code?: string; message: string } | null, fallback: string) {
+function rpcError(
+  error: { code?: string; message: string } | null,
+  fallback: string,
+) {
   if (!error) return;
   if (error.code === "PGRST202") {
-    throw new Error("Team & Access is not installed yet. Apply the business team migration in Supabase.");
+    throw new Error(
+      "Team & Access is not installed yet. Apply the business team migration in Supabase.",
+    );
   }
   throw new Error(error.message || fallback);
 }
@@ -122,7 +127,11 @@ export async function createBusinessTeamInvitation(
     const response = await fetch("/api/email/team-invitation", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tenantId, invitationId: invitation.id, token: invitation.token }),
+      body: JSON.stringify({
+        tenantId,
+        invitationId: invitation.id,
+        token: invitation.token,
+      }),
     });
     invitation.emailSent = response.ok;
   } catch {
@@ -144,7 +153,10 @@ export async function changeBusinessTeamRole(
   rpcError(error, "Unable to update this team member.");
 }
 
-export async function removeBusinessTeamMember(tenantId: string, membershipId: string) {
+export async function removeBusinessTeamMember(
+  tenantId: string,
+  membershipId: string,
+) {
   const { error } = await client().rpc("deactivate_team_member", {
     p_tenant_id: tenantId,
     p_membership_id: membershipId,
@@ -152,7 +164,10 @@ export async function removeBusinessTeamMember(tenantId: string, membershipId: s
   rpcError(error, "Unable to remove this team member.");
 }
 
-export async function revokeBusinessTeamInvitation(tenantId: string, invitationId: string) {
+export async function revokeBusinessTeamInvitation(
+  tenantId: string,
+  invitationId: string,
+) {
   const { error } = await client().rpc("revoke_team_invitation", {
     p_tenant_id: tenantId,
     p_invitation_id: invitationId,
@@ -160,7 +175,10 @@ export async function revokeBusinessTeamInvitation(tenantId: string, invitationI
   rpcError(error, "Unable to revoke this invitation.");
 }
 
-export async function acceptBusinessTeamInvitation(token: string, fullName = "") {
+export async function acceptBusinessTeamInvitation(
+  token: string,
+  fullName = "",
+) {
   const { data, error } = await client().rpc("accept_team_invitation", {
     p_token: token,
     p_full_name: fullName.trim(),
@@ -169,7 +187,10 @@ export async function acceptBusinessTeamInvitation(token: string, fullName = "")
   return data as string;
 }
 
-export async function requestPaidStaffSeats(tenantId: string, requestedPaidSeats: number) {
+export async function requestPaidStaffSeats(
+  tenantId: string,
+  requestedPaidSeats: number,
+) {
   const { error } = await client().rpc("request_tenant_paid_staff_seats", {
     p_tenant_id: tenantId,
     p_requested_paid_seats: requestedPaidSeats,
@@ -205,10 +226,13 @@ export async function rejectAdminPaidStaffSeatRequest(
   requestId: string,
   reviewNote: string,
 ) {
-  const { error } = await client().rpc("reject_tenant_paid_staff_seat_request", {
-    p_tenant_id: tenantId,
-    p_request_id: requestId,
-    p_review_note: reviewNote.trim(),
-  });
+  const { error } = await client().rpc(
+    "reject_tenant_paid_staff_seat_request",
+    {
+      p_tenant_id: tenantId,
+      p_request_id: requestId,
+      p_review_note: reviewNote.trim(),
+    },
+  );
   rpcError(error, "Unable to reject this paid-seat request.");
 }

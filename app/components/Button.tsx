@@ -1,18 +1,21 @@
-
-
 import { cn } from "../lib/utils";
 import { ButtonHTMLAttributes } from "react";
 
-type Variant = "primary" | "secondary" | "ghost" | "danger" | "outline" | "success";
-type Size    = "xs" | "sm" | "md" | "lg";
+type Variant =
+  "primary" | "secondary" | "ghost" | "danger" | "outline" | "success";
+type Size = "xs" | "sm" | "md" | "lg";
 
 const variantCls: Record<Variant, string> = {
-  primary:   "bg-violet-600 text-white hover:bg-violet-700 shadow-sm shadow-violet-900/20",
-  secondary: "bg-slate-700 light:bg-slate-100 text-slate-100 light:text-slate-700 hover:bg-slate-600 light:hover:bg-slate-200",
-  ghost:     "text-slate-400 light:text-slate-500 hover:bg-slate-800 light:hover:bg-slate-100 hover:text-slate-100 light:hover:text-slate-900",
-  danger:    "bg-red-600 text-white hover:bg-red-500",
-  outline:   "border border-slate-600 light:border-slate-300 text-slate-300 light:text-slate-700 hover:bg-slate-800 light:hover:bg-slate-50 hover:text-white light:hover:text-slate-900",
-  success:   "bg-emerald-600 text-white hover:bg-emerald-500",
+  primary:
+    "bg-violet-600 text-white hover:bg-violet-700 shadow-sm shadow-violet-900/20",
+  secondary:
+    "bg-slate-700 light:bg-slate-100 text-slate-100 light:text-slate-700 hover:bg-slate-600 light:hover:bg-slate-200",
+  ghost:
+    "text-slate-400 light:text-slate-500 hover:bg-slate-800 light:hover:bg-slate-100 hover:text-slate-100 light:hover:text-slate-900",
+  danger: "bg-red-600 text-white hover:bg-red-500",
+  outline:
+    "border border-slate-600 light:border-slate-300 text-slate-300 light:text-slate-700 hover:bg-slate-800 light:hover:bg-slate-50 hover:text-white light:hover:text-slate-900",
+  success: "bg-emerald-600 text-white hover:bg-emerald-500",
 };
 
 const sizeCls: Record<Size, string> = {

@@ -32,7 +32,10 @@ function parseStoredData<T>(key: string): T | null {
 }
 
 export function getStoredUserRecords(): StoredUserRecord[] {
-  const stored = parseStoredData<(StoredUserRecord & { password?: string })[]>(STORED_USERS_KEY) ?? [];
+  const stored =
+    parseStoredData<(StoredUserRecord & { password?: string })[]>(
+      STORED_USERS_KEY,
+    ) ?? [];
   const sanitized = stored.map((user) => {
     const sanitizedUser = { ...user };
     delete sanitizedUser.password;
@@ -100,12 +103,18 @@ export function getTenantBySlug(slug: string): Tenant | undefined {
 
 export function findUserRecordByEmail(email: string): StoredUserRecord | null {
   const normalized = email.trim().toLowerCase();
-  return getStoredUserRecords().find((user) => user.email.toLowerCase() === normalized) ?? null;
+  return (
+    getStoredUserRecords().find(
+      (user) => user.email.toLowerCase() === normalized,
+    ) ?? null
+  );
 }
 
 export function getUserByEmail(email: string): User | null {
   const normalized = email.trim().toLowerCase();
-  const stored = getStoredUserRecords().find((user) => user.email.toLowerCase() === normalized);
+  const stored = getStoredUserRecords().find(
+    (user) => user.email.toLowerCase() === normalized,
+  );
   if (stored) {
     return {
       id: stored.id,
@@ -118,9 +127,13 @@ export function getUserByEmail(email: string): User | null {
       lastLogin: stored.lastLogin,
     };
   }
-  const demoAccount = demoAccounts.find((account) => account.email.toLowerCase() === normalized);
+  const demoAccount = demoAccounts.find(
+    (account) => account.email.toLowerCase() === normalized,
+  );
   if (!demoAccount) return null;
-  const existingUser = mockUsers.find((user) => user.email.toLowerCase() === normalized);
+  const existingUser = mockUsers.find(
+    (user) => user.email.toLowerCase() === normalized,
+  );
   if (existingUser) return existingUser;
   return {
     id: demoAccount.email,
@@ -136,7 +149,9 @@ export function getUserByEmail(email: string): User | null {
 
 export function getUserById(id: string): User | null {
   const normalized = id.trim().toLowerCase();
-  const stored = getStoredUserRecords().find((user) => user.id.toLowerCase() === normalized);
+  const stored = getStoredUserRecords().find(
+    (user) => user.id.toLowerCase() === normalized,
+  );
   if (stored) {
     return {
       id: stored.id,

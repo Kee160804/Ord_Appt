@@ -33,9 +33,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const frame = window.requestAnimationFrame(() => {
       setThemeState(getBrowserTheme());
 
-      const savedDemoTheme = localStorage.getItem(DEMO_THEME_KEY) as Theme | null;
+      const savedDemoTheme = localStorage.getItem(
+        DEMO_THEME_KEY,
+      ) as Theme | null;
       setDemoThemeState(
-        savedDemoTheme === "light" || savedDemoTheme === "dark" ? savedDemoTheme : "dark",
+        savedDemoTheme === "light" || savedDemoTheme === "dark"
+          ? savedDemoTheme
+          : "dark",
       );
       setHasHydrated(true);
     });
@@ -75,8 +79,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem(DEMO_THEME_KEY, demoTheme);
   }, [demoTheme, hasHydrated]);
 
-  const toggleTheme = () => setThemeState((prev) => (prev === "dark" ? "light" : "dark"));
-  const toggleDemoTheme = () => setDemoThemeState((prev) => (prev === "dark" ? "light" : "dark"));
+  const toggleTheme = () =>
+    setThemeState((prev) => (prev === "dark" ? "light" : "dark"));
+  const toggleDemoTheme = () =>
+    setDemoThemeState((prev) => (prev === "dark" ? "light" : "dark"));
   const setTheme = (newTheme: Theme) => setThemeState(newTheme);
   const setDemoTheme = (newTheme: Theme) => setDemoThemeState(newTheme);
 

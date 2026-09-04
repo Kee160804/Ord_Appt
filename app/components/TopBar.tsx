@@ -28,7 +28,10 @@ export function TopBar({ title, action }: TopBarProps) {
       { terms: ["dashboard", "overview", "home"], href: "/dashboard" },
       ...(tenant?.businessType === "appointment"
         ? [
-            { terms: ["appointment", "appointments", "booking", "bookings"], href: "/dashboard/appointments" },
+            {
+              terms: ["appointment", "appointments", "booking", "bookings"],
+              href: "/dashboard/appointments",
+            },
             { terms: ["service", "services"], href: "/dashboard/services" },
           ]
         : [
@@ -36,12 +39,32 @@ export function TopBar({ title, action }: TopBarProps) {
             { terms: ["product", "products"], href: "/dashboard/products" },
           ]),
       { terms: ["customer", "customers"], href: "/dashboard/customers" },
-      { terms: ["analytics", "reports", "report"], href: "/dashboard/analytics" },
-      { terms: ["settings", "business", "storefront", "hours"], href: "/dashboard/settings" },
-      { terms: ["tools", "providers", "team", "departments", "promotions", "discounts", "reminders", "qr"], href: "/dashboard/tools" },
+      {
+        terms: ["analytics", "reports", "report"],
+        href: "/dashboard/analytics",
+      },
+      {
+        terms: ["settings", "business", "storefront", "hours"],
+        href: "/dashboard/settings",
+      },
+      {
+        terms: [
+          "tools",
+          "providers",
+          "team",
+          "departments",
+          "promotions",
+          "discounts",
+          "reminders",
+          "qr",
+        ],
+        href: "/dashboard/tools",
+      },
     ];
     const destination = destinations.find((candidate) =>
-      candidate.terms.some((term) => term.includes(query) || query.includes(term)),
+      candidate.terms.some(
+        (term) => term.includes(query) || query.includes(term),
+      ),
     );
     if (destination) {
       setSearchMessage("");
@@ -49,21 +72,27 @@ export function TopBar({ title, action }: TopBarProps) {
       router.push(destination.href);
       return;
     }
-    setSearchMessage("Try appointments, services, customers, analytics, or settings.");
+    setSearchMessage(
+      "Try appointments, services, customers, analytics, or settings.",
+    );
   };
 
   return (
     <header className="sticky top-0 z-20 flex min-h-14 flex-shrink-0 items-center justify-between gap-2 border-b border-slate-700/60 bg-[#0b1424]/95 px-2 py-2 backdrop-blur light:border-[#e7ebf2] light:bg-white/95 sm:px-4 md:px-5">
       <div className="flex min-w-0 items-center gap-1.5 sm:gap-3">
         <button
-          onClick={() => window.dispatchEvent(new Event("dashboard-sidebar-toggle"))}
+          onClick={() =>
+            window.dispatchEvent(new Event("dashboard-sidebar-toggle"))
+          }
           aria-label="Toggle sidebar"
           title="Toggle sidebar"
           className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-800 light:hover:bg-slate-100 hover:text-white light:hover:text-slate-900 sm:h-10 sm:w-10"
         >
           <Menu className="h-4 w-4" />
         </button>
-        <h1 className="max-w-[30vw] truncate text-sm font-bold text-white light:text-[#111b31] sm:max-w-none">{title}</h1>
+        <h1 className="max-w-[30vw] truncate text-sm font-bold text-white light:text-[#111b31] sm:max-w-none">
+          {title}
+        </h1>
       </div>
 
       <div className="flex flex-shrink-0 items-center gap-0.5 sm:gap-2">
@@ -107,7 +136,16 @@ export function TopBar({ title, action }: TopBarProps) {
           className="ml-1 hidden h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-amber-200 to-violet-300 text-[9px] font-bold text-slate-800 ring-2 ring-white/10 light:ring-slate-100 sm:flex"
           title={user?.name ?? "Account"}
         >
-          {user?.avatar || (user?.name ? user.name.split(" ").filter(Boolean).map((part) => part[0]).join("").slice(0, 2).toUpperCase() : "KM")}
+          {user?.avatar ||
+            (user?.name
+              ? user.name
+                  .split(" ")
+                  .filter(Boolean)
+                  .map((part) => part[0])
+                  .join("")
+                  .slice(0, 2)
+                  .toUpperCase()
+              : "KM")}
         </div>
 
         {action && (

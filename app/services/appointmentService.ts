@@ -1,6 +1,9 @@
 import { getSupabaseBrowserClient } from "@/app/lib/supabase/client";
 import type { Appointment, AppointmentStatus } from "@/app/types/index";
-import type { AppointmentRow, AppointmentServiceRow } from "@/app/types/supabase";
+import type {
+  AppointmentRow,
+  AppointmentServiceRow,
+} from "@/app/types/supabase";
 
 export interface AppointmentEmailDelivery {
   status: "PENDING" | "PROCESSING" | "SENT" | "FAILED";
@@ -31,7 +34,9 @@ function normalizeStatus(value: string): AppointmentStatus {
 }
 
 function firstService(row: AppointmentRow): AppointmentServiceRow | null {
-  return Array.isArray(row.appointment_services) ? row.appointment_services[0] ?? null : null;
+  return Array.isArray(row.appointment_services)
+    ? (row.appointment_services[0] ?? null)
+    : null;
 }
 
 function providerName(row: AppointmentRow) {
@@ -42,7 +47,8 @@ function providerName(row: AppointmentRow) {
 function durationFromTimes(row: AppointmentRow) {
   if (!row.starts_at || !row.ends_at) return 30;
   const duration = Math.round(
-    (new Date(row.ends_at).getTime() - new Date(row.starts_at).getTime()) / 60_000,
+    (new Date(row.ends_at).getTime() - new Date(row.starts_at).getTime()) /
+      60_000,
   );
   return duration > 0 ? duration : 30;
 }
@@ -50,7 +56,8 @@ function durationFromTimes(row: AppointmentRow) {
 function mapAppointment(row: AppointmentRow): Appointment {
   const service = firstService(row);
   const date = row.appointment_date ?? row.starts_at?.slice(0, 10) ?? "";
-  const time = row.appointment_time?.slice(0, 5) ?? row.starts_at?.slice(11, 16) ?? "";
+  const time =
+    row.appointment_time?.slice(0, 5) ?? row.starts_at?.slice(11, 16) ?? "";
 
   return {
     id: row.id,
@@ -74,20 +81,43 @@ function mapAppointment(row: AppointmentRow): Appointment {
   };
 }
 
-export async function listAppointments(tenantId: string): Promise<Appointment[]> {
+export async function listAppointments(
+  tenantId: string,
+  page = 0,
+  pageSize = 250,
+): Promise<Appointment[]> {
   const supabase = client();
+  const safePage = Math.max(0, Math.floor(page));
+  const safePageSize = Math.min(500, Math.max(1, Math.floor(pageSize)));
+  const from = safePage * safePageSize;
   const enhanced = await supabase
     .from("appointments")
-    .select("*, appointment_services(service_id, service_name, price, duration_minutes), staff(display_name)")
+    .select(
+      "*, appointment_services(service_id, service_name, price, duration_minutes), staff(display_name)",
+    )
     .eq("tenant_id", tenantId)
-    .order("starts_at", { ascending: true });
-  if (!enhanced.error) return ((enhanced.data ?? []) as AppointmentRow[]).map(mapAppointment);
+    .order("starts_at", { ascending: false })
+    .range(from, from + safePageSize - 1);
+  if (!enhanced.error)
+    return ((enhanced.data ?? []) as AppointmentRow[]).map(mapAppointment);
 
   // Keep appointments usable during a rolling deployment before the provider
   // migration reaches Supabase. Unrelated database errors still surface.
   const message = enhanced.error.message.toLowerCase();
-  if (!message.includes("display_name") && !message.includes("relationship") && !message.includes("schema cache")) throw enhanced.error;
-  const fallback = await supabase.from("appointments").select("*, appointment_services(service_id, service_name, price, duration_minutes)").eq("tenant_id", tenantId).order("starts_at", { ascending: true });
+  if (
+    !message.includes("display_name") &&
+    !message.includes("relationship") &&
+    !message.includes("schema cache")
+  )
+    throw enhanced.error;
+  const fallback = await supabase
+    .from("appointments")
+    .select(
+      "*, appointment_services(service_id, service_name, price, duration_minutes)",
+    )
+    .eq("tenant_id", tenantId)
+    .order("starts_at", { ascending: false })
+    .range(from, from + safePageSize - 1);
   if (fallback.error) throw fallback.error;
   return ((fallback.data ?? []) as AppointmentRow[]).map(mapAppointment);
 }
@@ -112,7 +142,9 @@ function availabilityError(error: unknown) {
   ) {
     return new Error(error.message);
   }
-  return error instanceof Error ? error : new Error("Unable to load available times.");
+  return error instanceof Error
+    ? error
+    : new Error("Unable to load available times.");
 }
 
 export async function listPublicAppointmentAvailability(
@@ -121,12 +153,17 @@ export async function listPublicAppointmentAvailability(
   date: string,
   providerId?: string,
 ): Promise<string[]> {
-  const { data, error } = await client().rpc(providerId ? "get_public_provider_availability" : "get_public_appointment_availability", {
-    p_tenant_id: tenantId,
-    p_service_id: serviceId,
-    p_appointment_date: date,
-    ...(providerId ? { p_staff_id: providerId } : {}),
-  });
+  const { data, error } = await client().rpc(
+    providerId
+      ? "get_public_provider_availability"
+      : "get_public_appointment_availability",
+    {
+      p_tenant_id: tenantId,
+      p_service_id: serviceId,
+      p_appointment_date: date,
+      ...(providerId ? { p_staff_id: providerId } : {}),
+    },
+  );
   if (error) throw availabilityError(error);
   return ((data ?? []) as { appointment_time: string }[]).map((slot) =>
     slot.appointment_time.slice(0, 5),
@@ -154,12 +191,23 @@ export async function setAppointmentStatus(
   if (error) throw error;
 }
 
-export async function assignAppointmentProvider(tenantId: string, appointmentId: string, providerId?: string) {
-  const { error } = await client().rpc("assign_appointment_provider", { p_tenant_id: tenantId, p_appointment_id: appointmentId, p_provider_id: providerId || null });
+export async function assignAppointmentProvider(
+  tenantId: string,
+  appointmentId: string,
+  providerId?: string,
+) {
+  const { error } = await client().rpc("assign_appointment_provider", {
+    p_tenant_id: tenantId,
+    p_appointment_id: appointmentId,
+    p_provider_id: providerId || null,
+  });
   if (error) throw error;
 }
 
-export async function deleteAppointment(tenantId: string, appointmentId: string) {
+export async function deleteAppointment(
+  tenantId: string,
+  appointmentId: string,
+) {
   const { error } = await client()
     .from("appointments")
     .delete()

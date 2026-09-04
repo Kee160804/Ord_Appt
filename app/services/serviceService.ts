@@ -32,7 +32,8 @@ function mapService(row: ServiceRow): Service {
     category: row.category ?? "Services",
     isActive: row.available,
     requiresDeposit: row.requires_deposit ?? false,
-    depositAmount: row.deposit_amount == null ? undefined : Number(row.deposit_amount),
+    depositAmount:
+      row.deposit_amount == null ? undefined : Number(row.deposit_amount),
     depositType: row.deposit_type ?? undefined,
     createdAt: row.created_at,
     departmentId: row.department_id ?? undefined,
@@ -50,8 +51,8 @@ function serviceValues(tenantId: string, input: ServiceInput) {
     category: input.category.trim() || "Services",
     available: true,
     requires_deposit: input.requiresDeposit,
-    deposit_type: input.requiresDeposit ? input.depositType ?? "fixed" : null,
-    deposit_amount: input.requiresDeposit ? input.depositAmount ?? 0 : null,
+    deposit_type: input.requiresDeposit ? (input.depositType ?? "fixed") : null,
+    deposit_amount: input.requiresDeposit ? (input.depositAmount ?? 0) : null,
   };
 }
 
@@ -66,7 +67,10 @@ export async function listServices(tenantId: string): Promise<Service[]> {
   return ((data ?? []) as ServiceRow[]).map(mapService);
 }
 
-export async function createService(tenantId: string, input: ServiceInput): Promise<Service> {
+export async function createService(
+  tenantId: string,
+  input: ServiceInput,
+): Promise<Service> {
   const { data, error } = await client()
     .from("services")
     .insert(serviceValues(tenantId, input))

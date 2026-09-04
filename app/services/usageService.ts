@@ -26,7 +26,9 @@ function normalizePlan(value: string): PlanType {
   return value === "pro" || value === "enterprise" ? value : "starter";
 }
 
-export async function getTenantMonthlyUsage(tenantId: string): Promise<MonthlyUsage> {
+export async function getTenantMonthlyUsage(
+  tenantId: string,
+): Promise<MonthlyUsage> {
   const supabase = getSupabaseBrowserClient();
   if (!supabase) throw new Error("Supabase is not configured.");
 
@@ -43,11 +45,11 @@ export async function getTenantMonthlyUsage(tenantId: string): Promise<MonthlyUs
   return {
     plan,
     activityCount: Number(row.activity_count) || 0,
-    activityLimit: row.activity_limit == null ? fallbackLimit : Number(row.activity_limit),
+    activityLimit:
+      row.activity_limit == null ? fallbackLimit : Number(row.activity_limit),
     periodStart: row.period_start,
     periodEnd: row.period_end,
     usagePercent: Math.max(0, Number(row.usage_percent) || 0),
     isLimitReached: Boolean(row.is_limit_reached),
   };
 }
-

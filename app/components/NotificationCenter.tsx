@@ -14,16 +14,19 @@ import {
   ShoppingBag,
   Sparkles,
   Tag,
+  Users,
   X,
 } from "lucide-react";
 import { getSupabaseBrowserClient } from "@/app/lib/supabase/client";
 import { isSupabaseConfigured } from "@/app/lib/supabase/config";
 import {
   deleteNotification,
-  listNotifications,
+  getNotificationSnapshot,
+  mapNotificationRow,
   markAllNotificationsRead,
   markNotificationRead,
   type BusinessNotification,
+  type NotificationRow,
   type NotificationType,
 } from "@/app/services/notificationService";
 import { useAuth } from "@/app/contexts/auth";
@@ -89,6 +92,12 @@ function getNotificationIcon(type: NotificationType) {
           <RotateCcw className="h-4 w-4" />
         </div>
       );
+    case "CUSTOMER":
+      return (
+        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-cyan-500/15 text-cyan-400 light:bg-cyan-50 light:text-cyan-700">
+          <Users className="h-4 w-4" />
+        </div>
+      );
     case "LOW_INVENTORY":
       return (
         <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-amber-500/15 text-amber-400 light:bg-amber-50 light:text-amber-600">
@@ -96,6 +105,7 @@ function getNotificationIcon(type: NotificationType) {
         </div>
       );
     case "SUBSCRIPTION":
+    case "TRIAL":
       return (
         <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-violet-500/15 text-violet-400 light:bg-violet-50 light:text-violet-600">
           <CreditCard className="h-4 w-4" />
@@ -125,20 +135,30 @@ export function NotificationCenter({
   const { user, tenant } = useAuth();
   const tenantId = propTenantId ?? tenant?.id;
   const userId = propUserId ?? user?.id;
+  const scopeKey = `${tenantId ?? ""}:${userId ?? ""}`;
 
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<BusinessNotification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [error, setError] = useState("");
   const [isMarkingAll, setIsMarkingAll] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const locallyReadIdsRef = useRef(new Set<string>());
+  const locallyDeletedIdsRef = useRef(new Set<string>());
+  const activeScopeRef = useRef(scopeKey);
+  activeScopeRef.current = scopeKey;
 
   const refresh = useCallback(async () => {
-    if (!tenantId || !isSupabaseConfigured()) return;
+    if (!tenantId || !userId || !isSupabaseConfigured()) return;
+    const requestedScope = `${tenantId}:${userId}`;
     try {
-      const data = await listNotifications(tenantId, userId);
-      setItems(data);
+      const snapshot = await getNotificationSnapshot(tenantId, userId);
+      if (activeScopeRef.current !== requestedScope) return;
+      setItems(snapshot.items);
+      setUnreadCount(snapshot.unreadCount);
       setError("");
     } catch (loadError) {
+      if (activeScopeRef.current !== requestedScope) return;
       setError(
         loadError instanceof Error
           ? loadError.message
@@ -147,24 +167,96 @@ export function NotificationCenter({
     }
   }, [tenantId, userId]);
 
+  useEffect(() => {
+    setItems([]);
+    setUnreadCount(0);
+    setError("");
+    locallyReadIdsRef.current.clear();
+    locallyDeletedIdsRef.current.clear();
+  }, [scopeKey]);
+
   // Initial load and real-time subscription
   useEffect(() => {
     const initialLoad = window.setTimeout(() => void refresh(), 0);
     const supabase = getSupabaseBrowserClient();
-    if (!supabase || !tenantId) return () => window.clearTimeout(initialLoad);
+    if (!supabase || !tenantId || !userId) {
+      return () => window.clearTimeout(initialLoad);
+    }
 
     const channel = supabase
-      .channel(`business-notifications-${tenantId}`)
+      .channel(`business-notifications-${tenantId}-${userId}`)
       .on(
         "postgres_changes",
         {
           event: "*",
           schema: "public",
           table: "business_notifications",
-          filter: `tenant_id=eq.${tenantId}`,
+          filter: `recipient_id=eq.${userId}`,
         },
-        () => {
-          void refresh();
+        (payload) => {
+          const eventType = payload.eventType;
+          const next = payload.new as NotificationRow;
+          const previous = payload.old as NotificationRow;
+          const row = eventType === "DELETE" ? previous : next;
+
+          // Realtime is recipient-filtered and RLS-protected. This final tenant
+          // check also prevents a multi-business session from mixing rows.
+          if (
+            eventType === "DELETE" &&
+            (!row?.tenant_id || !row?.recipient_id)
+          ) {
+            void refresh();
+            return;
+          }
+          if (
+            !row ||
+            row.tenant_id !== tenantId ||
+            row.recipient_id !== userId
+          ) {
+            return;
+          }
+
+          if (eventType === "INSERT") {
+            const notification = mapNotificationRow(next);
+            setItems((current) =>
+              [
+                notification,
+                ...current.filter((item) => item.id !== notification.id),
+              ].slice(0, 50),
+            );
+            if (!notification.isRead) {
+              setUnreadCount((current) => current + 1);
+            }
+            return;
+          }
+
+          if (eventType === "UPDATE") {
+            const notification = mapNotificationRow(next);
+            setItems((current) =>
+              current.map((item) =>
+                item.id === notification.id ? notification : item,
+              ),
+            );
+            const wasAppliedLocally = locallyReadIdsRef.current.delete(next.id);
+            if (!wasAppliedLocally && previous.is_read !== next.is_read) {
+              setUnreadCount((current) =>
+                Math.max(0, current + (next.is_read ? -1 : 1)),
+              );
+            }
+            return;
+          }
+
+          if (eventType === "DELETE") {
+            setItems((current) =>
+              current.filter((item) => item.id !== previous.id),
+            );
+            const wasAppliedLocally = locallyDeletedIdsRef.current.delete(
+              previous.id,
+            );
+            if (!wasAppliedLocally && !previous.is_read) {
+              setUnreadCount((current) => Math.max(0, current - 1));
+            }
+          }
         },
       )
       .subscribe();
@@ -173,7 +265,7 @@ export function NotificationCenter({
       window.clearTimeout(initialLoad);
       void supabase.removeChannel(channel);
     };
-  }, [refresh, tenantId]);
+  }, [refresh, tenantId, userId]);
 
   // Handle outside click and Escape key to close
   useEffect(() => {
@@ -205,18 +297,29 @@ export function NotificationCenter({
     };
   }, [open]);
 
-  const unreadCount = items.filter((item) => !item.isRead).length;
-
   const handleMarkAllRead = async () => {
-    if (!tenantId || unreadCount === 0 || isMarkingAll) return;
+    if (!tenantId || !userId || unreadCount === 0 || isMarkingAll) return;
     setIsMarkingAll(true);
+    const unreadIds = items
+      .filter((item) => !item.isRead)
+      .map((item) => item.id);
+    unreadIds.forEach((id) => locallyReadIdsRef.current.add(id));
     try {
-      await markAllNotificationsRead(tenantId);
-      setItems((current) =>
-        current.map((item) => ({ ...item, isRead: true })),
-      );
+      await markAllNotificationsRead(tenantId, userId);
+      setItems((current) => current.map((item) => ({ ...item, isRead: true })));
+      setUnreadCount(0);
+      setError("");
+      window.setTimeout(() => {
+        unreadIds.forEach((id) => locallyReadIdsRef.current.delete(id));
+      }, 15_000);
     } catch (err) {
-      console.error("Failed to mark all read:", err);
+      unreadIds.forEach((id) => locallyReadIdsRef.current.delete(id));
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to mark notifications as read.",
+      );
+      void refresh();
     } finally {
       setIsMarkingAll(false);
     }
@@ -224,13 +327,25 @@ export function NotificationCenter({
 
   const handleNotificationClick = (item: BusinessNotification) => {
     setOpen(false);
-    if (!item.isRead && tenantId) {
+    if (!item.isRead && tenantId && userId) {
+      locallyReadIdsRef.current.add(item.id);
       setItems((current) =>
         current.map((entry) =>
           entry.id === item.id ? { ...entry, isRead: true } : entry,
         ),
       );
-      void markNotificationRead(tenantId, item.id);
+      setUnreadCount((current) => Math.max(0, current - 1));
+      void markNotificationRead(tenantId, userId, item.id)
+        .then(() =>
+          window.setTimeout(
+            () => locallyReadIdsRef.current.delete(item.id),
+            15_000,
+          ),
+        )
+        .catch(() => {
+          locallyReadIdsRef.current.delete(item.id);
+          void refresh();
+        });
     }
     if (item.href) {
       router.push(item.href);
@@ -242,13 +357,28 @@ export function NotificationCenter({
     notificationId: string,
   ) => {
     event.stopPropagation();
-    if (!tenantId) return;
+    if (!tenantId || !userId) return;
 
+    const removed = items.find((item) => item.id === notificationId);
+    locallyDeletedIdsRef.current.add(notificationId);
     setItems((current) => current.filter((item) => item.id !== notificationId));
+    if (removed && !removed.isRead) {
+      setUnreadCount((current) => Math.max(0, current - 1));
+    }
     try {
-      await deleteNotification(tenantId, notificationId);
+      await deleteNotification(tenantId, userId, notificationId);
+      setError("");
+      window.setTimeout(
+        () => locallyDeletedIdsRef.current.delete(notificationId),
+        15_000,
+      );
     } catch (err) {
-      console.error("Failed to delete notification:", err);
+      locallyDeletedIdsRef.current.delete(notificationId);
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to dismiss the notification.",
+      );
       void refresh();
     }
   };
@@ -328,7 +458,8 @@ export function NotificationCenter({
                   All caught up!
                 </p>
                 <p className="mt-1 text-[11px] text-slate-500 light:text-slate-400">
-                  New orders, bookings, and alerts will appear here in real time.
+                  New orders, bookings, and alerts will appear here in real
+                  time.
                 </p>
               </div>
             )}
@@ -359,9 +490,13 @@ export function NotificationCenter({
                   <p className="mt-0.5 text-[11px] leading-relaxed text-slate-300 light:text-slate-600">
                     {item.message}
                   </p>
-                  <p className="mt-1 text-[10px] font-medium text-slate-500 light:text-slate-400">
+                  <time
+                    dateTime={item.createdAt}
+                    title={new Date(item.createdAt).toLocaleString()}
+                    className="mt-1 block text-[10px] font-medium text-slate-500 light:text-slate-400"
+                  >
                     {formatRelativeTime(item.createdAt)}
-                  </p>
+                  </time>
                 </div>
 
                 {/* Dismiss button */}
@@ -382,7 +517,9 @@ export function NotificationCenter({
           {items.length > 0 && (
             <div className="flex items-center justify-between border-t border-slate-700/80 bg-slate-950/40 px-4 py-2 text-[10px] text-slate-400 light:border-slate-200 light:bg-slate-50">
               <span>{items.length} notifications</span>
-              <span className="text-[9px] text-slate-500">Live updates active</span>
+              <span className="text-[9px] text-slate-500">
+                Live updates active
+              </span>
             </div>
           )}
         </div>

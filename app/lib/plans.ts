@@ -58,7 +58,7 @@ export const PLAN_DEFINITIONS: Record<PlanType, PlanDefinition> = {
     id: "enterprise",
     publicId: "enterprise",
     name: "Enterprise",
-    price: 16,
+    price: 15,
     monthlyActivityLimit: null,
     includedStaffSeats: 2,
     maxStaffSeats: 9,
@@ -84,7 +84,10 @@ const MINIMUM_PLAN_BY_FEATURE: Record<PlanFeature, PlanType> = {
 };
 
 export function planHasFeature(plan: PlanType, feature: PlanFeature) {
-  return PLAN_ORDER.indexOf(plan) >= PLAN_ORDER.indexOf(MINIMUM_PLAN_BY_FEATURE[feature]);
+  return (
+    PLAN_ORDER.indexOf(plan) >=
+    PLAN_ORDER.indexOf(MINIMUM_PLAN_BY_FEATURE[feature])
+  );
 }
 
 export function tenantHasFeature(
@@ -93,7 +96,10 @@ export function tenantHasFeature(
 ) {
   // The trial is intentionally a full product evaluation. The dashboard layout
   // separately blocks expired trials before any gated component is rendered.
-  return tenant.subscriptionStatus === "trial" || planHasFeature(tenant.plan, feature);
+  return (
+    tenant.subscriptionStatus === "trial" ||
+    planHasFeature(tenant.plan, feature)
+  );
 }
 
 export function requiredPlanForFeature(feature: PlanFeature) {
