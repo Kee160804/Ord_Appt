@@ -45,7 +45,7 @@ body {
     border-color 0.2s ease;
 }
 
-/* NEW: Light mode CSS variables override - this is the key section */
+/* Theme tokens shared by pages that render outside the dashboard shell. */
 html.light {
   color-scheme: light;
 }
@@ -73,7 +73,10 @@ body.dark {
 
 html,
 body {
-  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease,
+    border-color 0.3s ease;
 }
 
 /* Keep the landing header below the iOS/PWA status bar. */
@@ -103,10 +106,7 @@ body {
 /* iOS can report a zero safe-area inset for an already-installed PWA. */
 @media (display-mode: standalone) {
   .site-header {
-    padding-top: max(
-      3rem,
-      calc(1.25rem + env(safe-area-inset-top, 0px))
-    );
+    padding-top: max(3rem, calc(1.25rem + env(safe-area-inset-top, 0px)));
   }
 }
 
@@ -173,7 +173,8 @@ body {
 }
 
 @media (max-width: 640px) {
-  html, body {
+  html,
+  body {
     min-height: 100%;
   }
 
@@ -249,7 +250,7 @@ body.dark ::selection {
   background: #475569;
 }
 
-/* COMMENT: Light mode scrollbar styling */
+/* Keep scrollbar contrast comfortable in light mode. */
 html.light ::-webkit-scrollbar-thumb,
 .light ::-webkit-scrollbar-thumb {
   background: #cbd5e1;
@@ -260,7 +261,7 @@ html.light ::-webkit-scrollbar-thumb:hover,
   background: #94a3b8;
 }
 
-/* COMMENT: Hide scrollbar when using no-scrollbar class */
+/* Preserve scrolling while hiding the visual scrollbar. */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }

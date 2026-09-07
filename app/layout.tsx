@@ -1,79 +1,3 @@
-// import type { Metadata } from "next";
-// import { Geist, Geist_Mono } from "next/font/google";
-// import { ThemeProvider } from "@/app/contexts/theme";
-
-// import "@/app/styles/global.css";
-
-// const geistSans = Geist({
-//   variable: "--font-geist-sans",
-//   subsets: ["latin"],
-// });
-
-// const geistMono = Geist_Mono({
-//   variable: "--font-geist-mono",
-//   subsets: ["latin"],
-// });
-
-// export const metadata: Metadata = {
-//   title: "Dark Mode System Version",
-//   description: "Platform for local businesses to manage appointments and orders.",
-// };
-
-// export default function RootLayout({
-//   children,
-// }: Readonly<{
-//   children: React.ReactNode;
-// }>) {
-//   return (
-//     <html lang="en">
-//       <body
-//         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-//       >
-//         <ThemeProvider>{children}</ThemeProvider>
-//       </body>
-//     </html>
-//   );
-// }
-
-// import type { Metadata } from "next";
-// import { Geist, Geist_Mono } from "next/font/google";
-// import { ThemeProvider } from "@/app/contexts/theme";
-// import { AuthProvider } from "@/app/contexts/auth"; // adjust import path
-// import "@/app/styles/global.css";
-
-// const geistSans = Geist({
-//   variable: "--font-geist-sans",
-//   subsets: ["latin"],
-// });
-
-// const geistMono = Geist_Mono({
-//   variable: "--font-geist-mono",
-//   subsets: ["latin"],
-// });
-
-// export const metadata: Metadata = {
-//   title: "YuhBusiness",
-//   description: "Platform for local businesses to manage appointments and orders.",
-// };
-
-// export default function RootLayout({
-//   children,
-// }: Readonly<{
-//   children: React.ReactNode;
-// }>) {
-//   return (
-//     <html lang="en">
-//       <body
-//         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-//       >
-//         <ThemeProvider>
-//           <AuthProvider>{children}</AuthProvider>
-//         </ThemeProvider>
-//       </body>
-//     </html>
-//   );
-// }
-
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/app/contexts/theme";
@@ -113,6 +37,7 @@ export const viewport: Viewport = {
   ],
 };
 
+// Run before hydration to avoid briefly showing the wrong saved theme.
 const themeBootstrapScript = `
   (() => {
     try {

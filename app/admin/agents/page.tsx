@@ -24,13 +24,12 @@ export default function AgentsManagementPage() {
     role: "staff",
   });
 
-  // COMMENT: Filter out super admin and get all staff/admin users
+  // Super administrators are managed separately from tenant-facing agents.
   const filteredAgents = useMemo(
     () => agents.filter((a) => a.role !== "superadmin"),
     [agents],
   );
 
-  // COMMENT: Handle adding new agent
   const handleAddAgent = async () => {
     if (!formData.name || !formData.email) {
       alert("Please fill in all fields");
@@ -60,11 +59,9 @@ export default function AgentsManagementPage() {
     };
 
     if (editingAgent) {
-      // COMMENT: Update existing agent
       setAgents(agents.map((a) => (a.id === editingAgent.id ? newAgent : a)));
       setEditingAgent(null);
     } else {
-      // COMMENT: Add new agent
       setAgents([...agents, newAgent]);
     }
 
@@ -72,14 +69,12 @@ export default function AgentsManagementPage() {
     setShowAddAgent(false);
   };
 
-  // COMMENT: Handle deleting agent
   const handleDeleteAgent = (id: string) => {
     if (confirm("Are you sure you want to delete this agent?")) {
       setAgents(agents.filter((a) => a.id !== id));
     }
   };
 
-  // COMMENT: Handle editing agent
   const handleEditAgent = (agent: (typeof mockUsers)[0]) => {
     setEditingAgent(agent);
     setFormData({
@@ -90,7 +85,6 @@ export default function AgentsManagementPage() {
     setShowAddAgent(true);
   };
 
-  // COMMENT: Verify user is super admin
   if (user?.role !== "superadmin") {
     return (
       <div className="pwa-page-safe min-h-dvh bg-[#070b14] p-4 text-white sm:p-8">
@@ -101,7 +95,6 @@ export default function AgentsManagementPage() {
 
   return (
     <div className="pwa-page-safe min-h-dvh space-y-6 bg-[#070b14] p-4 text-white light:bg-white light:text-gray-900 sm:p-8">
-      {/* HEADER */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-black">Agent Management</h1>

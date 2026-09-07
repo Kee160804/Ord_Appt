@@ -272,9 +272,9 @@ export default function HomePage() {
           Ready fi grow yuh business?
           <br />
           <span className="bg-gradient-to-r from-violet-400 to-indigo-400 light:from-violet-600 light:to-indigo-600 bg-clip-text text-transparent">
-            Tek Yuh Business Online Eena minutes.
+            Yuh Business Online Eena minutes.
           </span>
-          ``{" "}
+          {" "}
         </h1>
 
         <p className="mx-auto mb-8 max-w-2xl text-base leading-relaxed text-slate-400 light:text-gray-600 sm:mb-10 sm:text-lg md:text-xl">

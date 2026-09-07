@@ -5,7 +5,7 @@ import { useAuth } from "@/app/contexts/auth";
 import { Card, CardHeader, CardBody } from "@/app/components/Card";
 import { Plus, Trash2, Edit2, Lock } from "lucide-react";
 
-// COMMENT: Define permission types for role-based access control
+// Keep permission keys explicit so role changes remain type-safe.
 type Permission =
   | "view_dashboard"
   | "manage_tenants"
@@ -93,7 +93,7 @@ export default function RolesManagementPage() {
     color: "#8b5cf6",
   });
 
-  // COMMENT: All available permissions for the system
+  // This catalog drives both the permission form and its user-facing labels.
   const allPermissions: {
     key: Permission;
     label: string;
@@ -151,19 +151,18 @@ export default function RolesManagementPage() {
     },
   ];
 
-  // COMMENT: Handle adding new role
   const handleAddRole = () => {
     if (!formData.name || !formData.description) {
       alert("Please fill in all fields");
       return;
     }
 
-    // COMMENT: Generate unique ID - use editing ID if updating, otherwise use timestamp approach
+    // Preserve an edited role's identity; new local roles receive a stable,
+    // readable ID based on the current collection size.
     let newRoleId: string;
     if (editingRole) {
       newRoleId = editingRole.id;
     } else {
-      // COMMENT: For new roles, use a UUID-like pattern without impure functions
       newRoleId = `role-custom-${roles.length + 1}`;
     }
 
@@ -177,25 +176,21 @@ export default function RolesManagementPage() {
     };
 
     if (editingRole) {
-      // COMMENT: Update existing role
       setRoles(roles.map((r) => (r.id === editingRole.id ? newRole : r)));
       setEditingRole(null);
     } else {
-      // COMMENT: Add new role
       setRoles([...roles, newRole]);
     }
 
     resetForm();
   };
 
-  // COMMENT: Reset form to initial state
   const resetForm = () => {
     setFormData({ name: "", description: "", color: "#8b5cf6" });
     setSelectedPermissions([]);
     setShowAddRole(false);
   };
 
-  // COMMENT: Handle editing role
   const handleEditRole = (role: Role) => {
     setEditingRole(role);
     setFormData({
@@ -207,14 +202,12 @@ export default function RolesManagementPage() {
     setShowAddRole(true);
   };
 
-  // COMMENT: Handle deleting role
   const handleDeleteRole = (id: string) => {
     if (confirm("Are you sure you want to delete this role?")) {
       setRoles(roles.filter((r) => r.id !== id));
     }
   };
 
-  // COMMENT: Toggle permission selection
   const togglePermission = (permission: Permission) => {
     setSelectedPermissions((prev) =>
       prev.includes(permission)
@@ -223,7 +216,6 @@ export default function RolesManagementPage() {
     );
   };
 
-  // COMMENT: Verify user is super admin
   if (user?.role !== "superadmin") {
     return (
       <div className="pwa-page-safe min-h-dvh bg-[#070b14] p-4 text-white sm:p-8">

@@ -369,9 +369,7 @@ function HoursTab({
                   }
                   className="px-2 py-1.5 bg-slate-700 light:bg-white border border-slate-600 light:border-gray-300 rounded-xl text-sm text-white light:text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30"
                 />
-                <span className="text-slate-400 light:text-gray-600">
-                  Ã¢â‚¬â€œ
-                </span>
+                <span className="text-slate-400 light:text-gray-600">–</span>
                 <input
                   type="time"
                   value={day.close}
@@ -578,7 +576,7 @@ function StorefrontTab({
             )}
             {coverFile && (
               <span className="absolute bottom-3 left-3 max-w-[calc(100%-1.5rem)] truncate rounded-full bg-slate-950/75 px-3 py-1 text-[10px] font-bold text-white backdrop-blur">
-                Ready to upload Ã‚· {coverFile.name}
+                Ready to upload · {coverFile.name}
               </span>
             )}
           </div>
@@ -618,8 +616,8 @@ function StorefrontTab({
             />
           </div>
           <p className="text-[11px] text-slate-500 light:text-slate-600">
-            JPG, PNG, or WebP Ã‚· Maximum 5 MB. Recommended wide format: 1600
-            Ãƒâ€” 700.
+            JPG, PNG, or WebP · Maximum 5 MB. Recommended wide format: 1600 ×
+            700.
           </p>
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -803,9 +801,7 @@ function PaymentsTab({
         </CardHeader>
         <CardBody>
           {loading ? (
-            <p className="text-sm text-slate-400">
-              Loading billing historyÃ¢â‚¬Â¦
-            </p>
+            <p className="text-sm text-slate-400">Loading billing history…</p>
           ) : invoices.length === 0 ? (
             <p className="text-sm text-slate-400">
               No subscription invoices yet.
@@ -820,7 +816,7 @@ function PaymentsTab({
                   <div>
                     <p className="font-bold">{invoice.number}</p>
                     <p className="text-slate-400">
-                      {PLAN_DEFINITIONS[invoice.plan]?.name ?? invoice.plan} Ã‚·{" "}
+                      {PLAN_DEFINITIONS[invoice.plan]?.name ?? invoice.plan} ·{" "}
                       {new Date(invoice.periodStart).toLocaleDateString()}
                     </p>
                   </div>
@@ -945,9 +941,7 @@ function OrderingTab({
     return (
       <Card>
         <CardBody>
-          <p className="text-sm text-slate-400">
-            Loading order operationsÃ¢â‚¬Â¦
-          </p>
+          <p className="text-sm text-slate-400">Loading order operations…</p>
         </CardBody>
       </Card>
     );
