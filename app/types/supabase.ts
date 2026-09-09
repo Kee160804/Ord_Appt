@@ -124,6 +124,7 @@ export interface AppointmentRow {
   customer_email: string | null;
   customer_phone: string | null;
   status: string;
+  payment_status?: string | null;
   notes: string | null;
   subtotal: number | string | null;
   deposit_required: number | string | null;

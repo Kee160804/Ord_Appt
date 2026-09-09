@@ -1,5 +1,9 @@
 import { getSupabaseBrowserClient } from "@/app/lib/supabase/client";
-import type { Appointment, AppointmentStatus } from "@/app/types/index";
+import type {
+  Appointment,
+  AppointmentStatus,
+  PaymentStatus,
+} from "@/app/types/index";
 import type {
   AppointmentRow,
   AppointmentServiceRow,
@@ -30,6 +34,20 @@ function normalizeStatus(value: string): AppointmentStatus {
       return "no_show";
     default:
       return "pending";
+  }
+}
+
+function normalizePaymentStatus(value?: string | null): PaymentStatus {
+  switch (value?.toUpperCase()) {
+    case "PAID":
+    case "COMPLETED":
+      return "paid";
+    case "PARTIAL":
+      return "partial";
+    case "REFUNDED":
+      return "refunded";
+    default:
+      return "unpaid";
   }
 }
 
@@ -73,7 +91,7 @@ function mapAppointment(row: AppointmentRow): Appointment {
     time,
     duration: service?.duration_minutes ?? durationFromTimes(row),
     status: normalizeStatus(row.status),
-    paymentStatus: "unpaid",
+    paymentStatus: normalizePaymentStatus(row.payment_status),
     notes: row.notes ?? undefined,
     createdAt: row.created_at,
     providerId: row.staff_id ?? undefined,

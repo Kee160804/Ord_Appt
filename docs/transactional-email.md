@@ -12,6 +12,26 @@ YuhBusiness uses Resend as an additional delivery channel. Supabase remains the 
 
 The worker consumes the existing `order_email_deliveries`, `appointment_email_deliveries`, and `appointment_reminders` records. The new `transactional_email_deliveries` table covers only events that had no existing outbox.
 
+## Before purchasing a domain
+
+A domain is not required for local development or integration testing. Use
+Resend's `onboarding@resend.dev` sender and send test messages only to the
+email address that owns the Resend account. This verifies queueing, worker
+authentication, templates, retries, and database delivery records, but it is
+not a production email configuration.
+
+Production delivery requires a verified domain in Resend. A website domain and
+an email domain may be the same purchased domain, but they do not need to be.
+After purchasing one, verify a dedicated sender subdomain such as
+`mail.example.com`, publish Resend's SPF/DKIM records, add DMARC, and use a
+sender such as `YuhBusiness <notifications@mail.example.com>`. Configure that
+same verified sender in Supabase Auth SMTP for confirmation, invitation, and
+password-reset email.
+
+Do not add placeholder domains, API keys, or secrets to source control. The
+server continues to reject email processing when the required environment
+variables are missing, which is intentional until Resend is configured.
+
 ## Files
 
 - `app/lib/email/resend.ts`: server-only Resend transport and recipient validation.
