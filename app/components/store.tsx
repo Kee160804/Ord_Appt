@@ -42,6 +42,7 @@ interface ExtendedTenant extends Tenant {
 interface CartItem {
   id: string;
   variantId?: string;
+  variantLabel?: string;
   name: string;
   price: number;
   quantity: number;

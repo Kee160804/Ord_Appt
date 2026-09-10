@@ -225,11 +225,18 @@ export function ProductsView({ tenant }: Props) {
       return;
     }
 
+    const usesVariantInventory =
+      tenant.businessType === "retail" && variants.length > 0;
     const inventory = newProduct.trackInventory
-      ? Number(newProduct.inventory)
+      ? usesVariantInventory
+        ? variants
+            .filter((variant) => variant.isActive)
+            .reduce((total, variant) => total + variant.stock, 0)
+        : Number(newProduct.inventory)
       : null;
     if (
       newProduct.trackInventory &&
+      !usesVariantInventory &&
       (newProduct.inventory.trim() === "" ||
         !Number.isInteger(inventory) ||
         inventory === null ||
@@ -258,12 +265,16 @@ export function ProductsView({ tenant }: Props) {
       variants.some(
         (variant) =>
           !variant.sku.trim() ||
+          Object.keys(variant.attributes).length === 0 ||
+          Object.values(variant.attributes).some((value) => !value.trim()) ||
+          (variant.price !== undefined &&
+            (!Number.isFinite(variant.price) || variant.price < 0)) ||
           !Number.isInteger(variant.stock) ||
           variant.stock < 0,
       )
     ) {
       setError(
-        "Each retail variant needs a SKU and a whole-number stock value.",
+        "Each retail variant needs a SKU, at least one option, and a whole-number stock value.",
       );
       return;
     }
@@ -274,6 +285,23 @@ export function ProductsView({ tenant }: Props) {
     ) {
       setError("Retail variant SKUs must be unique.");
       return;
+    }
+    if (tenant.businessType === "retail") {
+      const optionCombinations = variants.map((variant) =>
+        Object.entries(variant.attributes)
+          .map(
+            ([key, value]) =>
+              `${key.trim().toLowerCase()}:${value.trim().toLowerCase()}`,
+          )
+          .sort()
+          .join("|"),
+      );
+      if (new Set(optionCombinations).size !== optionCombinations.length) {
+        setError(
+          "Each retail size, color, or style combination must be unique.",
+        );
+        return;
+      }
     }
 
     setIsSaving(true);
@@ -311,10 +339,11 @@ export function ProductsView({ tenant }: Props) {
               category?.name ?? "Uncategorized",
             );
       } else {
+        const localProductId =
+          editingProduct?.id ??
+          `p${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
         product = {
-          id:
-            editingProduct?.id ??
-            `p${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+          id: localProductId,
           tenantId: tenant.id,
           name: newProduct.name,
           description: newProduct.description,
@@ -322,11 +351,19 @@ export function ProductsView({ tenant }: Props) {
           image: newProduct.image,
           categoryId: newProduct.categoryId,
           categoryName: category?.name ?? "Uncategorized",
-          isActive: true,
+          isActive: editingProduct?.isActive ?? true,
           inventory: inventory ?? undefined,
           trackInventory: newProduct.trackInventory,
           tags: newProduct.tags,
           addons: newProduct.addons,
+          variants:
+            tenant.businessType === "retail"
+              ? variants.map((variant) => ({
+                  ...variant,
+                  productId: localProductId,
+                  sku: variant.sku.trim(),
+                }))
+              : undefined,
           createdAt: editingProduct?.createdAt ?? new Date().toISOString(),
         };
         const nextProducts = editingProduct
@@ -731,19 +768,36 @@ export function ProductsView({ tenant }: Props) {
                   </span>
                 </span>
               </label>
-              {newProduct.trackInventory && (
-                <Input
-                  label="Units currently in stock"
-                  type="number"
-                  min="0"
-                  step="1"
-                  placeholder="e.g. 20"
-                  value={newProduct.inventory}
-                  onChange={(e) =>
-                    setNewProduct({ ...newProduct, inventory: e.target.value })
-                  }
-                />
-              )}
+              {newProduct.trackInventory &&
+                !(tenant.businessType === "retail" && variants.length > 0) && (
+                  <Input
+                    label="Units currently in stock"
+                    type="number"
+                    min="0"
+                    step="1"
+                    placeholder="e.g. 20"
+                    value={newProduct.inventory}
+                    onChange={(e) =>
+                      setNewProduct({
+                        ...newProduct,
+                        inventory: e.target.value,
+                      })
+                    }
+                  />
+                )}
+              {newProduct.trackInventory &&
+                tenant.businessType === "retail" &&
+                variants.length > 0 && (
+                  <div className="rounded-lg border border-violet-500/25 bg-violet-500/10 px-3 py-2 text-xs text-violet-200 light:border-violet-200 light:bg-violet-50 light:text-violet-800">
+                    Total inventory is calculated from active variants:{" "}
+                    <strong>
+                      {variants
+                        .filter((variant) => variant.isActive)
+                        .reduce((total, variant) => total + variant.stock, 0)}
+                    </strong>{" "}
+                    units.
+                  </div>
+                )}
               {!newProduct.trackInventory && (
                 <p className="text-xs text-emerald-400 light:text-emerald-700">
                   Unlimited inventory — orders will not reduce a stock count.
@@ -852,14 +906,16 @@ export function ProductsView({ tenant }: Props) {
             </div>
           )}
           {tenant.businessType === "retail" && canUseAdvancedCatalog && (
-            <div className="space-y-3 rounded-lg border border-emerald-500/25 p-3">
+            <div className="space-y-3 rounded-lg border border-violet-500/25 bg-violet-500/[0.04] p-3">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <label className="text-sm font-semibold">
                     Product variants
                   </label>
                   <p className="text-[10px] text-slate-400">
-                    Track size, color, style, or other stock separately.
+                    Add size, color, style, price, and stock combinations. The
+                    storefront turns these options into customer-friendly
+                    buttons and color swatches automatically.
                   </p>
                 </div>
                 <Button
@@ -883,6 +939,12 @@ export function ProductsView({ tenant }: Props) {
                   <Plus className="h-3.5 w-3.5" /> Add variant
                 </Button>
               </div>
+              {variants.length === 0 && (
+                <p className="rounded-lg border border-dashed border-slate-600 px-3 py-4 text-center text-xs text-slate-400 light:border-slate-300 light:text-slate-500">
+                  No variants yet. Add one when this product has selectable
+                  sizes, colors, or styles.
+                </p>
+              )}
               {variants.map((variant, index) => (
                 <div
                   key={variant.id}
@@ -903,7 +965,7 @@ export function ProductsView({ tenant }: Props) {
                     }
                   />
                   <Input
-                    label={index === 0 ? "Options" : undefined}
+                    label={index === 0 ? "Size / Color options" : undefined}
                     placeholder="size:M,color:Red"
                     value={Object.entries(variant.attributes)
                       .map(([key, value]) => `${key}:${value}`)
@@ -987,6 +1049,23 @@ export function ProductsView({ tenant }: Props) {
                   >
                     <Trash2 className="h-4 w-4 text-red-400" />
                   </Button>
+                  <label className="flex cursor-pointer items-center gap-2 text-xs font-medium text-slate-300 light:text-slate-700 sm:col-span-full">
+                    <input
+                      type="checkbox"
+                      checked={variant.isActive}
+                      onChange={(event) =>
+                        setVariants((current) =>
+                          current.map((item) =>
+                            item.id === variant.id
+                              ? { ...item, isActive: event.target.checked }
+                              : item,
+                          ),
+                        )
+                      }
+                      className="h-4 w-4 accent-violet-600"
+                    />
+                    Available on storefront
+                  </label>
                 </div>
               ))}
             </div>

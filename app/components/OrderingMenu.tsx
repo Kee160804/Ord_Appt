@@ -27,6 +27,7 @@ import { Product, Tenant } from "@/app/types/index";
 interface CartItem {
   id: string;
   variantId?: string;
+  variantLabel?: string;
   name: string;
   price: number;
   quantity: number;
@@ -76,6 +77,9 @@ export function OrderingMenu({
   const [quantity, setQuantity] = useState(1);
   const [selectedAddons, setSelectedAddons] = useState<AddonOption[]>([]);
   const [selectedVariantId, setSelectedVariantId] = useState("");
+  const [selectedVariantAttributes, setSelectedVariantAttributes] = useState<
+    Record<string, string>
+  >({});
   const [customerName, setCustomerName] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
@@ -305,14 +309,45 @@ export function OrderingMenu({
   // is updated only after the customer confirms the complete configuration.
   const openAddModal = (product: Product) => {
     if (isSoldOut(product)) return;
+    const firstAvailableVariant = product.variants?.find(
+      (variant) => variant.isActive && variant.stock > 0,
+    );
     setCurrentProduct(product);
     setQuantity(1);
     setSelectedAddons([]);
-    setSelectedVariantId(
-      product.variants?.find((variant) => variant.isActive && variant.stock > 0)
-        ?.id ?? "",
-    );
+    setSelectedVariantId(firstAvailableVariant?.id ?? "");
+    setSelectedVariantAttributes(firstAvailableVariant?.attributes ?? {});
+    setOrderError("");
     setModalOpen(true);
+  };
+
+  const selectVariantAttribute = (attribute: string, value: string) => {
+    if (!currentProduct?.variants?.length) return;
+
+    const nextAttributes = {
+      ...selectedVariantAttributes,
+      [attribute]: value,
+    };
+    const attributeNames = Array.from(
+      new Set(
+        currentProduct.variants.flatMap((variant) =>
+          Object.keys(variant.attributes),
+        ),
+      ),
+    );
+    const matchingVariant = currentProduct.variants.find(
+      (variant) =>
+        variant.isActive &&
+        variant.stock > 0 &&
+        attributeNames.every(
+          (name) => variant.attributes[name] === nextAttributes[name],
+        ),
+    );
+
+    setSelectedVariantAttributes(nextAttributes);
+    setSelectedVariantId(matchingVariant?.id ?? "");
+    setQuantity(1);
+    setOrderError("");
   };
 
   const handleAddToCart = () => {
@@ -341,6 +376,14 @@ export function OrderingMenu({
     onAddToCart({
       id: currentProduct.id,
       variantId: selectedVariant?.id,
+      variantLabel: selectedVariant
+        ? Object.entries(selectedVariant.attributes)
+            .map(
+              ([key, value]) =>
+                `${key.charAt(0).toUpperCase()}${key.slice(1)}: ${value}`,
+            )
+            .join(" · ")
+        : undefined,
       name: currentProduct.name,
       price: selectedVariant?.price ?? currentProduct.price,
       quantity,
@@ -354,15 +397,19 @@ export function OrderingMenu({
     setModalOpen(false);
   };
 
-  const updateQty = (id: string, delta: number) => {
+  const updateQty = (id: string, delta: number, variantId?: string) => {
     const product = products.find((candidate) => candidate.id === id);
     updateCart(
       cart
         .map((i) => {
-          if (i.id !== id) return i;
+          if (i.id !== id || i.variantId !== variantId) return i;
           const requested = Math.max(0, i.quantity + delta);
-          const maximum =
-            product && product.trackInventory !== false
+          const variant = product?.variants?.find(
+            (candidate) => candidate.id === variantId,
+          );
+          const maximum = variant
+            ? variant.stock
+            : product && product.trackInventory !== false
               ? (product.inventory ?? 0)
               : 99;
           return { ...i, quantity: Math.min(requested, maximum) };
@@ -371,8 +418,8 @@ export function OrderingMenu({
     );
   };
 
-  const removeItem = (id: string) =>
-    updateCart(cart.filter((i) => i.id !== id));
+  const removeItem = (id: string, variantId?: string) =>
+    updateCart(cart.filter((i) => i.id !== id || i.variantId !== variantId));
 
   // Clearing the full cart is the only quantity action that requires confirmation.
   const clearCart = () => {
@@ -610,11 +657,18 @@ export function OrderingMenu({
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
                   {group.products.map((product) => {
-                    const cartItem = cart.find((i) => i.id === product.id);
+                    const productCartItems = cart.filter(
+                      (item) => item.id === product.id,
+                    );
+                    const cartItem = productCartItems[0];
+                    const productCartQuantity = productCartItems.reduce(
+                      (sum, item) => sum + item.quantity,
+                      0,
+                    );
                     const soldOut = isSoldOut(product);
                     const stockLimitReached = reachedStockLimit(
                       product,
-                      cartItem?.quantity ?? 0,
+                      productCartQuantity,
                     );
                     return (
                       <article
@@ -660,7 +714,8 @@ export function OrderingMenu({
                             <div className="flex items-center gap-2">
                               <button
                                 onClick={() =>
-                                  cartItem && updateQty(product.id, -1)
+                                  cartItem &&
+                                  updateQty(product.id, -1, cartItem.variantId)
                                 }
                                 disabled={!cartItem}
                                 className="flex h-7 w-8 items-center justify-center rounded-full bg-[#1a2840] text-[#aab8cc] transition hover:bg-[#243550] disabled:opacity-35 light:bg-slate-100 light:text-slate-600"
@@ -669,13 +724,15 @@ export function OrderingMenu({
                                 <Minus className="w-2.5 h-2.5" />
                               </button>
                               <span className="w-4 text-center text-xs font-bold text-white light:text-slate-800">
-                                {cartItem?.quantity ?? 0}
+                                {productCartQuantity}
                               </span>
                               <button
                                 onClick={() =>
-                                  cartItem
-                                    ? updateQty(product.id, 1)
-                                    : openAddModal(product)
+                                  product.variants?.length
+                                    ? openAddModal(product)
+                                    : cartItem
+                                      ? updateQty(product.id, 1)
+                                      : openAddModal(product)
                                 }
                                 disabled={soldOut || stockLimitReached}
                                 className="flex h-7 w-8 items-center justify-center rounded-full bg-[#1a2840] text-[#aab8cc] transition hover:bg-[#243550] disabled:cursor-not-allowed disabled:opacity-35 light:bg-slate-100 light:text-slate-600"
@@ -950,7 +1007,7 @@ export function OrderingMenu({
                   const lineTotal = item.price * item.quantity + addonsTotal;
                   return (
                     <div
-                      key={item.id}
+                      key={`${item.id}:${item.variantId ?? "default"}`}
                       className="flex gap-3 rounded-xl border border-[#26364f] bg-[#111d30] p-3 light:border-slate-200 light:bg-slate-50"
                     >
                       <div className="relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-lg bg-[#172238] light:bg-slate-100">
@@ -979,6 +1036,11 @@ export function OrderingMenu({
                         <span className="mt-0.5 inline-block text-[10px] font-medium text-[#8798b2] light:text-slate-500">
                           Quantity {item.quantity}
                         </span>
+                        {item.variantLabel && (
+                          <p className="mt-0.5 text-[10px] font-medium text-violet-300 light:text-violet-600">
+                            {item.variantLabel}
+                          </p>
+                        )}
                         {item.addons.length > 0 && (
                           <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 space-y-0.5">
                             {item.addons.map((ad, i) => (
@@ -990,7 +1052,9 @@ export function OrderingMenu({
                         )}
                         <div className="flex items-center gap-1.5 mt-1.5">
                           <button
-                            onClick={() => updateQty(item.id, -1)}
+                            onClick={() =>
+                              updateQty(item.id, -1, item.variantId)
+                            }
                             className="w-5 h-5 rounded border border-slate-200 dark:border-slate-600 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-700 transition"
                             aria-label="Decrease quantity"
                           >
@@ -1000,14 +1064,16 @@ export function OrderingMenu({
                             {item.quantity}
                           </span>
                           <button
-                            onClick={() => updateQty(item.id, 1)}
+                            onClick={() =>
+                              updateQty(item.id, 1, item.variantId)
+                            }
                             className="w-5 h-5 rounded border border-slate-200 dark:border-slate-600 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-700 transition"
                             aria-label="Increase quantity"
                           >
                             <Plus className="w-2.5 h-2.5" />
                           </button>
                           <button
-                            onClick={() => removeItem(item.id)}
+                            onClick={() => removeItem(item.id, item.variantId)}
                             className="ml-auto text-slate-300 dark:text-slate-600 hover:text-red-500 transition"
                             aria-label="Remove item"
                           >
@@ -1111,9 +1177,33 @@ export function OrderingMenu({
         </button>
       )}
 
-      {/* Add-on Modal */}
+      {isRetail && (
+        <Modal
+          open={modalOpen}
+          onClose={() => setModalOpen(false)}
+          title="Add to Cart"
+          maxWidth="max-w-2xl"
+        >
+          {currentProduct && (
+            <RetailProductOptions
+              product={currentProduct}
+              cart={cart}
+              quantity={quantity}
+              setQuantity={setQuantity}
+              selectedVariantId={selectedVariantId}
+              selectedAttributes={selectedVariantAttributes}
+              onSelectAttribute={selectVariantAttribute}
+              selectedAddons={selectedAddons}
+              setSelectedAddons={setSelectedAddons}
+              onAddToCart={handleAddToCart}
+            />
+          )}
+        </Modal>
+      )}
+
+      {/* Food and drink add-on modal */}
       <Modal
-        open={modalOpen}
+        open={modalOpen && !isRetail}
         onClose={() => setModalOpen(false)}
         title="Add to Cart"
       >
@@ -1262,6 +1352,290 @@ export function OrderingMenu({
 }
 
 // Helpers
+function RetailProductOptions({
+  product,
+  cart,
+  quantity,
+  setQuantity,
+  selectedVariantId,
+  selectedAttributes,
+  onSelectAttribute,
+  selectedAddons,
+  setSelectedAddons,
+  onAddToCart,
+}: {
+  product: Product;
+  cart: CartItem[];
+  quantity: number;
+  setQuantity: (quantity: number) => void;
+  selectedVariantId: string;
+  selectedAttributes: Record<string, string>;
+  onSelectAttribute: (attribute: string, value: string) => void;
+  selectedAddons: AddonOption[];
+  setSelectedAddons: (addons: AddonOption[]) => void;
+  onAddToCart: () => void;
+}) {
+  const variants = product.variants ?? [];
+  const attributeGroups = Array.from(
+    variants.reduce((groups, variant) => {
+      Object.entries(variant.attributes).forEach(([key, value]) => {
+        const values = groups.get(key) ?? [];
+        if (!values.includes(value)) values.push(value);
+        groups.set(key, values);
+      });
+      return groups;
+    }, new Map<string, string[]>()),
+    ([key, values]) => ({ key, values }),
+  ).sort((a, b) => {
+    const priority = (key: string) => {
+      const normalized = key.toLowerCase();
+      if (normalized === "size") return 0;
+      if (normalized === "color" || normalized === "colour") return 1;
+      return 2;
+    };
+    return priority(a.key) - priority(b.key);
+  });
+  const selectedVariant = variants.find(
+    (variant) => variant.id === selectedVariantId,
+  );
+  const existingQuantity = cart.find(
+    (item) => item.id === product.id && item.variantId === selectedVariantId,
+  )?.quantity;
+  const availableStock = selectedVariant
+    ? selectedVariant.stock
+    : product.trackInventory === false
+      ? 99
+      : (product.inventory ?? 0);
+  const remainingStock = Math.max(0, availableStock - (existingQuantity ?? 0));
+  const unitPrice = selectedVariant?.price ?? product.price;
+  const addOnPrice = selectedAddons.reduce(
+    (sum, addon) => sum + addon.price,
+    0,
+  );
+  const hasValidSelection = variants.length === 0 || Boolean(selectedVariant);
+  const canAdd = hasValidSelection && remainingStock >= quantity;
+  const selectionSummary = selectedVariant
+    ? Object.entries(selectedVariant.attributes)
+        .map(([key, value]) => `${key.toLowerCase()} ${value}`)
+        .join(" · ")
+    : "";
+
+  const isOptionAvailable = (attribute: string, value: string) =>
+    variants.some(
+      (variant) =>
+        variant.isActive &&
+        variant.stock > 0 &&
+        variant.attributes[attribute] === value &&
+        attributeGroups.every(
+          (group) =>
+            group.key === attribute ||
+            !selectedAttributes[group.key] ||
+            variant.attributes[group.key] === selectedAttributes[group.key],
+        ),
+    );
+
+  return (
+    <div className="space-y-6 pb-1">
+      <div className="grid gap-5 sm:grid-cols-[180px_minmax(0,1fr)] sm:items-center">
+        <div className="relative mx-auto aspect-square w-full max-w-[240px] overflow-hidden rounded-2xl bg-[#eef1f6] dark:bg-[#111b2c]">
+          <Image
+            src={product.image || PLACEHOLDER_IMG}
+            alt={product.name}
+            fill
+            sizes="(max-width: 640px) 240px, 180px"
+            className="object-cover"
+            unoptimized
+            onError={(event) => {
+              (event.target as HTMLImageElement).src = PLACEHOLDER_IMG;
+            }}
+          />
+        </div>
+        <div className="min-w-0">
+          <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-violet-400/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-violet-400 light:text-violet-700">
+            <span className="h-1.5 w-1.5 rounded-full bg-violet-400" /> In stock
+          </div>
+          <h3 className="text-xl font-black tracking-[-0.02em] text-white light:text-[#18304b] sm:text-2xl">
+            {product.name}
+          </h3>
+          <p className="mt-2 text-sm leading-6 text-[#93a4bd] light:text-slate-500">
+            {product.description}
+          </p>
+          <p className="mt-3 text-2xl font-black text-white light:text-[#18304b]">
+            {formatCurrency(unitPrice)}
+          </p>
+        </div>
+      </div>
+
+      {attributeGroups.length > 0 && (
+        <div className="space-y-5 border-t border-[#2a3950] pt-5 light:border-slate-200">
+          {attributeGroups.map((group) => {
+            const isColor = ["color", "colour"].includes(
+              group.key.toLowerCase(),
+            );
+            const label = `${group.key.charAt(0).toUpperCase()}${group.key.slice(1)}`;
+
+            return (
+              <fieldset key={group.key}>
+                <legend className="mb-2.5 text-sm font-bold text-white light:text-[#18304b]">
+                  Select {label}:
+                  <span className="ml-2 font-medium text-[#91a1ba] light:text-slate-500">
+                    {selectedAttributes[group.key]}
+                  </span>
+                </legend>
+                <div className="flex flex-wrap gap-2.5">
+                  {group.values.map((value) => {
+                    const selected = selectedAttributes[group.key] === value;
+                    const available = isOptionAvailable(group.key, value);
+
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        aria-pressed={selected}
+                        aria-label={`${label} ${value}${available ? "" : ", unavailable"}`}
+                        disabled={!available}
+                        onClick={() => onSelectAttribute(group.key, value)}
+                        className={`flex min-h-11 items-center justify-center rounded-xl border text-sm font-bold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-violet-400/25 disabled:cursor-not-allowed disabled:opacity-30 ${
+                          isColor ? "gap-2.5 px-3.5" : "min-w-12 px-3.5"
+                        } ${
+                          selected
+                            ? "border-violet-500 bg-violet-600 text-white shadow-[0_7px_18px_rgba(109,40,217,0.28)] light:border-violet-600 light:bg-violet-600"
+                            : "border-[#3a4960] bg-[#152238] text-[#d6deea] hover:border-[#71819a] light:border-slate-200 light:bg-white light:text-[#18304b] light:hover:border-slate-400"
+                        }`}
+                      >
+                        {isColor && (
+                          <span
+                            className={`h-5 w-5 rounded-full border shadow-inner ${
+                              value.toLowerCase() === "white"
+                                ? "border-slate-300"
+                                : "border-white/25"
+                            }`}
+                            style={{ backgroundColor: colorSwatch(value) }}
+                            aria-hidden="true"
+                          />
+                        )}
+                        {value}
+                      </button>
+                    );
+                  })}
+                </div>
+              </fieldset>
+            );
+          })}
+
+          {selectedVariant ? (
+            <p className="text-sm italic text-[#a9b6ca] light:text-slate-500">
+              {remainingStock} available in {selectionSummary}
+            </p>
+          ) : (
+            <p className="text-sm font-medium text-rose-400 light:text-rose-600">
+              This combination is currently unavailable.
+            </p>
+          )}
+        </div>
+      )}
+
+      <div className="border-t border-[#2a3950] pt-5 light:border-slate-200">
+        <label className="mb-2.5 block text-sm font-bold text-white light:text-[#18304b]">
+          Quantity
+        </label>
+        <div className="flex items-center gap-2.5">
+          <button
+            type="button"
+            onClick={() => setQuantity(Math.max(1, quantity - 1))}
+            disabled={quantity <= 1}
+            className="flex h-11 w-11 items-center justify-center rounded-xl border border-[#3a4960] bg-[#152238] text-[#c3cede] transition hover:border-[#71819a] disabled:opacity-30 light:border-slate-200 light:bg-white light:text-[#18304b]"
+            aria-label="Decrease quantity"
+          >
+            <Minus className="h-4 w-4" />
+          </button>
+          <span className="flex h-11 min-w-20 items-center justify-center rounded-xl border border-[#3a4960] bg-[#111d30] px-5 text-lg font-black text-white light:border-slate-200 light:bg-white light:text-[#18304b]">
+            {quantity}
+          </span>
+          <button
+            type="button"
+            onClick={() => setQuantity(quantity + 1)}
+            disabled={!hasValidSelection || quantity >= remainingStock}
+            className="flex h-11 w-11 items-center justify-center rounded-xl border-2 border-violet-500 bg-[#152238] text-violet-300 transition hover:border-violet-300 hover:text-white disabled:cursor-not-allowed disabled:opacity-30 light:bg-white light:text-violet-700"
+            aria-label="Increase quantity"
+          >
+            <Plus className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+
+      {(product.addons ?? []).length > 0 && (
+        <fieldset className="border-t border-[#2a3950] pt-5 light:border-slate-200">
+          <legend className="mb-2.5 text-sm font-bold text-white light:text-[#18304b]">
+            Add-ons
+          </legend>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {(product.addons ?? []).map((addon) => (
+              <label
+                key={addon.id}
+                className="flex cursor-pointer items-center gap-3 rounded-xl border border-[#34445d] bg-[#142137] p-3 text-sm light:border-slate-200 light:bg-slate-50"
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedAddons.some((item) => item.id === addon.id)}
+                  onChange={(event) =>
+                    setSelectedAddons(
+                      event.target.checked
+                        ? [...selectedAddons, addon]
+                        : selectedAddons.filter((item) => item.id !== addon.id),
+                    )
+                  }
+                  className="h-4 w-4 accent-violet-600"
+                />
+                <span className="font-semibold text-white light:text-[#18304b]">
+                  {addon.name}
+                  <span className="ml-1 font-medium text-[#91a1ba] light:text-slate-500">
+                    +{formatCurrency(addon.price)}
+                  </span>
+                </span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      )}
+
+      <Button
+        type="button"
+        size="lg"
+        onClick={onAddToCart}
+        disabled={!canAdd}
+        className="w-full rounded-2xl border-0 bg-gradient-to-r from-violet-700 via-violet-600 to-purple-600 py-3.5 font-black text-white shadow-[0_12px_28px_rgba(109,40,217,0.32)] hover:brightness-110"
+      >
+        <ShoppingBag className="h-5 w-5" />
+        {remainingStock === 0 ? "Stock already in bag" : "Add to Bag"} —{" "}
+        {formatCurrency((unitPrice + addOnPrice) * quantity)}
+      </Button>
+    </div>
+  );
+}
+
+function colorSwatch(value: string) {
+  const swatches: Record<string, string> = {
+    black: "#111827",
+    white: "#ffffff",
+    red: "#dc2626",
+    blue: "#2563eb",
+    navy: "#172554",
+    green: "#16a34a",
+    grey: "#94a3b8",
+    gray: "#94a3b8",
+    cream: "#f4ead5",
+    beige: "#d6c2a1",
+    brown: "#795548",
+    pink: "#ec4899",
+    purple: "#9333ea",
+    yellow: "#facc15",
+    orange: "#f97316",
+  };
+
+  return swatches[value.toLowerCase()] ?? value;
+}
+
 function CategoryPill({
   label,
   active,
