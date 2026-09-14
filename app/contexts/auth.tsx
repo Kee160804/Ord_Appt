@@ -19,6 +19,7 @@ import {
   saveStoredUserRecord,
 } from "@/app/lib/data";
 import { getSupabaseBrowserClient } from "@/app/lib/supabase/client";
+import { PRIVACY_VERSION, TERMS_VERSION } from "@/app/lib/legal";
 import {
   isDemoModeEnabled,
   isSupabaseConfigured,
@@ -62,6 +63,7 @@ interface AuthContextType {
     city: string,
     phone: string,
     slug: string,
+    legalAcceptedAt: string,
   ) => Promise<AuthActionResult>;
   logout: () => Promise<void>;
   isLoading: boolean;
@@ -258,6 +260,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     city: string,
     phone: string,
     slug: string,
+    legalAcceptedAt: string,
   ): Promise<AuthActionResult> => {
     setIsLoading(true);
     const normalizedEmail = email.trim().toLowerCase();
@@ -280,6 +283,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         city,
         phone,
         slug,
+        legalAcceptedAt,
       );
       setIsLoading(false);
 
@@ -345,6 +349,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     saveStoredTenant(newTenant);
     saveStoredUserRecord(newUser);
+    window.localStorage.setItem(
+      `yuhbusiness_legal_acceptance:${newUser.id}`,
+      JSON.stringify({
+        acceptedAt: legalAcceptedAt,
+        termsVersion: TERMS_VERSION,
+        privacyVersion: PRIVACY_VERSION,
+      }),
+    );
     saveDemoSession(newUser);
     setUser(newUser);
     setTenant(newTenant);

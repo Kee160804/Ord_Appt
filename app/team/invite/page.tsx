@@ -12,6 +12,7 @@ import {
   Users,
 } from "lucide-react";
 import { getSupabaseBrowserClient } from "@/app/lib/supabase/client";
+import { PRIVACY_VERSION, TERMS_VERSION } from "@/app/lib/legal";
 import { loadAuthenticatedAppSession } from "@/app/services/authService";
 import { acceptBusinessTeamInvitation } from "@/app/services/teamService";
 
@@ -113,7 +114,13 @@ export default function TeamInvitationPage() {
         email: email.trim().toLowerCase(),
         password,
         options: {
-          data: { full_name: fullName.trim(), team_invitation: true },
+          data: {
+            full_name: fullName.trim(),
+            team_invitation: true,
+            terms_accepted_at: new Date().toISOString(),
+            terms_version: TERMS_VERSION,
+            privacy_version: PRIVACY_VERSION,
+          },
           emailRedirectTo: confirmationUrl.toString(),
         },
       });
@@ -292,7 +299,9 @@ export default function TeamInvitationPage() {
         </section>
         <p className="mt-5 text-center text-[11px] leading-5 text-slate-500">
           Invitation access is controlled by the business owner and protected by
-          YuhBusiness tenant permissions.
+          YuhBusiness tenant permissions. By creating or using an account, you
+          agree to the <Link href="/terms">Terms of Service</Link> and
+          acknowledge the <Link href="/privacy">Privacy Policy</Link>.
         </p>
       </main>
     </div>

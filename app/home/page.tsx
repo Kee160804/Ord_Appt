@@ -153,28 +153,12 @@ export default function HomePage() {
       city: "Miami, FL",
     },
     {
-      name: "Iron Edge Barbershop",
-      slug: "iron-edge",
-      type: "Appointments",
-      emoji: "💈",
-      color: "#34d399",
-      city: "Atlanta, GA",
-    },
-    {
       name: "Ember & Oak Kitchen",
       slug: "ember-oak",
       type: "Ordering",
       emoji: "🔥",
       color: "#fb923c",
       city: "Austin, TX",
-    },
-    {
-      name: "Blossom Bakehouse",
-      slug: "blossom-bakehouse",
-      type: "Ordering",
-      emoji: "🥐",
-      color: "#f472b6",
-      city: "Portland, OR",
     },
     {
       name: "Maya Streetwear",
@@ -273,8 +257,7 @@ export default function HomePage() {
           <br />
           <span className="bg-gradient-to-r from-violet-400 to-indigo-400 light:from-violet-600 light:to-indigo-600 bg-clip-text text-transparent">
             Yuh Business Online Eena minutes.
-          </span>
-          {" "}
+          </span>{" "}
         </h1>
 
         <p className="mx-auto mb-8 max-w-2xl text-base leading-relaxed text-slate-400 light:text-gray-600 sm:mb-10 sm:text-lg md:text-xl">
@@ -461,7 +444,7 @@ export default function HomePage() {
             </p>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="mx-auto grid max-w-5xl gap-6 md:grid-cols-3">
             {demos.map((d) => (
               <Link
                 key={d.slug}
@@ -763,7 +746,19 @@ export default function HomePage() {
             >
               Admin
             </Link>
-            <span>© 2025 YuhBusiness Platform</span>
+            <Link
+              href="/privacy"
+              className="hover:text-slate-300 light:hover:text-gray-900 transition-colors"
+            >
+              Privacy
+            </Link>
+            <Link
+              href="/terms"
+              className="hover:text-slate-300 light:hover:text-gray-900 transition-colors"
+            >
+              Terms
+            </Link>
+            <span>© {new Date().getFullYear()} YuhBusiness Platform</span>
           </div>
         </div>
       </footer>

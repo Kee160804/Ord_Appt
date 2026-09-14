@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "YuhBusiness",
     short_name: "YuhBusiness",
     description:
-      "Professional online storefront for appointments and ordering businesses.",
+      "Professional online storefront for appointment, ordering, and retail businesses.",
     start_url: "/",
     id: "/",
     display: "standalone",

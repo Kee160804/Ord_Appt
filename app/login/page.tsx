@@ -105,15 +105,15 @@ export default function LoginPage() {
           >
             Features
           </Link>
-         
+
           <Link
             href="/home#demos"
             className="text-slate-400 light:text-gray-600 hover:text-white light:hover:text-gray-900 transition-colors"
           >
             Live Demos
           </Link>
-          
-           <Link
+
+          <Link
             href="/home#pricing"
             className="text-slate-400 light:text-gray-600 hover:text-white light:hover:text-gray-900 transition-colors"
           >
@@ -328,6 +328,15 @@ export default function LoginPage() {
                 className="text-violet-400 light:text-violet-600 font-bold hover:text-violet-300 light:hover:text-violet-700 transition-colors"
               >
                 Mek one free
+              </Link>
+            </p>
+            <p className="text-center text-xs text-slate-600 light:text-slate-500">
+              <Link href="/privacy" className="hover:text-violet-500">
+                Privacy Policy
+              </Link>{" "}
+              ·{" "}
+              <Link href="/terms" className="hover:text-violet-500">
+                Terms of Service
               </Link>
             </p>
           </div>

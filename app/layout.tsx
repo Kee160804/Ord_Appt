@@ -18,7 +18,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "YuhBusiness",
   description:
-    "Platform for local businesses to manage appointments and orders.",
+    "Platform for local businesses to manage appointments, orders, retail sales, and customer relationships.",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import {
   ArrowRight,
   Heart,
@@ -1151,9 +1152,27 @@ export function OrderingMenu({
                         ? "Placing..."
                         : "Place Order"}
                 </Button>
-                <p className="mt-3 flex items-center justify-center gap-2 text-[10px] text-[#8292aa] light:text-slate-500">
-                  <LockKeyhole className="h-3.5 w-3.5" /> Your information is
-                  secure and encrypted.
+                <p className="mt-3 text-center text-[10px] leading-4 text-[#8292aa] light:text-slate-500">
+                  <LockKeyhole className="mr-1 inline h-3.5 w-3.5" /> By placing
+                  this order, you ask {tenant.name} to process your order and
+                  contact details and agree to the{" "}
+                  <Link
+                    href="/terms"
+                    target="_blank"
+                    className="font-semibold text-violet-300 underline light:text-violet-700"
+                  >
+                    Terms
+                  </Link>{" "}
+                  and{" "}
+                  <Link
+                    href="/privacy"
+                    target="_blank"
+                    className="font-semibold text-violet-300 underline light:text-violet-700"
+                  >
+                    Privacy Policy
+                  </Link>
+                  . The business&apos;s fulfilment, cancellation, and refund
+                  terms also apply.
                 </p>
               </div>
             </div>

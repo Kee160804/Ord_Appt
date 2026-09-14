@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, type FormEvent } from "react";
+import Link from "next/link";
 import {
   ArrowUpRight,
   Clock3,
@@ -370,9 +371,17 @@ export function StorefrontContact({
               {isSending ? "Sending..." : "Send Message"}
             </button>
 
-            <p className="mt-4 flex items-center justify-center gap-2 text-center text-xs text-slate-400">
-              <LockKeyhole className="h-3.5 w-3.5" /> Your information stays
-              between you and {tenant.name}.
+            <p className="mt-4 text-center text-xs leading-5 text-slate-400">
+              <LockKeyhole className="mr-1 inline h-3.5 w-3.5" /> Your message
+              is shared with {tenant.name} so they can respond. See our{" "}
+              <Link
+                href="/privacy"
+                target="_blank"
+                className="font-semibold text-violet-500 underline underline-offset-2"
+              >
+                Privacy Policy
+              </Link>
+              .
             </p>
           </form>
         )}

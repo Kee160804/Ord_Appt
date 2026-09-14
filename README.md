@@ -7,6 +7,9 @@ security.
 See [Transactional email setup](docs/transactional-email.md) for the Resend,
 Supabase, scheduler, and end-to-end testing guide.
 
+See [Legal and privacy readiness](docs/legal-readiness.md) for the implemented
+policy surfaces and the operational/legal work required before real payments.
+
 ## Local setup
 
 1. Create `.env.local`.
@@ -51,8 +54,8 @@ the values that were present when their client bundles were built.
 In Supabase, open **Authentication > URL Configuration** and configure:
 
 ```text
-Site URL: https://ord-appt.vercel.app
-Redirect URL: https://ord-appt.vercel.app/auth/confirm**
+Site URL: https://yuhbusiness.com
+Redirect URL: https://yuhbusiness.com/auth/confirm**
 ```
 
 The redirect configuration is used by signup confirmation and password recovery.
@@ -61,7 +64,7 @@ Password login itself requires the two public Supabase variables above.
 Password recovery and confirmation email are sent by Supabase Auth, not by the
 application's Resend SDK. Adding `RESEND_API_KEY` to Vercel does not connect
 Supabase Auth to Resend: configure Resend SMTP under **Supabase >
-Authentication > Email/SMTP**. The test sender `onboarding@resend.dev` can send
+Authentication > Notifications > Email > SMTP Settings**. The test sender `onboarding@resend.dev` can send
 only to the Resend account owner's address; verify a domain before sending Auth
 email to other users.
 

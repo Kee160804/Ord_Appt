@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import {
   ChevronLeft,
   ChevronRight,
@@ -898,6 +899,26 @@ export function AppointmentBooking({
               {bookingError}
             </p>
           )}
+          <p className="text-xs leading-5 text-slate-400">
+            By requesting this appointment, you ask {tenant.name} to process
+            your contact and booking details. See the{" "}
+            <Link
+              href="/privacy"
+              target="_blank"
+              className="font-semibold text-violet-300 underline underline-offset-2"
+            >
+              Privacy Policy
+            </Link>{" "}
+            and{" "}
+            <Link
+              href="/terms"
+              target="_blank"
+              className="font-semibold text-violet-300 underline underline-offset-2"
+            >
+              Terms of Service
+            </Link>
+            . The business&apos;s cancellation and refund terms also apply.
+          </p>
         </div>
       </Modal>
     </>

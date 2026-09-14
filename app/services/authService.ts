@@ -3,6 +3,7 @@ import type {
   User as SupabaseUser,
 } from "@supabase/supabase-js";
 import { getSupabaseBrowserClient } from "@/app/lib/supabase/client";
+import { PRIVACY_VERSION, TERMS_VERSION } from "@/app/lib/legal";
 import type { BusinessType, Tenant, User, UserRole } from "@/app/types/index";
 import type {
   BusinessHourRow,
@@ -29,6 +30,9 @@ interface SignupBusinessMetadata {
   business_city: string;
   business_phone: string;
   business_slug: string;
+  terms_accepted_at?: string;
+  terms_version?: string;
+  privacy_version?: string;
 }
 
 export interface CreateBusinessInput {
@@ -448,6 +452,7 @@ export async function supabaseSignup(
   city: string,
   phone: string,
   slug: string,
+  legalAcceptedAt: string,
 ): Promise<AuthResult> {
   const supabase = getSupabaseBrowserClient();
   if (!supabase) return { error: "Supabase is not configured." };
@@ -459,6 +464,9 @@ export async function supabaseSignup(
     business_city: city.trim(),
     business_phone: phone.trim(),
     business_slug: slugify(slug || businessName),
+    terms_accepted_at: legalAcceptedAt,
+    terms_version: TERMS_VERSION,
+    privacy_version: PRIVACY_VERSION,
   };
   const emailRedirectTo =
     typeof window === "undefined"

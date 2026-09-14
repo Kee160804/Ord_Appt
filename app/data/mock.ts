@@ -9,7 +9,9 @@ import type {
   AnalyticsSummary,
 } from "../types/index";
 
-export const mockTenants: Tenant[] = [
+const ACTIVE_DEMO_TENANT_IDS = new Set(["apt-001", "ord-001", "ret-001"]);
+
+const allMockTenants: Tenant[] = [
   {
     id: "apt-001",
     name: "Luxe Beauty Studio",
@@ -190,7 +192,11 @@ export const mockTenants: Tenant[] = [
   },
 ];
 
-export const mockUsers: User[] = [
+export const mockTenants = allMockTenants.filter((tenant) =>
+  ACTIVE_DEMO_TENANT_IDS.has(tenant.id),
+);
+
+const allMockUsers: User[] = [
   {
     id: "sa1",
     tenantId: null,
@@ -291,9 +297,23 @@ export const mockUsers: User[] = [
     createdAt: "2024-04-20",
     lastLogin: "2025-01-08",
   },
+  {
+    id: "u10",
+    tenantId: "ret-001",
+    name: "Amara Young",
+    email: "amara@mayastreetwear.com",
+    role: "owner",
+    avatar: "AY",
+    createdAt: "2025-01-12",
+    lastLogin: "2026-09-10",
+  },
 ];
 
-export const demoAccounts = [
+export const mockUsers = allMockUsers.filter(
+  (user) => user.tenantId === null || ACTIVE_DEMO_TENANT_IDS.has(user.tenantId),
+);
+
+const allDemoAccounts = [
   {
     label: "Super Admin",
     email: "admin@YuhBusiness.io",
@@ -329,9 +349,21 @@ export const demoAccounts = [
     role: "owner" as const,
     tenantId: "ord-002",
   },
+  {
+    label: "Maya Streetwear",
+    email: "amara@mayastreetwear.com",
+    password: "password123",
+    role: "owner" as const,
+    tenantId: "ret-001",
+  },
 ];
 
-export const mockServices: Service[] = [
+export const demoAccounts = allDemoAccounts.filter(
+  (account) =>
+    account.tenantId === null || ACTIVE_DEMO_TENANT_IDS.has(account.tenantId),
+);
+
+const allMockServices: Service[] = [
   {
     id: "s1",
     tenantId: "apt-001",
@@ -464,7 +496,11 @@ export const mockServices: Service[] = [
   },
 ];
 
-export const mockCategories: Category[] = [
+export const mockServices = allMockServices.filter((service) =>
+  ACTIVE_DEMO_TENANT_IDS.has(service.tenantId),
+);
+
+const allMockCategories: Category[] = [
   { id: "c1", tenantId: "ord-001", name: "Starters", sortOrder: 1 },
   { id: "c2", tenantId: "ord-001", name: "Mains", sortOrder: 2 },
   { id: "c3", tenantId: "ord-001", name: "Sides", sortOrder: 3 },
@@ -479,7 +515,11 @@ export const mockCategories: Category[] = [
   { id: "c12", tenantId: "ret-001", name: "Accessories", sortOrder: 3 },
 ];
 
-export const mockProducts: Product[] = [
+export const mockCategories = allMockCategories.filter((category) =>
+  ACTIVE_DEMO_TENANT_IDS.has(category.tenantId),
+);
+
+const allMockProducts: Product[] = [
   {
     id: "p11",
     tenantId: "ret-001",
@@ -821,7 +861,11 @@ export const mockProducts: Product[] = [
   },
 ];
 
-export const mockAppointments: Appointment[] = [
+export const mockProducts = allMockProducts.filter((product) =>
+  ACTIVE_DEMO_TENANT_IDS.has(product.tenantId),
+);
+
+const allMockAppointments: Appointment[] = [
   {
     id: "a1",
     tenantId: "apt-001",
@@ -972,7 +1016,11 @@ export const mockAppointments: Appointment[] = [
   },
 ];
 
-export const mockOrders: Order[] = [
+export const mockAppointments = allMockAppointments.filter((appointment) =>
+  ACTIVE_DEMO_TENANT_IDS.has(appointment.tenantId),
+);
+
+const allMockOrders: Order[] = [
   {
     id: "o1",
     tenantId: "ord-001",
@@ -1151,7 +1199,11 @@ export const mockOrders: Order[] = [
   },
 ];
 
-export const mockAnalytics: Record<string, AnalyticsSummary> = {
+export const mockOrders = allMockOrders.filter((order) =>
+  ACTIVE_DEMO_TENANT_IDS.has(order.tenantId),
+);
+
+const allMockAnalytics: Record<string, AnalyticsSummary> = {
   "apt-001": {
     totalRevenue: 4820,
     totalActivity: 42,
@@ -1257,6 +1309,13 @@ export const mockAnalytics: Record<string, AnalyticsSummary> = {
     ],
   },
 };
+
+export const mockAnalytics: Record<string, AnalyticsSummary> =
+  Object.fromEntries(
+    Object.entries(allMockAnalytics).filter(([tenantId]) =>
+      ACTIVE_DEMO_TENANT_IDS.has(tenantId),
+    ),
+  );
 
 export const getServicesByTenant = (id: string) =>
   mockServices.filter((s) => s.tenantId === id);

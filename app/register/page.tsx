@@ -26,6 +26,7 @@ export default function RegisterPage() {
   const [successMessage, setSuccessMessage] = useState("");
   const [confirmationEmail, setConfirmationEmail] = useState("");
   const [isResending, setIsResending] = useState(false);
+  const [acceptedLegal, setAcceptedLegal] = useState(false);
   const [form, setForm] = useState({
     firstName: "",
     lastName: "",
@@ -62,7 +63,14 @@ export default function RegisterPage() {
       return;
     }
 
+    if (!acceptedLegal) {
+      setError("Please accept the Terms of Service and Privacy Policy.");
+      setLoading(false);
+      return;
+    }
+
     const fullName = `${form.firstName} ${form.lastName}`;
+    const legalAcceptedAt = new Date().toISOString();
 
     const result = await signup(
       form.email,
@@ -73,6 +81,7 @@ export default function RegisterPage() {
       form.city,
       form.phone,
       form.slug,
+      legalAcceptedAt,
     );
 
     if (result.success) {
@@ -440,6 +449,43 @@ export default function RegisterPage() {
                   No credit card is required today.
                 </p>
               </div>
+              <div className="rounded-xl border border-slate-700 bg-slate-900/40 p-4">
+                <p className="mb-2 text-sm font-bold text-white">
+                  Terms &amp; privacy
+                </p>
+                <label className="flex cursor-pointer items-start gap-3 text-xs leading-5 text-slate-300">
+                  <input
+                    required
+                    type="checkbox"
+                    checked={acceptedLegal}
+                    onChange={(event) => setAcceptedLegal(event.target.checked)}
+                    className="mt-0.5 h-4 w-4 shrink-0 accent-violet-500"
+                  />
+                  <span>
+                    I agree to the{" "}
+                    <Link
+                      href="/terms"
+                      target="_blank"
+                      className="font-bold text-violet-300 underline underline-offset-2"
+                    >
+                      Terms of Service
+                    </Link>{" "}
+                    and acknowledge the{" "}
+                    <Link
+                      href="/privacy"
+                      target="_blank"
+                      className="font-bold text-violet-300 underline underline-offset-2"
+                    >
+                      Privacy Policy
+                    </Link>
+                    .
+                  </span>
+                </label>
+                <p className="mt-2 pl-7 text-[11px] leading-4 text-slate-500">
+                  Required to create an account. We record the acceptance date
+                  and policy versions.
+                </p>
+              </div>
               <div className="flex gap-3">
                 <button
                   onClick={() => setStep(2)}
@@ -449,7 +495,7 @@ export default function RegisterPage() {
                 </button>
                 <button
                   onClick={submit}
-                  disabled={loading}
+                  disabled={loading || !acceptedLegal}
                   className="flex-1 py-3 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
                 >
                   {loading ? (
@@ -473,6 +519,15 @@ export default function RegisterPage() {
             className="text-violet-400 font-bold hover:text-violet-300 transition-colors"
           >
             Sign een
+          </Link>
+        </p>
+        <p className="mt-3 text-center text-xs text-slate-600">
+          <Link href="/privacy" className="hover:text-violet-300">
+            Privacy Policy
+          </Link>{" "}
+          ·{" "}
+          <Link href="/terms" className="hover:text-violet-300">
+            Terms of Service
           </Link>
         </p>
       </div>
