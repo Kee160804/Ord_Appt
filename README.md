@@ -64,7 +64,7 @@ Password login itself requires the two public Supabase variables above.
 Password recovery and confirmation email are sent by Supabase Auth, not by the
 application's Resend SDK. Adding `RESEND_API_KEY` to Vercel does not connect
 Supabase Auth to Resend: configure Resend SMTP under **Supabase >
-Authentication > Notifications > Email > SMTP Settings**. The test sender `onboarding@resend.dev` can send
+Authentication > Notifications > Email > SMTP Settings**. The test sender `YuhBusiness <noreply@yuhbusiness.com>` can send
 only to the Resend account owner's address; verify a domain before sending Auth
 email to other users.
 

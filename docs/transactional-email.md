@@ -15,7 +15,7 @@ The worker consumes the existing `order_email_deliveries`, `appointment_email_de
 ## Before purchasing a domain
 
 A domain is not required for local development or integration testing. Use
-Resend's `onboarding@resend.dev` sender and send test messages only to the
+Resend's `YuhBusiness <noreply@yuhbusiness.com>` sender and send test messages only to the
 email address that owns the Resend account. This verifies queueing, worker
 authentication, templates, retries, and database delivery records, but it is
 not a production email configuration.
@@ -68,7 +68,7 @@ where routine_schema = 'public'
 5. Add a TXT record at `_dmarc` with `v=DMARC1; p=none;` if no DMARC record
    already exists. Tighten the policy after delivery has been monitored.
 6. Wait for Resend to show the domain as **Verified** before switching the
-   sender. Until then, `YuhBusiness <onboarding@resend.dev>` can be used only
+   sender. Until then, `YuhBusiness <YuhBusiness <noreply@yuhbusiness.com>>` can be used only
    for messages to the email address that owns the Resend account.
 
 ## 3. Configure local variables
@@ -184,7 +184,7 @@ Keep email confirmation enabled. Do not save the production sender until
 `mail.yuhbusiness.com` shows as verified in Resend. Brand the Supabase Auth
 templates after a plain confirmation email succeeds.
 
-`onboarding@resend.dev` is a test-only sender. It can send only to the email
+`YuhBusiness <noreply@yuhbusiness.com>` is a test-only sender. It can send only to the email
 address that owns the Resend account; it cannot deliver password resets or
 confirmations to arbitrary customer addresses. For production, add and verify
 a domain in Resend, then use the same verified sender address in both
@@ -266,8 +266,8 @@ order by queue,status;
 
 - `401`: the endpoint secret is missing, shorter than 16 characters, or does not match.
 - `RESEND_API_KEY is not configured`: add it to the invoked environment and redeploy/restart.
-- Resend validation error with `onboarding@resend.dev`: send only to the Resend account owner until a domain is verified.
-- Password recovery displays an empty `{}` error: Supabase Auth received a provider-side `5xx`, commonly because Auth SMTP uses `onboarding@resend.dev` for a recipient other than the Resend account owner. Verify a sending domain and update the Supabase Auth SMTP sender.
+- Resend validation error with `YuhBusiness <noreply@yuhbusiness.com>`: send only to the Resend account owner until a domain is verified.
+- Password recovery displays an empty `{}` error: Supabase Auth received a provider-side `5xx`, commonly because Auth SMTP uses `YuhBusiness <noreply@yuhbusiness.com>` for a recipient other than the Resend account owner. Verify a sending domain and update the Supabase Auth SMTP sender.
 - `Unable to claim email jobs`: apply the full migration and let PostgREST reload its schema.
 - Repeated `FAILED`: inspect `last_error`. Jobs stop after three attempts; after correcting the cause, reset only the intended row to `PENDING` and `attempt_count=0`.
 - A successful order/appointment with a failed email is intentional: business data remains committed while delivery is retried separately.
