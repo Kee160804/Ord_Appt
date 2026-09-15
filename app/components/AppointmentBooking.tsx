@@ -19,7 +19,12 @@ import { isSupabaseConfigured } from "@/app/lib/supabase/config";
 import { Button } from "@/app/components/Button";
 import { Input } from "@/app/components/input";
 import { Modal } from "@/app/components/Modal";
-import type { PublicServiceProvider, Service, Tenant } from "@/app/types/index";
+import type {
+  BusinessReview,
+  PublicServiceProvider,
+  Service,
+  Tenant,
+} from "@/app/types/index";
 
 // Extend Service type locally to include optional fields used in this component
 interface ExtendedService extends Service {
@@ -32,12 +37,36 @@ interface AppointmentBookingProps {
   tenant: Tenant;
   services: Service[];
   providers?: PublicServiceProvider[];
+  reviews?: BusinessReview[];
   viewOnly?: boolean;
 }
 
 // Helpers
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const PLACEHOLDER_IMG = "/fallback-product.png";
+
+/**
+ * Lightweight client-side validation mirrors the public booking API enough to
+ * give customers immediate feedback. The server remains authoritative.
+ */
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function isValidEmail(value: string) {
+  return EMAIL_PATTERN.test(value.trim());
+}
+
+function isValidPhone(value: string) {
+  const normalized = value.trim();
+  return normalized.length >= 7 && normalized.length <= 40;
+}
+
+function isValidBookingDate(value: string) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+function isValidBookingTime(value: string) {
+  return /^\d{2}:\d{2}(?::\d{2})?$/.test(value);
+}
 
 function dateKey(date: Date) {
   const year = date.getFullYear();
@@ -76,13 +105,11 @@ function buildTimeSlots(
   return slots;
 }
 
-// Placeholder reviews (replace with real data)
-const FAKE_REVIEWS: Record<string, { rating: number; text: string }[]> = {};
-
 export function AppointmentBooking({
   tenant,
   services,
   providers = [],
+  reviews = [],
   viewOnly = false,
 }: AppointmentBookingProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -123,6 +150,20 @@ export function AppointmentBooking({
       ),
     [providers, selectedServiceId],
   );
+
+  /**
+   * A provider selected for one service must never leak into another service.
+   * This also handles live storefront data changing while the page is open.
+   */
+  useEffect(() => {
+    if (
+      selectedProviderId &&
+      !eligibleProviders.some((provider) => provider.id === selectedProviderId)
+    ) {
+      setSelectedProviderId("");
+      setSelectedTime(null);
+    }
+  }, [eligibleProviders, selectedProviderId]);
   useEffect(() => {
     if (
       viewOnly ||
@@ -150,7 +191,20 @@ export function AppointmentBooking({
       selectedProviderId || undefined,
     )
       .then((slots) => {
-        if (active) setAvailableSlots(slots);
+        if (!active) return;
+
+        /**
+         * Only render well-formed, unique slot values returned by the server.
+         * The server still performs the final availability check at booking.
+         */
+        const normalizedSlots = Array.from(
+          new Set(slots.filter((slot) => isValidBookingTime(slot))),
+        ).sort();
+
+        setAvailableSlots(normalizedSlots);
+        setSelectedTime((current) =>
+          current && normalizedSlots.includes(current) ? current : null,
+        );
       })
       .catch((err) => {
         if (active) {
@@ -224,7 +278,9 @@ export function AppointmentBooking({
   const extendedServices = filteredServices as ExtendedService[];
   const detailService =
     extendedServices.find((s) => s.id === selectedServiceId) ?? null;
-  const reviews = detailService ? (FAKE_REVIEWS[detailService.id] ?? []) : [];
+  const serviceReviews = detailService
+    ? reviews.filter((review) => review.serviceId === detailService.id)
+    : [];
 
   const prevMonth = () =>
     setCurrentMonth((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1));
@@ -245,38 +301,107 @@ export function AppointmentBooking({
       );
       return;
     }
-    if (!selectedServiceId || !selectedDate || !selectedTime) return;
+
+    if (!selectedServiceId || !selectedDate || !selectedTime) {
+      setBookingError("Choose a service, date, and available time.");
+      return;
+    }
+
+    if (!selectedService) {
+      setBookingError("The selected service is no longer available.");
+      return;
+    }
+
     if (
-      !customer.name.trim() ||
-      !customer.email.trim() ||
-      !customer.phone.trim()
+      !isValidBookingDate(selectedDate) ||
+      !isValidBookingTime(selectedTime)
     ) {
-      setBookingError("Name, email, and phone are required.");
+      setBookingError("Choose a valid appointment date and time.");
+      return;
+    }
+
+    /**
+     * When the selected service has providers, a provider is required. Validate
+     * against the eligible list rather than trusting a stale select value.
+     */
+    if (
+      eligibleProviders.length > 0 &&
+      !eligibleProviders.some((provider) => provider.id === selectedProviderId)
+    ) {
+      setBookingError("Choose an available service provider.");
+      return;
+    }
+
+    const customerName = customer.name.trim();
+    const customerEmail = customer.email.trim().toLowerCase();
+    const customerPhone = customer.phone.trim();
+    const bookingNotes = concerns.trim();
+    const normalizedPromotionCode = promotionCode
+      .trim()
+      .toUpperCase()
+      .replace(/\s/g, "");
+
+    if (customerName.length < 2 || customerName.length > 120) {
+      setBookingError("Enter a valid full name.");
+      return;
+    }
+
+    if (!isValidEmail(customerEmail)) {
+      setBookingError("Enter a valid email address.");
+      return;
+    }
+
+    if (!isValidPhone(customerPhone)) {
+      setBookingError("Enter a valid phone number.");
+      return;
+    }
+
+    if (bookingNotes.length > 2000) {
+      setBookingError("Notes must be 2,000 characters or fewer.");
+      return;
+    }
+
+    if (normalizedPromotionCode.length > 100) {
+      setBookingError("The discount code is too long.");
+      return;
+    }
+
+    if (!isSupabaseConfigured()) {
+      setBookingError("Online appointment booking is not configured.");
       return;
     }
 
     setIsBooking(true);
     setBookingError("");
+
     try {
+      /**
+       * Only identifiers and customer selections are submitted. Service price,
+       * deposit amount, promotion value, provider eligibility, and final slot
+       * availability must be calculated/validated by the server/database.
+       */
       const result = await createPublicAppointment({
         tenantId: tenant.id,
         serviceId: selectedServiceId,
         date: selectedDate,
         time: selectedTime,
-        customerName: customer.name,
-        customerEmail: customer.email,
-        customerPhone: customer.phone,
-        notes: concerns,
-        providerId: selectedProviderId || undefined,
-        promotionCode: promotionCode.trim() || undefined,
+        customerName,
+        customerEmail,
+        customerPhone,
+        notes: bookingNotes,
+        providerId:
+          eligibleProviders.length > 0 ? selectedProviderId : undefined,
+        promotionCode: normalizedPromotionCode || undefined,
         paymentMethod,
       });
+
       setConfirmationId(result.appointmentId);
       setPaymentConfirmation(
         result.paymentStatus.toUpperCase() === "PAID"
           ? `Mock payment ${result.paymentReference ?? ""} approved.`
           : "Payment will be collected by the business.",
       );
+
       setBookingOpen(false);
       setSelectedServiceId(null);
       setSelectedDate(null);
@@ -297,10 +422,13 @@ export function AppointmentBooking({
   };
 
   const canBook =
-    !!selectedServiceId &&
+    !!selectedService &&
     !!selectedDate &&
+    isValidBookingDate(selectedDate) &&
     !!selectedTime &&
-    (eligibleProviders.length === 0 || !!selectedProviderId);
+    isValidBookingTime(selectedTime) &&
+    (eligibleProviders.length === 0 ||
+      eligibleProviders.some((provider) => provider.id === selectedProviderId));
 
   return (
     <>
@@ -487,6 +615,7 @@ export function AppointmentBooking({
               onChange={(e) => setConcerns(e.target.value)}
               placeholder="Describe your concerns or special requests…"
               rows={4}
+              maxLength={2000}
               className="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-3 text-xs text-slate-700 dark:text-slate-300 placeholder-slate-400 dark:placeholder-slate-600 outline-none focus:ring-2 focus:ring-violet-500 resize-none"
               aria-label="Notes or concerns"
             />
@@ -593,6 +722,7 @@ export function AppointmentBooking({
                           setSelectedServiceId(service.id);
                           setSelectedProviderId("");
                           setSelectedTime(null);
+                          setBookingError("");
                         }}
                         className="flex-1 py-2 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold transition"
                         aria-label={`Book ${service.name}`}
@@ -604,6 +734,7 @@ export function AppointmentBooking({
                           setSelectedServiceId(service.id);
                           setSelectedProviderId("");
                           setSelectedTime(null);
+                          setBookingError("");
                         }}
                         className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:border-violet-400 hover:text-violet-600 transition"
                         aria-label={`View details of ${service.name}`}
@@ -707,25 +838,30 @@ export function AppointmentBooking({
 
                 <div>
                   <SectionHeading>Reviews</SectionHeading>
-                  {reviews.length === 0 ? (
+                  {serviceReviews.length === 0 ? (
                     <p className="text-xs text-slate-400 dark:text-slate-500 mt-1.5">
                       No reviews yet for this service.
                     </p>
                   ) : (
                     <div className="mt-2 space-y-3">
-                      {reviews.map((r, i) => (
-                        <div key={i}>
+                      {serviceReviews.map((review) => (
+                        <div key={review.id}>
                           <div className="flex gap-0.5 text-amber-400 text-sm">
                             {Array.from({ length: 5 }).map((_, s) => (
                               <Star
                                 key={s}
                                 className="w-3.5 h-3.5"
-                                fill={s < r.rating ? "currentColor" : "none"}
+                                fill={
+                                  s < review.rating ? "currentColor" : "none"
+                                }
                               />
                             ))}
                           </div>
                           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 italic">
-                            &ldquo;{r.text}&rdquo;
+                            &ldquo;{review.body}&rdquo;
+                          </p>
+                          <p className="mt-1 text-[10px] font-semibold text-slate-400 dark:text-slate-500">
+                            {review.reviewerName}
                           </p>
                         </div>
                       ))}
@@ -827,6 +963,7 @@ export function AppointmentBooking({
             label="Full Name"
             autoComplete="name"
             value={customer.name}
+            maxLength={120}
             onChange={(event) =>
               setCustomer((current) => ({
                 ...current,
@@ -839,6 +976,7 @@ export function AppointmentBooking({
             type="email"
             autoComplete="email"
             value={customer.email}
+            maxLength={320}
             onChange={(event) =>
               setCustomer((current) => ({
                 ...current,
@@ -851,6 +989,7 @@ export function AppointmentBooking({
             type="tel"
             autoComplete="tel"
             value={customer.phone}
+            maxLength={40}
             onChange={(event) =>
               setCustomer((current) => ({
                 ...current,
@@ -861,6 +1000,7 @@ export function AppointmentBooking({
           <Input
             label="Discount Code (optional)"
             value={promotionCode}
+            maxLength={100}
             onChange={(event) =>
               setPromotionCode(
                 event.target.value.toUpperCase().replace(/\s/g, ""),

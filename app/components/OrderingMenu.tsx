@@ -42,6 +42,36 @@ interface AddonOption {
   price: number;
 }
 
+/**
+ * Returns the normalized add-on IDs for a configured cart line.
+ *
+ * Sorting makes the identity independent of the order in which the customer
+ * selected the add-ons.
+ */
+function cartAddonIds(item: Pick<CartItem, "addons">): string[] {
+  return item.addons
+    .map((addon) => addon.id)
+    .filter(Boolean)
+    .sort();
+}
+
+/**
+ * Creates the same configured-line identity used by the storefront cart.
+ *
+ * Quantity controls and removal actions must target the complete configuration,
+ * not merely product + variant. Otherwise two lines such as:
+ *
+ *   Burger / Large / Cheese
+ *   Burger / Large / Bacon
+ *
+ * could both be changed or removed by a single button click.
+ */
+function cartLineKey(
+  item: Pick<CartItem, "id" | "variantId" | "addons">,
+): string {
+  return `${item.id}::${item.variantId ?? ""}::${cartAddonIds(item).join(",")}`;
+}
+
 interface OrderingMenuProps {
   tenant: Tenant;
   products: Product[];
@@ -353,20 +383,32 @@ export function OrderingMenu({
 
   const handleAddToCart = () => {
     if (!currentProduct) return;
+
     const selectedVariant = currentProduct.variants?.find(
       (variant) => variant.id === selectedVariantId,
     );
+
     if (currentProduct.variants?.length && !selectedVariant) {
       setOrderError("Choose an available product variant.");
       return;
     }
-    const existingQuantity =
-      cart.find(
+
+    /**
+     * Inventory is shared by the underlying product/variant, even when the
+     * customer has several differently configured add-on lines in the cart.
+     * Therefore stock checks must total ALL lines for this product/variant.
+     */
+    const existingQuantity = cart
+      .filter(
         (item) =>
-          item.id === currentProduct.id && item.variantId === selectedVariantId,
-      )?.quantity ?? 0;
+          item.id === currentProduct.id &&
+          item.variantId === selectedVariant?.id,
+      )
+      .reduce((sum, item) => sum + item.quantity, 0);
+
     const availableStock =
       selectedVariant?.stock ?? currentProduct.inventory ?? 0;
+
     if (
       (selectedVariant || currentProduct.trackInventory !== false) &&
       existingQuantity + quantity > availableStock
@@ -374,6 +416,7 @@ export function OrderingMenu({
       setOrderError(`Only ${availableStock} ${currentProduct.name} available.`);
       return;
     }
+
     onAddToCart({
       id: currentProduct.id,
       variantId: selectedVariant?.id,
@@ -395,32 +438,69 @@ export function OrderingMenu({
       })),
       image: currentProduct.image,
     });
+
     setModalOpen(false);
   };
 
-  const updateQty = (id: string, delta: number, variantId?: string) => {
-    const product = products.find((candidate) => candidate.id === id);
+  /**
+   * Changes exactly one configured cart line.
+   *
+   * `target` includes add-ons so changing one configuration cannot accidentally
+   * change every line that shares the same product and variant.
+   */
+  const updateQty = (target: CartItem, delta: number) => {
+    const product = products.find((candidate) => candidate.id === target.id);
+    const targetKey = cartLineKey(target);
+
+    /**
+     * Stock belongs to the product/variant rather than to an add-on
+     * configuration. Count the other matching product/variant lines first.
+     */
+    const quantityInOtherConfigurations = cart
+      .filter(
+        (item) =>
+          cartLineKey(item) !== targetKey &&
+          item.id === target.id &&
+          item.variantId === target.variantId,
+      )
+      .reduce((sum, item) => sum + item.quantity, 0);
+
     updateCart(
       cart
-        .map((i) => {
-          if (i.id !== id || i.variantId !== variantId) return i;
-          const requested = Math.max(0, i.quantity + delta);
+        .map((item) => {
+          if (cartLineKey(item) !== targetKey) return item;
+
+          const requested = Math.max(0, item.quantity + delta);
           const variant = product?.variants?.find(
-            (candidate) => candidate.id === variantId,
+            (candidate) => candidate.id === target.variantId,
           );
-          const maximum = variant
+
+          const totalAvailable = variant
             ? variant.stock
             : product && product.trackInventory !== false
               ? (product.inventory ?? 0)
-              : 99;
-          return { ...i, quantity: Math.min(requested, maximum) };
+              : Number.POSITIVE_INFINITY;
+
+          const maximumForThisLine = Number.isFinite(totalAvailable)
+            ? Math.max(0, totalAvailable - quantityInOtherConfigurations)
+            : Number.POSITIVE_INFINITY;
+
+          return {
+            ...item,
+            quantity: Math.min(requested, maximumForThisLine),
+          };
         })
-        .filter((i) => i.quantity > 0),
+        .filter((item) => item.quantity > 0),
     );
   };
 
-  const removeItem = (id: string, variantId?: string) =>
-    updateCart(cart.filter((i) => i.id !== id || i.variantId !== variantId));
+  /**
+   * Removes exactly one configured cart line.
+   */
+  const removeItem = (target: CartItem) => {
+    const targetKey = cartLineKey(target);
+    updateCart(cart.filter((item) => cartLineKey(item) !== targetKey));
+  };
 
   // Clearing the full cart is the only quantity action that requires confirmation.
   const clearCart = () => {
@@ -508,9 +588,23 @@ export function OrderingMenu({
       setOrderConfirmation(
         `Order ${result.orderNumber} was placed successfully.${paymentMessage}`,
       );
-      onOrderPlaced?.(
-        cart.map((item) => ({ productId: item.id, quantity: item.quantity })),
+      /**
+       * A product may appear in several configured cart lines. Aggregate the
+       * quantities before updating the storefront inventory preview so no
+       * quantity is lost when multiple lines share the same product ID.
+       */
+      const orderedQuantities = Array.from(
+        cart.reduce((totals, item) => {
+          totals.set(item.id, (totals.get(item.id) ?? 0) + item.quantity);
+          return totals;
+        }, new Map<string, number>()),
+        ([productId, orderedQuantity]) => ({
+          productId,
+          quantity: orderedQuantity,
+        }),
       );
+
+      onOrderPlaced?.(orderedQuantities);
       updateCart([]);
       setCustomerName("");
       setCustomerEmail("");
@@ -714,11 +808,8 @@ export function OrderingMenu({
                             </span>
                             <div className="flex items-center gap-2">
                               <button
-                                onClick={() =>
-                                  cartItem &&
-                                  updateQty(product.id, -1, cartItem.variantId)
-                                }
-                                disabled={!cartItem}
+                                onClick={() => cartItem && updateQty(cartItem, -1)}
+                                disabled={!cartItem || productCartItems.length > 1}
                                 className="flex h-7 w-8 items-center justify-center rounded-full bg-[#1a2840] text-[#aab8cc] transition hover:bg-[#243550] disabled:opacity-35 light:bg-slate-100 light:text-slate-600"
                                 aria-label={`Decrease ${product.name} quantity`}
                               >
@@ -731,8 +822,8 @@ export function OrderingMenu({
                                 onClick={() =>
                                   product.variants?.length
                                     ? openAddModal(product)
-                                    : cartItem
-                                      ? updateQty(product.id, 1)
+                                    : cartItem && productCartItems.length === 1
+                                      ? updateQty(cartItem, 1)
                                       : openAddModal(product)
                                 }
                                 disabled={soldOut || stockLimitReached}
@@ -1008,7 +1099,7 @@ export function OrderingMenu({
                   const lineTotal = item.price * item.quantity + addonsTotal;
                   return (
                     <div
-                      key={`${item.id}:${item.variantId ?? "default"}`}
+                      key={cartLineKey(item)}
                       className="flex gap-3 rounded-xl border border-[#26364f] bg-[#111d30] p-3 light:border-slate-200 light:bg-slate-50"
                     >
                       <div className="relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-lg bg-[#172238] light:bg-slate-100">
@@ -1044,8 +1135,8 @@ export function OrderingMenu({
                         )}
                         {item.addons.length > 0 && (
                           <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 space-y-0.5">
-                            {item.addons.map((ad, i) => (
-                              <div key={i}>
+                            {item.addons.map((ad) => (
+                              <div key={ad.id}>
                                 • {ad.name} (+{formatCurrency(ad.price)})
                               </div>
                             ))}
@@ -1054,7 +1145,7 @@ export function OrderingMenu({
                         <div className="flex items-center gap-1.5 mt-1.5">
                           <button
                             onClick={() =>
-                              updateQty(item.id, -1, item.variantId)
+                              updateQty(item, -1)
                             }
                             className="w-5 h-5 rounded border border-slate-200 dark:border-slate-600 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-700 transition"
                             aria-label="Decrease quantity"
@@ -1066,7 +1157,7 @@ export function OrderingMenu({
                           </span>
                           <button
                             onClick={() =>
-                              updateQty(item.id, 1, item.variantId)
+                              updateQty(item, 1)
                             }
                             className="w-5 h-5 rounded border border-slate-200 dark:border-slate-600 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-700 transition"
                             aria-label="Increase quantity"
@@ -1074,7 +1165,7 @@ export function OrderingMenu({
                             <Plus className="w-2.5 h-2.5" />
                           </button>
                           <button
-                            onClick={() => removeItem(item.id, item.variantId)}
+                            onClick={() => removeItem(item)}
                             className="ml-auto text-slate-300 dark:text-slate-600 hover:text-red-500 transition"
                             aria-label="Remove item"
                           >
@@ -1304,8 +1395,9 @@ export function OrderingMenu({
                     disabled={
                       currentProduct.trackInventory !== false &&
                       quantity +
-                        (cart.find((item) => item.id === currentProduct.id)
-                          ?.quantity ?? 0) >=
+                        cart
+                          .filter((item) => item.id === currentProduct.id)
+                          .reduce((sum, item) => sum + item.quantity, 0) >=
                         (currentProduct.inventory ?? 0)
                     }
                     className="w-8 h-8 rounded-lg border border-slate-200 dark:border-slate-600 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-30 transition"
@@ -1417,15 +1509,26 @@ function RetailProductOptions({
   const selectedVariant = variants.find(
     (variant) => variant.id === selectedVariantId,
   );
-  const existingQuantity = cart.find(
-    (item) => item.id === product.id && item.variantId === selectedVariantId,
-  )?.quantity;
+  /**
+   * Inventory is shared across every add-on configuration of the selected
+   * product/variant, so remaining stock must use the summed cart quantity.
+   */
+  const existingQuantity = cart
+    .filter(
+      (item) =>
+        item.id === product.id && item.variantId === selectedVariantId,
+    )
+    .reduce((sum, item) => sum + item.quantity, 0);
+
   const availableStock = selectedVariant
     ? selectedVariant.stock
     : product.trackInventory === false
-      ? 99
+      ? Number.POSITIVE_INFINITY
       : (product.inventory ?? 0);
-  const remainingStock = Math.max(0, availableStock - (existingQuantity ?? 0));
+
+  const remainingStock = Number.isFinite(availableStock)
+    ? Math.max(0, availableStock - existingQuantity)
+    : Number.POSITIVE_INFINITY;
   const unitPrice = selectedVariant?.price ?? product.price;
   const addOnPrice = selectedAddons.reduce(
     (sum, addon) => sum + addon.price,

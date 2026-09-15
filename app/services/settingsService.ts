@@ -1,5 +1,10 @@
 import { getSupabaseBrowserClient } from "@/app/lib/supabase/client";
-import type { BusinessHours, OrderingSettings } from "@/app/types/index";
+import { cleanSocialLinks } from "@/app/lib/social-links";
+import type {
+  BusinessHours,
+  OrderingSettings,
+  SocialLinks,
+} from "@/app/types/index";
 
 export interface BusinessDetailsInput {
   name: string;
@@ -15,6 +20,8 @@ export interface StorefrontSettingsInput {
   coverImage: string;
   primaryColor: string;
   accentColor: string;
+  socialLinks: SocialLinks;
+  customDomain: string;
 }
 
 const DAYS = [
@@ -48,6 +55,30 @@ function slugify(value: string) {
     .replace(/[^a-z0-9-]/g, "")
     .replace(/-+/g, "-")
     .replace(/^-|-$/g, "");
+}
+
+function normalizeCustomDomain(value: string) {
+  const input = value.trim().toLowerCase();
+  if (!input) return "";
+  let url: URL;
+  try {
+    url = new URL(input.includes("://") ? input : `https://${input}`);
+  } catch {
+    throw new Error(
+      "Enter a valid custom domain, such as bookings.example.com.",
+    );
+  }
+  const hostname = url.hostname.replace(/\.$/, "");
+  if (
+    !hostname.includes(".") ||
+    hostname === "localhost" ||
+    !/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i.test(
+      hostname,
+    )
+  ) {
+    throw new Error("Enter a valid public custom domain.");
+  }
+  return hostname;
 }
 
 export function validateStorefrontCoverImage(file: File) {
@@ -139,6 +170,8 @@ export async function updateStorefrontSettings(
 ) {
   const slug = slugify(input.slug);
   if (!slug) throw new Error("Storefront URL is required.");
+  const customDomain = normalizeCustomDomain(input.customDomain);
+  const socialLinks = cleanSocialLinks(input.socialLinks);
 
   const coverImage = input.coverImage.trim();
   if (coverImage) {
@@ -161,13 +194,15 @@ export async function updateStorefrontSettings(
       cover_image: coverImage || null,
       primary_color: input.primaryColor,
       accent_color: input.accentColor,
+      social_links: socialLinks,
+      custom_domain: customDomain || null,
     })
     .eq("id", tenantId)
     .select("id")
     .single();
 
   if (error) throw error;
-  return { ...input, slug, coverImage };
+  return { ...input, slug, coverImage, socialLinks, customDomain };
 }
 
 export async function updateBusinessHours(

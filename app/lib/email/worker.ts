@@ -4,6 +4,13 @@ import { getSupabaseAdminClient } from "@/app/lib/supabase/admin";
 import { isValidEmailAddress, sendTransactionalEmail } from "./resend";
 import type { TransactionalEmailEvent } from "./templates";
 
+/**
+ * Database email job returned by the `claim_email_jobs` RPC.
+ *
+ * Queue ownership, retry limits, locking, and stale-job recovery are database
+ * responsibilities. This worker validates the claimed job again immediately
+ * before sending it to Resend.
+ */
 interface ClaimedEmailJob {
   queue_name: "transactional" | "order" | "appointment" | "reminder";
   id: string;
@@ -31,6 +38,12 @@ function stringValue(payload: Record<string, unknown>, key: string) {
   return typeof value === "string" ? value : "";
 }
 
+/**
+ * Revalidates the tenant immediately before delivery.
+ *
+ * The queue may contain an older snapshot, so current tenant data is loaded
+ * from Supabase and used to enrich the final email payload.
+ */
 async function validateTenant(job: ClaimedEmailJob) {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
@@ -43,6 +56,10 @@ async function validateTenant(job: ClaimedEmailJob) {
   return data;
 }
 
+/**
+ * Prevents a queued membership email from being delivered to an address that
+ * no longer belongs to the membership's current profile.
+ */
 async function validateMembershipRecipient(job: ClaimedEmailJob) {
   const supabase = getSupabaseAdminClient();
   const { data: membership, error: membershipError } = await supabase
@@ -70,6 +87,10 @@ async function validateMembershipRecipient(job: ClaimedEmailJob) {
   }
 }
 
+/**
+ * Confirms that an owner-targeted email is still addressed to the current
+ * OWNER membership for this tenant.
+ */
 async function validateOwnerRecipient(job: ClaimedEmailJob) {
   const supabase = getSupabaseAdminClient();
   const { data: memberships, error: membershipError } = await supabase
@@ -104,6 +125,13 @@ async function validateOwnerRecipient(job: ClaimedEmailJob) {
   }
 }
 
+/**
+ * Performs last-moment validation and enrichment for a claimed email job.
+ *
+ * This protects against stale queue data. For example, an appointment may
+ * have been cancelled after a reminder was queued but before the worker
+ * actually processes it.
+ */
 async function validateJob(job: ClaimedEmailJob) {
   if (!isValidEmailAddress(job.recipient_email))
     throw new Error("Invalid recipient email.");
@@ -159,6 +187,8 @@ async function validateJob(job: ClaimedEmailJob) {
         "The appointment recipient no longer matches the queued email.",
       );
     }
+    // Never send a stale reminder for an appointment that is no longer
+    // confirmed, has no valid start time, or has already started/passed.
     if (
       job.queue_name === "reminder" &&
       (data.status?.toUpperCase() !== "CONFIRMED" ||
@@ -169,6 +199,8 @@ async function validateJob(job: ClaimedEmailJob) {
         "The appointment is no longer eligible for this reminder.",
       );
     }
+    // A queued confirmation becomes invalid if the appointment is cancelled
+    // before the worker reaches it.
     if (
       job.event_type === "APPOINTMENT_CONFIRMED" &&
       data.status?.toUpperCase() === "CANCELLED"
@@ -177,6 +209,8 @@ async function validateJob(job: ClaimedEmailJob) {
         "The appointment was cancelled before its confirmation email was sent.",
       );
     }
+    // Likewise, only send cancellation mail while the source appointment is
+    // actually cancelled.
     if (
       job.event_type === "APPOINTMENT_CANCELLED" &&
       data.status?.toUpperCase() !== "CANCELLED"
@@ -240,6 +274,15 @@ async function validateJob(job: ClaimedEmailJob) {
   return { payload, replyTo };
 }
 
+/**
+ * Persists the outcome of a claimed job through the database RPC.
+ *
+ * IMPORTANT:
+ * `SENT` means Resend accepted the message and returned a provider message ID.
+ * It does not mean the recipient's mail server/inbox has delivered it.
+ * Final provider delivery state should be handled separately by signed Resend
+ * delivery webhooks.
+ */
 async function markResult(
   job: ClaimedEmailJob,
   status: "SENT" | "FAILED" | "CANCELLED",
@@ -259,6 +302,19 @@ async function markResult(
   if (error) throw error;
 }
 
+/**
+ * Claims and processes a bounded batch of transactional email jobs.
+ *
+ * Flow:
+ *  1. Enqueue any trial emails that are currently due.
+ *  2. Atomically claim a bounded batch through Supabase.
+ *  3. Revalidate each recipient/source record.
+ *  4. Send through the centralized Resend transport.
+ *  5. Persist SENT, FAILED, or CANCELLED back to the queue.
+ *
+ * Retry timing, attempt limits, locking, and stale-job recovery remain in the
+ * SQL RPC layer and should not be duplicated in this worker.
+ */
 export async function processTransactionalEmailQueue(
   limit = 30,
 ): Promise<EmailQueueResult> {
@@ -302,6 +358,8 @@ export async function processTransactionalEmailQueue(
         jobError instanceof Error
           ? jobError.message
           : "Unknown email delivery error.";
+      // Stale/invalid source records are terminal skips rather than transient
+      // provider failures. Other failures remain retryable according to SQL.
       const invalidRecord =
         message.includes("no longer") ||
         message.includes("not scoped") ||

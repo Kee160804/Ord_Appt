@@ -1,7 +1,10 @@
-import { getTenantBySlug } from "@/app/lib/data";
-import StorefrontClient from "@/app/components/store";
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+
+import StorefrontClient from "@/app/components/store";
+import { getTenantBySlug } from "@/app/lib/data";
 import { isSupabaseConfigured } from "@/app/lib/supabase/config";
+import { publicAppUrl, storefrontPath } from "@/app/lib/platform";
 import { getPublicStorefront } from "@/app/services/storefrontService";
 import {
   getCategoriesByTenant,
@@ -15,16 +18,181 @@ interface StorePageProps {
   searchParams?: Promise<{ demo?: string }> | { demo?: string };
 }
 
+const SITE_NAME = "YuhBusiness";
+const DEFAULT_DESCRIPTION =
+  "Browse products, services, and appointment options on YuhBusiness.";
+
+function normalizeSlug(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function isDemoRequest(demo: string | undefined): boolean {
+  return demo === "1";
+}
+
+function storefrontDescription(
+  name: string,
+  description: string | null | undefined,
+): string {
+  const normalized = description?.trim();
+  return normalized || `Visit ${name} on ${SITE_NAME}.`;
+}
+
+function canonicalStorefrontUrl(slug: string, customDomain?: string) {
+  if (customDomain) return `https://${customDomain}`;
+  return `${publicAppUrl() || "https://yuhbusiness.com"}${storefrontPath(slug)}`;
+}
+
+/**
+ * Generate storefront metadata on the server.
+ *
+ * We intentionally resolve metadata from the same public storefront source as
+ * the page. This prevents private dashboard data from being used to build
+ * public SEO metadata.
+ *
+ * Demo storefronts are explicitly marked noindex/nofollow so preview/sample
+ * pages do not compete with real tenant storefronts in search engines.
+ */
+export async function generateMetadata({
+  params,
+  searchParams,
+}: StorePageProps): Promise<Metadata> {
+  const resolvedParams = await params;
+  const resolvedSearchParams = searchParams ? await searchParams : {};
+  const slug = normalizeSlug(resolvedParams.slug);
+
+  if (!slug) {
+    return {
+      title: `Storefront | ${SITE_NAME}`,
+      description: DEFAULT_DESCRIPTION,
+      robots: { index: false, follow: false },
+    };
+  }
+
+  if (isDemoRequest(resolvedSearchParams.demo)) {
+    const demoTenant = getDemoTenantBySlug(slug);
+
+    if (!demoTenant) {
+      return {
+        title: `Storefront | ${SITE_NAME}`,
+        description: DEFAULT_DESCRIPTION,
+        robots: { index: false, follow: false },
+      };
+    }
+
+    const description = storefrontDescription(
+      demoTenant.name,
+      demoTenant.description,
+    );
+
+    return {
+      title: `${demoTenant.name} | ${SITE_NAME}`,
+      description,
+      robots: { index: false, follow: false },
+    };
+  }
+
+  if (isSupabaseConfigured()) {
+    try {
+      const storefront = await getPublicStorefront(slug);
+
+      if (!storefront) {
+        return {
+          title: `Storefront | ${SITE_NAME}`,
+          description: DEFAULT_DESCRIPTION,
+          robots: { index: false, follow: false },
+        };
+      }
+
+      const { tenant } = storefront;
+      const description = storefrontDescription(
+        tenant.name,
+        tenant.description,
+      );
+      const canonical = canonicalStorefrontUrl(tenant.slug, tenant.domain);
+
+      return {
+        title: `${tenant.name} | ${SITE_NAME}`,
+        description,
+        alternates: { canonical },
+        openGraph: {
+          title: tenant.name,
+          description,
+          type: "website",
+          url: canonical,
+          images: tenant.coverImage ? [{ url: tenant.coverImage }] : undefined,
+        },
+        twitter: {
+          card: tenant.coverImage ? "summary_large_image" : "summary",
+          title: tenant.name,
+          description,
+          images: tenant.coverImage ? [tenant.coverImage] : undefined,
+        },
+      };
+    } catch {
+      /**
+       * Metadata generation should not replace the page's real error behavior.
+       * The page load below remains authoritative and will surface/handle the
+       * storefront failure normally.
+       */
+      return {
+        title: `Storefront | ${SITE_NAME}`,
+        description: DEFAULT_DESCRIPTION,
+      };
+    }
+  }
+
+  const tenant = getTenantBySlug(slug);
+
+  if (!tenant) {
+    return {
+      title: `Storefront | ${SITE_NAME}`,
+      description: DEFAULT_DESCRIPTION,
+      robots: { index: false, follow: false },
+    };
+  }
+
+  const description = storefrontDescription(tenant.name, tenant.description);
+  const canonical = canonicalStorefrontUrl(tenant.slug, tenant.domain);
+
+  return {
+    title: `${tenant.name} | ${SITE_NAME}`,
+    description,
+    alternates: { canonical },
+    openGraph: {
+      title: tenant.name,
+      description,
+      type: "website",
+      url: canonical,
+      images: tenant.coverImage ? [{ url: tenant.coverImage }] : undefined,
+    },
+    twitter: {
+      card: tenant.coverImage ? "summary_large_image" : "summary",
+      title: tenant.name,
+      description,
+      images: tenant.coverImage ? [tenant.coverImage] : undefined,
+    },
+  };
+}
+
 export default async function StorePage({
   params,
   searchParams,
 }: StorePageProps) {
   const resolvedParams = await params;
   const resolvedSearchParams = searchParams ? await searchParams : {};
-  const slug = resolvedParams.slug;
-  if (resolvedSearchParams.demo === "1") {
+  const slug = normalizeSlug(resolvedParams.slug);
+
+  if (!slug) notFound();
+
+  /**
+   * Demo mode is deliberately isolated from the production storefront loader.
+   * It is view-only and never receives production providers or mutation data.
+   */
+  if (isDemoRequest(resolvedSearchParams.demo)) {
     const demoTenant = getDemoTenantBySlug(slug);
     if (!demoTenant) notFound();
+
     const dayOrder = [
       "Sunday",
       "Monday",
@@ -34,6 +202,7 @@ export default async function StorePage({
       "Friday",
       "Saturday",
     ];
+
     const previewTenant = {
       ...demoTenant,
       businessHours: [...demoTenant.businessHours].sort(
@@ -56,6 +225,10 @@ export default async function StorePage({
     );
   }
 
+  /**
+   * Production storefronts use the public/anonymous Supabase loader. That
+   * loader applies tenant scoping and only resolves active tenants.
+   */
   if (isSupabaseConfigured()) {
     const storefront = await getPublicStorefront(slug);
     if (!storefront) notFound();
@@ -67,10 +240,15 @@ export default async function StorePage({
         initialProducts={storefront.products}
         initialServices={storefront.services}
         initialProviders={storefront.providers}
+        initialReviews={storefront.reviews}
       />
     );
   }
 
+  /**
+   * Local fallback keeps development usable when Supabase is intentionally not
+   * configured. Production should normally take the Supabase branch above.
+   */
   const tenant = getTenantBySlug(slug);
 
   if (!tenant) {

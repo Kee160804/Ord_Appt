@@ -1,8 +1,17 @@
-// Supabase Edge Runtime APIs and database client.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.109.0";
 
 type DeliveryStatus = "PENDING" | "PROCESSING" | "SENT" | "FAILED";
+
+/**
+ * Legacy appointment-confirmation delivery worker.
+ *
+ * IMPORTANT:
+ * This Edge Function directly sends appointment confirmation emails through
+ * Resend. If the centralized Next.js email worker is also responsible for the
+ * same appointment event in production, only ONE pipeline should remain
+ * enabled to avoid duplicate emails.
+ */
 
 interface AppointmentEmailPayload {
   appointment_id: string;
@@ -62,12 +71,21 @@ function getSupabaseSecretKey() {
   return key;
 }
 
-function safeEqual(actual: string, expected: string) {
+/**
+ * Constant-work comparison suitable for the Supabase Edge/Deno runtime.
+ *
+ * Node's timingSafeEqual is intentionally not used here because this function
+ * runs in Supabase Edge Runtime rather than the Next.js Node runtime.
+ */
+function safeEqual(actual: string, expected: string): boolean {
   if (actual.length !== expected.length) return false;
+
   let result = 0;
+
   for (let index = 0; index < actual.length; index += 1) {
     result |= actual.charCodeAt(index) ^ expected.charCodeAt(index);
   }
+
   return result === 0;
 }
 
@@ -173,16 +191,30 @@ export default {
         return json({ error: "Unauthorized." }, 401);
       }
 
-      const body = (await request.json()) as WebhookBody;
+      let body: WebhookBody;
+
+      try {
+        body = (await request.json()) as WebhookBody;
+      } catch {
+        return json({ error: "Invalid JSON payload." }, 400);
+      }
+
       if (
         body.type !== "INSERT" ||
         body.schema !== "public" ||
         body.table !== "appointment_email_deliveries" ||
-        !body.record?.id
+        !body.record?.id ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+          body.record.id,
+        )
       ) {
         return json({ error: "Unsupported webhook payload." }, 400);
       }
 
+      /**
+       * Service-role access is required because this worker must claim and
+       * update delivery rows independently of an end-user session.
+       */
       const supabase = createClient(
         requiredEnv("SUPABASE_URL"),
         getSupabaseSecretKey(),
@@ -202,9 +234,19 @@ export default {
       const current = currentData as DeliveryRow | null;
       if (readError || !current)
         throw readError ?? new Error("Email delivery was not found.");
-      if (current.status === "SENT")
+      if (current.status === "SENT") {
         return json({ delivered: true, duplicate: true });
+      }
 
+      if (current.status === "PROCESSING") {
+        return json({ delivered: false, duplicate: true }, 202);
+      }
+
+      /**
+       * Claim the row before contacting Resend. Only PENDING/FAILED rows may
+       * transition to PROCESSING, which prevents two concurrent invocations
+       * from normally sending the same delivery.
+       */
       const { data: deliveryData, error: claimError } = await supabase
         .from("appointment_email_deliveries")
         .update({
@@ -227,6 +269,10 @@ export default {
       const resendApiKey = requiredEnv("RESEND_API_KEY");
       const from = requiredEnv("RESEND_FROM_EMAIL");
       const email = buildEmail(delivery);
+      /**
+       * Provider-level idempotency is the second duplicate-send safeguard.
+       * Reprocessing the same appointment uses the same Resend key.
+       */
       const resendResponse = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: {
@@ -251,16 +297,29 @@ export default {
       if (!resendResponse.ok || !resendResult.id) {
         const providerError =
           resendResult.message || `Resend returned ${resendResponse.status}.`;
-        await supabase
+        const { error: failureUpdateError } = await supabase
           .from("appointment_email_deliveries")
           .update({
             status: "FAILED",
             last_error: providerError.slice(0, 1000),
           })
           .eq("id", delivery.id);
+
+        if (failureUpdateError) {
+          console.error(
+            "[appointment-email] Unable to record provider failure:",
+            failureUpdateError.message,
+          );
+        }
+
         return json({ error: providerError }, 502);
       }
 
+      /**
+       * SENT means Resend accepted the message and supplied a provider ID.
+       * It does not mean final inbox delivery; that requires Resend delivery
+       * webhook events.
+       */
       const { error: sentError } = await supabase
         .from("appointment_email_deliveries")
         .update({
@@ -278,8 +337,12 @@ export default {
         error instanceof Error
           ? error.message
           : "Unable to send confirmation email.";
-      console.error(message);
-      return json({ error: message }, 500);
+      console.error("[appointment-email]", message);
+
+      return json(
+        { error: "Unable to send appointment confirmation email." },
+        500,
+      );
     }
   },
 };

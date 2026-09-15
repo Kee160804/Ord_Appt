@@ -1,5 +1,26 @@
 BEGIN;
 
+-- ============================================================================
+-- EMAIL SERVICE HARDENING NOTES
+-- ============================================================================
+-- This migration establishes the centralized YuhBusiness email outbox/worker.
+-- It is intentionally being STAGED during the code audit. If an earlier
+-- version has already been applied to production, do not rerun this historical
+-- migration; create an additive hardening migration after the final database
+-- migration review.
+--
+-- Delivery ownership:
+--   transactional_email_deliveries -> centralized Next.js worker
+--   order_email_deliveries         -> centralized Next.js worker
+--   appointment_email_deliveries   -> centralized Next.js worker
+--   appointment_reminders          -> centralized Next.js worker
+--
+-- Older Edge Functions that directly send these same records through Resend
+-- must not remain independently triggered in production once this centralized
+-- worker is authoritative, otherwise two delivery pipelines can compete.
+-- ============================================================================
+
+
 -- Some established YuhBusiness databases predate the dedicated order and
 -- appointment email migrations. Create those queues here as compatibility
 -- prerequisites so this migration can be applied directly and safely.
@@ -13,7 +34,7 @@ CREATE TABLE IF NOT EXISTS public.order_email_deliveries (
   subject TEXT NOT NULL,
   payload JSONB NOT NULL DEFAULT '{}'::JSONB,
   status TEXT NOT NULL DEFAULT 'PENDING',
-  attempt_count INTEGER NOT NULL DEFAULT 0,
+  attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
   provider_message_id TEXT,
   last_error TEXT,
   processing_started_at TIMESTAMPTZ,
@@ -38,6 +59,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS order_email_delivery_event_unique_idx
 CREATE INDEX IF NOT EXISTS order_email_delivery_status_idx
   ON public.order_email_deliveries (status, created_at);
 
+-- Supports worker scans for retryable order deliveries.
+CREATE INDEX IF NOT EXISTS order_email_delivery_retry_idx
+  ON public.order_email_deliveries (status, attempt_count, created_at);
+
 CREATE TABLE IF NOT EXISTS public.appointment_email_deliveries (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
@@ -48,7 +73,7 @@ CREATE TABLE IF NOT EXISTS public.appointment_email_deliveries (
   subject TEXT NOT NULL,
   payload JSONB NOT NULL DEFAULT '{}'::JSONB,
   status TEXT NOT NULL DEFAULT 'PENDING',
-  attempt_count INTEGER NOT NULL DEFAULT 0,
+  attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
   provider_message_id TEXT,
   last_error TEXT,
   processing_started_at TIMESTAMPTZ,
@@ -72,6 +97,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS appointment_email_delivery_event_unique_idx
   ON public.appointment_email_deliveries (appointment_id, event_type);
 CREATE INDEX IF NOT EXISTS appointment_email_delivery_status_idx
   ON public.appointment_email_deliveries (status, created_at);
+
+-- Supports worker scans for retryable appointment deliveries.
+CREATE INDEX IF NOT EXISTS appointment_email_delivery_retry_idx
+  ON public.appointment_email_deliveries (status, attempt_count, created_at);
 
 -- Central outbox for transactional events that do not already have a durable
 -- order/appointment delivery record. Resend is called only by trusted server
@@ -107,6 +136,9 @@ CREATE TABLE IF NOT EXISTS public.transactional_email_deliveries (
 );
 CREATE INDEX IF NOT EXISTS transactional_email_delivery_status_idx
   ON public.transactional_email_deliveries (status, created_at);
+
+CREATE INDEX IF NOT EXISTS transactional_email_delivery_retry_idx
+  ON public.transactional_email_deliveries (status, attempt_count, created_at);
 
 ALTER TABLE public.team_invitations
   ADD COLUMN IF NOT EXISTS email_sent_at TIMESTAMPTZ,
@@ -640,17 +672,31 @@ BEGIN
   IF COALESCE((SELECT auth.role()),'') <> 'service_role' THEN
     RAISE EXCEPTION 'Service role required.' USING ERRCODE='42501'; END IF;
 
-  UPDATE public.transactional_email_deliveries SET status='FAILED',processing_started_at=NULL,
-    last_error='Processing lease expired.',updated_at=NOW()
-  WHERE status='PROCESSING' AND processing_started_at<NOW()-INTERVAL '15 minutes' AND attempt_count<3;
-  UPDATE public.order_email_deliveries SET status='FAILED',processing_started_at=NULL,
-    last_error='Processing lease expired.',updated_at=NOW()
-  WHERE status='PROCESSING' AND processing_started_at<NOW()-INTERVAL '15 minutes' AND attempt_count<3;
-  UPDATE public.appointment_email_deliveries SET status='FAILED',processing_started_at=NULL,
-    last_error='Processing lease expired.',updated_at=NOW()
-  WHERE status='PROCESSING' AND processing_started_at<NOW()-INTERVAL '15 minutes' AND attempt_count<3;
-  UPDATE public.appointment_reminders SET status='FAILED',updated_at=NOW()
-  WHERE status='PROCESSING' AND updated_at<NOW()-INTERVAL '15 minutes' AND attempt_count<3;
+  -- Recover stale PROCESSING leases. Rows at the retry cap are still moved to
+  -- FAILED so they do not remain permanently stuck in PROCESSING; the claim
+  -- queries below will not retry them because attempt_count must remain < 3.
+  UPDATE public.transactional_email_deliveries
+  SET status='FAILED',processing_started_at=NULL,
+      last_error='Processing lease expired.',updated_at=NOW()
+  WHERE status='PROCESSING'
+    AND processing_started_at<NOW()-INTERVAL '15 minutes';
+
+  UPDATE public.order_email_deliveries
+  SET status='FAILED',processing_started_at=NULL,
+      last_error='Processing lease expired.',updated_at=NOW()
+  WHERE status='PROCESSING'
+    AND processing_started_at<NOW()-INTERVAL '15 minutes';
+
+  UPDATE public.appointment_email_deliveries
+  SET status='FAILED',processing_started_at=NULL,
+      last_error='Processing lease expired.',updated_at=NOW()
+  WHERE status='PROCESSING'
+    AND processing_started_at<NOW()-INTERVAL '15 minutes';
+
+  UPDATE public.appointment_reminders
+  SET status='FAILED',last_error='Processing lease expired.',updated_at=NOW()
+  WHERE status='PROCESSING'
+    AND updated_at<NOW()-INTERVAL '15 minutes';
 
   FOR v_row IN SELECT delivery.* FROM public.transactional_email_deliveries delivery
     WHERE delivery.status IN ('PENDING','FAILED') AND delivery.attempt_count<3
@@ -717,6 +763,10 @@ $$;
 REVOKE ALL ON FUNCTION public.claim_email_jobs(INTEGER) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.claim_email_jobs(INTEGER) TO service_role;
 
+-- Records the worker result. SENT means the provider accepted the message and
+-- returned a provider_message_id; it does NOT prove final inbox delivery.
+-- Delivered/bounced/complained state should be handled by signed Resend
+-- delivery webhooks in a later additive migration.
 CREATE OR REPLACE FUNCTION public.mark_email_job_result(
   p_queue_name TEXT,p_job_id UUID,p_status TEXT,p_provider_message_id TEXT DEFAULT NULL,p_error TEXT DEFAULT NULL
 )
@@ -743,7 +793,17 @@ BEGIN
     UPDATE public.appointment_reminders SET status=v_status,provider_message_id=p_provider_message_id,
       last_error=p_error,sent_at=CASE WHEN v_status='SENT' THEN NOW() ELSE sent_at END,updated_at=NOW()
       WHERE id=p_job_id AND status='PROCESSING';
-  ELSE RAISE EXCEPTION 'Unknown email queue.' USING ERRCODE='22023'; END IF;
+  ELSE
+    RAISE EXCEPTION 'Unknown email queue.' USING ERRCODE='22023';
+  END IF;
+
+  -- Every successful result must correspond to a job currently leased by this
+  -- worker. Silently accepting zero updated rows would hide stale/duplicate
+  -- completion attempts and make operational debugging much harder.
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Email job is no longer in PROCESSING state.'
+      USING ERRCODE='P0001';
+  END IF;
 END;
 $$;
 REVOKE ALL ON FUNCTION public.mark_email_job_result(TEXT,UUID,TEXT,TEXT,TEXT) FROM PUBLIC, anon, authenticated;

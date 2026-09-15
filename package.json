@@ -14,7 +14,8 @@
     "test:ci": "npm run lint && npm run typecheck && npm test && npm run build",
     "test:rls": "node scripts/verify-rls.mjs",
     "test:onboarding": "node scripts/verify-onboarding.mjs",
-    "test:entitlements": "node scripts/verify-entitlements.mjs"
+    "test:entitlements": "node scripts/verify-entitlements.mjs",
+    "types:supabase": "node scripts/generate-supabase-types.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "0.10.3",
@@ -22,7 +23,7 @@
     "@types/qrcode": "^1.5.6",
     "clsx": "^2.1.1",
     "lucide-react": "^0.577.0",
-    "next": "^16.1.7",
+    "next": "^16.3.3",
     "postcss": "^8.5.8",
     "qrcode": "^1.5.4",
     "react": "19.2.3",
@@ -36,7 +37,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.1.6",
+    "eslint-config-next": "^16.3.3",
     "prettier": "^3.9.6",
     "tailwindcss": "^4.2.2",
     "typescript": "^5"

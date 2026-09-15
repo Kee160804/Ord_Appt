@@ -417,6 +417,8 @@ function StorefrontTab({
   const [coverImage, setCoverImage] = useState(tenant.coverImage);
   const [primaryColor, setPrimaryColor] = useState(tenant.primaryColor);
   const [accentColor, setAccentColor] = useState(tenant.accentColor);
+  const [socialLinks, setSocialLinks] = useState(tenant.socialLinks);
+  const [customDomain, setCustomDomain] = useState(tenant.customDomain ?? "");
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -485,11 +487,24 @@ function StorefrontTab({
         coverImage: uploadedCoverImage || coverImage,
         primaryColor,
         accentColor,
+        socialLinks,
+        customDomain,
       });
       setSlug(saved.slug);
       setCoverImage(saved.coverImage);
       clearSelectedFile();
-      onTenantUpdated({ ...tenant, ...saved });
+      onTenantUpdated({
+        ...tenant,
+        ...saved,
+        domain:
+          saved.customDomain === tenant.customDomain && tenant.domain
+            ? tenant.domain
+            : undefined,
+        customDomainVerified:
+          saved.customDomain === tenant.customDomain
+            ? tenant.customDomainVerified
+            : false,
+      });
       if (uploadedCoverImage && tenant.coverImage !== uploadedCoverImage) {
         await deleteStorefrontCoverImage(tenant.id, tenant.coverImage);
       }
@@ -669,6 +684,88 @@ function StorefrontTab({
               />
             </div>
           </div>
+        </div>
+        <div className="space-y-3 rounded-2xl border border-slate-700 p-4 light:border-slate-200">
+          <div>
+            <h4 className="text-sm font-bold text-white light:text-slate-900">
+              Contact and social links
+            </h4>
+            <p className="mt-1 text-[11px] text-slate-500 light:text-slate-600">
+              These links appear in the public storefront contact section.
+            </p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Input
+              label="Website"
+              value={socialLinks.website ?? ""}
+              onChange={(event) =>
+                setSocialLinks((current) => ({
+                  ...current,
+                  website: event.target.value,
+                }))
+              }
+              placeholder="https://example.com"
+            />
+            <Input
+              label="Instagram"
+              value={socialLinks.instagram ?? ""}
+              onChange={(event) =>
+                setSocialLinks((current) => ({
+                  ...current,
+                  instagram: event.target.value,
+                }))
+              }
+              placeholder="@business or profile URL"
+            />
+            <Input
+              label="Facebook"
+              value={socialLinks.facebook ?? ""}
+              onChange={(event) =>
+                setSocialLinks((current) => ({
+                  ...current,
+                  facebook: event.target.value,
+                }))
+              }
+              placeholder="business page or URL"
+            />
+            <Input
+              label="X / Twitter"
+              value={socialLinks.twitter ?? ""}
+              onChange={(event) =>
+                setSocialLinks((current) => ({
+                  ...current,
+                  twitter: event.target.value,
+                }))
+              }
+              placeholder="@business or profile URL"
+            />
+          </div>
+        </div>
+        <div className="rounded-2xl border border-slate-700 p-4 light:border-slate-200">
+          <Input
+            label="Custom domain (optional)"
+            value={customDomain}
+            onChange={(event) => setCustomDomain(event.target.value)}
+            placeholder="bookings.example.com"
+          />
+          <p className="mt-2 text-[11px] text-slate-500 light:text-slate-600">
+            Add a CNAME record pointing this hostname to your Vercel domain,
+            then add and verify it in Vercel. Saving a changed domain marks it
+            unverified until an administrator confirms the DNS setup.
+          </p>
+          {tenant.customDomain && (
+            <p
+              className={`mt-2 text-xs font-semibold ${
+                tenant.customDomainVerified
+                  ? "text-emerald-400"
+                  : "text-amber-400"
+              }`}
+            >
+              {tenant.customDomainVerified
+                ? "Domain verified and active"
+                : "Domain awaiting verification"}
+            </p>
+          )}
         </div>
         {error && <p className="text-sm text-red-400">{error}</p>}
         {success && <p className="text-sm text-emerald-400">{success}</p>}

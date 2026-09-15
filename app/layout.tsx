@@ -5,6 +5,15 @@ import { AuthProvider } from "@/app/contexts/auth";
 import { PwaRegister } from "@/components/PwaRegister";
 import "@/app/styles/global.css";
 
+const configuredAppUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
+const metadataBase = (() => {
+  try {
+    return new URL(configuredAppUrl || "https://yuhbusiness.com");
+  } catch {
+    return new URL("https://yuhbusiness.com");
+  }
+})();
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -16,10 +25,23 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase,
   title: "YuhBusiness",
   description:
     "Platform for local businesses to manage appointments, orders, retail sales, and customer relationships.",
   manifest: "/manifest.webmanifest",
+  applicationName: "YuhBusiness",
+  icons: {
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
+  },
+  openGraph: {
+    type: "website",
+    siteName: "YuhBusiness",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",

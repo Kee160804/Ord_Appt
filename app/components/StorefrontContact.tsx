@@ -488,7 +488,7 @@ export function StorefrontContact({
           })}
           {socials.length === 0 && (
             <span className="text-xs text-slate-400">
-              Social links coming soon
+              No social profiles published yet
             </span>
           )}
         </div>

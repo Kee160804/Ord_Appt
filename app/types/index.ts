@@ -35,6 +35,17 @@ export interface SocialLinks {
   website?: string;
 }
 
+export interface BusinessReview {
+  id: string;
+  tenantId: string;
+  serviceId?: string;
+  rating: number;
+  title?: string;
+  body: string;
+  reviewerName: string;
+  createdAt: string;
+}
+
 export interface OrderingSettings {
   enabled: boolean;
   paused: boolean;
@@ -56,6 +67,8 @@ export interface Tenant {
   name: string;
   slug: string;
   domain?: string;
+  customDomain?: string;
+  customDomainVerified?: boolean;
   businessType: BusinessType;
   logo: string;
   logoBg: string;

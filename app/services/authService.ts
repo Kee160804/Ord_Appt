@@ -11,6 +11,7 @@ import type {
   ProfileRow,
   TenantRow,
 } from "@/app/types/supabase";
+import { parseSocialLinks } from "@/app/lib/social-links";
 
 export interface AuthenticatedAppSession {
   user: User;
@@ -142,6 +143,11 @@ function mapTenant(row: TenantRow, hours: BusinessHourRow[]): Tenant {
     id: row.id,
     name: businessName,
     slug: row.slug,
+    domain: row.custom_domain_verified_at
+      ? (row.custom_domain ?? undefined)
+      : undefined,
+    customDomain: row.custom_domain ?? undefined,
+    customDomainVerified: Boolean(row.custom_domain_verified_at),
     businessType: normalizeBusinessType(row.business_type),
     logo: row.logo ?? businessName.charAt(0).toUpperCase(),
     logoBg: row.logo_bg ?? row.primary_color ?? "#8b5cf6",
@@ -154,7 +160,7 @@ function mapTenant(row: TenantRow, hours: BusinessHourRow[]): Tenant {
       row.cover_image ??
       "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=1200&q=80",
     businessHours,
-    socialLinks: {},
+    socialLinks: parseSocialLinks(row.social_links),
     primaryColor: row.primary_color ?? "#8b5cf6",
     accentColor: row.accent_color ?? "#a78bfa",
     createdAt: row.created_at ?? new Date().toISOString(),

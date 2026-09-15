@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Calendar,
   Clock,
@@ -9,9 +9,10 @@ import {
   Mail,
   CheckCircle,
   XCircle,
+  ChevronLeft,
   ChevronRight,
   Download,
-  Trash2,
+  Search,
 } from "lucide-react";
 import { Card } from "./Card";
 import { Button } from "./Button";
@@ -21,7 +22,6 @@ import { getAppointmentsByTenant } from "../data/mock";
 import { getSupabaseBrowserClient } from "../lib/supabase/client";
 import { isSupabaseConfigured } from "../lib/supabase/config";
 import {
-  deleteAppointment,
   assignAppointmentProvider,
   listAppointments,
   setAppointmentStatus,
@@ -48,58 +48,166 @@ interface Props {
 
 export function AppointmentsView({ tenant }: Props) {
   const { user } = useAuth();
+  const usesSupabase = isSupabaseConfigured();
 
-  const [apts, setApts] = useState<Appointment[]>(
-    isSupabaseConfigured() ? [] : getAppointmentsByTenant(tenant.id),
-  );
+  const [apts, setApts] = useState<Appointment[]>([]);
   const [filter, setFilter] = useState<Filter>("all");
   const [selected, setSelected] = useState<Appointment | null>(null);
-  const [isLoading, setIsLoading] = useState(isSupabaseConfigured());
+  const [isLoading, setIsLoading] = useState(usesSupabase);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [deleteTarget, setDeleteTarget] = useState<Appointment | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
   const [providers, setProviders] = useState<ServiceProvider[]>([]);
 
-  useEffect(() => {
-    if (!isSupabaseConfigured()) return;
-    let active = true;
-    const supabase = getSupabaseBrowserClient();
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(0);
+  const [pagination, setPagination] = useState({
+    page: 0,
+    pageSize: 25,
+    total: 0,
+    totalPages: 0,
+    hasPreviousPage: false,
+    hasNextPage: false,
+  });
 
-    const load = async () => {
-      try {
-        const loaded = await listAppointments(tenant.id);
-        if (!active) return;
-        setApts(loaded);
+  /**
+   * Debounce free-text search so Supabase is not queried on every keystroke.
+   */
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setSearch(searchInput.trim());
+      setPage(0);
+      setSelected(null);
+    }, 300);
+
+    return () => window.clearTimeout(timer);
+  }, [searchInput]);
+
+  const loadAppointments = useCallback(async () => {
+    setIsLoading(true);
+
+    try {
+      if (!usesSupabase) {
+        const normalizedSearch = search.toLowerCase();
+
+        const filteredMock = getAppointmentsByTenant(tenant.id).filter(
+          (appointment) => {
+            if (filter !== "all" && appointment.status !== filter) {
+              return false;
+            }
+
+            if (!normalizedSearch) {
+              return true;
+            }
+
+            return [
+              appointment.customerName,
+              appointment.customerEmail,
+              appointment.customerPhone,
+              appointment.serviceName,
+            ].some((value) =>
+              value?.toLowerCase().includes(normalizedSearch),
+            );
+          },
+        );
+
+        const pageSize = 25;
+        const from = page * pageSize;
+        const pageAppointments = filteredMock.slice(
+          from,
+          from + pageSize,
+        );
+        const totalPages =
+          filteredMock.length === 0
+            ? 0
+            : Math.ceil(filteredMock.length / pageSize);
+
+        if (totalPages > 0 && page >= totalPages && page > 0) {
+          setPage(totalPages - 1);
+          return;
+        }
+
+        setApts(pageAppointments);
+        setPagination({
+          page,
+          pageSize,
+          total: filteredMock.length,
+          totalPages,
+          hasPreviousPage: page > 0,
+          hasNextPage:
+            from + pageAppointments.length < filteredMock.length,
+        });
         setSelected((current) =>
           current
-            ? (loaded.find((appointment) => appointment.id === current.id) ??
-              null)
+            ? (pageAppointments.find(
+                (appointment) => appointment.id === current.id,
+              ) ?? null)
             : null,
         );
         setError("");
-      } catch (loadError) {
-        if (!active) return;
-        setError(
-          loadError instanceof Error
-            ? loadError.message
-            : "Unable to load appointments.",
-        );
-      } finally {
-        if (active) setIsLoading(false);
+        return;
       }
+
+      const result = await listAppointments(tenant.id, {
+        page,
+        pageSize: 25,
+        search,
+        status: filter,
+      });
+
+      if (
+        result.totalPages > 0 &&
+        result.page >= result.totalPages &&
+        result.page > 0
+      ) {
+        setPage(result.totalPages - 1);
+        return;
+      }
+
+      setApts(result.appointments);
+      setPagination({
+        page: result.page,
+        pageSize: result.pageSize,
+        total: result.total,
+        totalPages: result.totalPages,
+        hasPreviousPage: result.hasPreviousPage,
+        hasNextPage: result.hasNextPage,
+      });
+      setSelected((current) =>
+        current
+          ? (result.appointments.find(
+              (appointment) => appointment.id === current.id,
+            ) ?? null)
+          : null,
+      );
+      setError("");
+    } catch (loadError) {
+      setError(
+        loadError instanceof Error
+          ? loadError.message
+          : "Unable to load appointments.",
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }, [filter, page, search, tenant.id, usesSupabase]);
+
+  /**
+   * Load the current appointment page and keep it synchronized when the
+   * browser regains focus or Supabase reports an appointment change.
+   */
+  useEffect(() => {
+    let active = true;
+    const supabase = usesSupabase ? getSupabaseBrowserClient() : null;
+
+    const refresh = async () => {
+      if (!active) return;
+      await loadAppointments();
     };
 
-    if (user?.role === "owner") {
-      void listServiceProviders(tenant.id)
-        .then((value) => {
-          if (active) setProviders(value);
-        })
-        .catch(() => undefined);
-    }
+    void refresh();
 
-    void load();
     const channel = supabase
       ?.channel(`appointments:${tenant.id}`)
       .on(
@@ -110,17 +218,50 @@ export function AppointmentsView({ tenant }: Props) {
           table: "appointments",
           filter: `tenant_id=eq.${tenant.id}`,
         },
-        () => void load(),
+        () => void refresh(),
       )
       .subscribe();
 
-    const handleFocus = () => void load();
+    const handleFocus = () => void refresh();
     window.addEventListener("focus", handleFocus);
 
     return () => {
       active = false;
       window.removeEventListener("focus", handleFocus);
-      if (channel && supabase) void supabase.removeChannel(channel);
+
+      if (channel && supabase) {
+        void supabase.removeChannel(channel);
+      }
+    };
+  }, [loadAppointments, tenant.id, usesSupabase]);
+
+  /**
+   * Provider management is owner-only and independent of appointment paging.
+   */
+  useEffect(() => {
+    let active = true;
+
+    if (user?.role !== "owner") {
+      setProviders([]);
+      return () => {
+        active = false;
+      };
+    }
+
+    void listServiceProviders(tenant.id)
+      .then((value) => {
+        if (active) {
+          setProviders(value);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setProviders([]);
+        }
+      });
+
+    return () => {
+      active = false;
     };
   }, [tenant.id, user?.role]);
 
@@ -133,15 +274,37 @@ export function AppointmentsView({ tenant }: Props) {
     "no_show",
   ];
 
-  const counts = tabs.reduce<Record<string, number>>((acc, t) => {
-    acc[t] =
-      t === "all" ? apts.length : apts.filter((a) => a.status === t).length;
-    return acc;
-  }, {});
+  const today = new Date().toLocaleDateString("en-CA");
 
-  const filtered =
-    filter === "all" ? apts : apts.filter((a) => a.status === filter);
+  const pageRange = useMemo(() => {
+    if (pagination.total === 0 || apts.length === 0) {
+      return { first: 0, last: 0 };
+    }
 
+    const first = pagination.page * pagination.pageSize + 1;
+
+    return {
+      first,
+      last: first + apts.length - 1,
+    };
+  }, [apts.length, pagination.page, pagination.pageSize, pagination.total]);
+
+  const changeFilter = (nextFilter: Filter) => {
+    setFilter(nextFilter);
+    setPage(0);
+    setSelected(null);
+  };
+
+  /**
+   * Updates an appointment through its normal lifecycle.
+   *
+   * IMPORTANT:
+   * Appointments are preserved as historical transaction records.
+   * Cancelling an appointment changes its status instead of deleting it,
+   * which keeps customer, provider, payment, service, and email history intact.
+   *
+   * The UI updates optimistically and rolls back if Supabase rejects the change.
+   */
   const updateStatus = async (id: string, status: AppointmentStatus) => {
     const appointment = apts.find((candidate) => candidate.id === id);
     if (!appointment) return;
@@ -158,8 +321,11 @@ export function AppointmentsView({ tenant }: Props) {
     setNotice("");
 
     try {
-      if (isSupabaseConfigured())
+      if (usesSupabase) {
         await setAppointmentStatus(tenant.id, id, status);
+        await loadAppointments();
+      }
+
       setNotice(`Appointment marked ${status.replace("_", "-")}.`);
     } catch (updateError) {
       setApts((previous) =>
@@ -178,39 +344,8 @@ export function AppointmentsView({ tenant }: Props) {
     }
   };
 
-  const removeAppointment = async () => {
-    if (!deleteTarget) return;
-    const appointment = deleteTarget;
-    setIsDeleting(true);
-    setError("");
-    setNotice("");
 
-    try {
-      if (isSupabaseConfigured()) {
-        await deleteAppointment(tenant.id, appointment.id);
-      }
-      setApts((current) =>
-        current.filter((candidate) => candidate.id !== appointment.id),
-      );
-      setSelected((current) =>
-        current?.id === appointment.id ? null : current,
-      );
-      setDeleteTarget(null);
-      setNotice(
-        `Appointment for ${appointment.customerName} was permanently deleted.`,
-      );
-    } catch (deleteError) {
-      setError(
-        deleteError instanceof Error
-          ? deleteError.message
-          : "Unable to delete the appointment.",
-      );
-    } finally {
-      setIsDeleting(false);
-    }
-  };
 
-  const today = new Date().toLocaleDateString("en-CA");
   const assignProvider = async (providerId: string) => {
     if (!selected) return;
     setUpdatingId(selected.id);
@@ -305,19 +440,19 @@ export function AppointmentsView({ tenant }: Props) {
           },
           {
             label: "Pending",
-            value: counts.pending,
+            value: filter === "pending" ? pagination.total : "—",
             bg: "bg-amber-500/10 light:bg-amber-50 border-amber-400/20 light:border-amber-100",
             text: "text-amber-400 light:text-amber-700",
           },
           {
             label: "Confirmed",
-            value: counts.confirmed,
+            value: filter === "confirmed" ? pagination.total : "—",
             bg: "bg-green-500/10 light:bg-emerald-50 border-green-400/20 light:border-emerald-100",
             text: "text-green-400 light:text-green-700",
           },
           {
             label: "Completed",
-            value: counts.completed,
+            value: filter === "completed" ? pagination.total : "—",
             bg: "bg-slate-700/40 light:bg-slate-50 border-slate-600/40 light:border-slate-200",
             text: "text-slate-300 light:text-slate-700",
           },
@@ -347,31 +482,48 @@ export function AppointmentsView({ tenant }: Props) {
         </p>
       )}
 
-      {/* Filter tabs */}
-      <div className="flex w-fit max-w-full items-center gap-1 overflow-x-auto rounded-lg border border-slate-700/60 light:border-[#e5e9f1] bg-slate-900/70 light:bg-white p-1">
-        {tabs.map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setFilter(tab)}
-            className={cn(
-              "whitespace-nowrap rounded-md px-3 py-1.5 text-[10px] font-medium capitalize transition-all",
-              filter === tab
-                ? "bg-violet-600 light:bg-white text-white light:text-gray-900 shadow-sm"
-                : "text-slate-400 light:text-gray-600 hover:text-white light:hover:text-gray-900",
-            )}
-          >
-            {tab}{" "}
-            <span className="text-slate-500 light:text-gray-500 text-xs ml-0.5">
-              ({counts[tab]})
-            </span>
-          </button>
-        ))}
+      {/* Search and status filters */}
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+        <div className="relative w-full max-w-md">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+          <input
+            type="search"
+            value={searchInput}
+            onChange={(event) => setSearchInput(event.target.value)}
+            placeholder="Search customer, email or phone..."
+            maxLength={120}
+            className="h-10 w-full rounded-lg border border-slate-700/60 bg-slate-900/70 pl-9 pr-3 text-sm text-white outline-none transition focus:border-violet-500 light:border-[#e5e9f1] light:bg-white light:text-slate-900"
+          />
+        </div>
+
+        <div className="flex w-fit max-w-full items-center gap-1 overflow-x-auto rounded-lg border border-slate-700/60 bg-slate-900/70 p-1 light:border-[#e5e9f1] light:bg-white">
+          {tabs.map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => changeFilter(tab)}
+              className={cn(
+                "whitespace-nowrap rounded-md px-3 py-1.5 text-[10px] font-medium capitalize transition-all",
+                filter === tab
+                  ? "bg-violet-600 text-white shadow-sm"
+                  : "text-slate-400 hover:text-white light:text-slate-600 light:hover:text-gray-900",
+              )}
+            >
+              {tab.replaceAll("_", " ")}
+              {filter === tab && (
+                <span className="ml-1 text-xs opacity-75">
+                  ({pagination.total})
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* List */}
       <Card>
         <div className="divide-y divide-slate-700 light:divide-slate-100">
-          {filtered.length === 0 && (
+          {!isLoading && apts.length === 0 && (
             <div className="py-20 text-center text-slate-400 light:text-gray-500">
               <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-violet-500/15 text-violet-400 light:bg-violet-50 light:text-violet-600">
                 <Calendar className="h-5 w-5" />
@@ -381,9 +533,10 @@ export function AppointmentsView({ tenant }: Props) {
               </p>
             </div>
           )}
-          {filtered.map((apt) => (
+          {apts.map((apt) => (
             <button
               key={apt.id}
+              type="button"
               onClick={() => setSelected(apt)}
               className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-slate-800/70 light:hover:bg-[#fafbfe]"
             >
@@ -428,6 +581,50 @@ export function AppointmentsView({ tenant }: Props) {
         </div>
       </Card>
 
+      <div className="flex flex-col gap-3 rounded-xl border border-slate-700/60 bg-slate-900/40 px-4 py-3 light:border-slate-200 light:bg-white sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-xs text-slate-400 light:text-slate-600">
+          {pagination.total === 0
+            ? "0 appointments"
+            : `Showing ${pageRange.first}-${pageRange.last} of ${pagination.total} appointments`}
+        </p>
+
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={isLoading || !pagination.hasPreviousPage}
+            onClick={() =>
+              setPage((current) => Math.max(0, current - 1))
+            }
+          >
+            <ChevronLeft className="mr-1 h-3.5 w-3.5" />
+            Previous
+          </Button>
+
+          <span className="min-w-20 text-center text-xs text-slate-400 light:text-slate-600">
+            {pagination.totalPages === 0
+              ? "Page 0 of 0"
+              : `Page ${pagination.page + 1} of ${pagination.totalPages}`}
+          </span>
+
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={isLoading || !pagination.hasNextPage}
+            onClick={() => setPage((current) => current + 1)}
+          >
+            Next
+            <ChevronRight className="ml-1 h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </div>
+
+      {/*
+        Appointment lifecycle note:
+        Completed, cancelled, and no-show appointments are retained as read-only
+        historical records. No permanent-delete action is exposed in the UI.
+      */}
+
       {/* Detail modal */}
       <Modal
         open={!!selected}
@@ -440,7 +637,7 @@ export function AppointmentsView({ tenant }: Props) {
                 variant="danger"
                 className="flex-1"
                 disabled={updatingId === selected.id}
-                onClick={() => updateStatus(selected!.id, "cancelled")}
+                onClick={() => void updateStatus(selected.id, "cancelled")}
               >
                 <XCircle className="w-4 h-4" /> Cancel
               </Button>
@@ -448,7 +645,7 @@ export function AppointmentsView({ tenant }: Props) {
                 variant="success"
                 className="flex-1"
                 disabled={updatingId === selected.id}
-                onClick={() => updateStatus(selected!.id, "confirmed")}
+                onClick={() => void updateStatus(selected.id, "confirmed")}
               >
                 <CheckCircle className="w-4 h-4" /> Confirm
               </Button>
@@ -458,34 +655,25 @@ export function AppointmentsView({ tenant }: Props) {
               <Button
                 variant="danger"
                 disabled={updatingId === selected.id}
-                onClick={() => updateStatus(selected.id, "cancelled")}
+                onClick={() => void updateStatus(selected.id, "cancelled")}
               >
                 Cancel
               </Button>
               <Button
                 variant="outline"
                 disabled={updatingId === selected.id}
-                onClick={() => updateStatus(selected.id, "no_show")}
+                onClick={() => void updateStatus(selected.id, "no_show")}
               >
                 No-show
               </Button>
               <Button
                 variant="success"
                 disabled={updatingId === selected.id}
-                onClick={() => updateStatus(selected.id, "completed")}
+                onClick={() => void updateStatus(selected.id, "completed")}
               >
                 Complete
               </Button>
             </div>
-          ) : selected &&
-            ["completed", "cancelled", "no_show"].includes(selected.status) ? (
-            <Button
-              variant="danger"
-              className="w-full"
-              onClick={() => setDeleteTarget(selected)}
-            >
-              <Trash2 className="h-4 w-4" /> Delete Appointment
-            </Button>
           ) : undefined
         }
       >
@@ -551,10 +739,15 @@ export function AppointmentsView({ tenant }: Props) {
                 provider.serviceIds.includes(selected.serviceId),
               ) && (
                 <div>
-                  <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-400 light:text-gray-500">
+                  <label
+                    htmlFor="appointment-provider"
+                    className="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-400 light:text-gray-500"
+                  >
                     Service Provider
                   </label>
                   <select
+                    id="appointment-provider"
+                    name="appointment-provider"
                     value={selected.providerId ?? ""}
                     disabled={updatingId === selected.id}
                     onChange={(event) =>
@@ -619,37 +812,6 @@ export function AppointmentsView({ tenant }: Props) {
         )}
       </Modal>
 
-      <Modal
-        open={!!deleteTarget}
-        onClose={() => !isDeleting && setDeleteTarget(null)}
-        title="Delete appointment?"
-        footer={
-          <div className="flex gap-3">
-            <Button
-              variant="outline"
-              className="flex-1"
-              disabled={isDeleting}
-              onClick={() => setDeleteTarget(null)}
-            >
-              Keep Appointment
-            </Button>
-            <Button
-              variant="danger"
-              className="flex-1"
-              loading={isDeleting}
-              onClick={removeAppointment}
-            >
-              Delete Permanently
-            </Button>
-          </div>
-        }
-      >
-        <p className="text-sm leading-6 text-slate-300 light:text-slate-700">
-          This permanently removes the appointment for{" "}
-          {deleteTarget?.customerName}, including its service and email-delivery
-          records. This action cannot be undone.
-        </p>
-      </Modal>
     </div>
   );
 }

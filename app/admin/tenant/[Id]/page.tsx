@@ -14,9 +14,11 @@ import {
   Users,
 } from "lucide-react";
 import { Card, CardBody, CardHeader } from "@/app/components/Card";
+import { Button } from "@/app/components/Button";
 import { formatCurrency } from "@/app/lib/utils";
 import {
   loadAdminTenantData,
+  updateAdminDomainVerification,
   updateAdminTenantSubscription,
   type AdminTenantData,
 } from "@/app/services/adminService";
@@ -39,6 +41,9 @@ export default function TenantDetailPage() {
   const [isUpdatingSubscription, setIsUpdatingSubscription] = useState(false);
   const [subscriptionError, setSubscriptionError] = useState("");
   const [subscriptionMessage, setSubscriptionMessage] = useState("");
+  const [isUpdatingDomain, setIsUpdatingDomain] = useState(false);
+  const [domainMessage, setDomainMessage] = useState("");
+  const [domainError, setDomainError] = useState("");
   const [seatSummary, setSeatSummary] = useState<AdminSeatSummary | null>(null);
   const [paidStaffSeats, setPaidStaffSeats] = useState(0);
   const [seatReviewNote, setSeatReviewNote] = useState("");
@@ -186,6 +191,31 @@ export default function TenantDetailPage() {
     setSeatSummary(summary);
     setPaidStaffSeats(summary.paidStaffSeats);
     return summary;
+  };
+
+  const setDomainVerification = async (verified: boolean) => {
+    setIsUpdatingDomain(true);
+    setDomainError("");
+    setDomainMessage("");
+    try {
+      await updateAdminDomainVerification(tenantId, verified);
+      const refreshed = await loadAdminTenantData(tenantId);
+      if (!refreshed) throw new Error("The business could not be reloaded.");
+      setData(refreshed);
+      setDomainMessage(
+        verified
+          ? "Custom domain marked verified. The root host can now resolve this storefront."
+          : "Custom-domain verification removed.",
+      );
+    } catch (domainUpdateError) {
+      setDomainError(
+        domainUpdateError instanceof Error
+          ? domainUpdateError.message
+          : "Unable to update domain verification.",
+      );
+    } finally {
+      setIsUpdatingDomain(false);
+    }
   };
 
   const savePaidStaffSeats = async (
@@ -394,6 +424,45 @@ export default function TenantDetailPage() {
           </div>
         </CardBody>
       </Card>
+
+      {tenant.customDomain && (
+        <Card className="border-slate-700 bg-slate-800/50 light:border-slate-200 light:bg-white">
+          <CardHeader>
+            <h3 className="font-semibold text-white light:text-gray-900">
+              Custom Domain
+            </h3>
+          </CardHeader>
+          <CardBody>
+            <p className="break-all font-mono text-sm text-slate-200 light:text-slate-800">
+              {tenant.customDomain}
+            </p>
+            <p className="mt-2 text-sm text-slate-400 light:text-slate-600">
+              Confirm the domain is assigned in Vercel and its DNS resolves to
+              this deployment before marking it verified.
+            </p>
+            {domainError && (
+              <p className="mt-3 text-sm text-red-400">{domainError}</p>
+            )}
+            {domainMessage && (
+              <p className="mt-3 text-sm text-emerald-400">{domainMessage}</p>
+            )}
+            <Button
+              type="button"
+              className="mt-4"
+              disabled={isUpdatingDomain}
+              onClick={() =>
+                void setDomainVerification(!tenant.customDomainVerified)
+              }
+            >
+              {isUpdatingDomain
+                ? "Saving..."
+                : tenant.customDomainVerified
+                  ? "Remove verification"
+                  : "Mark domain verified"}
+            </Button>
+          </CardBody>
+        </Card>
+      )}
 
       <Card className="border-slate-700 bg-slate-800/50 light:border-slate-200 light:bg-white">
         <CardHeader>

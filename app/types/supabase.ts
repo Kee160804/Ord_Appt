@@ -32,6 +32,9 @@ export interface TenantRow {
   business_name: string;
   slug: string;
   subdomain: string;
+  custom_domain?: string | null;
+  custom_domain_verified_at?: string | null;
+  social_links?: Record<string, unknown> | null;
   business_type?: string | null;
   description?: string | null;
   phone?: string | null;
@@ -49,8 +52,20 @@ export interface TenantRow {
   stripe_connected?: boolean | null;
   trial_ends_at?: string | null;
   created_at?: string | null;
+  updated_at?: string | null;
   is_active: boolean;
   status: string;
+}
+
+export interface BusinessReviewRow {
+  id: string;
+  tenant_id: string;
+  service_id: string | null;
+  rating: number;
+  title: string | null;
+  body: string | null;
+  reviewer_name: string | null;
+  created_at: string | null;
 }
 
 export interface BusinessHourRow {

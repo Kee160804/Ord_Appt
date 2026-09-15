@@ -103,9 +103,59 @@ function detailRows(rows: Array<[string, string]>) {
     .join("")}</table>`;
 }
 
+/**
+ * Renders a safe call-to-action link.
+ *
+ * Email action URLs must be absolute HTTP(S) URLs. Credentials embedded in
+ * URLs are rejected to avoid accidentally rendering unsafe or misleading
+ * links from payload data.
+ */
 function action(label: string, href: string) {
-  if (!/^https?:\/\//i.test(href)) return "";
-  return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px 0"><tr><td style="border-radius:12px;background:${PURPLE}"><a href="${escapeHtml(href)}" style="display:inline-block;padding:13px 20px;color:#ffffff;text-decoration:none;font-size:14px;font-weight:800">${escapeHtml(label)}</a></td></tr></table>`;
+  try {
+    const url = new URL(href);
+
+    if (
+      (url.protocol !== "https:" && url.protocol !== "http:") ||
+      url.username ||
+      url.password
+    ) {
+      return "";
+    }
+
+    return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px 0"><tr><td style="border-radius:12px;background:${PURPLE}"><a href="${escapeHtml(url.toString())}" style="display:inline-block;padding:13px 20px;color:#ffffff;text-decoration:none;font-size:14px;font-weight:800">${escapeHtml(label)}</a></td></tr></table>`;
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Builds a YuhBusiness application URL from a configured base URL and an
+ * internal application path. External/protocol-relative payload paths are
+ * rejected and fall back to the supplied safe route.
+ */
+function appActionUrl(
+  appUrl: string,
+  requestedPath: string,
+  fallbackPath = "/dashboard",
+) {
+  try {
+    const base = new URL(appUrl);
+    if (base.protocol !== "https:" && base.protocol !== "http:") return "";
+
+    const safePath =
+      requestedPath.startsWith("/") &&
+      !requestedPath.startsWith("//") &&
+      !requestedPath.includes("\\")
+        ? requestedPath
+        : fallbackPath;
+
+    const destination = new URL(safePath, base.origin);
+    if (destination.origin !== base.origin) return "";
+
+    return destination.toString();
+  } catch {
+    return "";
+  }
 }
 
 function shell(
@@ -166,7 +216,7 @@ export function buildTransactionalEmail(
     payload,
     "app_url",
     process.env.NEXT_PUBLIC_APP_URL || "",
-  );
+  ).replace(/\/+$/, "");
   let subject = input.subject?.trim() || "An update from YuhBusiness";
   let title = subject;
   let preview = subject;
@@ -179,7 +229,7 @@ export function buildTransactionalEmail(
     content =
       paragraph(
         "Your account is ready. You can now manage each of your businesses securely from one login.",
-      ) + action("Open your dashboard", `${appUrl}/dashboard`);
+      ) + action("Open your dashboard", appActionUrl(appUrl, "/dashboard"));
   } else if (input.eventType === "BUSINESS_CREATED") {
     subject = input.subject?.trim() || `${business} is ready on YuhBusiness`;
     title = `${business} is ready`;
@@ -187,7 +237,7 @@ export function buildTransactionalEmail(
     content =
       paragraph(
         `Your separate workspace for ${business} has been created. Its customers, orders, appointments, settings, analytics, storefront, and subscription remain isolated from your other businesses.`,
-      ) + action("Manage this business", `${appUrl}/dashboard`);
+      ) + action("Manage this business", appActionUrl(appUrl, "/dashboard"));
   } else if (input.eventType === "TEAM_INVITATION") {
     subject = input.subject?.trim() || `You were invited to ${business}`;
     title = `Join ${business}`;
@@ -301,7 +351,7 @@ export function buildTransactionalEmail(
         expired
           ? `The free trial for ${business} has ended. Select a plan to restore business access.`
           : `The free trial for ${business} ends on ${dateTime(stringValue(payload, "trial_ends_at"), stringValue(payload, "timezone", "America/Belize"))}. Select a plan to keep the business active.`,
-      ) + action("View plans", `${appUrl}/#pricing`);
+      ) + action("View plans", appActionUrl(appUrl, "/#pricing"));
   } else if (input.eventType.startsWith("SUBSCRIPTION_")) {
     const plan = stringValue(payload, "plan", "Beginner");
     const status = stringValue(
@@ -326,7 +376,10 @@ export function buildTransactionalEmail(
         ["Plan", plan],
         ["Status", status],
       ]) +
-      action("Review subscription", `${appUrl}/dashboard/settings`);
+      action(
+        "Review subscription",
+        appActionUrl(appUrl, "/dashboard/settings"),
+      );
   } else {
     subject =
       input.subject?.trim() ||
@@ -343,7 +396,11 @@ export function buildTransactionalEmail(
       ) +
       action(
         "Open YuhBusiness",
-        `${appUrl}${stringValue(payload, "href", "/dashboard")}`,
+        appActionUrl(
+          appUrl,
+          stringValue(payload, "href", "/dashboard"),
+          "/dashboard",
+        ),
       );
   }
 

@@ -1,5 +1,5 @@
-const CACHE_NAME = "yuhbusiness-offline-v4";
-const OFFLINE_PAGE = "/home";
+const CACHE_NAME = "yuhbusiness-offline-v5";
+const OFFLINE_PAGE = "/offline.html";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(

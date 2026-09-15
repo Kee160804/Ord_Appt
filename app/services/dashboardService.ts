@@ -337,13 +337,71 @@ function aggregateOrders(orders: Order[], customers: CustomerSummary[]) {
   } satisfies AnalyticsSummary;
 }
 
+/**
+ * Dashboard analytics currently require the complete activity set to calculate
+ * revenue, returning customers, top items, busiest periods, and completion
+ * rates correctly. The list services are now paginated, so collect their pages
+ * explicitly instead of treating a ProductPage-style response as an array.
+ *
+ * This preserves dashboard correctness while we prepare the final database
+ * aggregation RPC during the SQL phase. Once that RPC exists, these collectors
+ * can be replaced with a single server-side aggregate call.
+ */
+async function loadAllAppointments(tenantId: string): Promise<Appointment[]> {
+  const pageSize = 100;
+  const appointments: Appointment[] = [];
+  let page = 0;
+
+  while (true) {
+    const result = await listAppointments(tenantId, { page, pageSize });
+    appointments.push(...result.appointments);
+
+    if (!result.hasNextPage) break;
+    page += 1;
+  }
+
+  return appointments;
+}
+
+async function loadAllOrders(tenantId: string): Promise<Order[]> {
+  const pageSize = 100;
+  const orders: Order[] = [];
+  let page = 0;
+
+  while (true) {
+    const result = await listOrders(tenantId, { page, pageSize });
+    orders.push(...result.orders);
+
+    if (!result.hasNextPage) break;
+    page += 1;
+  }
+
+  return orders;
+}
+
+async function loadAllCustomers(tenantId: string): Promise<CustomerRecord[]> {
+  const pageSize = 100;
+  const customers: CustomerRecord[] = [];
+  let page = 0;
+
+  while (true) {
+    const result = await listCustomers(tenantId, { page, pageSize });
+    customers.push(...result.customers);
+
+    if (!result.hasNextPage) break;
+    page += 1;
+  }
+
+  return customers;
+}
+
 export async function loadDashboardData(
   tenant: Tenant,
 ): Promise<DashboardData> {
   if (tenant.businessType === "appointment") {
     const [appointments, customerRecords] = await Promise.all([
-      listAppointments(tenant.id),
-      listCustomers(tenant.id),
+      loadAllAppointments(tenant.id),
+      loadAllCustomers(tenant.id),
     ]);
     const customers = mergePersistedCustomers(
       customerRecords,
@@ -358,8 +416,8 @@ export async function loadDashboardData(
   }
 
   const [orders, customerRecords] = await Promise.all([
-    listOrders(tenant.id),
-    listCustomers(tenant.id),
+    loadAllOrders(tenant.id),
+    loadAllCustomers(tenant.id),
   ]);
   const customers = mergePersistedCustomers(
     customerRecords,

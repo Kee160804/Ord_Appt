@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  ChevronLeft,
+  ChevronRight,
   Download,
   DollarSign,
   History,
@@ -73,11 +75,25 @@ function demoCustomers(tenant: Tenant): CustomerSummary[] {
 }
 
 export function CustomersView({ tenant }: Props) {
+  const usesSupabase = isSupabaseConfigured();
+
   const [customers, setCustomers] = useState<CustomerSummary[]>(
-    isSupabaseConfigured() ? [] : demoCustomers(tenant),
+    usesSupabase ? [] : demoCustomers(tenant),
   );
+  const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
-  const [isLoading, setIsLoading] = useState(isSupabaseConfigured());
+  const [activeFilter, setActiveFilter] = useState<boolean | "all">("all");
+  const [page, setPage] = useState(0);
+  const [pagination, setPagination] = useState({
+    page: 0,
+    pageSize: 25,
+    total: usesSupabase ? 0 : demoCustomers(tenant).length,
+    totalPages: usesSupabase ? 0 : Math.ceil(demoCustomers(tenant).length / 25),
+    hasPreviousPage: false,
+    hasNextPage: !usesSupabase && demoCustomers(tenant).length > 25,
+  });
+
+  const [isLoading, setIsLoading] = useState(usesSupabase);
   const [error, setError] = useState("");
   const [records, setRecords] = useState<CustomerRecord[]>([]);
   const [editing, setEditing] = useState<CustomerRecord | null>(null);
@@ -95,13 +111,35 @@ export function CustomersView({ tenant }: Props) {
     }[]
   >([]);
 
+  /**
+   * Dashboard/customer activity data is retained for the existing CRM summary
+   * and history UI. Customer rows themselves are loaded separately using the
+   * paginated customer service.
+   */
+  const [activityByContact, setActivityByContact] = useState<
+    Map<string, CustomerSummary>
+  >(new Map());
+
   useEffect(() => {
-    if (!isSupabaseConfigured()) return;
+    const timer = window.setTimeout(() => {
+      setSearch(searchInput.trim());
+      setPage(0);
+    }, 300);
+
+    return () => window.clearTimeout(timer);
+  }, [searchInput]);
+
+  useEffect(() => {
+    if (!usesSupabase) {
+      return;
+    }
+
     let active = true;
-    Promise.all([loadDashboardData(tenant), listCustomers(tenant.id)])
-      .then(([data, loadedCustomers]) => {
+
+    void loadDashboardData(tenant)
+      .then((data) => {
         if (!active) return;
-        setRecords(loadedCustomers);
+
         setActivities(
           tenant.businessType === "appointment"
             ? data.appointments.map((item) => ({
@@ -121,92 +159,160 @@ export function CustomersView({ tenant }: Props) {
                 status: item.status,
               })),
         );
-        const activityByContact = new Map(
-          data.customers.map((customer) => [
-            customer.email.toLowerCase() || customer.phone,
-            customer,
-          ]),
-        );
-        setCustomers(
-          loadedCustomers.map((customer) => {
-            const activity = activityByContact.get(
+
+        setActivityByContact(
+          new Map(
+            data.customers.map((customer) => [
               customer.email.toLowerCase() || customer.phone,
-            );
-            return {
-              id: customer.id,
-              isActive: customer.isActive,
-              key: customer.id,
-              name: customer.name,
-              email: customer.email,
-              phone: customer.phone,
-              lastActivity:
-                activity?.lastActivity ?? customer.createdAt.slice(0, 10),
-              activityCount: activity?.activityCount ?? 0,
-              totalValue: activity?.totalValue ?? 0,
-            };
-          }),
+              customer,
+            ]),
+          ),
         );
-        setError("");
       })
       .catch((loadError: unknown) => {
         if (!active) return;
+
         setError(
           loadError instanceof Error
             ? loadError.message
-            : "Unable to load customers.",
+            : "Unable to load customer activity.",
         );
-      })
-      .finally(() => {
-        if (active) setIsLoading(false);
       });
+
     return () => {
       active = false;
     };
-  }, [tenant]);
+  }, [tenant, usesSupabase]);
+
+  const loadCustomerPage = useCallback(async () => {
+    if (!usesSupabase) {
+      const query = search.toLowerCase();
+      const allDemoCustomers = demoCustomers(tenant).filter((customer) => {
+        if (
+          query &&
+          ![customer.name, customer.email, customer.phone].some((value) =>
+            value.toLowerCase().includes(query),
+          )
+        ) {
+          return false;
+        }
+
+        return true;
+      });
+
+      const pageSize = 25;
+      const from = page * pageSize;
+      const pageCustomers = allDemoCustomers.slice(from, from + pageSize);
+      const totalPages =
+        allDemoCustomers.length === 0
+          ? 0
+          : Math.ceil(allDemoCustomers.length / pageSize);
+
+      if (totalPages > 0 && page >= totalPages && page > 0) {
+        setPage(totalPages - 1);
+        return;
+      }
+
+      setCustomers(pageCustomers);
+      setPagination({
+        page,
+        pageSize,
+        total: allDemoCustomers.length,
+        totalPages,
+        hasPreviousPage: page > 0,
+        hasNextPage: from + pageCustomers.length < allDemoCustomers.length,
+      });
+      setError("");
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const result = await listCustomers(tenant.id, {
+        page,
+        pageSize: 25,
+        search,
+        active: activeFilter,
+      });
+
+      if (
+        result.totalPages > 0 &&
+        result.page >= result.totalPages &&
+        result.page > 0
+      ) {
+        setPage(result.totalPages - 1);
+        return;
+      }
+
+      setRecords(result.customers);
+
+      setCustomers(
+        result.customers.map((customer) => {
+          const activity = activityByContact.get(
+            customer.email.toLowerCase() || customer.phone,
+          );
+
+          return {
+            id: customer.id,
+            isActive: customer.isActive,
+            key: customer.id,
+            name: customer.name,
+            email: customer.email,
+            phone: customer.phone,
+            lastActivity:
+              activity?.lastActivity ?? customer.createdAt.slice(0, 10),
+            activityCount: activity?.activityCount ?? 0,
+            totalValue: activity?.totalValue ?? 0,
+          };
+        }),
+      );
+
+      setPagination({
+        page: result.page,
+        pageSize: result.pageSize,
+        total: result.total,
+        totalPages: result.totalPages,
+        hasPreviousPage: result.hasPreviousPage,
+        hasNextPage: result.hasNextPage,
+      });
+
+      setError("");
+    } catch (loadError) {
+      setError(
+        loadError instanceof Error
+          ? loadError.message
+          : "Unable to load customers.",
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }, [activeFilter, activityByContact, page, search, tenant, usesSupabase]);
+
+  useEffect(() => {
+    void loadCustomerPage();
+  }, [loadCustomerPage]);
 
   const saveCustomer = async () => {
     if (!editing) return;
+
     setIsSaving(true);
     setError("");
+
     try {
-      const updated = editing.id
-        ? await updateCustomer(tenant.id, editing.id, editing)
-        : await createCustomer(tenant.id, editing);
-      setRecords((current) =>
-        editing.id
-          ? current.map((customer) =>
-              customer.id === updated.id ? updated : customer,
-            )
-          : [updated, ...current],
-      );
-      setCustomers((current) =>
-        editing.id
-          ? current.map((customer) =>
-              customer.id === updated.id
-                ? {
-                    ...customer,
-                    name: updated.name,
-                    email: updated.email,
-                    phone: updated.phone,
-                  }
-                : customer,
-            )
-          : [
-              {
-                id: updated.id,
-                isActive: true,
-                key: updated.id,
-                name: updated.name,
-                email: updated.email,
-                phone: updated.phone,
-                lastActivity: updated.createdAt.slice(0, 10),
-                activityCount: 0,
-                totalValue: 0,
-              },
-              ...current,
-            ],
-      );
+      if (editing.id) {
+        await updateCustomer(tenant.id, editing.id, editing);
+      } else {
+        await createCustomer(tenant.id, editing);
+      }
+
       setEditing(null);
+
+      if (page !== 0) {
+        setPage(0);
+      } else {
+        await loadCustomerPage();
+      }
     } catch (saveError) {
       setError(
         saveError instanceof Error
@@ -220,29 +326,16 @@ export function CustomersView({ tenant }: Props) {
 
   const toggleCustomer = async (customer: CustomerSummary) => {
     if (!customer.id) return;
+
     const record = records.find((candidate) => candidate.id === customer.id);
+
     if (!record) return;
+
     try {
       await setCustomerActive(tenant.id, record.id, !record.isActive);
-      setRecords((current) =>
-        current.map((candidate) =>
-          candidate.id === record.id
-            ? { ...candidate, isActive: !candidate.isActive }
-            : candidate,
-        ),
-      );
-      setCustomers((current) =>
-        current.map((candidate) =>
-          candidate.id === record.id
-            ? { ...candidate, isActive: !record.isActive }
-            : candidate,
-        ),
-      );
-      setEditing((current) =>
-        current?.id === record.id
-          ? { ...current, isActive: !record.isActive }
-          : current,
-      );
+
+      setEditing(null);
+      await loadCustomerPage();
     } catch (toggleError) {
       setError(
         toggleError instanceof Error
@@ -252,16 +345,6 @@ export function CustomersView({ tenant }: Props) {
     }
   };
 
-  const filtered = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    if (!query) return customers;
-    return customers.filter((customer) =>
-      [customer.name, customer.email, customer.phone].some((value) =>
-        value.toLowerCase().includes(query),
-      ),
-    );
-  }, [customers, search]);
-
   const returningCustomers = customers.filter(
     (customer) => customer.activityCount > 1,
   ).length;
@@ -270,6 +353,24 @@ export function CustomersView({ tenant }: Props) {
     0,
   );
   const averageValue = customers.length ? lifetimeValue / customers.length : 0;
+  const pageRange = useMemo(() => {
+    if (pagination.total === 0 || customers.length === 0) {
+      return { first: 0, last: 0 };
+    }
+
+    const first = pagination.page * pagination.pageSize + 1;
+
+    return {
+      first,
+      last: first + customers.length - 1,
+    };
+  }, [
+    customers.length,
+    pagination.page,
+    pagination.pageSize,
+    pagination.total,
+  ]);
+
   const selectedActivities = historyCustomer
     ? activities.filter(
         (activity) =>
@@ -279,10 +380,55 @@ export function CustomersView({ tenant }: Props) {
       )
     : [];
 
+  /**
+   * Neutralize spreadsheet formula prefixes before exporting customer data.
+   *
+   * CSV quoting alone does not stop Excel and similar spreadsheet programs
+   * from interpreting values beginning with =, +, -, or @ as formulas.
+   * Prefixing those values with an apostrophe forces spreadsheet programs to
+   * treat the exported value as text while leaving the stored Supabase data
+   * completely unchanged.
+   */
+  const sanitizeCsvCell = (
+    value: string | number | boolean | null | undefined,
+  ) => {
+    const text = String(value ?? "");
+    const firstMeaningfulCharacter = text.trimStart().charAt(0);
+
+    if (
+      firstMeaningfulCharacter === "=" ||
+      firstMeaningfulCharacter === "+" ||
+      firstMeaningfulCharacter === "-" ||
+      firstMeaningfulCharacter === "@"
+    ) {
+      return `'${text}`;
+    }
+
+    return text;
+  };
+
+  /**
+   * Escape one value according to CSV quoting rules after formula
+   * neutralization. Double quotes inside a CSV field are escaped by doubling
+   * them, and every field is wrapped in quotes for consistent output.
+   */
+  const escapeCsvCell = (
+    value: string | number | boolean | null | undefined,
+  ) => {
+    const safeValue = sanitizeCsvCell(value);
+    return `"${safeValue.replaceAll('\"', '\"\"')}"`;
+  };
+
+  /**
+   * Export the current customer list as a UTF-8 CSV file.
+   *
+   * The UTF-8 BOM improves compatibility when the file is opened directly in
+   * Excel, while sanitizeCsvCell protects customer-controlled values such as
+   * names, email addresses, phone numbers, and notes from CSV formula
+   * injection.
+   */
   const exportCustomers = () => {
-    const escape = (value: string | number | boolean) =>
-      `"${String(value).replaceAll('"', '""')}"`;
-    const rows = [
+    const rows: Array<Array<string | number | boolean | null | undefined>> = [
       [
         "Name",
         "Email",
@@ -297,6 +443,7 @@ export function CustomersView({ tenant }: Props) {
         const record = records.find(
           (candidate) => candidate.id === customer.id,
         );
+
         return [
           customer.name,
           customer.email,
@@ -309,15 +456,26 @@ export function CustomersView({ tenant }: Props) {
         ];
       }),
     ];
-    const blob = new Blob(
-      [rows.map((row) => row.map(escape).join(",")).join("\r\n")],
-      { type: "text/csv;charset=utf-8" },
-    );
+
+    const csv =
+      "\uFEFF" +
+      rows.map((row) => row.map(escapeCsvCell).join(",")).join("\r\n");
+
+    const blob = new Blob([csv], {
+      type: "text/csv;charset=utf-8",
+    });
+
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
+
     link.href = url;
     link.download = `${tenant.slug}-customers.csv`;
+
+    // Attach the temporary anchor for consistent browser download behavior.
+    document.body.appendChild(link);
     link.click();
+    link.remove();
+
     URL.revokeObjectURL(url);
   };
 
@@ -329,8 +487,8 @@ export function CustomersView({ tenant }: Props) {
             Customers
           </h2>
           <p className="mt-0.5 text-[10px] text-slate-400 light:text-[#71809a]">
-            {customers.length} unique customer
-            {customers.length === 1 ? "" : "s"}
+            {pagination.total} unique customer
+            {pagination.total === 1 ? "" : "s"}
           </p>
         </div>
         <div className="flex w-full items-center gap-2 sm:w-auto">
@@ -340,7 +498,7 @@ export function CustomersView({ tenant }: Props) {
             disabled={!customers.length}
             onClick={exportCustomers}
           >
-            <Download className="h-3.5 w-3.5" /> Export CSV
+            <Download className="h-3.5 w-3.5" /> Export Page CSV
           </Button>
           {isSupabaseConfigured() && (
             <Button
@@ -363,14 +521,42 @@ export function CustomersView({ tenant }: Props) {
           <div className="relative min-w-0 flex-1 sm:flex-none">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 light:text-gray-500" />
             <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              value={searchInput}
+              onChange={(event) => setSearchInput(event.target.value)}
               placeholder="Search customers..."
               aria-label="Search customers"
+              maxLength={120}
               className="h-8 w-full rounded-lg border border-slate-700 light:border-[#e3e8f0] bg-slate-900/70 light:bg-white pl-9 pr-3 text-[10px] text-white light:text-[#17223a] outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/10 placeholder:text-slate-500 sm:w-52"
             />
           </div>
         </div>
+      </div>
+
+      <div className="flex w-fit max-w-full items-center gap-1 overflow-x-auto rounded-lg border border-slate-700/60 bg-slate-900/70 p-1 light:border-[#e5e9f1] light:bg-white">
+        {[
+          { label: "All", value: "all" as const },
+          { label: "Active", value: true as const },
+          { label: "Inactive", value: false as const },
+        ].map((option) => (
+          <button
+            key={option.label}
+            type="button"
+            onClick={() => {
+              setActiveFilter(option.value);
+              setPage(0);
+            }}
+            className={`rounded-md px-3 py-1.5 text-[10px] font-medium transition-all ${
+              activeFilter === option.value
+                ? "bg-violet-600 text-white shadow-sm"
+                : "text-slate-400 hover:text-white light:text-slate-600 light:hover:text-gray-900"
+            }`}
+          >
+            {option.label}
+            {activeFilter === option.value && (
+              <span className="ml-1 opacity-75">({pagination.total})</span>
+            )}
+          </button>
+        ))}
       </div>
 
       {error && (
@@ -429,24 +615,24 @@ export function CustomersView({ tenant }: Props) {
           </p>
         </div>
         <div className="divide-y divide-slate-700 light:divide-slate-100">
-          {!isLoading && filtered.length === 0 && (
+          {!isLoading && customers.length === 0 && (
             <div className="py-20 text-center text-slate-400 light:text-gray-500">
               <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-400 light:bg-emerald-50 light:text-emerald-600">
                 <Users className="h-5 w-5" />
               </div>
               <p className="text-xs font-bold text-white light:text-[#17223a]">
-                {search
+                {searchInput
                   ? "No customers match your search."
                   : "No customers yet"}
               </p>
-              {!search && (
+              {!searchInput && (
                 <p className="mx-auto mt-1 max-w-64 text-[10px] leading-4 text-slate-400 light:text-[#71809a]">
                   Add customers to build relationships and grow your business.
                 </p>
               )}
             </div>
           )}
-          {filtered.map((customer) => (
+          {customers.map((customer) => (
             <div
               key={customer.key}
               className="grid min-w-[600px] grid-cols-4 items-center gap-4 px-5 py-3 transition-colors hover:bg-slate-700/60 light:hover:bg-[#fafbfe]"
@@ -494,6 +680,7 @@ export function CustomersView({ tenant }: Props) {
                   {formatCurrency(customer.totalValue)}
                 </p>
                 <button
+                  type="button"
                   className="text-violet-400"
                   title="View customer history"
                   aria-label={`View ${customer.name} history`}
@@ -503,6 +690,7 @@ export function CustomersView({ tenant }: Props) {
                 </button>
                 {customer.id && (
                   <button
+                    type="button"
                     className="text-[10px] text-violet-400"
                     onClick={() => {
                       const record = records.find(
@@ -520,6 +708,42 @@ export function CustomersView({ tenant }: Props) {
         </div>
       </Card>
 
+      <div className="flex flex-col gap-3 rounded-xl border border-slate-700/60 bg-slate-900/40 px-4 py-3 light:border-slate-200 light:bg-white sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-xs text-slate-400 light:text-slate-600">
+          {pagination.total === 0
+            ? "0 customers"
+            : `Showing ${pageRange.first}-${pageRange.last} of ${pagination.total} customers`}
+        </p>
+
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={isLoading || !pagination.hasPreviousPage}
+            onClick={() => setPage((current) => Math.max(0, current - 1))}
+          >
+            <ChevronLeft className="mr-1 h-3.5 w-3.5" />
+            Previous
+          </Button>
+
+          <span className="min-w-20 text-center text-xs text-slate-400 light:text-slate-600">
+            {pagination.totalPages === 0
+              ? "Page 0 of 0"
+              : `Page ${pagination.page + 1} of ${pagination.totalPages}`}
+          </span>
+
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={isLoading || !pagination.hasNextPage}
+            onClick={() => setPage((current) => current + 1)}
+          >
+            Next
+            <ChevronRight className="ml-1 h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </div>
+
       <Modal
         open={!!editing}
         onClose={() => setEditing(null)}
@@ -536,7 +760,7 @@ export function CustomersView({ tenant }: Props) {
             <Button
               className="flex-1 bg-violet-600 text-white"
               disabled={isSaving}
-              onClick={saveCustomer}
+              onClick={() => void saveCustomer()}
             >
               {isSaving ? "Saving..." : "Save Customer"}
             </Button>

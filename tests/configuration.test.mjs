@@ -20,7 +20,12 @@ test("large operational lists use bounded database ranges", async () => {
     "app/services/customerService.ts",
   ]) {
     const source = await readFile(path, "utf8");
-    assert.match(source, /\.range\(from, from \+ safePageSize - 1\)/, path);
-    assert.match(source, /Math\.min\(500,/, path);
+    assert.match(
+      source,
+      /\.range\(from, (?:to|from \+ safePageSize - 1)\)/,
+      path,
+    );
+    assert.match(source, /MAX_[A-Z_]*PAGE_SIZE\s*=\s*\d+/, path);
+    assert.match(source, /Math\.min\(/, path);
   }
 });

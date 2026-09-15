@@ -5,6 +5,31 @@ import { Sparkles, Eye, EyeOff, AlertCircle, Sun, Moon } from "lucide-react";
 import { useAuth } from "@/app/contexts/auth";
 import { useTheme } from "@/app/contexts/theme";
 
+
+/**
+ * Validates a post-login destination.
+ *
+ * SECURITY:
+ * Only application-relative paths beginning with exactly one forward slash
+ * are accepted. Protocol-relative URLs, absolute URLs, and backslash-based
+ * paths are rejected.
+ */
+function getSafeInternalPath(value: string | null): string | null {
+  if (!value) return null;
+  if (!value.startsWith("/") || value.startsWith("//") || value.includes("\\")) {
+    return null;
+  }
+
+  try {
+    const resolved = new URL(value, window.location.origin);
+    if (resolved.origin !== window.location.origin) return null;
+
+    return `${resolved.pathname}${resolved.search}${resolved.hash}`;
+  } catch {
+    return null;
+  }
+}
+
 export default function LoginPage() {
   const { login, isLoading: isAuthLoading } = useAuth();
   const { theme, toggleTheme } = useTheme();
@@ -48,14 +73,7 @@ export default function LoginPage() {
     }
 
     const params = new URLSearchParams(window.location.search);
-    const nextPath = params.get("next");
-    const safeNextPath =
-      nextPath &&
-      nextPath.startsWith("/") &&
-      !nextPath.startsWith("//") &&
-      !nextPath.includes("\\")
-        ? nextPath
-        : null;
+    const safeNextPath = getSafeInternalPath(params.get("next"));
 
     if (result.user?.role === "superadmin") {
       const adminDestination =
@@ -235,11 +253,17 @@ export default function LoginPage() {
               )}
 
               <div className="space-y-1.5">
-                <label className="text-sm font-semibold text-slate-300 light:text-gray-800">
+                <label
+                  htmlFor="login-email"
+                  className="text-sm font-semibold text-slate-300 light:text-gray-800"
+                >
                   Email Address
                 </label>
                 <input
+                  id="login-email"
+                  name="email"
                   type="email"
+                  autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   disabled={isAuthLoading || loading}
@@ -255,12 +279,18 @@ export default function LoginPage() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-sm font-semibold text-slate-300 light:text-gray-800">
+                <label
+                  htmlFor="login-password"
+                  className="text-sm font-semibold text-slate-300 light:text-gray-800"
+                >
                   Password
                 </label>
                 <div className="relative">
                   <input
+                    id="login-password"
+                    name="password"
                     type={showPw ? "text" : "password"}
+                    autoComplete="current-password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     disabled={isAuthLoading || loading}
@@ -276,6 +306,8 @@ export default function LoginPage() {
                   <button
                     type="button"
                     onClick={() => setShowPw(!showPw)}
+                    aria-label={showPw ? "Hide password" : "Show password"}
+                    aria-pressed={showPw}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 light:text-gray-600 hover:text-slate-300 light:hover:text-gray-800 transition-colors"
                   >
                     {showPw ? (
@@ -290,6 +322,8 @@ export default function LoginPage() {
               <div className="flex items-center justify-between gap-3 text-xs sm:text-sm">
                 <label className="flex items-center gap-2 text-slate-400 light:text-gray-700 cursor-pointer font-medium">
                   <input
+                    id="remember-me"
+                    name="remember-me"
                     type="checkbox"
                     checked={rememberMe}
                     onChange={(event) => setRememberMe(event.target.checked)}

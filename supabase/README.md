@@ -17,8 +17,13 @@ After connecting the Supabase CLI, generate the canonical TypeScript database
 types whenever the schema changes:
 
 ```powershell
-npx supabase gen types typescript --project-id YOUR_PROJECT_REF --schema public > app/types/database.generated.ts
+$env:SUPABASE_PROJECT_REF="YOUR_PROJECT_REF"
+$env:SUPABASE_ACCESS_TOKEN="YOUR_PERSONAL_ACCESS_TOKEN"
+npm run types:supabase
 ```
+
+The script writes `app/types/database.generated.ts` atomically, so a failed CLI
+or network request cannot replace a valid generated file with partial output.
 
 Do not put the service-role key in a `NEXT_PUBLIC_` variable. The browser uses
 only the publishable (or legacy anon) key and relies on RLS for authorization.

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import Image from "next/image";
+import { useCallback, useEffect, useState } from "react";
 import {
   Plus,
   Edit2,
@@ -10,6 +11,8 @@ import {
   ToggleLeft,
   ToggleRight,
   FolderTree,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { Card } from "../components/Card";
 import { Button } from "../components/Button";
@@ -54,8 +57,19 @@ export function ProductsView({ tenant }: Props) {
   const [categories, setCategories] = useState<Category[]>(
     isSupabaseConfigured() ? [] : getCategoriesByTenant(tenant.id),
   );
+  const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
-  const [cat, setCat] = useState("All");
+  const [categoryId, setCategoryId] = useState<string | "all">("all");
+  const [availability, setAvailability] = useState<boolean | "all">("all");
+  const [page, setPage] = useState(0);
+  const [pagination, setPagination] = useState({
+    page: 0,
+    pageSize: 25,
+    total: 0,
+    totalPages: 0,
+    hasPreviousPage: false,
+    hasNextPage: false,
+  });
   const [showAdd, setShowAdd] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
@@ -71,40 +85,130 @@ export function ProductsView({ tenant }: Props) {
   const [variants, setVariants] = useState<ProductVariant[]>([]);
 
   useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setSearch(searchInput.trim());
+      setPage(0);
+    }, 300);
+
+    return () => window.clearTimeout(timer);
+  }, [searchInput]);
+
+  useEffect(() => {
+    let active = true;
+
     if (!isSupabaseConfigured()) {
       const frame = window.requestAnimationFrame(() => {
         const storedProducts = getStoredProducts(tenant.id);
         if (storedProducts) setProducts(storedProducts);
+        setCategories(getCategoriesByTenant(tenant.id));
         setIsLoading(false);
       });
 
-      return () => window.cancelAnimationFrame(frame);
+      return () => {
+        active = false;
+        window.cancelAnimationFrame(frame);
+      };
     }
-    let active = true;
 
-    Promise.all([listProducts(tenant.id), listCategories(tenant.id, true)])
-      .then(([loadedProducts, loadedCategories]) => {
-        if (!active) return;
-        setProducts(loadedProducts);
-        setCategories(loadedCategories);
-        setError("");
+    void listCategories(tenant.id, true)
+      .then((loadedCategories) => {
+        if (active) setCategories(loadedCategories);
       })
       .catch((loadError: unknown) => {
         if (!active) return;
         setError(
           loadError instanceof Error
             ? loadError.message
-            : "Unable to load products.",
+            : "Unable to load categories.",
         );
-      })
-      .finally(() => {
-        if (active) setIsLoading(false);
       });
 
     return () => {
       active = false;
     };
   }, [tenant.id]);
+
+  const loadProductPage = useCallback(async () => {
+    if (!isSupabaseConfigured()) {
+      const source = getStoredProducts(tenant.id) ?? getProductsByTenant(tenant.id);
+      const normalizedSearch = search.toLowerCase();
+      const filteredProducts = source.filter((product) => {
+        const matchesSearch =
+          !normalizedSearch ||
+          product.name.toLowerCase().includes(normalizedSearch) ||
+          product.description.toLowerCase().includes(normalizedSearch);
+        const matchesCategory =
+          categoryId === "all" || product.categoryId === categoryId;
+        const matchesAvailability =
+          availability === "all" || product.isActive === availability;
+        return matchesSearch && matchesCategory && matchesAvailability;
+      });
+      const pageSize = 25;
+      const totalPages =
+        filteredProducts.length === 0
+          ? 0
+          : Math.ceil(filteredProducts.length / pageSize);
+
+      if (totalPages > 0 && page >= totalPages && page > 0) {
+        setPage(totalPages - 1);
+        return;
+      }
+
+      const from = page * pageSize;
+      const pageProducts = filteredProducts.slice(from, from + pageSize);
+      setProducts(pageProducts);
+      setPagination({
+        page,
+        pageSize,
+        total: filteredProducts.length,
+        totalPages,
+        hasPreviousPage: page > 0,
+        hasNextPage: from + pageProducts.length < filteredProducts.length,
+      });
+      setIsLoading(false);
+      setError("");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const result = await listProducts(tenant.id, {
+        page,
+        pageSize: 25,
+        search,
+        categoryId,
+        availability,
+      });
+
+      if (result.totalPages > 0 && result.page >= result.totalPages && result.page > 0) {
+        setPage(result.totalPages - 1);
+        return;
+      }
+
+      setProducts(result.products);
+      setPagination({
+        page: result.page,
+        pageSize: result.pageSize,
+        total: result.total,
+        totalPages: result.totalPages,
+        hasPreviousPage: result.hasPreviousPage,
+        hasNextPage: result.hasNextPage,
+      });
+      setError("");
+    } catch (loadError) {
+      setError(
+        loadError instanceof Error
+          ? loadError.message
+          : "Unable to load products.",
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }, [availability, categoryId, page, search, tenant.id]);
+
+  useEffect(() => {
+    void loadProductPage();
+  }, [loadProductPage]);
 
   // State for the new product form
   const [newProduct, setNewProduct] = useState({
@@ -123,13 +227,6 @@ export function ProductsView({ tenant }: Props) {
     (category) => category.isActive !== false,
   );
 
-  const filtered = products.filter((p) => {
-    const matchSearch =
-      search === "" || p.name.toLowerCase().includes(search.toLowerCase());
-    const matchCat = cat === "All" || p.categoryName === cat;
-    return matchSearch && matchCat;
-  });
-
   const toggle = async (id: string) => {
     const current = products.find((product) => product.id === id);
     if (!current) return;
@@ -143,6 +240,7 @@ export function ProductsView({ tenant }: Props) {
     try {
       if (isSupabaseConfigured()) {
         await setProductAvailability(tenant.id, id, !current.isActive);
+        await loadProductPage();
       } else setStoredProducts(tenant.id, updated);
     } catch (updateError) {
       setProducts(products);
@@ -162,8 +260,12 @@ export function ProductsView({ tenant }: Props) {
     setIsDeleting(true);
 
     try {
-      if (isSupabaseConfigured()) await deleteProduct(tenant.id, id);
-      else setStoredProducts(tenant.id, updated);
+      if (isSupabaseConfigured()) {
+        await deleteProduct(tenant.id, id);
+        await loadProductPage();
+      } else {
+        setStoredProducts(tenant.id, updated);
+      }
       setDeleteTarget(null);
     } catch (deleteError) {
       setProducts(previous);
@@ -394,13 +496,21 @@ export function ProductsView({ tenant }: Props) {
         product = { ...product, variants };
       }
 
-      setProducts((current) =>
-        editingProduct
-          ? current.map((candidate) =>
-              candidate.id === product.id ? product : candidate,
-            )
-          : [...current, product],
-      );
+      if (isSupabaseConfigured()) {
+        if (!editingProduct && page !== 0) {
+          setPage(0);
+        } else {
+          await loadProductPage();
+        }
+      } else {
+        setProducts((current) =>
+          editingProduct
+            ? current.map((candidate) =>
+                candidate.id === product.id ? product : candidate,
+              )
+            : [...current, product],
+        );
+      }
       setNewProduct({
         name: "",
         price: "",
@@ -521,7 +631,7 @@ export function ProductsView({ tenant }: Props) {
               : product,
           ),
         );
-        if (cat === editingCategory.name) setCat(saved.name);
+        if (categoryId === editingCategory.id) setCategoryId(saved.id);
       }
       resetCategoryForm();
     } catch (categoryError) {
@@ -550,7 +660,10 @@ export function ProductsView({ tenant }: Props) {
           candidate.id === saved.id ? saved : candidate,
         ),
       );
-      if (saved.isActive === false && cat === saved.name) setCat("All");
+      if (saved.isActive === false && categoryId === saved.id) {
+        setCategoryId("all");
+        setPage(0);
+      }
     } catch (categoryError) {
       setError(
         categoryError instanceof Error
@@ -568,8 +681,7 @@ export function ProductsView({ tenant }: Props) {
             Products
           </h2>
           <p className="mt-0.5 text-[10px] text-slate-400 light:text-[#71809a]">
-            {products.filter((p) => p.isActive).length} active ·{" "}
-            {products.length} total
+            {pagination.total} product{pagination.total === 1 ? "" : "s"}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -613,41 +725,84 @@ export function ProductsView({ tenant }: Props) {
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 light:text-gray-500" />
           <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
             placeholder="Search products..."
+            maxLength={120}
             className="h-8 w-full rounded-lg border border-slate-700 light:border-[#e3e8f0] bg-slate-800 light:bg-white pl-9 pr-3 text-[10px]
                        focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500
                        text-white light:text-gray-900 placeholder:text-slate-500 light:placeholder:text-gray-400"
           />
         </div>
         <div className="flex gap-1.5 flex-wrap">
-          {["All", ...activeCategories.map((c) => c.name)].map((c) => (
+          <button
+            type="button"
+            onClick={() => {
+              setCategoryId("all");
+              setPage(0);
+            }}
+            className={cn(
+              "rounded-lg px-3 py-1.5 text-[10px] font-medium transition-colors",
+              categoryId === "all"
+                ? "bg-violet-600 text-white"
+                : "bg-slate-800 light:bg-gray-100 text-slate-300 light:text-gray-700 hover:bg-slate-700 light:hover:bg-gray-200",
+            )}
+          >
+            All
+          </button>
+          {activeCategories.map((category) => (
             <button
-              key={c}
-              onClick={() => setCat(c)}
+              type="button"
+              key={category.id}
+              onClick={() => {
+                setCategoryId(category.id);
+                setPage(0);
+              }}
               className={cn(
                 "rounded-lg px-3 py-1.5 text-[10px] font-medium transition-colors",
-                cat === c
+                categoryId === category.id
                   ? "bg-violet-600 text-white"
                   : "bg-slate-800 light:bg-gray-100 text-slate-300 light:text-gray-700 hover:bg-slate-700 light:hover:bg-gray-200",
               )}
             >
-              {c}
+              {category.name}
+            </button>
+          ))}
+          {[
+            { label: "Live", value: true as const },
+            { label: "Paused", value: false as const },
+          ].map((option) => (
+            <button
+              type="button"
+              key={option.label}
+              onClick={() => {
+                setAvailability((current) =>
+                  current === option.value ? "all" : option.value,
+                );
+                setPage(0);
+              }}
+              className={cn(
+                "rounded-lg px-3 py-1.5 text-[10px] font-medium transition-colors",
+                availability === option.value
+                  ? "bg-violet-600 text-white"
+                  : "bg-slate-800 light:bg-gray-100 text-slate-300 light:text-gray-700 hover:bg-slate-700 light:hover:bg-gray-200",
+              )}
+            >
+              {option.label}
             </button>
           ))}
         </div>
       </div>
 
       {/* Grid */}
-      {filtered.length === 0 ? (
+      {!isLoading && products.length === 0 ? (
         <div className="py-16 text-center text-slate-400 light:text-gray-500">
           <Package className="w-10 h-10 mx-auto mb-3 opacity-40" />
           <p className="text-sm">No products found</p>
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {filtered.map((p) => (
+          {products.map((p) => (
             <ProductCard
               key={p.id}
               product={p}
@@ -658,6 +813,39 @@ export function ProductsView({ tenant }: Props) {
           ))}
         </div>
       )}
+
+      <div className="flex flex-col gap-3 rounded-xl border border-slate-700/60 bg-slate-900/40 px-4 py-3 light:border-slate-200 light:bg-white sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-xs text-slate-400 light:text-slate-600">
+          {pagination.total === 0
+            ? "0 products"
+            : `Showing ${pagination.page * pagination.pageSize + 1}-${
+                pagination.page * pagination.pageSize + products.length
+              } of ${pagination.total} products`}
+        </p>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={isLoading || !pagination.hasPreviousPage}
+            onClick={() => setPage((current) => Math.max(0, current - 1))}
+          >
+            <ChevronLeft className="mr-1 h-3.5 w-3.5" /> Previous
+          </Button>
+          <span className="min-w-20 text-center text-xs text-slate-400 light:text-slate-600">
+            {pagination.totalPages === 0
+              ? "Page 0 of 0"
+              : `Page ${pagination.page + 1} of ${pagination.totalPages}`}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={isLoading || !pagination.hasNextPage}
+            onClick={() => setPage((current) => current + 1)}
+          >
+            Next <ChevronRight className="ml-1 h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </div>
 
       {/* Add modal */}
       <Modal
@@ -676,7 +864,7 @@ export function ProductsView({ tenant }: Props) {
             <Button
               disabled={isSaving}
               className="flex-1 bg-violet-600 hover:bg-violet-500 light:bg-violet-600 light:hover:bg-violet-700 text-white"
-              onClick={handleSaveProduct}
+              onClick={() => void handleSaveProduct()}
             >
               {isSaving
                 ? "Saving..."
@@ -1112,7 +1300,7 @@ export function ProductsView({ tenant }: Props) {
                     Cancel
                   </Button>
                 )}
-                <Button disabled={isSavingCategory} onClick={saveCategory}>
+                <Button disabled={isSavingCategory} onClick={() => void saveCategory()}>
                   {isSavingCategory
                     ? "Saving..."
                     : editingCategory
@@ -1147,12 +1335,10 @@ export function ProductsView({ tenant }: Props) {
                   </div>
                   <p className="mt-1 text-[10px] text-slate-400">
                     Position {category.sortOrder} ·{" "}
-                    {
-                      products.filter(
-                        (product) => product.categoryId === category.id,
-                      ).length
-                    }{" "}
-                    products
+                    {products.filter(
+                      (product) => product.categoryId === category.id,
+                    ).length}{" "}
+                    on this page
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -1194,7 +1380,9 @@ export function ProductsView({ tenant }: Props) {
               variant="danger"
               className="flex-1"
               disabled={isDeleting}
-              onClick={() => deleteTarget && del(deleteTarget.id)}
+              onClick={() => {
+                if (deleteTarget) void del(deleteTarget.id);
+              }}
             >
               Delete Product
             </Button>
@@ -1230,10 +1418,13 @@ function ProductCard({
     <Card className="group overflow-hidden">
       <div className="relative h-40 overflow-hidden bg-slate-700 light:bg-slate-100">
         {product.image ? (
-          <img
+          <Image
             src={product.image}
             alt={product.name}
-            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+            fill
+            unoptimized
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+            className="object-cover transition-transform duration-300 group-hover:scale-105"
           />
         ) : (
           <div className="flex h-full items-center justify-center text-slate-500">
@@ -1316,6 +1507,7 @@ function ProductCard({
           </Button>
           <div className="w-px h-5 bg-slate-700 light:bg-slate-200" />
           <button
+            type="button"
             onClick={() => onToggle(product.id)}
             className="text-slate-400 light:text-gray-500 hover:text-white light:hover:text-gray-900 transition-colors"
             aria-label={

@@ -12,16 +12,24 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
+
       - run: npm ci
+
+      # Prevent high/critical vulnerable dependencies from passing CI.
+      - run: npm audit --audit-level=high
+
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
+
       - run: npm run build
         env:
           NEXT_PUBLIC_ENABLE_DEMO_MODE: "false"

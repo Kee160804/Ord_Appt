@@ -1,7 +1,9 @@
 import "server-only";
 
 import { getSupabasePublicClient } from "@/app/lib/supabase/server";
+import { parseSocialLinks } from "@/app/lib/social-links";
 import type {
+  BusinessReview,
   Category,
   Product,
   PublicServiceProvider,
@@ -10,6 +12,7 @@ import type {
 } from "@/app/types/index";
 import type {
   BusinessHourRow,
+  BusinessReviewRow,
   CategoryRow,
   ProductRow,
   ProductVariantRow,
@@ -23,6 +26,12 @@ export interface PublicStorefrontData {
   products: Product[];
   services: Service[];
   providers: PublicServiceProvider[];
+  reviews: BusinessReview[];
+}
+
+export interface PublicStorefrontEntry {
+  slug: string;
+  updatedAt: string;
 }
 
 type PublicOrderingSettingsRow = {
@@ -51,12 +60,49 @@ const DAYS = [
   "Saturday",
 ];
 
+/**
+ * Public storefronts should never request an unbounded tenant catalogue.
+ *
+ * These are intentionally generous storefront limits rather than pagination.
+ * The public UI can add pagination/infinite loading later without changing the
+ * security boundary here.
+ */
+const PUBLIC_CATEGORY_LIMIT = 100;
+const PUBLIC_PRODUCT_LIMIT = 250;
+const PUBLIC_VARIANT_LIMIT = 1000;
+const PUBLIC_SERVICE_LIMIT = 250;
+const PUBLIC_PROVIDER_LIMIT = 250;
+const PUBLIC_ASSIGNMENT_LIMIT = 2000;
+const PUBLIC_REVIEW_LIMIT = 250;
+
+function finiteNumber(value: unknown, fallback: number): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function nonNegativeNumber(value: unknown, fallback: number): number {
+  return Math.max(0, finiteNumber(value, fallback));
+}
+
+function percentage(value: unknown, fallback: number): number {
+  return Math.min(100, Math.max(0, finiteNumber(value, fallback)));
+}
+
+function normalizedSlug(value: string): string {
+  return value.trim().toLowerCase();
+}
+
 function mapTenant(row: TenantRow, hours: BusinessHourRow[]): Tenant {
   const businessName = row.business_name;
   return {
     id: row.id,
     name: businessName,
     slug: row.slug,
+    domain: row.custom_domain_verified_at
+      ? (row.custom_domain ?? undefined)
+      : undefined,
+    customDomain: row.custom_domain ?? undefined,
+    customDomainVerified: Boolean(row.custom_domain_verified_at),
     businessType:
       row.business_type?.toLowerCase() === "ordering"
         ? "ordering"
@@ -81,7 +127,7 @@ function mapTenant(row: TenantRow, hours: BusinessHourRow[]): Tenant {
         close: hour.close_time?.slice(0, 5) ?? "",
         closed: hour.is_closed,
       })),
-    socialLinks: {},
+    socialLinks: parseSocialLinks(row.social_links),
     primaryColor: row.primary_color ?? "#8b5cf6",
     accentColor: row.accent_color ?? "#a78bfa",
     createdAt: row.created_at ?? new Date().toISOString(),
@@ -99,6 +145,30 @@ function mapTenant(row: TenantRow, hours: BusinessHourRow[]): Tenant {
   };
 }
 
+export async function listPublicStorefrontEntries(): Promise<
+  PublicStorefrontEntry[]
+> {
+  const supabase = getSupabasePublicClient();
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from("tenants")
+    .select("slug, updated_at")
+    .eq("is_active", true)
+    .eq("status", "ACTIVE")
+    .order("updated_at", { ascending: false })
+    .range(0, 999);
+  if (error) throw error;
+  return (data ?? [])
+    .filter(
+      (row): row is { slug: string; updated_at: string | null } =>
+        typeof row.slug === "string" && row.slug.trim().length > 0,
+    )
+    .map((row) => ({
+      slug: row.slug,
+      updatedAt: row.updated_at ?? new Date().toISOString(),
+    }));
+}
+
 export async function getPublicStorefront(
   slug: string,
 ): Promise<PublicStorefrontData | null> {
@@ -108,10 +178,18 @@ export async function getPublicStorefront(
   const supabase = getSupabasePublicClient();
   if (!supabase) return null;
 
+  const storefrontSlug = normalizedSlug(slug);
+  if (!storefrontSlug || storefrontSlug.length > 100) return null;
+
+  /**
+   * Only active tenants can resolve through the public storefront loader.
+   * RLS remains the database boundary; these filters also avoid loading an
+   * inactive tenant into application memory.
+   */
   const { data: tenantData, error: tenantError } = await supabase
     .from("tenants")
     .select("*")
-    .eq("slug", slug)
+    .eq("slug", storefrontSlug)
     .eq("is_active", true)
     .eq("status", "ACTIVE")
     .maybeSingle();
@@ -129,6 +207,7 @@ export async function getPublicStorefront(
     providersResult,
     assignmentsResult,
     orderingSettingsResult,
+    reviewsResult,
   ] = await Promise.all([
     supabase
       .from("business_hours")
@@ -139,35 +218,41 @@ export async function getPublicStorefront(
       .select("*")
       .eq("tenant_id", tenantRow.id)
       .eq("is_active", true)
-      .order("sort_order"),
+      .order("sort_order")
+      .range(0, PUBLIC_CATEGORY_LIMIT - 1),
     supabase
       .from("products")
       .select("*")
       .eq("tenant_id", tenantRow.id)
       .eq("available", true)
-      .order("name"),
+      .order("name")
+      .range(0, PUBLIC_PRODUCT_LIMIT - 1),
     supabase
       .from("product_variants")
       .select("*")
       .eq("tenant_id", tenantRow.id)
-      .eq("available", true),
+      .eq("available", true)
+      .range(0, PUBLIC_VARIANT_LIMIT - 1),
     supabase
       .from("services")
       .select("*")
       .eq("tenant_id", tenantRow.id)
       .eq("available", true)
-      .order("name"),
+      .order("name")
+      .range(0, PUBLIC_SERVICE_LIMIT - 1),
     supabase
       .from("staff")
       .select("id, tenant_id, display_name, bio, color")
       .eq("tenant_id", tenantRow.id)
       .eq("is_active", true)
       .eq("accepts_appointments", true)
-      .order("display_name"),
+      .order("display_name")
+      .range(0, PUBLIC_PROVIDER_LIMIT - 1),
     supabase
       .from("staff_services")
       .select("staff_id, service_id")
-      .eq("tenant_id", tenantRow.id),
+      .eq("tenant_id", tenantRow.id)
+      .range(0, PUBLIC_ASSIGNMENT_LIMIT - 1),
     supabase
       .from("business_settings")
       .select(
@@ -175,8 +260,25 @@ export async function getPublicStorefront(
       )
       .eq("tenant_id", tenantRow.id)
       .maybeSingle(),
+    supabase
+      .from("business_reviews")
+      .select(
+        "id, tenant_id, service_id, rating, title, body, reviewer_name, created_at",
+      )
+      .eq("tenant_id", tenantRow.id)
+      .eq("is_published", true)
+      .order("created_at", { ascending: false })
+      .range(0, PUBLIC_REVIEW_LIMIT - 1),
   ]);
 
+  /**
+   * Hours/categories/products/services are core storefront data. Fail the load
+   * rather than rendering a misleading partial storefront when one of these
+   * queries fails.
+   *
+   * Variants, providers, assignments, and ordering settings are optional
+   * enrichments and continue to degrade safely to their existing defaults.
+   */
   const firstError =
     hoursResult.error ??
     categoriesResult.error ??
@@ -212,8 +314,9 @@ export async function getPublicStorefront(
     tenantRow,
     (hoursResult.data ?? []) as BusinessHourRow[],
   );
-  const ordering = (orderingSettingsResult.data ??
-    {}) as Partial<PublicOrderingSettingsRow>;
+  const ordering = (
+    orderingSettingsResult.error ? {} : (orderingSettingsResult.data ?? {})
+  ) as Partial<PublicOrderingSettingsRow>;
   tenant.orderingSettings = {
     enabled: ordering.ordering_enabled !== false,
     paused: ordering.ordering_paused === true,
@@ -222,14 +325,22 @@ export async function getPublicStorefront(
     ).filter((value): value is "dine_in" | "pickup" | "delivery" =>
       ["dine_in", "pickup", "delivery"].includes(value),
     ),
-    taxRate: Number(ordering.tax_rate ?? 10),
+    taxRate: percentage(ordering.tax_rate, 10),
     discountEnabled: ordering.discount_enabled !== false,
-    discountThreshold: Number(ordering.discount_threshold ?? 100),
-    discountRate: Number(ordering.discount_rate ?? 5),
-    minimumOrder: Number(ordering.minimum_order ?? 0),
-    deliveryFee: Number(ordering.delivery_fee ?? 0),
-    deliveryAreas: ordering.delivery_areas ?? [],
-    preparationMinutes: Number(ordering.preparation_minutes ?? 30),
+    discountThreshold: nonNegativeNumber(ordering.discount_threshold, 100),
+    discountRate: percentage(ordering.discount_rate, 5),
+    minimumOrder: nonNegativeNumber(ordering.minimum_order, 0),
+    deliveryFee: nonNegativeNumber(ordering.delivery_fee, 0),
+    deliveryAreas: Array.isArray(ordering.delivery_areas)
+      ? ordering.delivery_areas.filter(
+          (area): area is string =>
+            typeof area === "string" && area.trim().length > 0,
+        )
+      : [],
+    preparationMinutes: Math.max(
+      0,
+      Math.floor(finiteNumber(ordering.preparation_minutes, 30)),
+    ),
     openTime: ordering.ordering_open_time?.slice(0, 5),
     closeTime: ordering.ordering_close_time?.slice(0, 5),
   };
@@ -248,7 +359,7 @@ export async function getPublicStorefront(
       tenantId: row.tenant_id,
       name: row.name,
       description: row.description ?? "",
-      price: Number(row.price),
+      price: nonNegativeNumber(row.price, 0),
       image: row.image_url ?? "",
       categoryId: row.category_id ?? "",
       categoryName: categoryNames.get(row.category_id ?? "") ?? "Uncategorized",
@@ -304,6 +415,21 @@ export async function getPublicStorefront(
           bio: row.bio ?? "",
           color: row.color ?? "#8b5cf6",
           serviceIds: assignments.get(row.id) ?? [],
+        };
+      },
+    ),
+    reviews: (reviewsResult.error ? [] : (reviewsResult.data ?? [])).map(
+      (raw) => {
+        const row = raw as BusinessReviewRow;
+        return {
+          id: row.id,
+          tenantId: row.tenant_id,
+          serviceId: row.service_id ?? undefined,
+          rating: Math.min(5, Math.max(1, Number(row.rating))),
+          title: row.title ?? undefined,
+          body: row.body ?? "",
+          reviewerName: row.reviewer_name?.trim() || "Customer",
+          createdAt: row.created_at ?? new Date().toISOString(),
         };
       },
     ),

@@ -1,6 +1,7 @@
 import { getSupabaseBrowserClient } from "@/app/lib/supabase/client";
 import type { AnalyticsSummary, Tenant, TopItem } from "@/app/types/index";
 import type { TenantRow } from "@/app/types/supabase";
+import { parseSocialLinks } from "@/app/lib/social-links";
 
 const PAGE_SIZE = 1000;
 
@@ -154,10 +155,17 @@ function mapTenant(row: TenantRow): Tenant {
     id: row.id,
     name: businessName,
     slug: row.slug,
+    domain: row.custom_domain_verified_at
+      ? (row.custom_domain ?? undefined)
+      : undefined,
+    customDomain: row.custom_domain ?? undefined,
+    customDomainVerified: Boolean(row.custom_domain_verified_at),
     businessType:
       row.business_type?.toLowerCase() === "ordering"
         ? "ordering"
-        : "appointment",
+        : row.business_type?.toLowerCase() === "retail"
+          ? "retail"
+          : "appointment",
     logo: row.logo ?? (businessName.charAt(0).toUpperCase() || "B"),
     logoBg: row.logo_bg ?? row.primary_color ?? "#8b5cf6",
     description: row.description ?? "",
@@ -167,7 +175,7 @@ function mapTenant(row: TenantRow): Tenant {
     city: row.city ?? "",
     coverImage: row.cover_image ?? "",
     businessHours: [],
-    socialLinks: {},
+    socialLinks: parseSocialLinks(row.social_links),
     primaryColor: row.primary_color ?? "#8b5cf6",
     accentColor: row.accent_color ?? "#a78bfa",
     createdAt: row.created_at ?? "",
@@ -594,6 +602,29 @@ export async function updateAdminTenantSubscription(
   return payload.subscription;
 }
 
+export async function updateAdminDomainVerification(
+  tenantId: string,
+  verified: boolean,
+) {
+  const response = await fetch(
+    `/api/admin/tenants/${encodeURIComponent(tenantId)}/domain`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ verified }),
+    },
+  );
+  const payload = (await response.json()) as {
+    domain?: string;
+    verified?: boolean;
+    error?: string;
+  };
+  if (!response.ok || typeof payload.verified !== "boolean") {
+    throw new Error(payload.error || "Unable to update domain verification.");
+  }
+  return { domain: payload.domain ?? "", verified: payload.verified };
+}
+
 export interface CreateAdminTenantInput {
   businessName: string;
   businessType: "appointment" | "ordering" | "retail";
@@ -628,10 +659,21 @@ export interface CreateAdminTenantResult {
   createdNewUser?: boolean;
 }
 
+/**
+ * Roles supported by the platform Agent Management API.
+ *
+ * SECURITY:
+ * - "superadmin" is platform-scoped.
+ * - All other roles are tenant-scoped and require a tenantId.
+ * - The protected server API remains the final authorization authority.
+ */
+export type AdminAgentRole =
+  "superadmin" | "owner" | "admin" | "manager" | "staff";
+
 export interface CreateAdminAgentInput {
   name: string;
   email: string;
-  role: "superadmin" | "owner" | "admin" | "manager" | "staff";
+  role: AdminAgentRole;
   tenantId?: string | null;
   password?: string;
   sendPasswordEmail?: boolean;
@@ -672,16 +714,63 @@ export async function createAdminTenant(
 export async function createAdminAgent(
   input: CreateAdminAgentInput,
 ): Promise<CreateAdminAgentResult> {
+  const name = input.name.trim();
+  const email = input.email.trim().toLowerCase();
+  const tenantId =
+    typeof input.tenantId === "string" && input.tenantId.trim()
+      ? input.tenantId.trim()
+      : null;
+
+  if (name.length < 2) {
+    throw new Error("Agent full name is required.");
+  }
+
+  if (!email) {
+    throw new Error("Agent email address is required.");
+  }
+
+  const isSuperAdmin = input.role === "superadmin";
+
+  if (!isSuperAdmin && !tenantId) {
+    throw new Error(
+      "A business tenant is required for owner, admin, manager, and staff accounts.",
+    );
+  }
+
+  if (isSuperAdmin && tenantId) {
+    throw new Error(
+      "Platform super admins cannot be assigned to a tenant during creation.",
+    );
+  }
+
   const response = await fetch("/api/admin/agents", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      ...input,
+      name,
+      email,
+      tenantId,
+    }),
   });
-  const data = (await response.json()) as CreateAdminAgentResult & {
-    error?: string;
-  };
-  if (!response.ok || !data.success) {
-    throw new Error(data.error || "Unable to create agent.");
+
+  let data: (CreateAdminAgentResult & { error?: string }) | null = null;
+
+  try {
+    data = (await response.json()) as CreateAdminAgentResult & {
+      error?: string;
+    };
+  } catch {
+    throw new Error(
+      "The server returned an invalid response while creating the agent.",
+    );
   }
+
+  if (!response.ok || !data?.success) {
+    throw new Error(data?.error || "Unable to create agent. Please try again.");
+  }
+
   return data;
 }

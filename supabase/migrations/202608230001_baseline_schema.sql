@@ -1,25 +1,56 @@
 BEGIN;
 
--- Canonical baseline for a brand-new Supabase project. Every later migration
--- in this repository is additive and can be applied after this file in order.
+-- ============================================================================
+-- YuhBusiness canonical baseline schema
+-- ----------------------------------------------------------------------------
+-- Core authorization model:
+--   * Platform privilege: profiles.platform_role = 'SUPER_ADMIN'
+--   * Tenant membership: tenant_memberships
+--   * Tenant role: roles
+--   * Tenant permissions: roles.permissions JSONB
+--
+-- A single profile may belong to multiple tenants through tenant_memberships.
+-- profiles.tenant_id / profiles.role are retained only for backwards
+-- compatibility and MUST NOT be treated as the source of tenant authorization.
+-- ============================================================================
+
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 CREATE OR REPLACE FUNCTION public.set_updated_at()
-RETURNS TRIGGER LANGUAGE plpgsql SET search_path = public, pg_temp AS $$
-BEGIN NEW.updated_at := NOW(); RETURN NEW; END;
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  NEW.updated_at := NOW();
+  RETURN NEW;
+END;
 $$;
+
+-- ============================================================================
+-- Profiles
+-- ============================================================================
 
 CREATE TABLE IF NOT EXISTS public.profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+
+  -- Legacy compatibility fields. Tenant authorization uses memberships/roles.
   tenant_id UUID,
   full_name TEXT,
   email TEXT,
   role TEXT,
+
+  -- Platform-only privilege. Business owners can never assign this value.
   platform_role TEXT NOT NULL DEFAULT '',
+
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- ============================================================================
+-- Tenants / Businesses
+-- ============================================================================
 
 CREATE TABLE IF NOT EXISTS public.tenants (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -47,12 +78,34 @@ CREATE TABLE IF NOT EXISTS public.tenants (
   created_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  CHECK (LOWER(business_type) IN ('appointment','ordering','retail'))
+  CHECK (LOWER(business_type) IN ('appointment', 'ordering', 'retail'))
 );
-ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS profiles_tenant_id_fkey;
-ALTER TABLE public.profiles ADD CONSTRAINT profiles_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE SET NULL;
-CREATE UNIQUE INDEX IF NOT EXISTS tenants_slug_unique ON public.tenants (LOWER(slug));
-CREATE UNIQUE INDEX IF NOT EXISTS tenants_subdomain_unique ON public.tenants (LOWER(subdomain));
+
+ALTER TABLE public.profiles
+  DROP CONSTRAINT IF EXISTS profiles_tenant_id_fkey;
+
+ALTER TABLE public.profiles
+  ADD CONSTRAINT profiles_tenant_id_fkey
+  FOREIGN KEY (tenant_id)
+  REFERENCES public.tenants(id)
+  ON DELETE SET NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS tenants_slug_unique
+  ON public.tenants (LOWER(slug));
+
+CREATE UNIQUE INDEX IF NOT EXISTS tenants_subdomain_unique
+  ON public.tenants (LOWER(subdomain));
+
+-- ============================================================================
+-- Tenant Roles
+-- ----------------------------------------------------------------------------
+-- Each business owns its own roles.
+-- permissions is a JSON array of permission keys.
+-- Example:
+--   ["view_dashboard", "manage_orders", "manage_team"]
+--
+-- OWNER uses ["*"] for full tenant access.
+-- ============================================================================
 
 CREATE TABLE IF NOT EXISTS public.roles (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -62,8 +115,22 @@ CREATE TABLE IF NOT EXISTS public.roles (
   permissions JSONB NOT NULL DEFAULT '[]'::JSONB,
   is_system_role BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+  CONSTRAINT roles_permissions_array_check
+    CHECK (jsonb_typeof(permissions) = 'array'),
+
   UNIQUE (tenant_id, name)
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS roles_tenant_name_ci_unique
+  ON public.roles (tenant_id, LOWER(name));
+
+-- ============================================================================
+-- Tenant Memberships
+-- ----------------------------------------------------------------------------
+-- A profile can belong to many businesses, but only once per business.
+-- ============================================================================
 
 CREATE TABLE IF NOT EXISTS public.tenant_memberships (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -77,13 +144,184 @@ CREATE TABLE IF NOT EXISTS public.tenant_memberships (
   UNIQUE (tenant_id, profile_id)
 );
 
-CREATE OR REPLACE FUNCTION public.user_has_tenant_access(requested_tenant_id UUID)
-RETURNS BOOLEAN LANGUAGE SQL STABLE SECURITY DEFINER SET search_path = public, auth, pg_temp AS $$
-  SELECT EXISTS (SELECT 1 FROM public.tenant_memberships m JOIN public.profiles p ON p.id=m.profile_id
-    WHERE m.profile_id=auth.uid() AND m.tenant_id=requested_tenant_id AND m.is_active AND p.is_active);
+CREATE INDEX IF NOT EXISTS tenant_memberships_profile_idx
+  ON public.tenant_memberships(profile_id);
+
+CREATE INDEX IF NOT EXISTS tenant_memberships_tenant_idx
+  ON public.tenant_memberships(tenant_id);
+
+CREATE INDEX IF NOT EXISTS tenant_memberships_role_idx
+  ON public.tenant_memberships(role_id);
+
+-- ============================================================================
+-- Authorization helpers
+-- ============================================================================
+
+CREATE OR REPLACE FUNCTION public.is_super_admin()
+RETURNS BOOLEAN
+LANGUAGE SQL
+STABLE
+SECURITY DEFINER
+SET search_path = public, auth, pg_temp
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.profiles p
+    WHERE p.id = auth.uid()
+      AND p.is_active = TRUE
+      AND UPPER(COALESCE(p.platform_role, '')) = 'SUPER_ADMIN'
+  );
 $$;
+
+REVOKE ALL ON FUNCTION public.is_super_admin() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.is_super_admin() TO authenticated, service_role;
+
+CREATE OR REPLACE FUNCTION public.user_has_tenant_access(requested_tenant_id UUID)
+RETURNS BOOLEAN
+LANGUAGE SQL
+STABLE
+SECURITY DEFINER
+SET search_path = public, auth, pg_temp
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.tenant_memberships m
+    JOIN public.profiles p ON p.id = m.profile_id
+    JOIN public.roles r
+      ON r.id = m.role_id
+     AND r.tenant_id = m.tenant_id
+    WHERE m.profile_id = auth.uid()
+      AND m.tenant_id = requested_tenant_id
+      AND m.is_active = TRUE
+      AND p.is_active = TRUE
+  );
+$$;
+
 REVOKE ALL ON FUNCTION public.user_has_tenant_access(UUID) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.user_has_tenant_access(UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.user_has_tenant_access(UUID)
+  TO authenticated, service_role;
+
+CREATE OR REPLACE FUNCTION public.current_tenant_role(p_tenant_id UUID)
+RETURNS TEXT
+LANGUAGE SQL
+STABLE
+SECURITY DEFINER
+SET search_path = public, auth, pg_temp
+AS $$
+  SELECT UPPER(r.name)
+  FROM public.tenant_memberships m
+  JOIN public.roles r ON r.id = m.role_id
+  JOIN public.profiles p ON p.id = m.profile_id
+  WHERE m.tenant_id = p_tenant_id
+    AND m.profile_id = auth.uid()
+    AND m.is_active = TRUE
+    AND p.is_active = TRUE
+  LIMIT 1;
+$$;
+
+REVOKE ALL ON FUNCTION public.current_tenant_role(UUID) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.current_tenant_role(UUID)
+  TO authenticated, service_role;
+
+CREATE OR REPLACE FUNCTION public.current_user_owns_tenant(p_tenant_id UUID)
+RETURNS BOOLEAN
+LANGUAGE SQL
+STABLE
+SECURITY DEFINER
+SET search_path = public, auth, pg_temp
+AS $$
+  SELECT COALESCE(public.current_tenant_role(p_tenant_id) = 'OWNER', FALSE);
+$$;
+
+REVOKE ALL ON FUNCTION public.current_user_owns_tenant(UUID) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.current_user_owns_tenant(UUID)
+  TO authenticated, service_role;
+
+CREATE OR REPLACE FUNCTION public.user_has_permission(
+  requested_tenant_id UUID,
+  requested_permission TEXT
+)
+RETURNS BOOLEAN
+LANGUAGE SQL
+STABLE
+SECURITY DEFINER
+SET search_path = public, auth, pg_temp
+AS $$
+  SELECT
+    public.is_super_admin()
+    OR EXISTS (
+      SELECT 1
+      FROM public.tenant_memberships m
+      JOIN public.profiles p ON p.id = m.profile_id
+      JOIN public.roles r
+        ON r.id = m.role_id
+       AND r.tenant_id = m.tenant_id
+      WHERE m.profile_id = auth.uid()
+        AND m.tenant_id = requested_tenant_id
+        AND m.is_active = TRUE
+        AND p.is_active = TRUE
+        AND (
+          r.permissions ? '*'
+          OR r.permissions ? requested_permission
+        )
+    );
+$$;
+
+REVOKE ALL ON FUNCTION public.user_has_permission(UUID, TEXT) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.user_has_permission(UUID, TEXT)
+  TO authenticated, service_role;
+
+CREATE OR REPLACE FUNCTION public.user_can_manage_team(p_tenant_id UUID)
+RETURNS BOOLEAN
+LANGUAGE SQL
+STABLE
+SECURITY DEFINER
+SET search_path = public, auth, pg_temp
+AS $$
+  SELECT
+    public.is_super_admin()
+    OR public.current_user_owns_tenant(p_tenant_id)
+    OR public.user_has_permission(p_tenant_id, 'manage_team');
+$$;
+
+REVOKE ALL ON FUNCTION public.user_can_manage_team(UUID) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.user_can_manage_team(UUID)
+  TO authenticated, service_role;
+
+-- Business access helper used by team invitation / seat flows.
+CREATE OR REPLACE FUNCTION public.tenant_subscription_allows_access(
+  p_tenant_id UUID
+)
+RETURNS BOOLEAN
+LANGUAGE SQL
+STABLE
+SECURITY DEFINER
+SET search_path = public, auth, pg_temp
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.tenants t
+    WHERE t.id = p_tenant_id
+      AND t.is_active = TRUE
+      AND UPPER(COALESCE(t.status, 'ACTIVE')) = 'ACTIVE'
+      AND (
+        LOWER(COALESCE(t.subscription_status, 'trial')) = 'active'
+        OR (
+          LOWER(COALESCE(t.subscription_status, 'trial')) = 'trial'
+          AND (t.trial_ends_at IS NULL OR t.trial_ends_at > NOW())
+        )
+      )
+  );
+$$;
+
+REVOKE ALL ON FUNCTION public.tenant_subscription_allows_access(UUID)
+  FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.tenant_subscription_allows_access(UUID)
+  TO authenticated, service_role;
+
+-- ============================================================================
+-- Business configuration
+-- ============================================================================
 
 CREATE TABLE IF NOT EXISTS public.business_settings (
   tenant_id UUID PRIMARY KEY REFERENCES public.tenants(id) ON DELETE CASCADE,
@@ -93,6 +331,7 @@ CREATE TABLE IF NOT EXISTS public.business_settings (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
 CREATE TABLE IF NOT EXISTS public.business_modules (
   tenant_id UUID PRIMARY KEY REFERENCES public.tenants(id) ON DELETE CASCADE,
   appointments BOOLEAN NOT NULL DEFAULT TRUE,
@@ -101,6 +340,7 @@ CREATE TABLE IF NOT EXISTS public.business_modules (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
 CREATE TABLE IF NOT EXISTS public.business_hours (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
@@ -113,127 +353,585 @@ CREATE TABLE IF NOT EXISTS public.business_hours (
   UNIQUE (tenant_id, day_of_week)
 );
 
+-- ============================================================================
+-- Catalog / services
+-- ============================================================================
+
 CREATE TABLE IF NOT EXISTS public.categories (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(), tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
-  name TEXT NOT NULL, description TEXT, sort_order INTEGER NOT NULL DEFAULT 0, is_active BOOLEAN NOT NULL DEFAULT TRUE,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  description TEXT,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
 CREATE TABLE IF NOT EXISTS public.products (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(), tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
-  category_id UUID REFERENCES public.categories(id) ON DELETE SET NULL, name TEXT NOT NULL, description TEXT,
-  price NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (price >= 0), image_url TEXT, sku TEXT, stock INTEGER,
-  available BOOLEAN NOT NULL DEFAULT TRUE, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
+  category_id UUID REFERENCES public.categories(id) ON DELETE SET NULL,
+  name TEXT NOT NULL,
+  description TEXT,
+  price NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (price >= 0),
+  image_url TEXT,
+  sku TEXT,
+  stock INTEGER,
+  available BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
 CREATE TABLE IF NOT EXISTS public.services (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(), tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
-  name TEXT NOT NULL, description TEXT, duration_minutes INTEGER NOT NULL DEFAULT 30 CHECK (duration_minutes > 0),
-  price NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (price >= 0), image_url TEXT, available BOOLEAN NOT NULL DEFAULT TRUE,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  description TEXT,
+  duration_minutes INTEGER NOT NULL DEFAULT 30 CHECK (duration_minutes > 0),
+  price NUMERIC(12,2) NOT NULL DEFAULT 0 CHECK (price >= 0),
+  image_url TEXT,
+  available BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
 CREATE TABLE IF NOT EXISTS public.staff (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(), tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
-  user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
 CREATE TABLE IF NOT EXISTS public.staff_services (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(), staff_id UUID NOT NULL REFERENCES public.staff(id) ON DELETE CASCADE,
-  service_id UUID NOT NULL REFERENCES public.services(id) ON DELETE CASCADE, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  staff_id UUID NOT NULL REFERENCES public.staff(id) ON DELETE CASCADE,
+  service_id UUID NOT NULL REFERENCES public.services(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (staff_id, service_id)
 );
+
+-- ============================================================================
+-- Customers / orders / appointments
+-- ============================================================================
+
 CREATE TABLE IF NOT EXISTS public.customers (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(), tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
-  first_name TEXT NOT NULL DEFAULT '', last_name TEXT NOT NULL DEFAULT '', email TEXT, phone TEXT, notes TEXT,
-  is_active BOOLEAN NOT NULL DEFAULT TRUE, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
+  first_name TEXT NOT NULL DEFAULT '',
+  last_name TEXT NOT NULL DEFAULT '',
+  email TEXT,
+  phone TEXT,
+  notes TEXT,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-CREATE INDEX IF NOT EXISTS customers_tenant_email_idx ON public.customers (tenant_id, LOWER(email));
-CREATE INDEX IF NOT EXISTS customers_tenant_phone_idx ON public.customers (tenant_id, phone);
+
+CREATE INDEX IF NOT EXISTS customers_tenant_email_idx
+  ON public.customers (tenant_id, LOWER(email));
+
+CREATE INDEX IF NOT EXISTS customers_tenant_phone_idx
+  ON public.customers (tenant_id, phone);
 
 CREATE TABLE IF NOT EXISTS public.orders (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(), tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
-  customer_id UUID REFERENCES public.customers(id) ON DELETE SET NULL, order_number TEXT NOT NULL,
-  customer_name TEXT, customer_email TEXT, customer_phone TEXT, status TEXT NOT NULL DEFAULT 'PENDING',
-  payment_status TEXT NOT NULL DEFAULT 'UNPAID', total NUMERIC(12,2) NOT NULL DEFAULT 0, notes TEXT,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
+  customer_id UUID REFERENCES public.customers(id) ON DELETE SET NULL,
+  order_number TEXT NOT NULL,
+  customer_name TEXT,
+  customer_email TEXT,
+  customer_phone TEXT,
+  status TEXT NOT NULL DEFAULT 'PENDING',
+  payment_status TEXT NOT NULL DEFAULT 'UNPAID',
+  total NUMERIC(12,2) NOT NULL DEFAULT 0,
+  notes TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-CREATE UNIQUE INDEX IF NOT EXISTS orders_tenant_number_idx ON public.orders (tenant_id, order_number);
+
+CREATE UNIQUE INDEX IF NOT EXISTS orders_tenant_number_idx
+  ON public.orders (tenant_id, order_number);
+
 CREATE TABLE IF NOT EXISTS public.order_items (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(), tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
-  order_id UUID NOT NULL REFERENCES public.orders(id) ON DELETE CASCADE, product_id UUID REFERENCES public.products(id) ON DELETE SET NULL,
-  product_name TEXT NOT NULL, quantity INTEGER NOT NULL CHECK (quantity > 0), unit_price NUMERIC(12,2) NOT NULL,
-  subtotal NUMERIC(12,2) NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
+  order_id UUID NOT NULL REFERENCES public.orders(id) ON DELETE CASCADE,
+  product_id UUID REFERENCES public.products(id) ON DELETE SET NULL,
+  product_name TEXT NOT NULL,
+  quantity INTEGER NOT NULL CHECK (quantity > 0),
+  unit_price NUMERIC(12,2) NOT NULL,
+  subtotal NUMERIC(12,2) NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS public.appointments (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(), tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
-  customer_id UUID REFERENCES public.customers(id) ON DELETE SET NULL, staff_id UUID REFERENCES public.staff(id) ON DELETE SET NULL,
-  service_id UUID REFERENCES public.services(id) ON DELETE SET NULL, appointment_date DATE, appointment_time TIME,
-  starts_at TIMESTAMPTZ, ends_at TIMESTAMPTZ, customer_name TEXT, customer_email TEXT, customer_phone TEXT,
-  status TEXT NOT NULL DEFAULT 'PENDING', notes TEXT, subtotal NUMERIC(12,2), deposit_required NUMERIC(12,2) DEFAULT 0,
-  total NUMERIC(12,2), payment_status TEXT NOT NULL DEFAULT 'UNPAID', cancelled_at TIMESTAMPTZ, completed_at TIMESTAMPTZ,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-CREATE TABLE IF NOT EXISTS public.appointment_services (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(), tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
-  appointment_id UUID NOT NULL REFERENCES public.appointments(id) ON DELETE CASCADE,
-  service_id UUID REFERENCES public.services(id) ON DELETE SET NULL, service_name TEXT NOT NULL,
-  price NUMERIC(12,2) NOT NULL, duration_minutes INTEGER NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-CREATE TABLE IF NOT EXISTS public.business_reviews (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(), tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
-  customer_id UUID REFERENCES public.customers(id) ON DELETE SET NULL, rating SMALLINT NOT NULL CHECK (rating BETWEEN 1 AND 5),
-  title TEXT, body TEXT, is_published BOOLEAN NOT NULL DEFAULT FALSE, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
+  customer_id UUID REFERENCES public.customers(id) ON DELETE SET NULL,
+  staff_id UUID REFERENCES public.staff(id) ON DELETE SET NULL,
+  service_id UUID REFERENCES public.services(id) ON DELETE SET NULL,
+  appointment_date DATE,
+  appointment_time TIME,
+  starts_at TIMESTAMPTZ,
+  ends_at TIMESTAMPTZ,
+  customer_name TEXT,
+  customer_email TEXT,
+  customer_phone TEXT,
+  status TEXT NOT NULL DEFAULT 'PENDING',
+  notes TEXT,
+  subtotal NUMERIC(12,2),
+  deposit_required NUMERIC(12,2) DEFAULT 0,
+  total NUMERIC(12,2),
+  payment_status TEXT NOT NULL DEFAULT 'UNPAID',
+  cancelled_at TIMESTAMPTZ,
+  completed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS public.appointment_services (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
+  appointment_id UUID NOT NULL REFERENCES public.appointments(id) ON DELETE CASCADE,
+  service_id UUID REFERENCES public.services(id) ON DELETE SET NULL,
+  service_name TEXT NOT NULL,
+  price NUMERIC(12,2) NOT NULL,
+  duration_minutes INTEGER NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS public.business_reviews (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
+  customer_id UUID REFERENCES public.customers(id) ON DELETE SET NULL,
+  rating SMALLINT NOT NULL CHECK (rating BETWEEN 1 AND 5),
+  title TEXT,
+  body TEXT,
+  is_published BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- ============================================================================
+-- Initialize every new tenant
+-- ----------------------------------------------------------------------------
+-- Creates defaults, protected OWNER role, and owner membership.
+-- ============================================================================
+
 CREATE OR REPLACE FUNCTION public.initialize_new_tenant()
-RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, auth, pg_temp AS $$
-DECLARE v_role UUID; v_day INTEGER;
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, auth, pg_temp
+AS $$
+DECLARE
+  v_role UUID;
+  v_day INTEGER;
 BEGIN
-  INSERT INTO public.business_settings (tenant_id) VALUES (NEW.id) ON CONFLICT DO NOTHING;
-  INSERT INTO public.business_modules (tenant_id,appointments,ordering,inventory)
-    VALUES (NEW.id,LOWER(NEW.business_type)='appointment',LOWER(NEW.business_type)='ordering',LOWER(NEW.business_type) IN ('ordering','retail')) ON CONFLICT DO NOTHING;
-  FOR v_day IN 0..6 LOOP INSERT INTO public.business_hours (tenant_id,day_of_week,open_time,close_time,is_closed)
-    VALUES (NEW.id,v_day,'09:00','17:00',v_day IN (0,6)) ON CONFLICT DO NOTHING; END LOOP;
-  INSERT INTO public.roles (tenant_id,name,description,is_system_role) VALUES (NEW.id,'OWNER','Business owner',TRUE)
-    ON CONFLICT DO NOTHING RETURNING id INTO v_role;
-  IF v_role IS NULL THEN SELECT id INTO v_role FROM public.roles WHERE tenant_id=NEW.id AND name='OWNER'; END IF;
-  IF NEW.created_by IS NOT NULL AND EXISTS (SELECT 1 FROM public.profiles WHERE id=NEW.created_by) THEN
-    INSERT INTO public.tenant_memberships (tenant_id,profile_id,role_id,is_active) VALUES (NEW.id,NEW.created_by,v_role,TRUE) ON CONFLICT DO NOTHING;
+  INSERT INTO public.business_settings (tenant_id)
+  VALUES (NEW.id)
+  ON CONFLICT DO NOTHING;
+
+  INSERT INTO public.business_modules (
+    tenant_id,
+    appointments,
+    ordering,
+    inventory
+  )
+  VALUES (
+    NEW.id,
+    LOWER(NEW.business_type) = 'appointment',
+    LOWER(NEW.business_type) = 'ordering',
+    LOWER(NEW.business_type) IN ('ordering', 'retail')
+  )
+  ON CONFLICT DO NOTHING;
+
+  FOR v_day IN 0..6 LOOP
+    INSERT INTO public.business_hours (
+      tenant_id,
+      day_of_week,
+      open_time,
+      close_time,
+      is_closed
+    )
+    VALUES (
+      NEW.id,
+      v_day,
+      '09:00',
+      '17:00',
+      v_day IN (0, 6)
+    )
+    ON CONFLICT DO NOTHING;
+  END LOOP;
+
+  INSERT INTO public.roles (
+    tenant_id,
+    name,
+    description,
+    permissions,
+    is_system_role
+  )
+  VALUES (
+    NEW.id,
+    'OWNER',
+    'Business owner with full tenant access',
+    '["*"]'::JSONB,
+    TRUE
+  )
+  ON CONFLICT DO NOTHING
+  RETURNING id INTO v_role;
+
+  IF v_role IS NULL THEN
+    SELECT id
+    INTO v_role
+    FROM public.roles
+    WHERE tenant_id = NEW.id
+      AND UPPER(name) = 'OWNER'
+    LIMIT 1;
   END IF;
+
+  IF NEW.created_by IS NOT NULL
+     AND EXISTS (
+       SELECT 1
+       FROM public.profiles
+       WHERE id = NEW.created_by
+     )
+  THEN
+    INSERT INTO public.tenant_memberships (
+      tenant_id,
+      profile_id,
+      role_id,
+      is_active
+    )
+    VALUES (
+      NEW.id,
+      NEW.created_by,
+      v_role,
+      TRUE
+    )
+    ON CONFLICT DO NOTHING;
+  END IF;
+
   RETURN NEW;
 END;
 $$;
+
 DROP TRIGGER IF EXISTS trg_initialize_new_tenant ON public.tenants;
-CREATE TRIGGER trg_initialize_new_tenant AFTER INSERT ON public.tenants FOR EACH ROW EXECUTE FUNCTION public.initialize_new_tenant();
 
-DO $$ DECLARE table_name TEXT; BEGIN
-  FOREACH table_name IN ARRAY ARRAY['profiles','tenants','roles','tenant_memberships','business_settings','business_modules','business_hours','categories','products','services','staff','staff_services','customers','orders','order_items','appointments','appointment_services','business_reviews']
-  LOOP EXECUTE FORMAT('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY',table_name); END LOOP;
-END $$;
+CREATE TRIGGER trg_initialize_new_tenant
+AFTER INSERT ON public.tenants
+FOR EACH ROW
+EXECUTE FUNCTION public.initialize_new_tenant();
 
-CREATE POLICY profiles_self_select ON public.profiles FOR SELECT TO authenticated USING (id=auth.uid());
-CREATE POLICY profiles_self_update ON public.profiles FOR UPDATE TO authenticated USING (id=auth.uid()) WITH CHECK (id=auth.uid());
-CREATE POLICY memberships_self_select ON public.tenant_memberships FOR SELECT TO authenticated USING (profile_id=auth.uid());
-CREATE POLICY tenant_member_access ON public.tenants FOR ALL TO authenticated USING (public.user_has_tenant_access(id)) WITH CHECK (public.user_has_tenant_access(id));
-CREATE POLICY roles_member_access ON public.roles FOR ALL TO authenticated USING (public.user_has_tenant_access(tenant_id)) WITH CHECK (public.user_has_tenant_access(tenant_id));
-DO $$ DECLARE table_name TEXT; BEGIN
-  FOREACH table_name IN ARRAY ARRAY['business_settings','business_modules','business_hours','categories','products','services','staff','customers','orders','order_items','appointments','appointment_services','business_reviews'] LOOP
-    EXECUTE FORMAT('CREATE POLICY tenant_member_access ON public.%I FOR ALL TO authenticated USING (public.user_has_tenant_access(tenant_id)) WITH CHECK (public.user_has_tenant_access(tenant_id))',table_name);
+DROP TRIGGER IF EXISTS trg_roles_updated_at ON public.roles;
+
+CREATE TRIGGER trg_roles_updated_at
+BEFORE UPDATE ON public.roles
+FOR EACH ROW
+EXECUTE FUNCTION public.set_updated_at();
+
+DROP TRIGGER IF EXISTS trg_tenant_memberships_updated_at
+  ON public.tenant_memberships;
+
+CREATE TRIGGER trg_tenant_memberships_updated_at
+BEFORE UPDATE ON public.tenant_memberships
+FOR EACH ROW
+EXECUTE FUNCTION public.set_updated_at();
+
+-- ============================================================================
+-- Row Level Security
+-- ============================================================================
+
+DO $$
+DECLARE
+  table_name TEXT;
+BEGIN
+  FOREACH table_name IN ARRAY ARRAY[
+    'profiles',
+    'tenants',
+    'roles',
+    'tenant_memberships',
+    'business_settings',
+    'business_modules',
+    'business_hours',
+    'categories',
+    'products',
+    'services',
+    'staff',
+    'staff_services',
+    'customers',
+    'orders',
+    'order_items',
+    'appointments',
+    'appointment_services',
+    'business_reviews'
+  ]
+  LOOP
+    EXECUTE FORMAT(
+      'ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY',
+      table_name
+    );
   END LOOP;
 END $$;
-CREATE POLICY staff_services_member_access ON public.staff_services FOR ALL TO authenticated
-  USING (EXISTS (SELECT 1 FROM public.staff s WHERE s.id=staff_id AND public.user_has_tenant_access(s.tenant_id)))
-  WITH CHECK (EXISTS (SELECT 1 FROM public.staff s WHERE s.id=staff_id AND public.user_has_tenant_access(s.tenant_id)));
 
-CREATE POLICY public_active_tenants ON public.tenants FOR SELECT TO anon USING (is_active AND UPPER(status)='ACTIVE');
-CREATE POLICY public_active_settings ON public.business_settings FOR SELECT TO anon USING (EXISTS (SELECT 1 FROM public.tenants t WHERE t.id=tenant_id AND t.is_active AND UPPER(t.status)='ACTIVE'));
-CREATE POLICY public_active_hours ON public.business_hours FOR SELECT TO anon USING (EXISTS (SELECT 1 FROM public.tenants t WHERE t.id=tenant_id AND t.is_active AND UPPER(t.status)='ACTIVE'));
-CREATE POLICY public_active_categories ON public.categories FOR SELECT TO anon USING (is_active AND EXISTS (SELECT 1 FROM public.tenants t WHERE t.id=tenant_id AND t.is_active AND UPPER(t.status)='ACTIVE'));
-CREATE POLICY public_active_products ON public.products FOR SELECT TO anon USING (available AND EXISTS (SELECT 1 FROM public.tenants t WHERE t.id=tenant_id AND t.is_active AND UPPER(t.status)='ACTIVE'));
-CREATE POLICY public_active_services ON public.services FOR SELECT TO anon USING (available AND EXISTS (SELECT 1 FROM public.tenants t WHERE t.id=tenant_id AND t.is_active AND UPPER(t.status)='ACTIVE'));
-CREATE POLICY public_active_staff ON public.staff FOR SELECT TO anon USING (EXISTS (SELECT 1 FROM public.tenants t WHERE t.id=tenant_id AND t.is_active AND UPPER(t.status)='ACTIVE'));
-CREATE POLICY public_staff_services ON public.staff_services FOR SELECT TO anon USING (TRUE);
-CREATE POLICY public_reviews ON public.business_reviews FOR SELECT TO anon USING (is_published);
+DROP POLICY IF EXISTS profiles_self_select ON public.profiles;
+CREATE POLICY profiles_self_select
+ON public.profiles
+FOR SELECT TO authenticated
+USING (
+  id = auth.uid()
+  OR public.is_super_admin()
+);
 
-GRANT SELECT ON public.tenants,public.business_settings,public.business_modules,public.business_hours,public.categories,public.products,public.services,public.staff,public.staff_services,public.business_reviews TO anon,authenticated;
-GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA public TO authenticated;
+DROP POLICY IF EXISTS profiles_self_update ON public.profiles;
+CREATE POLICY profiles_self_update
+ON public.profiles
+FOR UPDATE TO authenticated
+USING (id = auth.uid())
+WITH CHECK (id = auth.uid());
+
+DROP POLICY IF EXISTS memberships_self_select ON public.tenant_memberships;
+DROP POLICY IF EXISTS memberships_tenant_select ON public.tenant_memberships;
+
+CREATE POLICY memberships_tenant_select
+ON public.tenant_memberships
+FOR SELECT TO authenticated
+USING (
+  profile_id = auth.uid()
+  OR public.user_can_manage_team(tenant_id)
+  OR public.is_super_admin()
+);
+
+DROP POLICY IF EXISTS tenant_member_access ON public.tenants;
+CREATE POLICY tenant_member_access
+ON public.tenants
+FOR SELECT TO authenticated
+USING (
+  public.user_has_tenant_access(id)
+  OR public.is_super_admin()
+);
+
+DROP POLICY IF EXISTS roles_member_access ON public.roles;
+
+CREATE POLICY roles_tenant_select
+ON public.roles
+FOR SELECT TO authenticated
+USING (
+  public.user_has_tenant_access(tenant_id)
+  OR public.is_super_admin()
+);
+
+-- Role writes are intentionally NOT granted directly.
+-- They are managed through secured RPCs introduced in the team migration.
+
+-- Generic tenant-table read policies.
+DO $$
+DECLARE
+  table_name TEXT;
+BEGIN
+  FOREACH table_name IN ARRAY ARRAY[
+    'business_settings',
+    'business_modules',
+    'business_hours',
+    'categories',
+    'products',
+    'services',
+    'staff',
+    'customers',
+    'orders',
+    'order_items',
+    'appointments',
+    'appointment_services',
+    'business_reviews'
+  ]
+  LOOP
+    EXECUTE FORMAT(
+      'DROP POLICY IF EXISTS tenant_member_access ON public.%I',
+      table_name
+    );
+
+    EXECUTE FORMAT(
+      'CREATE POLICY tenant_member_access ON public.%I FOR SELECT TO authenticated
+       USING (public.user_has_tenant_access(tenant_id) OR public.is_super_admin())',
+      table_name
+    );
+  END LOOP;
+END $$;
+
+DROP POLICY IF EXISTS staff_services_member_access ON public.staff_services;
+
+CREATE POLICY staff_services_member_access
+ON public.staff_services
+FOR SELECT TO authenticated
+USING (
+  EXISTS (
+    SELECT 1
+    FROM public.staff s
+    WHERE s.id = staff_id
+      AND (
+        public.user_has_tenant_access(s.tenant_id)
+        OR public.is_super_admin()
+      )
+  )
+);
+
+-- ============================================================================
+-- Public storefront read access
+-- ============================================================================
+
+DROP POLICY IF EXISTS public_active_tenants ON public.tenants;
+CREATE POLICY public_active_tenants
+ON public.tenants
+FOR SELECT TO anon
+USING (
+  is_active
+  AND UPPER(status) = 'ACTIVE'
+);
+
+DROP POLICY IF EXISTS public_active_settings ON public.business_settings;
+CREATE POLICY public_active_settings
+ON public.business_settings
+FOR SELECT TO anon
+USING (
+  EXISTS (
+    SELECT 1
+    FROM public.tenants t
+    WHERE t.id = tenant_id
+      AND t.is_active
+      AND UPPER(t.status) = 'ACTIVE'
+  )
+);
+
+DROP POLICY IF EXISTS public_active_hours ON public.business_hours;
+CREATE POLICY public_active_hours
+ON public.business_hours
+FOR SELECT TO anon
+USING (
+  EXISTS (
+    SELECT 1
+    FROM public.tenants t
+    WHERE t.id = tenant_id
+      AND t.is_active
+      AND UPPER(t.status) = 'ACTIVE'
+  )
+);
+
+DROP POLICY IF EXISTS public_active_categories ON public.categories;
+CREATE POLICY public_active_categories
+ON public.categories
+FOR SELECT TO anon
+USING (
+  is_active
+  AND EXISTS (
+    SELECT 1
+    FROM public.tenants t
+    WHERE t.id = tenant_id
+      AND t.is_active
+      AND UPPER(t.status) = 'ACTIVE'
+  )
+);
+
+DROP POLICY IF EXISTS public_active_products ON public.products;
+CREATE POLICY public_active_products
+ON public.products
+FOR SELECT TO anon
+USING (
+  available
+  AND EXISTS (
+    SELECT 1
+    FROM public.tenants t
+    WHERE t.id = tenant_id
+      AND t.is_active
+      AND UPPER(t.status) = 'ACTIVE'
+  )
+);
+
+DROP POLICY IF EXISTS public_active_services ON public.services;
+CREATE POLICY public_active_services
+ON public.services
+FOR SELECT TO anon
+USING (
+  available
+  AND EXISTS (
+    SELECT 1
+    FROM public.tenants t
+    WHERE t.id = tenant_id
+      AND t.is_active
+      AND UPPER(t.status) = 'ACTIVE'
+  )
+);
+
+DROP POLICY IF EXISTS public_active_staff ON public.staff;
+CREATE POLICY public_active_staff
+ON public.staff
+FOR SELECT TO anon
+USING (
+  EXISTS (
+    SELECT 1
+    FROM public.tenants t
+    WHERE t.id = tenant_id
+      AND t.is_active
+      AND UPPER(t.status) = 'ACTIVE'
+  )
+);
+
+DROP POLICY IF EXISTS public_staff_services ON public.staff_services;
+CREATE POLICY public_staff_services
+ON public.staff_services
+FOR SELECT TO anon
+USING (TRUE);
+
+DROP POLICY IF EXISTS public_reviews ON public.business_reviews;
+CREATE POLICY public_reviews
+ON public.business_reviews
+FOR SELECT TO anon
+USING (is_published);
+
+-- ============================================================================
+-- Grants
+-- ============================================================================
+
+GRANT SELECT ON
+  public.tenants,
+  public.business_settings,
+  public.business_modules,
+  public.business_hours,
+  public.categories,
+  public.products,
+  public.services,
+  public.staff,
+  public.staff_services,
+  public.business_reviews
+TO anon, authenticated;
+
+GRANT SELECT ON public.roles, public.tenant_memberships TO authenticated;
+
+-- Authenticated writes to business data are still required by the app,
+-- but RLS in the later team-enforcement migration restricts which permissions
+-- can perform them.
+GRANT SELECT, INSERT, UPDATE
+ON ALL TABLES IN SCHEMA public
+TO authenticated;
+
+-- ============================================================================
+-- Transaction retention protection
+-- ----------------------------------------------------------------------------
+-- Orders and appointments are historical business transactions. Authenticated
+-- application users may change their lifecycle status (for example CANCELLED,
+-- COMPLETED, or NO_SHOW) through UPDATE policies, but may not physically delete
+-- the transaction or its captured line/service history.
+--
+-- service_role remains unaffected for controlled server-side administration,
+-- migrations, backups, and exceptional maintenance.
+-- ============================================================================
+
+REVOKE DELETE ON public.orders FROM authenticated;
+REVOKE DELETE ON public.order_items FROM authenticated;
+REVOKE DELETE ON public.appointments FROM authenticated;
+REVOKE DELETE ON public.appointment_services FROM authenticated;
+
+-- Explicitly remove direct role/membership mutation from clients.
+REVOKE INSERT, UPDATE, DELETE ON public.roles FROM authenticated;
+REVOKE INSERT, UPDATE, DELETE ON public.tenant_memberships FROM authenticated;
 
 COMMIT;

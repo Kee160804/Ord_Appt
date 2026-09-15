@@ -137,7 +137,10 @@ export function BusinessToolsView({ tenant }: { tenant: Tenant }) {
       ]);
       setPromotions(promotionData);
       if (isAppointment) {
-        setServices(inventory as Service[]);
+        if (!("services" in inventory)) {
+          throw new Error("The service catalog could not be loaded.");
+        }
+        setServices(inventory.services);
         const [providerData, departmentData, settings, reminderData] =
           await Promise.all([
             listServiceProviders(tenant.id),
@@ -149,7 +152,12 @@ export function BusinessToolsView({ tenant }: { tenant: Tenant }) {
         setDepartments(departmentData);
         setReminderSettings(settings);
         setReminders(reminderData);
-      } else setProducts(inventory as Product[]);
+      } else {
+        if (!("products" in inventory)) {
+          throw new Error("The product catalog could not be loaded.");
+        }
+        setProducts(inventory.products);
+      }
       setError("");
     } catch (loadError) {
       setError(

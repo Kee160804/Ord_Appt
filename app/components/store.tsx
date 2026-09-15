@@ -27,6 +27,7 @@ import { DemoDashboardPreview } from "../components/DemoDashboardPreview";
 import { StorefrontContact } from "../components/StorefrontContact";
 import { useTheme } from "@/app/contexts/theme";
 import type {
+  BusinessReview,
   Category,
   Tenant,
   Service,
@@ -50,12 +51,56 @@ interface CartItem {
   image?: string;
 }
 
+/**
+ * Builds a deterministic identity for one configured cart line.
+ *
+ * A cart line is only the same when ALL of these match:
+ * - product ID
+ * - selected variant ID
+ * - selected add-on IDs
+ *
+ * Add-on IDs are sorted before joining so selecting the same add-ons in a
+ * different UI order still produces the same cart identity.
+ *
+ * This prevents two differently configured products from being merged into
+ * one line and incorrectly applying one set of add-ons across both quantities.
+ */
+function cartLineKey(item: CartItem): string {
+  const addonIds = item.addons
+    .map((addon) => addon.id)
+    .filter(Boolean)
+    .sort()
+    .join(",");
+
+  return `${item.id}::${item.variantId ?? ""}::${addonIds}`;
+}
+
+/**
+ * Returns a defensive copy of a cart item with normalized quantity/add-ons.
+ *
+ * The cart should never hold duplicate add-on IDs for the same configured line.
+ */
+function normalizeCartItem(item: CartItem): CartItem {
+  const uniqueAddons = Array.from(
+    new Map(
+      item.addons.filter((addon) => addon.id).map((addon) => [addon.id, addon]),
+    ).values(),
+  );
+
+  return {
+    ...item,
+    quantity: Math.max(1, Math.floor(item.quantity || 1)),
+    addons: uniqueAddons,
+  };
+}
+
 interface StorefrontClientProps {
   tenant: Tenant;
   initialCategories?: Category[];
   initialProducts?: Product[];
   initialServices?: Service[];
   initialProviders?: PublicServiceProvider[];
+  initialReviews?: BusinessReview[];
   viewOnly?: boolean;
 }
 
@@ -65,6 +110,7 @@ export default function StorefrontClient({
   initialProducts,
   initialServices,
   initialProviders = [],
+  initialReviews = [],
   viewOnly = false,
 }: StorefrontClientProps) {
   const extendedTenant = tenant as ExtendedTenant;
@@ -104,28 +150,44 @@ export default function StorefrontClient({
   const [cart, setCart] = useState<CartItem[]>([]);
   const itemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
+  /**
+   * Adds one configured product to the cart.
+   *
+   * IMPORTANT:
+   * Product ID + variant ID alone are not enough to identify a cart line.
+   * Different add-on selections must stay as separate lines because their
+   * pricing/configuration differs.
+   *
+   * Example:
+   *   Burger / Large / Cheese
+   *   Burger / Large / Bacon
+   *
+   * Those are two different cart lines.
+   *
+   * But adding Burger / Large / Cheese twice safely increases the quantity of
+   * the existing Cheese line.
+   */
   const handleAddToCart = (item: CartItem) => {
-    setCart((prev) => {
-      const existing = prev.find(
-        (i) => i.id === item.id && i.variantId === item.variantId,
+    const normalizedItem = normalizeCartItem(item);
+    const incomingKey = cartLineKey(normalizedItem);
+
+    setCart((previous) => {
+      const existing = previous.find(
+        (cartItem) => cartLineKey(cartItem) === incomingKey,
       );
-      if (existing) {
-        const mergedAddons = [...existing.addons];
-        item.addons.forEach((addon) => {
-          const found = mergedAddons.find((a) => a.name === addon.name);
-          if (!found) mergedAddons.push(addon);
-        });
-        return prev.map((i) =>
-          i.id === item.id && i.variantId === item.variantId
-            ? {
-                ...i,
-                quantity: i.quantity + item.quantity,
-                addons: mergedAddons,
-              }
-            : i,
-        );
+
+      if (!existing) {
+        return [...previous, normalizedItem];
       }
-      return [...prev, item];
+
+      return previous.map((cartItem) =>
+        cartLineKey(cartItem) === incomingKey
+          ? {
+              ...cartItem,
+              quantity: cartItem.quantity + normalizedItem.quantity,
+            }
+          : cartItem,
+      );
     });
   };
 
@@ -401,6 +463,7 @@ export default function StorefrontClient({
                     tenant={tenant}
                     services={services}
                     providers={initialProviders}
+                    reviews={initialReviews}
                     viewOnly={viewOnly}
                   />
                 ) : (

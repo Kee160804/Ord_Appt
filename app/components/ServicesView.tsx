@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Plus,
   Edit2,
@@ -9,6 +9,9 @@ import {
   ToggleRight,
   Clock,
   Shield,
+  Search,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { Card } from "../components/Card";
 import { Button } from "../components/Button";
@@ -47,52 +50,133 @@ const EMPTY_FORM = {
 
 export function ServicesView({ tenant }: Props) {
   const canUseBookingDeposits = tenantHasFeature(tenant, "booking_deposits");
+  const usesSupabase = isSupabaseConfigured();
   const [services, setServices] = useState<Service[]>(
-    isSupabaseConfigured() ? [] : getServicesByTenant(tenant.id),
+    usesSupabase ? [] : getServicesByTenant(tenant.id),
   );
   const [showAdd, setShowAdd] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
-  const [isLoading, setIsLoading] = useState(isSupabaseConfigured());
+  const [isLoading, setIsLoading] = useState(usesSupabase);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
+  // Server-backed list controls.
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
+  const [availability, setAvailability] = useState<boolean | "all">("all");
+  const [page, setPage] = useState(0);
+  const [pagination, setPagination] = useState({
+    page: 0,
+    pageSize: 25,
+    total: usesSupabase ? 0 : getServicesByTenant(tenant.id).length,
+    totalPages: usesSupabase
+      ? 0
+      : Math.ceil(getServicesByTenant(tenant.id).length / 25),
+    hasPreviousPage: false,
+    hasNextPage: !usesSupabase && getServicesByTenant(tenant.id).length > 25,
+  });
+
+  // Debounce search so typing does not issue a Supabase query on every keypress.
   useEffect(() => {
-    if (!isSupabaseConfigured()) {
-      const frame = window.requestAnimationFrame(() => {
+    const timeout = window.setTimeout(() => {
+      setSearch(searchInput.trim());
+      setPage(0);
+    }, 300);
+
+    return () => window.clearTimeout(timeout);
+  }, [searchInput]);
+
+  const loadServicePage = useCallback(async () => {
+    setIsLoading(true);
+    setError("");
+
+    try {
+      if (!usesSupabase) {
         const stored = getStoredServices(tenant.id);
-        if (stored) setServices(stored);
-        setIsLoading(false);
+        const allServices = stored ?? getServicesByTenant(tenant.id);
+        const normalizedSearch = search.toLowerCase();
+
+        const filtered = allServices.filter((service) => {
+          const matchesSearch =
+            !normalizedSearch ||
+            service.name.toLowerCase().includes(normalizedSearch) ||
+            service.description.toLowerCase().includes(normalizedSearch) ||
+            service.category.toLowerCase().includes(normalizedSearch);
+          const matchesAvailability =
+            availability === "all" || service.isActive === availability;
+
+          return matchesSearch && matchesAvailability;
+        });
+
+        const pageSize = 25;
+        const totalPages =
+          filtered.length === 0 ? 0 : Math.ceil(filtered.length / pageSize);
+        const safePage =
+          totalPages === 0 ? 0 : Math.min(page, totalPages - 1);
+        const from = safePage * pageSize;
+        const pageServices = filtered.slice(from, from + pageSize);
+
+        setServices(pageServices);
+        setPagination({
+          page: safePage,
+          pageSize,
+          total: filtered.length,
+          totalPages,
+          hasPreviousPage: safePage > 0,
+          hasNextPage: safePage + 1 < totalPages,
+        });
+
+        if (safePage !== page) setPage(safePage);
+        return;
+      }
+
+      const result = await listServices(tenant.id, {
+        page,
+        pageSize: 25,
+        search,
+        availability,
       });
-      return () => window.cancelAnimationFrame(frame);
+
+      // If a mutation/search leaves us beyond the final page, move back once
+      // and let the effect load the valid page.
+      if (result.totalPages > 0 && page >= result.totalPages) {
+        setPage(result.totalPages - 1);
+        return;
+      }
+
+      setServices(result.services);
+      setPagination({
+        page: result.page,
+        pageSize: result.pageSize,
+        total: result.total,
+        totalPages: result.totalPages,
+        hasPreviousPage: result.hasPreviousPage,
+        hasNextPage: result.hasNextPage,
+      });
+    } catch (loadError: unknown) {
+      setError(
+        loadError instanceof Error
+          ? loadError.message
+          : "Unable to load services.",
+      );
+    } finally {
+      setIsLoading(false);
     }
+  }, [availability, page, search, tenant.id, usesSupabase]);
 
-    let active = true;
-    listServices(tenant.id)
-      .then((loaded) => {
-        if (!active) return;
-        setServices(loaded);
-        setError("");
-      })
-      .catch((loadError: unknown) => {
-        if (!active) return;
-        setError(
-          loadError instanceof Error
-            ? loadError.message
-            : "Unable to load services.",
-        );
-      })
-      .finally(() => {
-        if (active) setIsLoading(false);
-      });
+  useEffect(() => {
+    void loadServicePage();
+  }, [loadServicePage]);
 
-    return () => {
-      active = false;
-    };
-  }, [tenant.id]);
-
-  const categories = [...new Set(services.map((s) => s.category))];
+  // Categories shown on the current page are used only for visual grouping.
+  // A tenant-wide category filter would require a separate distinct-category
+  // query/RPC; deriving a global filter from one page would be misleading.
+  const categories = useMemo(
+    () => [...new Set(services.map((service) => service.category))],
+    [services],
+  );
 
   const openAdd = () => {
     setEditingId(null);
@@ -124,20 +208,33 @@ export function ServicesView({ tenant }: Props) {
   const toggle = async (id: string) => {
     const current = services.find((service) => service.id === id);
     if (!current) return;
+
+    const previous = services;
     const updated = services.map((service) =>
       service.id === id ? { ...service, isActive: !service.isActive } : service,
     );
+
     setServices(updated);
     setError("");
 
     try {
-      if (isSupabaseConfigured()) {
+      if (usesSupabase) {
         await setServiceAvailability(tenant.id, id, !current.isActive);
+        await loadServicePage();
       } else {
-        setStoredServices(tenant.id, updated);
+        const stored = getStoredServices(tenant.id) ?? getServicesByTenant(tenant.id);
+        setStoredServices(
+          tenant.id,
+          stored.map((service) =>
+            service.id === id
+              ? { ...service, isActive: !service.isActive }
+              : service,
+          ),
+        );
+        await loadServicePage();
       }
     } catch (updateError) {
-      setServices(services);
+      setServices(previous);
       setError(
         updateError instanceof Error
           ? updateError.message
@@ -148,14 +245,23 @@ export function ServicesView({ tenant }: Props) {
 
   const del = async (id: string) => {
     if (!window.confirm("Delete this service? This cannot be undone.")) return;
+
     const previous = services;
-    const updated = services.filter((service) => service.id !== id);
-    setServices(updated);
+    setServices((current) => current.filter((service) => service.id !== id));
     setError("");
 
     try {
-      if (isSupabaseConfigured()) await deleteService(tenant.id, id);
-      else setStoredServices(tenant.id, updated);
+      if (usesSupabase) {
+        await deleteService(tenant.id, id);
+      } else {
+        const stored = getStoredServices(tenant.id) ?? getServicesByTenant(tenant.id);
+        setStoredServices(
+          tenant.id,
+          stored.filter((service) => service.id !== id),
+        );
+      }
+
+      await loadServicePage();
     } catch (deleteError) {
       setServices(previous);
       setError(
@@ -179,8 +285,8 @@ export function ServicesView({ tenant }: Props) {
       setError("Enter a valid service price.");
       return;
     }
-    if (!Number.isFinite(duration) || duration <= 0) {
-      setError("Enter a valid service duration.");
+    if (!Number.isFinite(duration) || !Number.isInteger(duration) || duration <= 0) {
+      setError("Enter a valid whole-number service duration.");
       return;
     }
     if (
@@ -188,6 +294,22 @@ export function ServicesView({ tenant }: Props) {
       (!Number.isFinite(depositAmount) || depositAmount < 0)
     ) {
       setError("Enter a valid deposit amount.");
+      return;
+    }
+    if (
+      form.requiresDeposit &&
+      form.depositType === "percentage" &&
+      depositAmount > 100
+    ) {
+      setError("Deposit percentage cannot exceed 100%.");
+      return;
+    }
+    if (
+      form.requiresDeposit &&
+      form.depositType === "fixed" &&
+      depositAmount > price
+    ) {
+      setError("Fixed deposit cannot exceed the service price.");
       return;
     }
 
@@ -208,7 +330,7 @@ export function ServicesView({ tenant }: Props) {
     setSuccess("");
     try {
       let saved: Service;
-      if (isSupabaseConfigured()) {
+      if (usesSupabase) {
         saved = editingId
           ? await updateService(tenant.id, editingId, input)
           : await createService(tenant.id, input);
@@ -228,17 +350,32 @@ export function ServicesView({ tenant }: Props) {
             };
       }
 
-      const updated = editingId
-        ? services.map((service) =>
-            service.id === editingId ? saved : service,
-          )
-        : [...services, saved];
-      setServices(updated);
-      if (!isSupabaseConfigured()) setStoredServices(tenant.id, updated);
+      if (!usesSupabase) {
+        const stored = getStoredServices(tenant.id) ?? getServicesByTenant(tenant.id);
+        const updated = editingId
+          ? stored.map((service) =>
+              service.id === editingId ? saved : service,
+            )
+          : [...stored, saved];
+        setStoredServices(tenant.id, updated);
+      }
+
+      const successMessage = editingId
+        ? "Service updated."
+        : "Service created.";
+
       setShowAdd(false);
       setEditingId(null);
       setForm(EMPTY_FORM);
-      setSuccess(editingId ? "Service updated." : "Service created.");
+      setSuccess(successMessage);
+
+      // New records are ordered newest-first, so return to page one after
+      // creation. Edits refresh the current server page.
+      if (!editingId && page !== 0) {
+        setPage(0);
+      } else {
+        await loadServicePage();
+      }
     } catch (saveError) {
       setError(
         saveError instanceof Error
@@ -258,8 +395,11 @@ export function ServicesView({ tenant }: Props) {
             Services
           </h2>
           <p className="mt-0.5 text-[10px] text-slate-400 light:text-[#71809a]">
-            {services.filter((s) => s.isActive).length} active ·{" "}
-            {services.length} total
+            {availability === true
+              ? `${pagination.total} active`
+              : availability === false
+                ? `${pagination.total} paused`
+                : `${pagination.total} total`}
           </p>
         </div>
         <Button onClick={openAdd} size="sm">
@@ -277,6 +417,46 @@ export function ServicesView({ tenant }: Props) {
           {success}
         </p>
       )}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative w-full max-w-sm">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input
+            type="search"
+            value={searchInput}
+            maxLength={120}
+            onChange={(event) => setSearchInput(event.target.value)}
+            placeholder="Search services..."
+            className="h-8 w-full rounded-lg border border-slate-700 bg-slate-800 pl-9 pr-3 text-[10px] text-white placeholder:text-slate-500 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/30 light:border-[#e3e8f0] light:bg-white light:text-gray-900 light:placeholder:text-gray-400"
+          />
+        </div>
+
+        <div className="flex flex-wrap gap-1.5">
+          {(
+            [
+              ["all", "All"],
+              [true, "Active"],
+              [false, "Paused"],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              type="button"
+              key={String(value)}
+              onClick={() => {
+                setAvailability(value);
+                setPage(0);
+              }}
+              className={`rounded-lg px-3 py-1.5 text-[10px] font-medium transition-colors ${
+                availability === value
+                  ? "bg-violet-600 text-white"
+                  : "bg-slate-800 text-slate-300 hover:bg-slate-700 light:bg-gray-100 light:text-gray-700 light:hover:bg-gray-200"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {isLoading && (
         <p className="text-xs text-slate-500">
           Loading services from Supabase...
@@ -285,7 +465,9 @@ export function ServicesView({ tenant }: Props) {
 
       {!isLoading && services.length === 0 && (
         <Card className="p-12 text-center text-xs text-slate-500">
-          No services yet. Add the first service for your storefront.
+          {search || availability !== "all"
+            ? "No services match the current filters."
+            : "No services yet. Add the first service for your storefront."}
         </Card>
       )}
 
@@ -309,6 +491,49 @@ export function ServicesView({ tenant }: Props) {
           </div>
         </div>
       ))}
+
+      {!isLoading && pagination.total > 0 && (
+        <div className="flex flex-col gap-2 rounded-lg border border-slate-800 px-3 py-2 text-[10px] text-slate-400 light:border-slate-200 light:text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+          <span>
+            Showing{" "}
+            {pagination.page * pagination.pageSize + 1}–
+            {Math.min(
+              (pagination.page + 1) * pagination.pageSize,
+              pagination.total,
+            )}{" "}
+            of {pagination.total}
+          </span>
+
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="xs"
+              disabled={!pagination.hasPreviousPage || isLoading}
+              onClick={() => setPage((current) => Math.max(0, current - 1))}
+            >
+              <ChevronLeft className="h-3.5 w-3.5" />
+              Previous
+            </Button>
+
+            <span>
+              Page {pagination.totalPages === 0 ? 0 : pagination.page + 1} of{" "}
+              {pagination.totalPages}
+            </span>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="xs"
+              disabled={!pagination.hasNextPage || isLoading}
+              onClick={() => setPage((current) => current + 1)}
+            >
+              Next
+              <ChevronRight className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        </div>
+      )}
 
       <Modal
         open={showAdd}
@@ -481,6 +706,9 @@ function ServiceCard({
     <Card className="group w-full overflow-hidden">
       <div className="relative h-32 overflow-hidden bg-slate-800 light:bg-slate-100">
         {service.image ? (
+          // Tenant-configured image URLs can use arbitrary hosts, so a native
+          // image is retained instead of restricting them through next/image.
+          // eslint-disable-next-line @next/next/no-img-element
           <img
             src={service.image}
             alt={service.name}
@@ -550,8 +778,14 @@ function ServiceCard({
             </Button>
           </div>
           <button
+            type="button"
             onClick={() => onToggle(service.id)}
             className="text-slate-400 hover:text-slate-600 transition-colors"
+            aria-label={
+              service.isActive
+                ? `Pause ${service.name}`
+                : `Publish ${service.name}`
+            }
           >
             {service.isActive ? (
               <ToggleRight className="w-6 h-6 text-emerald-500" />

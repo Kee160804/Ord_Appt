@@ -3,6 +3,15 @@ import { createClient } from "npm:@supabase/supabase-js@2.109.0";
 
 type DeliveryStatus = "PENDING" | "PROCESSING" | "SENT" | "FAILED";
 
+/**
+ * Legacy order-email delivery worker for the Supabase Edge Runtime.
+ *
+ * IMPORTANT:
+ * This function sends order emails directly through Resend. If the centralized
+ * Next.js email worker is also enabled for the same order events, only one
+ * production delivery pipeline should remain active to prevent duplicates.
+ */
+
 interface OrderEmailPayload {
   business_name: string;
   business_email?: string | null;
@@ -69,12 +78,21 @@ function getSupabaseSecretKey() {
   return key;
 }
 
-function safeEqual(actual: string, expected: string) {
+/**
+ * Constant-work secret comparison for the Supabase Edge/Deno runtime.
+ *
+ * Node's timingSafeEqual is intentionally not used because this code executes
+ * in Supabase Edge Runtime.
+ */
+function safeEqual(actual: string, expected: string): boolean {
   if (actual.length !== expected.length) return false;
+
   let result = 0;
+
   for (let index = 0; index < actual.length; index += 1) {
     result |= actual.charCodeAt(index) ^ expected.charCodeAt(index);
   }
+
   return result === 0;
 }
 
@@ -86,10 +104,18 @@ const escapeHtml = (value: unknown) =>
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
 
-const money = (value: number | null | undefined) =>
-  new Intl.NumberFormat("en-BZ", { style: "currency", currency: "BZD" }).format(
-    Number(value ?? 0),
-  );
+/**
+ * Formats monetary values using Belize dollars while preventing NaN/Infinity
+ * from leaking into customer-facing email content.
+ */
+function money(value: number | null | undefined): string {
+  const numericValue = Number(value ?? 0);
+
+  return new Intl.NumberFormat("en-BZ", {
+    style: "currency",
+    currency: "BZD",
+  }).format(Number.isFinite(numericValue) ? numericValue : 0);
+}
 
 const EVENT_COPY: Record<string, { heading: string; message: string }> = {
   ORDER_RECEIVED: {
@@ -123,10 +149,14 @@ function buildEmail(delivery: DeliveryRow) {
   const payload = delivery.payload;
   const copy = EVENT_COPY[delivery.event_type] ?? EVENT_COPY.ORDER_RECEIVED;
   const items = (payload.items ?? [])
-    .map(
-      (item) =>
-        `<tr><td style="padding:8px 0;color:#334155">${escapeHtml(item.name)} × ${item.quantity}</td><td style="padding:8px 0;text-align:right;font-weight:600">${escapeHtml(money(item.subtotal))}</td></tr>`,
-    )
+    .slice(0, 50)
+    .map((item) => {
+      const quantity = Number.isFinite(Number(item.quantity))
+        ? Math.max(1, Math.trunc(Number(item.quantity)))
+        : 1;
+
+      return `<tr><td style="padding:8px 0;color:#334155">${escapeHtml(item.name)} × ${quantity}</td><td style="padding:8px 0;text-align:right;font-weight:600">${escapeHtml(money(item.subtotal))}</td></tr>`;
+    })
     .join("");
   const fulfillment = [
     payload.order_type ? payload.order_type.replaceAll("_", " ") : "",
@@ -134,9 +164,15 @@ function buildEmail(delivery: DeliveryRow) {
     payload.delivery_area,
     payload.delivery_address,
     payload.requested_time
-      ? new Date(payload.requested_time).toLocaleString("en-BZ", {
-          timeZone: "America/Belize",
-        })
+      ? (() => {
+          const requestedTime = new Date(payload.requested_time);
+
+          return Number.isNaN(requestedTime.getTime())
+            ? ""
+            : requestedTime.toLocaleString("en-BZ", {
+                timeZone: "America/Belize",
+              });
+        })()
       : "",
   ]
     .filter(Boolean)
@@ -174,16 +210,30 @@ export default {
       ) {
         return json({ error: "Unauthorized." }, 401);
       }
-      const body = (await request.json()) as WebhookBody;
+      let body: WebhookBody;
+
+      try {
+        body = (await request.json()) as WebhookBody;
+      } catch {
+        return json({ error: "Invalid JSON payload." }, 400);
+      }
+
       if (
         body.type !== "INSERT" ||
         body.schema !== "public" ||
         body.table !== "order_email_deliveries" ||
-        !body.record?.id
+        !body.record?.id ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+          body.record.id,
+        )
       ) {
         return json({ error: "Unsupported webhook payload." }, 400);
       }
 
+      /**
+       * Service-role access is required because the Edge Function processes
+       * delivery records without an end-user Supabase session.
+       */
       const supabase = createClient(
         requiredEnv("SUPABASE_URL"),
         getSupabaseSecretKey(),
@@ -201,9 +251,19 @@ export default {
       const current = currentData as DeliveryRow | null;
       if (readError || !current)
         throw readError ?? new Error("Email delivery was not found.");
-      if (current.status === "SENT")
+      if (current.status === "SENT") {
         return json({ delivered: true, duplicate: true });
+      }
 
+      if (current.status === "PROCESSING") {
+        return json({ delivered: false, duplicate: true }, 202);
+      }
+
+      /**
+       * Claim before contacting Resend. Only PENDING/FAILED rows may become
+       * PROCESSING, preventing concurrent invocations from normally sending
+       * the same delivery.
+       */
       const { data: claimedData, error: claimError } = await supabase
         .from("order_email_deliveries")
         .update({
@@ -221,6 +281,11 @@ export default {
       if (!delivery) return json({ delivered: false, duplicate: true }, 202);
 
       const email = buildEmail(delivery);
+
+      /**
+       * Provider-level idempotency is the second duplicate-send safeguard.
+       * The same order/event combination always receives the same Resend key.
+       */
       const resendResponse = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: {
@@ -244,15 +309,28 @@ export default {
       if (!resendResponse.ok || !result.id) {
         const providerError =
           result.message || `Resend returned ${resendResponse.status}.`;
-        await supabase
+        const { error: failureUpdateError } = await supabase
           .from("order_email_deliveries")
           .update({
             status: "FAILED",
             last_error: providerError.slice(0, 1000),
           })
           .eq("id", delivery.id);
-        return json({ error: providerError }, 502);
+
+        if (failureUpdateError) {
+          console.error(
+            "[order-email] Unable to record provider failure:",
+            failureUpdateError.message,
+          );
+        }
+
+        return json({ error: "Email provider rejected the order email." }, 502);
       }
+      /**
+       * SENT means Resend accepted the message and returned a provider ID.
+       * Final inbox delivery should be tracked separately using signed Resend
+       * delivery webhooks.
+       */
       const { error: sentError } = await supabase
         .from("order_email_deliveries")
         .update({
@@ -267,8 +345,9 @@ export default {
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Unable to send order email.";
-      console.error(message);
-      return json({ error: message }, 500);
+      console.error("[order-email]", message);
+
+      return json({ error: "Unable to send order email." }, 500);
     }
   },
 };
