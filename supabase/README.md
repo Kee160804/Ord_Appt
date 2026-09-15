@@ -39,6 +39,13 @@ For projects that already applied the first owner-onboarding migration, apply
 cooperate with foundational `trg_initialize_new_tenant` installations and
 prevents duplicate OWNER membership inserts.
 
+If an existing project reports `Choose a valid business type` while a newly
+confirmed retail owner signs in, apply
+`202609150002_repair_retail_owner_provisioning.sql`. Some projects installed
+the onboarding function before retail was supported; this forward-only repair
+updates the live function and the next login safely completes the missing
+tenant and OWNER membership.
+
 ## Multi-business accounts
 
 Apply `202609010001_multi_business_accounts.sql` after the entitlement and

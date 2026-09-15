@@ -250,6 +250,14 @@ async function createTenantFromMetadata(
         "Account provisioning is not installed. Apply the owner onboarding migration in Supabase, then sign in again.",
       );
     }
+    if (
+      metadata.business_type === "retail" &&
+      error.message.includes("Choose a valid business type")
+    ) {
+      throw new Error(
+        "Retail account setup is not installed in the live database. Apply the retail owner-provisioning repair migration, then sign in again.",
+      );
+    }
     throw error;
   }
   return data as string;

@@ -47,3 +47,19 @@ test("mock payment migration is explicit, atomic, and provider neutral", async (
   );
   assert.match(sql, /DEFERRABLE INITIALLY DEFERRED/);
 });
+
+test("retail owner provisioning is repaired by a forward-only migration", async () => {
+  const sql = await readFile(
+    "supabase/migrations/202609150002_repair_retail_owner_provisioning.sql",
+    "utf8",
+  );
+
+  assert.match(
+    sql,
+    /CREATE OR REPLACE FUNCTION public\.provision_owner_business/,
+  );
+  assert.match(sql, /NOT IN \('appointment', 'ordering', 'retail'\)/);
+  assert.match(sql, /pg_advisory_xact_lock/);
+  assert.match(sql, /tenant_memberships_tenant_id_profile_id_key/);
+  assert.match(sql, /GRANT EXECUTE[\s\S]+TO authenticated/);
+});
