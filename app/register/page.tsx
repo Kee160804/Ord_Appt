@@ -120,17 +120,29 @@ export default function RegisterPage() {
     setError("");
   };
 
-  const goToAccount = () => {
+  const goBack = () => {
     setError("");
-    setStep(1);
+    if (step === 1) {
+      router.push("/home");
+      return;
+    }
+    setStep((current) => current - 1);
   };
 
   const continueFromAccount = () => {
     const firstName = form.firstName.trim();
     const lastName = form.lastName.trim();
     const email = form.email.trim();
-    if (!firstName || !lastName) {
+    if (!firstName && !lastName) {
       setError("Enter your first and last name.");
+      return;
+    }
+    if (!firstName) {
+      setError("Enter your first name.");
+      return;
+    }
+    if (!lastName) {
+      setError("Enter your last name.");
       return;
     }
     if (!EMAIL_PATTERN.test(email)) {
@@ -278,17 +290,18 @@ export default function RegisterPage() {
 
         <Progress step={step} />
 
-        {error && (
-          <div
-            role="alert"
-            className="fixed left-1/2 top-3 z-50 w-[min(500px,calc(100%-1.5rem))] -translate-x-1/2 rounded-xl border border-rose-500/40 bg-[#2a101d] px-4 py-3 text-sm text-rose-200 shadow-xl"
-          >
-            {error}
-          </div>
-        )}
-
         <form onSubmit={handleSubmit} className="min-h-0 flex-1">
           <section className="flex h-full flex-col overflow-hidden rounded-[20px] border border-[#273858] bg-[linear-gradient(145deg,rgba(17,29,51,0.98),rgba(9,19,36,0.98))] p-3 shadow-[0_30px_90px_rgba(0,0,0,0.35)] sm:p-4">
+            {error && (
+              <div
+                role="alert"
+                aria-live="assertive"
+                className="mb-3 shrink-0 rounded-xl border border-rose-500/40 bg-[#2a101d] px-4 py-2.5 text-sm text-rose-200 shadow-lg"
+              >
+                {error}
+              </div>
+            )}
+
             {confirmationEmail ? (
               <ConfirmationPanel
                 email={confirmationEmail}
@@ -331,15 +344,13 @@ export default function RegisterPage() {
 
             {!confirmationEmail && (
               <div className="mt-3 flex shrink-0 gap-3">
-                {step > 1 && (
-                  <button
-                    type="button"
-                    onClick={step === 2 ? goToAccount : () => setStep(2)}
-                    className="flex h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-[#7990b8] text-sm font-bold text-slate-200 transition hover:border-violet-400 hover:bg-violet-500/10"
-                  >
-                    <ArrowLeft className="h-4 w-4" /> Back
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={goBack}
+                  className="flex h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-[#7990b8] text-sm font-bold text-slate-200 transition hover:border-violet-400 hover:bg-violet-500/10"
+                >
+                  <ArrowLeft className="h-4 w-4" /> Back
+                </button>
                 <button
                   type="submit"
                   disabled={loading || (step === 2 && !businessType)}
@@ -486,7 +497,7 @@ function AccountStep({
   toggleConfirmation,
 }: AccountStepProps) {
   return (
-    <div className="min-h-0 flex-1 animate-fade-in">
+    <div className="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain pr-1 animate-fade-in">
       <PanelHeading
         icon={UserRound}
         title="Create your account"
@@ -587,7 +598,7 @@ function BusinessTypeStep({
   onSelect: (type: BusinessType) => void;
 }) {
   return (
-    <div className="min-h-0 flex-1 animate-fade-in">
+    <div className="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain pr-1 animate-fade-in">
       <PanelHeading
         icon={Store}
         title="Select your business type"
@@ -709,7 +720,7 @@ function BusinessDetailsStep({
         : "online ordering";
 
   return (
-    <div className="min-h-0 flex-1 animate-fade-in">
+    <div className="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain pr-1 animate-fade-in">
       <PanelHeading
         icon={Store}
         title="Tell us about your business"
@@ -779,7 +790,7 @@ function BusinessDetailsStep({
             value={form.slug}
             onChange={(event) => update("slug", event.target.value)}
             placeholder="your-business"
-            className="min-w-0 flex-1 bg-transparent px-3 text-sm text-white outline-none placeholder:text-[#60769a]"
+            className="min-w-0 flex-1 bg-transparent px-3 text-base text-white outline-none placeholder:text-[#60769a] sm:text-sm"
           />
         </div>
       </div>
@@ -905,7 +916,7 @@ function FormField({
         <input
           {...inputProps}
           onChange={(event) => onChange(event.target.value)}
-          className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-[#60769a]"
+          className="min-w-0 flex-1 bg-transparent text-base text-white outline-none placeholder:text-[#60769a] sm:text-sm"
         />
         {action}
       </span>

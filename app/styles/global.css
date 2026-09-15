@@ -189,6 +189,16 @@ body {
   }
 }
 
+/* Keep browser/PWA autofill legible on the dark registration form. */
+.registration-shell input:-webkit-autofill,
+.registration-shell input:-webkit-autofill:hover,
+.registration-shell input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #ffffff;
+  caret-color: #ffffff;
+  box-shadow: 0 0 0 1000px #13213a inset;
+  transition: background-color 9999s ease-out 0s;
+}
+
 button,
 input,
 textarea,

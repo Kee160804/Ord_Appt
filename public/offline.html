@@ -4,19 +4,92 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta name="theme-color" content="#070b14" />
-    <title>Offline | YuhBusiness</title>
+    <title>Connection interrupted | YuhBusiness</title>
     <style>
-      body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px; box-sizing: border-box; background: #070b14; color: white; font-family: system-ui, sans-serif; text-align: center; }
-      main { max-width: 480px; }
-      p { color: #94a3b8; line-height: 1.6; }
-      button { margin-top: 16px; border: 0; border-radius: 12px; padding: 12px 20px; background: #7c3aed; color: white; font-weight: 700; cursor: pointer; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        box-sizing: border-box;
+        background: #070b14;
+        color: white;
+        font-family: system-ui, sans-serif;
+        text-align: center;
+      }
+      main {
+        max-width: 480px;
+      }
+      p {
+        color: #94a3b8;
+        line-height: 1.6;
+      }
+      button {
+        margin-top: 16px;
+        border: 0;
+        border-radius: 12px;
+        padding: 12px 20px;
+        background: #7c3aed;
+        color: white;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      button:disabled {
+        cursor: wait;
+        opacity: 0.65;
+      }
     </style>
   </head>
   <body>
     <main>
-      <h1>You&apos;re offline</h1>
-      <p>Reconnect to load current storefront availability, inventory, or account data.</p>
-      <button type="button" onclick="location.reload()">Try again</button>
+      <h1>We couldn&apos;t connect</h1>
+      <p id="connection-message">
+        YuhBusiness did not respond. Your device may still be online, so
+        we&apos;ll retry automatically.
+      </p>
+      <button id="retry-button" type="button">Try again</button>
     </main>
+    <script>
+      (() => {
+        const retryButton = document.getElementById("retry-button");
+        const message = document.getElementById("connection-message");
+        const retryKey = "yuhbusiness-offline-retry";
+
+        const retry = async (manual = false) => {
+          retryButton.disabled = true;
+          retryButton.textContent = "Checking...";
+
+          try {
+            const response = await fetch(`/sw.js?recovery=${Date.now()}`, {
+              cache: "no-store",
+            });
+            if (!response.ok) throw new Error("App server unavailable");
+
+            const registration =
+              await navigator.serviceWorker?.getRegistration();
+            await registration?.update();
+
+            const lastRetry = Number(sessionStorage.getItem(retryKey) || 0);
+            if (manual || Date.now() - lastRetry > 10000) {
+              sessionStorage.setItem(retryKey, String(Date.now()));
+              location.reload();
+              return;
+            }
+          } catch {
+            message.textContent = navigator.onLine
+              ? "Your internet connection is available, but YuhBusiness is not responding yet. Please try again."
+              : "Reconnect to load current storefront availability, inventory, or account data.";
+          }
+
+          retryButton.disabled = false;
+          retryButton.textContent = "Try again";
+        };
+
+        retryButton.addEventListener("click", () => void retry(true));
+        window.addEventListener("online", () => void retry(true));
+        if (navigator.onLine) setTimeout(() => void retry(), 750);
+      })();
+    </script>
   </body>
 </html>
