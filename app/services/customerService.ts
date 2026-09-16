@@ -1,4 +1,4 @@
-import { getSupabaseBrowserClient } from "@/app/lib/supabase/client";
+import { requireSupabaseBrowserClient as client } from "@/app/lib/supabase/client";
 
 export interface CustomerRecord {
   id: string;
@@ -52,16 +52,6 @@ const CUSTOMER_SELECT =
 const DEFAULT_CUSTOMER_PAGE_SIZE = 25;
 const MAX_CUSTOMER_PAGE_SIZE = 100;
 const MAX_CUSTOMER_SEARCH_LENGTH = 120;
-
-function client() {
-  const supabase = getSupabaseBrowserClient();
-
-  if (!supabase) {
-    throw new Error("Supabase is not configured.");
-  }
-
-  return supabase;
-}
 
 function mapCustomer(row: CustomerRow): CustomerRecord {
   return {

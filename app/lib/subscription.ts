@@ -1,9 +1,9 @@
 import type { Tenant } from "@/app/types";
 
-export const TRIAL_LENGTH_DAYS = 14;
+const TRIAL_LENGTH_DAYS = 14;
 const DAY_IN_MS = 86_400_000;
 
-export type TenantAccessState = "active" | "trial" | "expired";
+type TenantAccessState = "active" | "trial" | "expired";
 
 export interface TenantEntitlement {
   state: TenantAccessState;

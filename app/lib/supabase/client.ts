@@ -12,3 +12,10 @@ export function getSupabaseBrowserClient(): SupabaseClient | null {
   browserClient = createBrowserClient(url, key);
   return browserClient;
 }
+
+/** Returns the singleton browser client for features that require Supabase. */
+export function requireSupabaseBrowserClient(): SupabaseClient {
+  const client = getSupabaseBrowserClient();
+  if (!client) throw new Error("Supabase is not configured.");
+  return client;
+}

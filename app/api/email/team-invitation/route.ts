@@ -1,23 +1,13 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 
 import { sendTransactionalEmail } from "@/app/lib/email/resend";
+import { publicAppOrigin } from "@/app/lib/platform";
 import { getSupabaseAdminClient } from "@/app/lib/supabase/admin";
 import { getSupabaseServerClient } from "@/app/lib/supabase/server";
-import { safeServerError } from "@/app/lib/server/security";
+import { isValidUuid, safeServerError } from "@/app/lib/server/security";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-/**
- * Invitation tokens are intentionally bounded before hashing.
- * UUID validation prevents malformed tenant/invitation identifiers from
- * reaching the database layer.
- */
-function validUuid(value: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    value,
-  );
-}
 
 /**
  * Constant-time comparison for invitation-token hashes.
@@ -32,33 +22,6 @@ function safeHashEqual(left: string, right: string): boolean {
     leftBuffer.length === rightBuffer.length &&
     timingSafeEqual(leftBuffer, rightBuffer)
   );
-}
-
-/**
- * Resolves the application origin used in invitation links.
- *
- * Prefer the configured production URL. If it is missing or invalid, fall
- * back to the current request origin. Only HTTP(S) origins are accepted.
- */
-function getApplicationOrigin(request: Request): string {
-  const fallbackOrigin = new URL(request.url).origin;
-  const configured = process.env.NEXT_PUBLIC_APP_URL?.trim();
-
-  if (!configured) {
-    return fallbackOrigin;
-  }
-
-  try {
-    const url = new URL(configured);
-
-    if (url.protocol !== "https:" && url.protocol !== "http:") {
-      return fallbackOrigin;
-    }
-
-    return url.origin;
-  } catch {
-    return fallbackOrigin;
-  }
 }
 
 /**
@@ -129,8 +92,8 @@ export async function POST(request: Request) {
     const token = body.token?.trim() || "";
 
     if (
-      !validUuid(tenantId) ||
-      !validUuid(invitationId) ||
+      !isValidUuid(tenantId) ||
+      !isValidUuid(invitationId) ||
       token.length < 32 ||
       token.length > 256
     ) {
@@ -290,7 +253,7 @@ export async function POST(request: Request) {
        8. Build the invitation URL from the trusted application origin
        ---------------------------------------------------------------------- */
 
-    const appUrl = getApplicationOrigin(request);
+    const appUrl = publicAppOrigin(new URL(request.url).origin);
     const invitationUrl = new URL("/team/invite", appUrl);
 
     invitationUrl.searchParams.set("token", token);

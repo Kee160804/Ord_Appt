@@ -117,7 +117,7 @@ export function publicOperationError(error: unknown, fallback: string) {
  * This is NOT an authentication identity and must never be used for
  * authorization decisions.
  */
-export function requestFingerprint(request: Request, identity = "") {
+function requestFingerprint(request: Request, identity = "") {
   const forwarded = request.headers
     .get("x-forwarded-for")
     ?.split(",")[0]

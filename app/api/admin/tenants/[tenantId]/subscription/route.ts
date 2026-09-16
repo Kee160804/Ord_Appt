@@ -1,6 +1,5 @@
-import { getSupabaseAdminClient } from "@/app/lib/supabase/admin";
-import { getSupabaseServerClient } from "@/app/lib/supabase/server";
-import { safeServerError } from "@/app/lib/server/security";
+import { authorizeActiveSuperAdmin } from "@/app/lib/server/admin-authorization";
+import { isValidUuid, safeServerError } from "@/app/lib/server/security";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,30 +15,19 @@ interface SubscriptionRequest {
   trialDays?: unknown;
 }
 
-function validUuid(value: string) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    value,
-  );
-}
-
 export async function PATCH(request: Request, context: RouteContext) {
   try {
     const { tenantId } = await context.params;
-    if (!validUuid(tenantId)) {
+    if (!isValidUuid(tenantId)) {
       return Response.json({ error: "Invalid business ID." }, { status: 400 });
     }
 
-    const supabase = await getSupabaseServerClient();
-    if (!supabase) {
-      return Response.json(
-        { error: "Supabase is not configured." },
-        { status: 503 },
-      );
-    }
-    const { data: authData, error: authError } = await supabase.auth.getUser();
-    if (authError || !authData.user) {
-      return Response.json({ error: "Unauthorized." }, { status: 401 });
-    }
+    const authorization = await authorizeActiveSuperAdmin(
+      "Only a platform super admin can change subscription access.",
+    );
+    if (!authorization.authorized) return authorization.response;
+
+    const { admin, userId: callerId } = authorization;
 
     const body = (await request.json()) as SubscriptionRequest;
     const plan =
@@ -61,25 +49,6 @@ export async function PATCH(request: Request, context: RouteContext) {
       return Response.json(
         { error: "Trial days must be a whole number between 1 and 365." },
         { status: 400 },
-      );
-    }
-
-    const admin = getSupabaseAdminClient();
-    const { data: profile, error: profileError } = await admin
-      .from("profiles")
-      .select("id, platform_role, is_active")
-      .eq("id", authData.user.id)
-      .maybeSingle();
-    if (profileError) throw profileError;
-    if (
-      !profile?.is_active ||
-      profile.platform_role?.toUpperCase() !== "SUPER_ADMIN"
-    ) {
-      return Response.json(
-        {
-          error: "Only a platform super admin can change subscription access.",
-        },
-        { status: 403 },
       );
     }
 
@@ -118,7 +87,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       .from("team_access_events")
       .insert({
         tenant_id: tenantId,
-        actor_id: authData.user.id,
+        actor_id: callerId,
         action: "SUBSCRIPTION_OVERRIDE_SET",
         details: {
           plan: tenant.plan,

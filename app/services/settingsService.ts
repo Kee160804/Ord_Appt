@@ -1,4 +1,5 @@
-import { getSupabaseBrowserClient } from "@/app/lib/supabase/client";
+import { requireSupabaseBrowserClient as client } from "@/app/lib/supabase/client";
+import { slugify } from "@/app/lib/utils";
 import { cleanSocialLinks } from "@/app/lib/social-links";
 import type {
   BusinessHours,
@@ -40,22 +41,6 @@ const COVER_IMAGE_EXTENSIONS: Record<string, string> = {
   "image/png": "png",
   "image/webp": "webp",
 };
-
-function client() {
-  const supabase = getSupabaseBrowserClient();
-  if (!supabase) throw new Error("Supabase is not configured.");
-  return supabase;
-}
-
-function slugify(value: string) {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, "-")
-    .replace(/[^a-z0-9-]/g, "")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "");
-}
 
 function normalizeCustomDomain(value: string) {
   const input = value.trim().toLowerCase();

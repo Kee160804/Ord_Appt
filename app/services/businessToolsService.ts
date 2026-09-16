@@ -1,4 +1,4 @@
-import { getSupabaseBrowserClient } from "@/app/lib/supabase/client";
+import { requireSupabaseBrowserClient as client } from "@/app/lib/supabase/client";
 
 export interface ServiceProvider {
   id: string;
@@ -61,12 +61,6 @@ export interface AppointmentReminder {
 }
 
 type Row = Record<string, unknown>;
-
-function client() {
-  const supabase = getSupabaseBrowserClient();
-  if (!supabase) throw new Error("Supabase is not configured.");
-  return supabase;
-}
 
 function textValue(value: unknown) {
   return typeof value === "string" ? value : "";

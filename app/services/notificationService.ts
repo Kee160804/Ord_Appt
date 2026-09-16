@@ -1,4 +1,4 @@
-import { getSupabaseBrowserClient } from "@/app/lib/supabase/client";
+import { requireSupabaseBrowserClient as client } from "@/app/lib/supabase/client";
 
 export type NotificationType =
   | "ORDER"
@@ -48,12 +48,6 @@ export interface NotificationSnapshot {
 const NOTIFICATION_COLUMNS =
   "id,tenant_id,recipient_id,type,title,message,href,is_read,read_at,created_at,metadata";
 
-function client() {
-  const supabase = getSupabaseBrowserClient();
-  if (!supabase) throw new Error("Supabase is not configured.");
-  return supabase;
-}
-
 export function mapNotificationRow(row: NotificationRow): BusinessNotification {
   return {
     id: row.id,
@@ -70,14 +64,14 @@ export function mapNotificationRow(row: NotificationRow): BusinessNotification {
   };
 }
 
-export async function enqueueDueNotifications(tenantId: string) {
+async function enqueueDueNotifications(tenantId: string) {
   const { error } = await client().rpc("enqueue_due_business_notifications", {
     p_tenant_id: tenantId,
   });
   if (error) throw error;
 }
 
-export async function listNotifications(
+async function listNotifications(
   tenantId: string,
   recipientId: string,
 ): Promise<BusinessNotification[]> {
@@ -93,7 +87,7 @@ export async function listNotifications(
   return ((data ?? []) as NotificationRow[]).map(mapNotificationRow);
 }
 
-export async function getUnreadNotificationCount(
+async function getUnreadNotificationCount(
   tenantId: string,
   recipientId: string,
 ): Promise<number> {

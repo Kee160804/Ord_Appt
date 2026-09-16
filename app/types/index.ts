@@ -13,14 +13,6 @@ export type OrderStatus =
 export type AppointmentStatus =
   "pending" | "confirmed" | "cancelled" | "completed" | "no_show";
 export type PaymentStatus = "unpaid" | "partial" | "paid" | "refunded";
-export type PermissionType =
-  | "view_dashboard"
-  | "manage_tenants"
-  | "edit_storefront"
-  | "view_analytics"
-  | "manage_agents"
-  | "manage_roles";
-
 export interface BusinessHours {
   day: string;
   open: string;
@@ -99,26 +91,6 @@ export interface User {
   avatar: string;
   createdAt: string;
   lastLogin: string;
-}
-export interface Role {
-  id: string;
-  name: string;
-  description: string;
-  permissions: PermissionType[];
-  isSystem: boolean;
-  createdAt: string;
-}
-export interface Agent {
-  id: string;
-  tenantId: string | null;
-  name: string;
-  email: string;
-  phone?: string;
-  role: string;
-  roleId: string;
-  isActive: boolean;
-  avatar?: string;
-  createdAt: string;
 }
 export interface Service {
   id: string;
@@ -251,8 +223,4 @@ export interface AnalyticsSummary {
   busiestDay?: string;
   busiestTime?: string;
   completionRate?: number;
-}
-export interface CartItem {
-  product: Product;
-  quantity: number;
 }

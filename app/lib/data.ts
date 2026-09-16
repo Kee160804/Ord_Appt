@@ -31,7 +31,7 @@ function parseStoredData<T>(key: string): T | null {
   }
 }
 
-export function getStoredUserRecords(): StoredUserRecord[] {
+function getStoredUserRecords(): StoredUserRecord[] {
   const stored =
     parseStoredData<(StoredUserRecord & { password?: string })[]>(
       STORED_USERS_KEY,
@@ -47,7 +47,7 @@ export function getStoredUserRecords(): StoredUserRecord[] {
   return sanitized;
 }
 
-export function getStoredTenants(): Tenant[] {
+function getStoredTenants(): Tenant[] {
   return parseStoredData<Tenant[]>(STORED_TENANTS_KEY) ?? [];
 }
 

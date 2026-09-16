@@ -11,6 +11,7 @@ import {
   Package,
 } from "lucide-react";
 import { useAuth } from "@/app/contexts/auth";
+import { slugify } from "@/app/lib/utils";
 import { PLAN_DEFINITIONS } from "@/app/lib/plans";
 import type { BusinessType, Tenant } from "@/app/types";
 import { Modal } from "@/app/components/Modal";
@@ -24,16 +25,6 @@ interface BusinessSwitcherProps {
 
 const inputClass =
   "mt-1.5 h-11 w-full rounded-xl border border-slate-600 bg-slate-900/70 px-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/15 light:border-slate-300 light:bg-white light:text-slate-900";
-
-function slugify(value: string) {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, "-")
-    .replace(/[^a-z0-9-]/g, "")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "");
-}
 
 export function BusinessSwitcher({
   tenant,

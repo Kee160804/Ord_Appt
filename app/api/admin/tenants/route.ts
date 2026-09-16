@@ -1,6 +1,6 @@
-import { getSupabaseAdminClient } from "@/app/lib/supabase/admin";
-import { getSupabaseServerClient } from "@/app/lib/supabase/server";
 import { authCallbackUrl } from "@/app/lib/platform";
+import { authorizeActiveSuperAdmin } from "@/app/lib/server/admin-authorization";
+import { slugify } from "@/app/lib/utils";
 import {
   generateSecurePassword,
   isValidEmail,
@@ -25,51 +25,14 @@ interface CreateTenantRequest {
   sendPasswordEmail?: boolean;
 }
 
-function cleanSlug(value: string): string {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, "-")
-    .replace(/[^a-z0-9-]/g, "")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "");
-}
-
 export async function POST(request: Request) {
   try {
-    const supabase = await getSupabaseServerClient();
-    if (!supabase) {
-      return Response.json(
-        { error: "Supabase is not configured." },
-        { status: 503 },
-      );
-    }
+    const authorization = await authorizeActiveSuperAdmin(
+      "Only a platform super admin can manually create tenants.",
+    );
+    if (!authorization.authorized) return authorization.response;
 
-    // Verify session
-    const { data: authData, error: authError } = await supabase.auth.getUser();
-    if (authError || !authData.user) {
-      return Response.json({ error: "Unauthorized." }, { status: 401 });
-    }
-
-    const admin = getSupabaseAdminClient();
-
-    // Verify caller is super admin
-    const { data: profile, error: profileError } = await admin
-      .from("profiles")
-      .select("id, platform_role, is_active")
-      .eq("id", authData.user.id)
-      .maybeSingle();
-
-    if (profileError) throw profileError;
-    if (
-      !profile?.is_active ||
-      profile.platform_role?.toUpperCase() !== "SUPER_ADMIN"
-    ) {
-      return Response.json(
-        { error: "Only a platform super admin can manually create tenants." },
-        { status: 403 },
-      );
-    }
+    const { admin, userId: callerId } = authorization;
 
     const body = (await request.json()) as CreateTenantRequest;
     const businessName = body.businessName?.trim();
@@ -118,7 +81,7 @@ export async function POST(request: Request) {
         : generateSecurePassword();
 
     // Determine unique slug
-    let baseSlug = cleanSlug(body.slug || businessName);
+    let baseSlug = slugify(body.slug || businessName);
     if (!baseSlug) baseSlug = `business-${Date.now().toString().slice(-6)}`;
 
     let finalSlug = baseSlug;
@@ -301,7 +264,7 @@ export async function POST(request: Request) {
     try {
       await admin.from("team_access_events").insert({
         tenant_id: newTenant.id,
-        actor_id: authData.user.id,
+        actor_id: callerId,
         action: "TENANT_MANUALLY_CREATED",
         details: {
           businessName: newTenant.business_name,

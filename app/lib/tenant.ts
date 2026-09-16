@@ -11,7 +11,7 @@ export function normalizeHost(hostname: string) {
   return forwardedHost.replace(/:\d+$/, "").replace(/\.$/, "");
 }
 
-export function isLocalHost(hostname: string) {
+function isLocalHost(hostname: string) {
   const host = normalizeHost(hostname);
   return (
     host === "localhost" ||

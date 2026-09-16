@@ -1,4 +1,4 @@
-import { getSupabaseBrowserClient } from "@/app/lib/supabase/client";
+import { requireSupabaseBrowserClient as client } from "@/app/lib/supabase/client";
 import type { Service } from "@/app/types/index";
 import type { ServiceRow } from "@/app/types/supabase";
 
@@ -41,16 +41,6 @@ export interface ListServicesOptions {
 const DEFAULT_SERVICE_PAGE_SIZE = 25;
 const MAX_SERVICE_PAGE_SIZE = 100;
 const MAX_SERVICE_SEARCH_LENGTH = 120;
-
-function client() {
-  const supabase = getSupabaseBrowserClient();
-
-  if (!supabase) {
-    throw new Error("Supabase is not configured.");
-  }
-
-  return supabase;
-}
 
 function mapService(row: ServiceRow): Service {
   return {

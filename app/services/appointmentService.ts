@@ -1,4 +1,4 @@
-import { getSupabaseBrowserClient } from "@/app/lib/supabase/client";
+import { requireSupabaseBrowserClient as client } from "@/app/lib/supabase/client";
 
 import type {
   Appointment,
@@ -10,22 +10,6 @@ import type {
   AppointmentRow,
   AppointmentServiceRow,
 } from "@/app/types/supabase";
-
-/**
- * Returns the configured Supabase browser client.
- *
- * Appointment management requires Supabase. Throwing here prevents
- * functions from silently failing when the application is not configured.
- */
-function client() {
-  const supabase = getSupabaseBrowserClient();
-
-  if (!supabase) {
-    throw new Error("Supabase is not configured.");
-  }
-
-  return supabase;
-}
 
 /**
  * Converts database appointment statuses into the application's

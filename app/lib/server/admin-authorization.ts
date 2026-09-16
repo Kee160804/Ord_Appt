@@ -18,7 +18,9 @@ type AdminAuthorizationResult =
  * Authenticates privileged admin API calls before exposing the service-role
  * client. The service role bypasses RLS, so every caller must pass this check.
  */
-export async function authorizeActiveSuperAdmin(): Promise<AdminAuthorizationResult> {
+export async function authorizeActiveSuperAdmin(
+  forbiddenMessage = "Only an active platform super admin can perform this action.",
+): Promise<AdminAuthorizationResult> {
   const supabase = await getSupabaseServerClient();
 
   if (!supabase) {
@@ -57,12 +59,7 @@ export async function authorizeActiveSuperAdmin(): Promise<AdminAuthorizationRes
   ) {
     return {
       authorized: false,
-      response: Response.json(
-        {
-          error: "Only an active platform super admin can perform this action.",
-        },
-        { status: 403 },
-      ),
+      response: Response.json({ error: forbiddenMessage }, { status: 403 }),
     };
   }
 

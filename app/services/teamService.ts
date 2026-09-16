@@ -1,9 +1,9 @@
-import { getSupabaseBrowserClient } from "@/app/lib/supabase/client";
+import { requireSupabaseBrowserClient as client } from "@/app/lib/supabase/client";
 import type { PlanType } from "@/app/types";
 
 export type BusinessTeamRole = "manager" | "staff";
 
-export interface BusinessTeamMember {
+interface BusinessTeamMember {
   membershipId: string;
   profileId: string;
   name: string;
@@ -13,7 +13,7 @@ export interface BusinessTeamMember {
   joinedAt: string;
 }
 
-export interface BusinessTeamInvitation {
+interface BusinessTeamInvitation {
   id: string;
   email: string;
   role: BusinessTeamRole;
@@ -22,7 +22,7 @@ export interface BusinessTeamInvitation {
   createdAt: string;
 }
 
-export interface PendingSeatRequest {
+interface PendingSeatRequest {
   id: string;
   requestedPaidSeats: number;
   status: "pending";
@@ -44,7 +44,7 @@ export interface BusinessTeamSummary {
   pendingSeatRequest: PendingSeatRequest | null;
 }
 
-export interface CreatedTeamInvitation {
+interface CreatedTeamInvitation {
   id: string;
   token: string;
   email: string;
@@ -64,12 +64,6 @@ export interface AdminSeatSummary {
     requestedPaidSeats: number;
     createdAt: string;
   } | null;
-}
-
-function client() {
-  const supabase = getSupabaseBrowserClient();
-  if (!supabase) throw new Error("Supabase is not configured.");
-  return supabase;
 }
 
 function rpcError(

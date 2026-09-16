@@ -10,7 +10,7 @@ export interface ProfileRow {
   updated_at: string | null;
 }
 
-export interface RoleRow {
+interface RoleRow {
   id: string;
   tenant_id: string;
   name: string;

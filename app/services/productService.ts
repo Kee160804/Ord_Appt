@@ -1,4 +1,4 @@
-import { getSupabaseBrowserClient } from "@/app/lib/supabase/client";
+import { requireSupabaseBrowserClient as client } from "@/app/lib/supabase/client";
 import type {
   Category,
   Product,
@@ -58,16 +58,6 @@ export interface ListProductsOptions {
 const DEFAULT_PRODUCT_PAGE_SIZE = 25;
 const MAX_PRODUCT_PAGE_SIZE = 100;
 const MAX_PRODUCT_SEARCH_LENGTH = 120;
-
-function client() {
-  const supabase = getSupabaseBrowserClient();
-
-  if (!supabase) {
-    throw new Error("Supabase is not configured.");
-  }
-
-  return supabase;
-}
 
 function mapCategory(row: CategoryRow): Category {
   return {

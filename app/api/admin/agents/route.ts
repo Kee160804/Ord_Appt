@@ -1,6 +1,5 @@
-import { getSupabaseAdminClient } from "@/app/lib/supabase/admin";
-import { getSupabaseServerClient } from "@/app/lib/supabase/server";
 import { authCallbackUrl } from "@/app/lib/platform";
+import { authorizeActiveSuperAdmin } from "@/app/lib/server/admin-authorization";
 import {
   generateSecurePassword,
   isValidEmail,
@@ -10,14 +9,7 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/**
- * Roles that can be created through Agent Management.
- *
- * IMPORTANT:
- * - SUPERADMIN is a platform-level role.
- * - OWNER/ADMIN/MANAGER/STAFF are tenant-level roles.
- * - Tenant-level roles MUST always have a valid tenantId.
- */
+/** Platform roles are global; every other role requires a tenant. */
 type AgentRole = "superadmin" | "owner" | "admin" | "manager" | "staff";
 
 interface CreateAgentRequest {
@@ -37,74 +29,15 @@ const ALLOWED_ROLES: AgentRole[] = [
   "staff",
 ];
 
-/**
- * POST /api/admin/agents
- *
- * Creates or assigns an agent.
- *
- * SECURITY:
- * Only an authenticated, active platform SUPER_ADMIN can call
- * this endpoint.
- */
+/** Creates or assigns an agent after server-side Super Admin authorization. */
 export async function POST(request: Request) {
   try {
-    /* ================================================================
-       1. VERIFY AUTHENTICATED SESSION
-       ================================================================ */
+    const authorization = await authorizeActiveSuperAdmin(
+      "Only an active platform super admin can manage agents.",
+    );
+    if (!authorization.authorized) return authorization.response;
 
-    const supabase = await getSupabaseServerClient();
-
-    if (!supabase) {
-      return Response.json(
-        { error: "Supabase is not configured." },
-        { status: 503 },
-      );
-    }
-
-    const { data: authData, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !authData.user) {
-      return Response.json({ error: "Unauthorized." }, { status: 401 });
-    }
-
-    /*
-     * The service-role/admin client bypasses RLS.
-     *
-     * Therefore authorization MUST be completed before performing
-     * privileged database operations with this client.
-     */
-    const admin = getSupabaseAdminClient();
-
-    /* ================================================================
-       2. VERIFY CALLER IS AN ACTIVE PLATFORM SUPER ADMIN
-       ================================================================ */
-
-    const { data: callerProfile, error: callerProfileError } = await admin
-      .from("profiles")
-      .select("id, platform_role, is_active")
-      .eq("id", authData.user.id)
-      .maybeSingle();
-
-    if (callerProfileError) {
-      throw callerProfileError;
-    }
-
-    const callerIsSuperAdmin =
-      callerProfile?.is_active === true &&
-      callerProfile.platform_role?.toUpperCase() === "SUPER_ADMIN";
-
-    if (!callerIsSuperAdmin) {
-      return Response.json(
-        {
-          error: "Only an active platform super admin can manage agents.",
-        },
-        { status: 403 },
-      );
-    }
-
-    /* ================================================================
-       3. PARSE AND NORMALIZE REQUEST
-       ================================================================ */
+    const { admin, userId: callerId } = authorization;
 
     let body: CreateAgentRequest;
 
@@ -117,20 +50,11 @@ export async function POST(request: Request) {
     const name = body.name?.trim();
     const email = body.email?.trim().toLowerCase();
 
-    /*
-     * Do NOT silently default invalid/missing roles to STAFF.
-     *
-     * Authorization-related values should always be explicit.
-     */
+    // Authorization values are explicit; invalid roles never default to STAFF.
     const requestedRole =
       typeof body.role === "string" ? body.role.trim().toLowerCase() : "";
 
-    /*
-     * Normalize empty tenant IDs to null.
-     *
-     * "platform" is NOT treated as a tenant ID.
-     * Platform access is determined explicitly by role === superadmin.
-     */
+    // "platform" is a scope marker, not a tenant ID.
     const tenantId =
       typeof body.tenantId === "string" &&
       body.tenantId.trim() !== "" &&
@@ -139,10 +63,6 @@ export async function POST(request: Request) {
         : null;
 
     const sendPasswordEmail = body.sendPasswordEmail !== false;
-
-    /* ================================================================
-       4. VALIDATE BASIC INPUT
-       ================================================================ */
 
     if (!name || name.length < 2) {
       return Response.json(
@@ -158,47 +78,16 @@ export async function POST(request: Request) {
       );
     }
 
-    /*
-     * Explicitly allow-list roles.
-     *
-     * Never trust the TypeScript interface as runtime validation,
-     * because clients can send arbitrary JSON.
-     */
+    // Client JSON is untrusted, so enforce the runtime role allow-list.
     if (!ALLOWED_ROLES.includes(requestedRole as AgentRole)) {
       return Response.json({ error: "Invalid agent role." }, { status: 400 });
     }
 
     const role = requestedRole as AgentRole;
 
-    /* ================================================================
-       5. CRITICAL ROLE / TENANT AUTHORIZATION RULES
-       ================================================================ */
-
-    /**
-     * CRITICAL SECURITY FIX
-     *
-     * OLD:
-     *
-     * const isSuperAdmin = role === "superadmin" || !tenantId;
-     *
-     * That meant:
-     *
-     * role = "staff"
-     * tenantId = null
-     *
-     * could result in SUPER_ADMIN privileges.
-     *
-     * Super-admin status must ONLY come from an explicit
-     * superadmin role request.
-     */
+    // Missing tenant data must never elevate a tenant role to Super Admin.
     const isSuperAdmin = role === "superadmin";
 
-    /**
-     * Tenant-facing roles MUST have a tenant.
-     *
-     * Missing tenant IDs now produce a 400 response instead of
-     * silently creating a SUPER_ADMIN.
-     */
     if (!isSuperAdmin && !tenantId) {
       return Response.json(
         {
@@ -209,10 +98,6 @@ export async function POST(request: Request) {
       );
     }
 
-    /**
-     * A SUPER_ADMIN is platform-scoped and should not be created
-     * with a tenant assignment through this endpoint.
-     */
     if (isSuperAdmin && tenantId) {
       return Response.json(
         {
@@ -222,10 +107,6 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
-
-    /* ================================================================
-       6. VERIFY TENANT
-       ================================================================ */
 
     let tenantName = "Platform";
 
@@ -250,18 +131,10 @@ export async function POST(request: Request) {
       tenantName = tenantRow.business_name;
     }
 
-    /* ================================================================
-       7. GENERATE / VALIDATE INITIAL PASSWORD
-       ================================================================ */
-
     const password =
       body.password && body.password.length >= 12
         ? body.password
         : generateSecurePassword();
-
-    /* ================================================================
-       8. CREATE OR FIND AUTH USER
-       ================================================================ */
 
     let userId: string;
     let createdNewUser = false;
@@ -277,12 +150,7 @@ export async function POST(request: Request) {
       });
 
     if (createAuthError) {
-      /*
-       * The email may already belong to an existing account.
-       *
-       * Do NOT reset/rotate an existing user's password here.
-       * We only reuse the existing profile ID.
-       */
+      // Reuse an existing identity without rotating credentials it owns.
       const { data: existingProfile, error: existingProfileError } = await admin
         .from("profiles")
         .select("id, platform_role")
@@ -312,10 +180,6 @@ export async function POST(request: Request) {
       createdNewUser = true;
     }
 
-    /* ================================================================
-       9. CHECK EXISTING PROFILE PRIVILEGES
-       ================================================================ */
-
     const { data: existingUserProfile, error: userProfileError } = await admin
       .from("profiles")
       .select("id, platform_role")
@@ -326,13 +190,7 @@ export async function POST(request: Request) {
       throw userProfileError;
     }
 
-    /**
-     * Important:
-     *
-     * If an existing SUPER_ADMIN is assigned tenant membership,
-     * we should NOT accidentally remove their platform role by
-     * writing platform_role: null.
-     */
+    // Adding tenant membership must not demote an existing Super Admin.
     const existingPlatformRole =
       existingUserProfile?.platform_role?.toUpperCase() || null;
 
@@ -341,10 +199,6 @@ export async function POST(request: Request) {
       : existingPlatformRole === "SUPER_ADMIN"
         ? "SUPER_ADMIN"
         : null;
-
-    /* ================================================================
-       10. UPSERT PROFILE
-       ================================================================ */
 
     const { error: profileUpsertError } = await admin.from("profiles").upsert({
       id: userId,
@@ -359,10 +213,6 @@ export async function POST(request: Request) {
       throw profileUpsertError;
     }
 
-    /* ================================================================
-       11. ASSIGN TENANT ROLE + MEMBERSHIP
-       ================================================================ */
-
     let assignedRoleName = isSuperAdmin ? "Super Admin" : role.toUpperCase();
 
     if (tenantId) {
@@ -370,9 +220,6 @@ export async function POST(request: Request) {
 
       let roleId: string;
 
-      /*
-       * Look for an existing tenant role first.
-       */
       const { data: existingRole, error: existingRoleError } = await admin
         .from("roles")
         .select("id, name")
@@ -388,10 +235,6 @@ export async function POST(request: Request) {
         roleId = existingRole.id;
         assignedRoleName = existingRole.name;
       } else {
-        /*
-         * Preserve your existing behavior:
-         * create the role if this tenant does not have it.
-         */
         const { data: insertedRole, error: roleInsertError } = await admin
           .from("roles")
           .insert({
@@ -411,9 +254,6 @@ export async function POST(request: Request) {
         assignedRoleName = insertedRole.name;
       }
 
-      /*
-       * Create/update membership for this specific tenant.
-       */
       const { error: membershipError } = await admin
         .from("tenant_memberships")
         .upsert({
@@ -427,10 +267,6 @@ export async function POST(request: Request) {
         throw membershipError;
       }
     }
-
-    /* ================================================================
-       12. SEND PASSWORD SETUP / RESET EMAIL
-       ================================================================ */
 
     let emailSent = false;
 
@@ -455,10 +291,7 @@ export async function POST(request: Request) {
           );
         }
       } catch (emailError) {
-        /*
-         * Agent creation should remain successful even if email
-         * delivery temporarily fails.
-         */
+        // Account creation remains valid when optional email delivery fails.
         console.warn(
           "Could not dispatch password reset email to agent:",
           emailError,
@@ -466,14 +299,10 @@ export async function POST(request: Request) {
       }
     }
 
-    /* ================================================================
-       13. RECORD AUDIT EVENT
-       ================================================================ */
-
     try {
       await admin.from("team_access_events").insert({
         tenant_id: tenantId,
-        actor_id: authData.user.id,
+        actor_id: callerId,
         action: "AGENT_CREATED",
         details: {
           name,
@@ -485,18 +314,9 @@ export async function POST(request: Request) {
         },
       });
     } catch (auditError) {
-      /*
-       * Audit logging is currently best-effort.
-       *
-       * Do not fail an otherwise successful account creation merely
-       * because the optional audit table is unavailable.
-       */
+      // Preserve a successful account operation when optional auditing fails.
       console.warn("Could not record agent audit event:", auditError);
     }
-
-    /* ================================================================
-       14. SUCCESS RESPONSE
-       ================================================================ */
 
     return Response.json(
       {

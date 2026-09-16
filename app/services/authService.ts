@@ -13,8 +13,9 @@ import type {
   TenantRow,
 } from "@/app/types/supabase";
 import { parseSocialLinks } from "@/app/lib/social-links";
+import { slugify } from "@/app/lib/utils";
 
-export interface AuthenticatedAppSession {
+interface AuthenticatedAppSession {
   user: User;
   tenant: Tenant | null;
   businesses: Tenant[];
@@ -217,16 +218,6 @@ function metadataFromUser(user: SupabaseUser): SignupBusinessMetadata | null {
     business_phone: metadata.business_phone ?? "",
     business_slug: metadata.business_slug ?? "",
   };
-}
-
-function slugify(value: string) {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, "-")
-    .replace(/[^a-z0-9-]/g, "")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "");
 }
 
 async function createTenantFromMetadata(

@@ -1,4 +1,4 @@
-import { getSupabaseBrowserClient } from "@/app/lib/supabase/client";
+import { requireSupabaseBrowserClient as client } from "@/app/lib/supabase/client";
 import type { AnalyticsSummary, Tenant, TopItem } from "@/app/types/index";
 import type { TenantRow } from "@/app/types/supabase";
 import { parseSocialLinks } from "@/app/lib/social-links";
@@ -125,12 +125,6 @@ export interface AdminPlatformData {
   roles: AdminRoleSummary[];
   revenueSeries: AdminRevenuePoint[];
   recentActivity: AdminActivityRecord[];
-}
-
-function client() {
-  const supabase = getSupabaseBrowserClient();
-  if (!supabase) throw new Error("Supabase is not configured.");
-  return supabase;
 }
 
 async function collectPages<T>(
@@ -667,8 +661,7 @@ export interface CreateAdminTenantResult {
  * - All other roles are tenant-scoped and require a tenantId.
  * - The protected server API remains the final authorization authority.
  */
-export type AdminAgentRole =
-  "superadmin" | "owner" | "admin" | "manager" | "staff";
+type AdminAgentRole = "superadmin" | "owner" | "admin" | "manager" | "staff";
 
 export interface CreateAdminAgentInput {
   name: string;

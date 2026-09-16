@@ -496,7 +496,7 @@ const allMockServices: Service[] = [
   },
 ];
 
-export const mockServices = allMockServices.filter((service) =>
+const mockServices = allMockServices.filter((service) =>
   ACTIVE_DEMO_TENANT_IDS.has(service.tenantId),
 );
 
@@ -515,7 +515,7 @@ const allMockCategories: Category[] = [
   { id: "c12", tenantId: "ret-001", name: "Accessories", sortOrder: 3 },
 ];
 
-export const mockCategories = allMockCategories.filter((category) =>
+const mockCategories = allMockCategories.filter((category) =>
   ACTIVE_DEMO_TENANT_IDS.has(category.tenantId),
 );
 
@@ -861,7 +861,7 @@ const allMockProducts: Product[] = [
   },
 ];
 
-export const mockProducts = allMockProducts.filter((product) =>
+const mockProducts = allMockProducts.filter((product) =>
   ACTIVE_DEMO_TENANT_IDS.has(product.tenantId),
 );
 
@@ -1016,7 +1016,7 @@ const allMockAppointments: Appointment[] = [
   },
 ];
 
-export const mockAppointments = allMockAppointments.filter((appointment) =>
+const mockAppointments = allMockAppointments.filter((appointment) =>
   ACTIVE_DEMO_TENANT_IDS.has(appointment.tenantId),
 );
 
@@ -1199,7 +1199,7 @@ const allMockOrders: Order[] = [
   },
 ];
 
-export const mockOrders = allMockOrders.filter((order) =>
+const mockOrders = allMockOrders.filter((order) =>
   ACTIVE_DEMO_TENANT_IDS.has(order.tenantId),
 );
 
@@ -1327,7 +1327,5 @@ export const getAppointmentsByTenant = (id: string) =>
   mockAppointments.filter((a) => a.tenantId === id);
 export const getOrdersByTenant = (id: string) =>
   mockOrders.filter((o) => o.tenantId === id);
-export const getTenantById = (id: string) =>
-  mockTenants.find((t) => t.id === id);
 export const getTenantBySlug = (slug: string) =>
   mockTenants.find((t) => t.slug === slug);

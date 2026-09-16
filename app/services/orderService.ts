@@ -1,4 +1,4 @@
-import { getSupabaseBrowserClient } from "@/app/lib/supabase/client";
+import { requireSupabaseBrowserClient as client } from "@/app/lib/supabase/client";
 
 import type {
   Order,
@@ -16,7 +16,7 @@ import type {
 /**
  * Public checkout item submitted from the storefront.
  */
-export interface PublicOrderItemInput {
+interface PublicOrderItemInput {
   productId: string;
   quantity: number;
 
@@ -68,19 +68,6 @@ export interface PublicOrderResult {
   paymentStatus: PaymentStatus;
 
   paymentReference?: string;
-}
-
-/**
- * Returns the configured Supabase browser client.
- */
-function client() {
-  const supabase = getSupabaseBrowserClient();
-
-  if (!supabase) {
-    throw new Error("Supabase is not configured.");
-  }
-
-  return supabase;
 }
 
 /**
