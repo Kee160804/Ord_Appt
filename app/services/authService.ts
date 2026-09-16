@@ -4,6 +4,7 @@ import type {
 } from "@supabase/supabase-js";
 import { getSupabaseBrowserClient } from "@/app/lib/supabase/client";
 import { PRIVACY_VERSION, TERMS_VERSION } from "@/app/lib/legal";
+import { authCallbackUrl } from "@/app/lib/platform";
 import type { BusinessType, Tenant, User, UserRole } from "@/app/types/index";
 import type {
   BusinessHourRow,
@@ -482,10 +483,10 @@ export async function supabaseSignup(
     terms_version: TERMS_VERSION,
     privacy_version: PRIVACY_VERSION,
   };
-  const emailRedirectTo =
-    typeof window === "undefined"
-      ? undefined
-      : `${window.location.origin}/auth/confirm?next=/dashboard`;
+  const emailRedirectTo = authCallbackUrl(
+    "/dashboard",
+    typeof window === "undefined" ? undefined : window.location.origin,
+  );
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
@@ -509,10 +510,10 @@ export async function requestPasswordReset(email: string) {
   if (!supabase)
     throw new Error("Password recovery is not configured for this deployment.");
 
-  const redirectTo =
-    typeof window === "undefined"
-      ? undefined
-      : `${window.location.origin}/auth/confirm?next=/reset-password`;
+  const redirectTo = authCallbackUrl(
+    "/reset-password",
+    typeof window === "undefined" ? undefined : window.location.origin,
+  );
   const { error } = await supabase.auth.resetPasswordForEmail(
     email.trim().toLowerCase(),
     {
@@ -535,10 +536,10 @@ export async function resendSignupConfirmation(email: string) {
     throw new Error(
       "Email confirmation is not configured for this deployment.",
     );
-  const emailRedirectTo =
-    typeof window === "undefined"
-      ? undefined
-      : `${window.location.origin}/auth/confirm?next=/dashboard`;
+  const emailRedirectTo = authCallbackUrl(
+    "/dashboard",
+    typeof window === "undefined" ? undefined : window.location.origin,
+  );
   const { error } = await supabase.auth.resend({
     type: "signup",
     email: email.trim().toLowerCase(),

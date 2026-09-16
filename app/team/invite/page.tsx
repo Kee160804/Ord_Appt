@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { getSupabaseBrowserClient } from "@/app/lib/supabase/client";
 import { PRIVACY_VERSION, TERMS_VERSION } from "@/app/lib/legal";
+import { authCallbackUrl } from "@/app/lib/platform";
 import { loadAuthenticatedAppSession } from "@/app/services/authService";
 import { acceptBusinessTeamInvitation } from "@/app/services/teamService";
 
@@ -108,8 +109,10 @@ export default function TeamInvitationPage() {
       if (password.length < 8)
         throw new Error("Use a password with at least 8 characters.");
       const invitationPath = `/team/invite?token=${encodeURIComponent(token)}`;
-      const confirmationUrl = new URL("/auth/confirm", window.location.origin);
-      confirmationUrl.searchParams.set("next", invitationPath);
+      const confirmationUrl = authCallbackUrl(
+        invitationPath,
+        window.location.origin,
+      );
       const { data, error: signUpError } = await supabase.auth.signUp({
         email: email.trim().toLowerCase(),
         password,
@@ -121,7 +124,7 @@ export default function TeamInvitationPage() {
             terms_version: TERMS_VERSION,
             privacy_version: PRIVACY_VERSION,
           },
-          emailRedirectTo: confirmationUrl.toString(),
+          emailRedirectTo: confirmationUrl,
         },
       });
       if (signUpError) throw signUpError;

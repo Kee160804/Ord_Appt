@@ -58,6 +58,11 @@ Site URL: https://yuhbusiness.com
 Redirect URL: https://yuhbusiness.com/auth/confirm**
 ```
 
+Supabase falls back to the configured **Site URL** when an application's
+`redirectTo` URL is missing from the Redirect URLs allow-list. If production
+confirmation emails open localhost, update both values above and send a new
+confirmation email; links generated before the change keep their old target.
+
 The redirect configuration is used by signup confirmation and password recovery.
 Password login itself requires the two public Supabase variables above.
 

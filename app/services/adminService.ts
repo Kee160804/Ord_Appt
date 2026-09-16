@@ -711,6 +711,35 @@ export async function createAdminTenant(
   return data;
 }
 
+export interface DeleteAdminTenantResult {
+  success: boolean;
+  deletedTenant: {
+    id: string;
+    name: string;
+  };
+  removedAccountIds: string[];
+  retainedAccountIds: string[];
+  cleanupWarnings: string[];
+}
+
+export async function deleteAdminTenant(
+  tenantId: string,
+): Promise<DeleteAdminTenantResult> {
+  const response = await fetch(
+    `/api/admin/tenants/${encodeURIComponent(tenantId)}`,
+    { method: "DELETE" },
+  );
+  const data = (await response.json()) as DeleteAdminTenantResult & {
+    error?: string;
+  };
+
+  if (!response.ok || !data.success) {
+    throw new Error(data.error || "Unable to delete tenant.");
+  }
+
+  return data;
+}
+
 export async function createAdminAgent(
   input: CreateAdminAgentInput,
 ): Promise<CreateAdminAgentResult> {
@@ -773,4 +802,19 @@ export async function createAdminAgent(
   }
 
   return data;
+}
+
+export async function deleteAdminAgent(agentId: string): Promise<void> {
+  const response = await fetch(
+    `/api/admin/agents/${encodeURIComponent(agentId)}`,
+    { method: "DELETE" },
+  );
+  const data = (await response.json()) as {
+    success?: boolean;
+    error?: string;
+  };
+
+  if (!response.ok || !data.success) {
+    throw new Error(data.error || "Unable to delete account.");
+  }
 }

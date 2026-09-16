@@ -1,5 +1,6 @@
 import { getSupabaseAdminClient } from "@/app/lib/supabase/admin";
 import { getSupabaseServerClient } from "@/app/lib/supabase/server";
+import { authCallbackUrl } from "@/app/lib/platform";
 import {
   generateSecurePassword,
   isValidEmail,
@@ -272,12 +273,10 @@ export async function POST(request: Request) {
     // 7. Handle password setup / reset email or recovery link
     let emailSent = false;
 
-    const origin =
-      request.headers.get("origin") ||
-      request.headers.get("referer") ||
-      "http://localhost:3000";
-    const cleanOrigin = origin.replace(/\/+$/, "");
-    const redirectTo = `${cleanOrigin}/auth/confirm?next=/reset-password`;
+    const redirectTo = authCallbackUrl(
+      "/reset-password",
+      new URL(request.url).origin,
+    );
 
     if (sendPasswordEmail) {
       try {

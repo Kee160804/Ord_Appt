@@ -22,7 +22,6 @@ import {
   CircleDollarSign,
   Copy,
   CreditCard,
-  Ellipsis,
   Eye,
   EyeOff,
   FileClock,
@@ -40,6 +39,7 @@ import {
   ShoppingCart,
   Sparkles,
   Sun,
+  Trash2,
   UserCog,
   Users,
   UsersRound,
@@ -53,6 +53,8 @@ import { PLAN_DEFINITIONS } from "@/app/lib/plans";
 import {
   createAdminAgent,
   createAdminTenant,
+  deleteAdminAgent,
+  deleteAdminTenant,
   loadAdminPlatformData,
   type AdminActivityRecord,
   type AdminAgentRecord,
@@ -852,6 +854,10 @@ function TenantView({
   const [showAddModal, setShowAddModal] = useState(false);
   const [successData, setSuccessData] =
     useState<CreateAdminTenantResult | null>(null);
+  const [tenantToDelete, setTenantToDelete] = useState<Tenant | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+  const [deleteMessage, setDeleteMessage] = useState("");
   const pageSize = 7;
 
   const filtered = useMemo(() => {
@@ -892,6 +898,40 @@ function TenantView({
     setPage(1);
   };
 
+  const confirmTenantDeletion = async () => {
+    if (!tenantToDelete) return;
+
+    setIsDeleting(true);
+    setDeleteError("");
+    setDeleteMessage("");
+
+    try {
+      const result = await deleteAdminTenant(tenantToDelete.id);
+      const accountSummary =
+        result.removedAccountIds.length > 0
+          ? ` ${result.removedAccountIds.length} account${result.removedAccountIds.length === 1 ? "" : "s"} with no remaining businesses ${result.removedAccountIds.length === 1 ? "was" : "were"} also removed.`
+          : "";
+      const warningSummary =
+        result.cleanupWarnings.length > 0
+          ? ` ${result.cleanupWarnings.join(" ")}`
+          : "";
+
+      setDeleteMessage(
+        `${result.deletedTenant.name} and its business records were permanently deleted.${accountSummary}${warningSummary}`,
+      );
+      setTenantToDelete(null);
+      onRefresh();
+    } catch (deleteFailure) {
+      setDeleteError(
+        deleteFailure instanceof Error
+          ? deleteFailure.message
+          : "Unable to delete this tenant.",
+      );
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <>
       <ManagementPanel
@@ -900,6 +940,11 @@ function TenantView({
         description="Create, inspect, and manage platform businesses"
         title="Tenant Management"
       >
+        {deleteMessage && (
+          <div className="mx-5 mt-5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300 light:text-emerald-700">
+            {deleteMessage}
+          </div>
+        )}
         <ManagementFilters
           query={query}
           onQuery={changeQuery}
@@ -976,13 +1021,27 @@ function TenantView({
                       {formatDate(tenant.createdAt)}
                     </td>
                     <td className="px-4 py-4 text-right">
-                      <Link
-                        className="inline-flex rounded-lg p-2 text-slate-500 hover:bg-violet-500/10 hover:text-violet-400"
-                        href={`/admin/tenant/${tenant.id}`}
-                        title={`View ${tenant.name}`}
-                      >
-                        <ArrowRight className="h-4 w-4" />
-                      </Link>
+                      <div className="flex items-center justify-end gap-1">
+                        <Link
+                          className="inline-flex rounded-lg p-2 text-slate-500 hover:bg-violet-500/10 hover:text-violet-400"
+                          href={`/admin/tenant/${tenant.id}`}
+                          title={`View ${tenant.name}`}
+                        >
+                          <ArrowRight className="h-4 w-4" />
+                        </Link>
+                        <button
+                          type="button"
+                          className="inline-flex rounded-lg p-2 text-slate-500 transition hover:bg-rose-500/10 hover:text-rose-400"
+                          onClick={() => {
+                            setDeleteError("");
+                            setTenantToDelete(tenant);
+                          }}
+                          title={`Delete ${tenant.name}`}
+                          aria-label={`Delete ${tenant.name}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -1026,6 +1085,23 @@ function TenantView({
           emailSent={successData.emailSent}
         />
       )}
+
+      {tenantToDelete && (
+        <DeleteConfirmationModal
+          entityName={tenantToDelete.name}
+          error={deleteError}
+          isDeleting={isDeleting}
+          title="Permanently delete tenant?"
+          warning="This deletes the business and all of its customers, products, orders, appointments, settings, and tenant-scoped history. Accounts that belong to other businesses will be preserved."
+          onCancel={() => {
+            if (!isDeleting) {
+              setTenantToDelete(null);
+              setDeleteError("");
+            }
+          }}
+          onConfirm={() => void confirmTenantDeletion()}
+        />
+      )}
     </>
   );
 }
@@ -1048,6 +1124,12 @@ function AgentView({
   const [successData, setSuccessData] = useState<CreateAdminAgentResult | null>(
     null,
   );
+  const [agentToDelete, setAgentToDelete] = useState<AdminAgentRecord | null>(
+    null,
+  );
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+  const [deleteMessage, setDeleteMessage] = useState("");
   const roles = [...new Set(agents.map((agent) => agent.role))].sort();
 
   const filtered = agents.filter((agent) => {
@@ -1064,6 +1146,31 @@ function AgentView({
     return matchesSearch && matchesRole && matchesStatus;
   });
 
+  const confirmAgentDeletion = async () => {
+    if (!agentToDelete) return;
+
+    setIsDeleting(true);
+    setDeleteError("");
+    setDeleteMessage("");
+
+    try {
+      await deleteAdminAgent(agentToDelete.id);
+      setDeleteMessage(
+        `${agentToDelete.name}'s authentication account, profile, and memberships were permanently deleted.`,
+      );
+      setAgentToDelete(null);
+      onRefresh();
+    } catch (deleteFailure) {
+      setDeleteError(
+        deleteFailure instanceof Error
+          ? deleteFailure.message
+          : "Unable to delete this account.",
+      );
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <>
       <ManagementPanel
@@ -1072,6 +1179,11 @@ function AgentView({
         description="Platform profiles joined to tenant memberships and roles"
         title="Agent Management"
       >
+        {deleteMessage && (
+          <div className="mx-5 mt-5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300 light:text-emerald-700">
+            {deleteMessage}
+          </div>
+        )}
         <ManagementFilters
           query={query}
           onQuery={setQuery}
@@ -1149,11 +1261,16 @@ function AgentView({
                     </td>
                     <td className="px-4 py-4 text-right">
                       <button
-                        className="rounded-lg p-2 text-slate-500"
-                        disabled
-                        title="Agent editing requires a secured admin action"
+                        type="button"
+                        className="rounded-lg p-2 text-slate-500 transition hover:bg-rose-500/10 hover:text-rose-400"
+                        onClick={() => {
+                          setDeleteError("");
+                          setAgentToDelete(agent);
+                        }}
+                        title={`Delete ${agent.name}`}
+                        aria-label={`Delete ${agent.name}`}
                       >
-                        <Ellipsis className="h-4 w-4" />
+                        <Trash2 className="h-4 w-4" />
                       </button>
                     </td>
                   </tr>
@@ -1192,6 +1309,23 @@ function AgentView({
           email={successData.agent.email}
           roleOrType={`${successData.agent.role} · ${successData.agent.tenantName}`}
           emailSent={successData.emailSent}
+        />
+      )}
+
+      {agentToDelete && (
+        <DeleteConfirmationModal
+          entityName={agentToDelete.email}
+          error={deleteError}
+          isDeleting={isDeleting}
+          title="Permanently delete account?"
+          warning="This removes the Supabase Auth identity, application profile, and all tenant memberships. Deletion is blocked if this account is the last owner of a business."
+          onCancel={() => {
+            if (!isDeleting) {
+              setAgentToDelete(null);
+              setDeleteError("");
+            }
+          }}
+          onConfirm={() => void confirmAgentDeletion()}
         />
       )}
     </>
@@ -1898,6 +2032,96 @@ function generateRandomPassword(length = 18): string {
     ];
   }
   return characters.join("");
+}
+
+function DeleteConfirmationModal({
+  entityName,
+  error,
+  isDeleting,
+  onCancel,
+  onConfirm,
+  title,
+  warning,
+}: {
+  entityName: string;
+  error: string;
+  isDeleting: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+  title: string;
+  warning: string;
+}) {
+  const [confirmation, setConfirmation] = useState("");
+  const matches = confirmation.trim() === entityName;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/80 p-4 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="delete-confirmation-title"
+    >
+      <div className="w-full max-w-md rounded-2xl border border-rose-500/30 bg-[#0c1425] p-6 text-slate-100 shadow-2xl light:bg-white light:text-slate-900">
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-500/15 text-rose-400">
+            <Trash2 className="h-5 w-5" />
+          </div>
+          <div>
+            <h3 id="delete-confirmation-title" className="text-lg font-bold">
+              {title}
+            </h3>
+            <p className="mt-1 text-sm leading-6 text-slate-400 light:text-slate-600">
+              {warning}
+            </p>
+          </div>
+        </div>
+
+        {error && (
+          <div
+            role="alert"
+            className="mt-4 flex items-start gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-300 light:text-rose-700"
+          >
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
+
+        <label className="mt-5 block">
+          <span className="text-xs font-semibold text-slate-300 light:text-slate-700">
+            Type <strong>{entityName}</strong> to confirm
+          </span>
+          <input
+            autoFocus
+            type="text"
+            value={confirmation}
+            disabled={isDeleting}
+            onChange={(event) => setConfirmation(event.target.value)}
+            className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-2.5 text-sm text-white outline-none focus:border-rose-500 disabled:opacity-60 light:border-slate-300 light:bg-white light:text-slate-900"
+          />
+        </label>
+
+        <div className="mt-6 flex justify-end gap-3">
+          <button
+            type="button"
+            disabled={isDeleting}
+            onClick={onCancel}
+            className="rounded-xl border border-slate-700 px-4 py-2.5 text-sm font-semibold text-slate-300 transition hover:bg-slate-800 disabled:opacity-50 light:border-slate-300 light:text-slate-700 light:hover:bg-slate-100"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={!matches || isDeleting}
+            onClick={onConfirm}
+            className="inline-flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <Trash2 className="h-4 w-4" />
+            {isDeleting ? "Deleting..." : "Delete permanently"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function AddTenantModal({

@@ -1,5 +1,6 @@
 import { getSupabaseAdminClient } from "@/app/lib/supabase/admin";
 import { getSupabaseServerClient } from "@/app/lib/supabase/server";
+import { authCallbackUrl } from "@/app/lib/platform";
 import {
   generateSecurePassword,
   isValidEmail,
@@ -433,43 +434,10 @@ export async function POST(request: Request) {
 
     let emailSent = false;
 
-    /**
-     * Prefer a configured application URL.
-     *
-     * Do not blindly trust Origin/Referer for security-sensitive
-     * redirect URLs.
-     *
-     * Add NEXT_PUBLIC_SITE_URL=https://yuhbusiness.com
-     * to production if it is not already configured.
-     */
-    const configuredSiteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim();
-
-    let appOrigin = "http://localhost:3000";
-
-    if (configuredSiteUrl) {
-      try {
-        appOrigin = new URL(configuredSiteUrl).origin;
-      } catch {
-        console.warn(
-          "NEXT_PUBLIC_SITE_URL is invalid. Falling back to localhost.",
-        );
-      }
-    } else if (process.env.NODE_ENV !== "production") {
-      /*
-       * Local development convenience only.
-       */
-      const requestOrigin = request.headers.get("origin");
-
-      if (requestOrigin) {
-        try {
-          appOrigin = new URL(requestOrigin).origin;
-        } catch {
-          // Keep localhost fallback.
-        }
-      }
-    }
-
-    const redirectTo = `${appOrigin}/auth/confirm?next=/reset-password`;
+    const redirectTo = authCallbackUrl(
+      "/reset-password",
+      new URL(request.url).origin,
+    );
 
     if (sendPasswordEmail) {
       try {

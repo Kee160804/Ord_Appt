@@ -29,3 +29,23 @@ test("large operational lists use bounded database ranges", async () => {
     assert.match(source, /Math\.min\(/, path);
   }
 });
+
+test("production authentication emails cannot emit localhost callbacks", async () => {
+  const platform = await readFile("app/lib/platform.ts", "utf8");
+  const authService = await readFile("app/services/authService.ts", "utf8");
+  const adminAgents = await readFile("app/api/admin/agents/route.ts", "utf8");
+  const adminTenants = await readFile("app/api/admin/tenants/route.ts", "utf8");
+
+  assert.match(
+    platform,
+    /PRODUCTION_APP_ORIGIN = "https:\/\/yuhbusiness\.com"/,
+  );
+  assert.match(platform, /NODE_ENV === "production"/);
+  assert.match(platform, /isLoopbackOrigin/);
+  assert.match(authService, /authCallbackUrl/);
+  assert.match(adminAgents, /authCallbackUrl/);
+  assert.match(adminTenants, /authCallbackUrl/);
+  assert.doesNotMatch(adminAgents, /NEXT_PUBLIC_SITE_URL/);
+  assert.doesNotMatch(adminAgents, /let appOrigin = "http:\/\/localhost/);
+  assert.doesNotMatch(adminTenants, /"http:\/\/localhost:3000"/);
+});
