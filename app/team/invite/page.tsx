@@ -163,7 +163,7 @@ export default function TeamInvitationPage() {
     <div className="pwa-page-safe flex min-h-dvh items-center justify-center bg-[#070b14] px-4 py-8 text-white light:bg-white light:text-slate-900">
       <main className="w-full max-w-md">
         <Link href="/" className="mx-auto flex w-fit items-center gap-2.5">
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-indigo-700">
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-linear-to-br from-violet-500 to-indigo-700">
             <Sparkles className="h-5 w-5 text-white" />
           </span>
           <span className="text-lg font-black">YuhBusiness</span>

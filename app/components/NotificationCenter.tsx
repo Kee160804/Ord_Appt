@@ -70,57 +70,57 @@ function getNotificationIcon(type: NotificationType) {
   switch (type) {
     case "ORDER":
       return (
-        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-400 light:bg-emerald-50 light:text-emerald-600">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-400 light:bg-emerald-50 light:text-emerald-600">
           <ShoppingBag className="h-4 w-4" />
         </div>
       );
     case "APPOINTMENT":
       return (
-        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-blue-500/15 text-blue-400 light:bg-blue-50 light:text-blue-600">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-500/15 text-blue-400 light:bg-blue-50 light:text-blue-600">
           <Calendar className="h-4 w-4" />
         </div>
       );
     case "CANCELLATION":
       return (
-        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-rose-500/15 text-rose-400 light:bg-rose-50 light:text-rose-600">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-rose-500/15 text-rose-400 light:bg-rose-50 light:text-rose-600">
           <AlertTriangle className="h-4 w-4" />
         </div>
       );
     case "RESCHEDULE":
       return (
-        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-amber-500/15 text-amber-400 light:bg-amber-50 light:text-amber-600">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-500/15 text-amber-400 light:bg-amber-50 light:text-amber-600">
           <RotateCcw className="h-4 w-4" />
         </div>
       );
     case "CUSTOMER":
       return (
-        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-cyan-500/15 text-cyan-400 light:bg-cyan-50 light:text-cyan-700">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-cyan-500/15 text-cyan-400 light:bg-cyan-50 light:text-cyan-700">
           <Users className="h-4 w-4" />
         </div>
       );
     case "LOW_INVENTORY":
       return (
-        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-amber-500/15 text-amber-400 light:bg-amber-50 light:text-amber-600">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-500/15 text-amber-400 light:bg-amber-50 light:text-amber-600">
           <Package className="h-4 w-4" />
         </div>
       );
     case "SUBSCRIPTION":
     case "TRIAL":
       return (
-        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-violet-500/15 text-violet-400 light:bg-violet-50 light:text-violet-600">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-500/15 text-violet-400 light:bg-violet-50 light:text-violet-600">
           <CreditCard className="h-4 w-4" />
         </div>
       );
     case "PROMOTION":
       return (
-        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-pink-500/15 text-pink-400 light:bg-pink-50 light:text-pink-600">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-pink-500/15 text-pink-400 light:bg-pink-50 light:text-pink-600">
           <Tag className="h-4 w-4" />
         </div>
       );
     case "SYSTEM":
     default:
       return (
-        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-indigo-500/15 text-indigo-400 light:bg-indigo-50 light:text-indigo-600">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-indigo-500/15 text-indigo-400 light:bg-indigo-50 light:text-indigo-600">
           <Sparkles className="h-4 w-4" />
         </div>
       );
@@ -444,7 +444,7 @@ export function NotificationCenter({
           <div className="flex-1 overflow-y-auto overscroll-contain">
             {error && (
               <div className="m-3 flex items-center gap-2 rounded-lg bg-rose-500/10 p-3 text-[11px] text-rose-400">
-                <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                <AlertCircle className="h-4 w-4 shrink-0" />
                 <span>{error}</span>
               </div>
             )}
@@ -471,7 +471,7 @@ export function NotificationCenter({
                 className={`group relative flex cursor-pointer items-start gap-3 border-b border-slate-800/80 px-4 py-3 transition-colors hover:bg-slate-800/50 light:border-slate-100 light:hover:bg-slate-50 ${
                   item.isRead
                     ? "opacity-80 hover:opacity-100"
-                    : "bg-violet-500/[0.07] light:bg-violet-50/50"
+                    : "bg-violet-500/7 light:bg-violet-50/50"
                 }`}
               >
                 {/* Icon */}

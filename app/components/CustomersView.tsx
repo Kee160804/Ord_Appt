@@ -603,7 +603,7 @@ export function CustomersView({ tenant }: Props) {
       </div>
 
       <Card className="overflow-x-auto">
-        <div className="grid min-w-[600px] grid-cols-4 gap-4 border-b border-slate-700 light:border-[#e8ecf3] px-5 py-3">
+        <div className="grid min-w-150 grid-cols-4 gap-4 border-b border-slate-700 light:border-[#e8ecf3] px-5 py-3">
           <p className="text-xs font-semibold text-slate-400 light:text-gray-600 uppercase tracking-wider col-span-2">
             Customer
           </p>
@@ -635,10 +635,10 @@ export function CustomersView({ tenant }: Props) {
           {customers.map((customer) => (
             <div
               key={customer.key}
-              className="grid min-w-[600px] grid-cols-4 items-center gap-4 px-5 py-3 transition-colors hover:bg-slate-700/60 light:hover:bg-[#fafbfe]"
+              className="grid min-w-150 grid-cols-4 items-center gap-4 px-5 py-3 transition-colors hover:bg-slate-700/60 light:hover:bg-[#fafbfe]"
             >
               <div className="col-span-2 flex items-center gap-3 min-w-0">
-                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-violet-500 to-indigo-600 text-xs font-bold text-white">
                   {customer.name
                     .split(" ")
                     .map((part) => part[0])

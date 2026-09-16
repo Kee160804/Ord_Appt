@@ -254,7 +254,7 @@ export function AnalyticsView({ tenant }: Props) {
                         </div>
                       </div>
                       <div
-                        className="w-full rounded-t-xl bg-gradient-to-t from-violet-600 to-violet-400 transition-all duration-200"
+                        className="w-full rounded-t-xl bg-linear-to-t from-violet-600 to-violet-400 transition-all duration-200"
                         style={{
                           height: `${Math.max(percentage, point.count ? 6 : 2)}%`,
                         }}
@@ -291,20 +291,20 @@ export function AnalyticsView({ tenant }: Props) {
                 <div key={item.name} className="space-y-1.5">
                   <div className="flex items-center justify-between text-sm">
                     <div className="flex items-center gap-2 min-w-0">
-                      <span className="w-5 h-5 rounded-md bg-slate-700 light:bg-slate-200 text-white light:text-slate-700 text-xs font-bold flex items-center justify-center flex-shrink-0">
+                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-slate-700 text-xs font-bold text-white light:bg-slate-200 light:text-slate-700">
                         {index + 1}
                       </span>
                       <span className="font-medium text-white light:text-gray-800 truncate">
                         {item.name}
                       </span>
                     </div>
-                    <span className="text-slate-400 text-xs ml-2 flex-shrink-0">
+                    <span className="ml-2 shrink-0 text-xs text-slate-400">
                       {item.count}x
                     </span>
                   </div>
                   <div className="h-1.5 bg-slate-700 light:bg-slate-200 rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-gradient-to-r from-violet-500 to-indigo-500 rounded-full"
+                      className="h-full rounded-full bg-linear-to-r from-violet-500 to-indigo-500"
                       style={{ width: `${(item.count / maximum) * 100}%` }}
                     />
                   </div>
@@ -327,7 +327,7 @@ export function AnalyticsView({ tenant }: Props) {
         <div className="divide-y divide-slate-700 light:divide-slate-100">
           {analytics.revenueData.map((point) => (
             <div key={point.date} className="px-6 py-3 flex items-center gap-4">
-              <span className="text-sm text-slate-400 w-24 flex-shrink-0">
+              <span className="w-24 shrink-0 text-sm text-slate-400">
                 {point.date}
               </span>
               <div className="flex-1 bg-slate-700 light:bg-slate-200 rounded-full h-2 overflow-hidden">
@@ -336,10 +336,10 @@ export function AnalyticsView({ tenant }: Props) {
                   style={{ width: `${(point.revenue / maxRevenue) * 100}%` }}
                 />
               </div>
-              <span className="text-sm font-bold text-white light:text-gray-900 w-24 text-right flex-shrink-0">
+              <span className="w-24 shrink-0 text-right text-sm font-bold text-white light:text-gray-900">
                 {formatCurrency(point.revenue)}
               </span>
-              <span className="text-xs text-slate-400 w-20 text-right flex-shrink-0">
+              <span className="w-20 shrink-0 text-right text-xs text-slate-400">
                 {point.count} {isAppt ? "bookings" : "orders"}
               </span>
             </div>

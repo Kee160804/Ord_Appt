@@ -37,10 +37,7 @@ interface PromotionRequest {
   website?: string;
 }
 
-function json(
-  body: unknown,
-  status = 200,
-): Response {
+function json(body: unknown, status = 200): Response {
   return Response.json(body, {
     status,
     headers: {
@@ -67,9 +64,7 @@ function json(
  * - final discount
  * - final transaction total
  */
-export async function POST(
-  request: Request,
-): Promise<Response> {
+export async function POST(request: Request): Promise<Response> {
   /* -----------------------------------------------------------------------
      1. SAME-ORIGIN CHECK
      ----------------------------------------------------------------------- */
@@ -88,11 +83,7 @@ export async function POST(
        2. READ BOUNDED REQUEST
        --------------------------------------------------------------------- */
 
-    const body =
-      await readJsonBody<PromotionRequest>(
-        request,
-        8_192,
-      );
+    const body = await readJsonBody<PromotionRequest>(request, 8_192);
 
     /* ---------------------------------------------------------------------
        3. HONEYPOT
@@ -111,25 +102,17 @@ export async function POST(
        4. NORMALIZE IDENTIFIERS
        --------------------------------------------------------------------- */
 
-    const tenantId =
-      body.tenantId?.trim() || "";
+    const tenantId = body.tenantId?.trim() || "";
 
-    const code =
-      body.code
-        ?.trim()
-        .toUpperCase() || "";
+    const code = body.code?.trim().toUpperCase() || "";
 
-    const serviceId =
-      body.serviceId?.trim() || null;
+    const serviceId = body.serviceId?.trim() || null;
 
     /* ---------------------------------------------------------------------
        5. VALIDATE TENANT + PROMOTION CODE
        --------------------------------------------------------------------- */
 
-    if (
-      !isValidUuid(tenantId) ||
-      !/^[A-Z0-9_-]{2,32}$/.test(code)
-    ) {
+    if (!isValidUuid(tenantId) || !/^[A-Z0-9_-]{2,32}$/.test(code)) {
       return json(
         {
           error: "Invalid discount code.",
@@ -144,14 +127,10 @@ export async function POST(
        Do not silently convert an invalid supplied UUID into null.
        --------------------------------------------------------------------- */
 
-    if (
-      serviceId &&
-      !isValidUuid(serviceId)
-    ) {
+    if (serviceId && !isValidUuid(serviceId)) {
       return json(
         {
-          error:
-            "Invalid promotion request.",
+          error: "Invalid promotion request.",
         },
         400,
       );
@@ -178,70 +157,56 @@ export async function POST(
        Instead, reject malformed input.
        --------------------------------------------------------------------- */
 
-    const productIds =
-      body.productIds ?? [];
+    const productIds = body.productIds ?? [];
 
     if (!Array.isArray(productIds)) {
       return json(
         {
-          error:
-            "Invalid promotion request.",
+          error: "Invalid promotion request.",
         },
         400,
       );
     }
 
-    if (
-      productIds.length >
-      MAX_PRODUCT_IDS
-    ) {
+    if (productIds.length > MAX_PRODUCT_IDS) {
       return json(
         {
-          error:
-            "Too many products were submitted.",
+          error: "Too many products were submitted.",
         },
         400,
       );
     }
 
-    const normalizedProductIds: string[] =
-      [];
+    const normalizedProductIds: string[] = [];
 
     for (const productId of productIds) {
       if (typeof productId !== "string") {
         return json(
           {
-            error:
-              "Invalid promotion request.",
+            error: "Invalid promotion request.",
           },
           400,
         );
       }
 
-      const normalized =
-        productId.trim();
+      const normalized = productId.trim();
 
       if (!isValidUuid(normalized)) {
         return json(
           {
-            error:
-              "Invalid promotion request.",
+            error: "Invalid promotion request.",
           },
           400,
         );
       }
 
-      normalizedProductIds.push(
-        normalized,
-      );
+      normalizedProductIds.push(normalized);
     }
 
     /**
      * Duplicate IDs do not provide useful promotion context.
      */
-    const uniqueProductIds = [
-      ...new Set(normalizedProductIds),
-    ];
+    const uniqueProductIds = [...new Set(normalizedProductIds)];
 
     /* ---------------------------------------------------------------------
        8. VALIDATE CLIENT PREVIEW AMOUNT
@@ -253,8 +218,7 @@ export async function POST(
        must still be recalculated during order/appointment creation.
        --------------------------------------------------------------------- */
 
-    const amount =
-      Number(body.amount);
+    const amount = Number(body.amount);
 
     if (
       !Number.isFinite(amount) ||
@@ -263,8 +227,7 @@ export async function POST(
     ) {
       return json(
         {
-          error:
-            "Invalid promotion amount.",
+          error: "Invalid promotion amount.",
         },
         400,
       );
@@ -277,20 +240,17 @@ export async function POST(
        five minutes.
        --------------------------------------------------------------------- */
 
-    const rate =
-      await enforcePublicRateLimit(
-        request,
-        "promotion",
-        tenantId,
-        code,
-        12,
-        300,
-      );
+    const rate = await enforcePublicRateLimit(
+      request,
+      "promotion",
+      tenantId,
+      code,
+      12,
+      300,
+    );
 
     if (!rate.allowed) {
-      return rateLimitResponse(
-        rate.retryAfter,
-      );
+      return rateLimitResponse(rate.retryAfter);
     }
 
     /* ---------------------------------------------------------------------
@@ -300,13 +260,11 @@ export async function POST(
     let supabase;
 
     try {
-      supabase =
-        getSupabaseAdminClient();
+      supabase = getSupabaseAdminClient();
     } catch {
       return json(
         {
-          error:
-            "Discount validation is not configured.",
+          error: "Discount validation is not configured.",
         },
         503,
       );
@@ -324,26 +282,17 @@ export async function POST(
        - has remaining usage
        --------------------------------------------------------------------- */
 
-    const { data, error } =
-      await supabase.rpc(
-        "calculate_promotion_discount",
-        {
-          p_tenant_id:
-            tenantId,
+    const { data, error } = await supabase.rpc("calculate_promotion_discount", {
+      p_tenant_id: tenantId,
 
-          p_code:
-            code,
+      p_code: code,
 
-          p_amount:
-            amount,
+      p_amount: amount,
 
-          p_product_ids:
-            uniqueProductIds,
+      p_product_ids: uniqueProductIds,
 
-          p_service_id:
-            serviceId,
-        },
-      );
+      p_service_id: serviceId,
+    });
 
     if (error) {
       return json(
@@ -366,42 +315,29 @@ export async function POST(
 
     return json(data);
   } catch (error) {
-    if (
-      error instanceof Error &&
-      error.message ===
-        "REQUEST_TOO_LARGE"
-    ) {
+    if (error instanceof Error && error.message === "REQUEST_TOO_LARGE") {
       return json(
         {
-          error:
-            "The discount request is too large.",
+          error: "The discount request is too large.",
         },
         413,
       );
     }
 
-    if (
-      error instanceof Error &&
-      error.message === "INVALID_JSON"
-    ) {
+    if (error instanceof Error && error.message === "INVALID_JSON") {
       return json(
         {
-          error:
-            "Invalid discount request.",
+          error: "Invalid discount request.",
         },
         400,
       );
     }
 
-    console.error(
-      "[public-promotion] Unexpected request failure.",
-      error,
-    );
+    console.error("[public-promotion] Unexpected request failure.", error);
 
     return json(
       {
-        error:
-          "Invalid discount request.",
+        error: "Invalid discount request.",
       },
       400,
     );

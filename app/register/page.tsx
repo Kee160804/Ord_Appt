@@ -276,7 +276,7 @@ export default function RegisterPage() {
       <div className="pointer-events-none absolute -bottom-32 right-[-5rem] h-80 w-80 rounded-full bg-indigo-800/25 blur-3xl" />
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(124,58,237,0.08),transparent_38%)]" />
 
-      <div className="relative mx-auto flex h-full w-full max-w-[500px] flex-col">
+      <div className="relative mx-auto flex h-full w-full max-w-125 flex-col">
         <BrandHeader />
 
         <div className="mb-2 shrink-0 text-center">
@@ -879,7 +879,7 @@ function PanelHeading({
 }) {
   return (
     <div className="flex items-start gap-4">
-      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-800 to-violet-950 text-fuchsia-300 shadow-inner shadow-violet-400/20">
+      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-violet-800 to-violet-950 text-fuchsia-300 shadow-inner shadow-violet-400/20">
         <Icon className="h-7 w-7" />
       </div>
       <div className="pt-1">

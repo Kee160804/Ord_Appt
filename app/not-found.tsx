@@ -7,7 +7,9 @@ export default function NotFound() {
         <p className="text-sm font-black uppercase tracking-[0.25em] text-violet-400">
           404
         </p>
-        <h1 className="mt-4 text-4xl font-black">We couldn&apos;t find that page.</h1>
+        <h1 className="mt-4 text-4xl font-black">
+          We couldn&apos;t find that page.
+        </h1>
         <p className="mt-4 text-slate-400">
           The storefront may be inactive, renamed, or the link may be incorrect.
         </p>

@@ -118,13 +118,13 @@ export function DashboardOverview({ tenant }: OverviewProps) {
 
   return (
     <div className="space-y-3.5 p-4 md:p-5">
-      <section className="relative min-h-[124px] overflow-hidden rounded-xl border border-slate-700/60 light:border-[#e4e9f1] bg-slate-900 light:bg-white shadow-sm">
+      <section className="relative min-h-31 overflow-hidden rounded-xl border border-slate-700/60 bg-slate-900 shadow-sm light:border-[#e4e9f1] light:bg-white">
         <div
           className="absolute inset-y-0 right-0 w-[58%] bg-cover bg-center opacity-50 light:opacity-75"
           style={{ backgroundImage: `url("${tenant.coverImage}")` }}
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/95 to-slate-950/25 light:from-white light:via-white/95 light:to-white/15" />
-        <div className="relative z-10 flex min-h-[124px] items-center justify-between gap-4 px-6 py-5">
+        <div className="absolute inset-0 bg-linear-to-r from-slate-950 via-slate-950/95 to-slate-950/25 light:from-white light:via-white/95 light:to-white/15" />
+        <div className="relative z-10 flex min-h-31 items-center justify-between gap-4 px-6 py-5">
           <div>
             <p className="text-xs font-medium text-slate-400 light:text-[#566681]">
               Gud maanin, {firstName}! <span aria-hidden="true">👋</span>
@@ -213,7 +213,7 @@ export function DashboardOverview({ tenant }: OverviewProps) {
               Last 7 days <ChevronDown className="ml-2 inline h-3 w-3" />
             </div>
           </CardHeader>
-          <CardBody className="min-h-[220px]">
+          <CardBody className="min-h-55">
             {chartData.every((point) => point.revenue === 0) ? (
               <EmptyState
                 icon={<WalletCards className="h-5 w-5" />}
@@ -255,7 +255,7 @@ export function DashboardOverview({ tenant }: OverviewProps) {
               View all
             </Link>
           </CardHeader>
-          <CardBody className="min-h-[220px]">
+          <CardBody className="min-h-55">
             {data.analytics.topItems.length === 0 ? (
               <EmptyState
                 icon={<TrendingUp className="h-5 w-5" />}
@@ -306,7 +306,7 @@ export function DashboardOverview({ tenant }: OverviewProps) {
               <ArrowRight className="h-3 w-3" />
             </Link>
           </CardHeader>
-          <div className="min-h-[172px] divide-y divide-slate-700/60 light:divide-[#edf0f5]">
+          <div className="min-h-43 divide-y divide-slate-700/60 light:divide-[#edf0f5]">
             {!isLoading &&
               (isAppt
                 ? recentAppointments.length === 0
@@ -403,7 +403,7 @@ export function DashboardOverview({ tenant }: OverviewProps) {
               View all
             </Link>
           </CardHeader>
-          <div className="min-h-[172px] divide-y divide-slate-700/60 light:divide-[#edf0f5]">
+          <div className="min-h-43 divide-y divide-slate-700/60 light:divide-[#edf0f5]">
             {!isLoading && data.customers.length === 0 && (
               <EmptyState
                 icon={<Users className="h-5 w-5" />}
@@ -458,7 +458,7 @@ function EmptyState({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-[170px] flex-col items-center justify-center px-6 py-4 text-center">
+    <div className="flex min-h-42.5 flex-col items-center justify-center px-6 py-4 text-center">
       <div
         className={cn(
           "flex h-12 w-12 items-center justify-center rounded-full",

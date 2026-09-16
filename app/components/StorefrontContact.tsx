@@ -271,14 +271,14 @@ export function StorefrontContact({
           >
             <div className="absolute h-56 w-56 rounded-full border border-violet-400/15" />
             <div className="absolute h-40 w-40 rounded-full bg-violet-500/20 blur-2xl" />
-            <div className="relative mt-10 h-40 w-56 rounded-b-3xl bg-gradient-to-br from-violet-500 to-violet-700 shadow-[0_30px_80px_rgba(124,58,237,0.4)]">
-              <div className="absolute -top-16 left-1/2 h-36 w-40 -translate-x-1/2 rounded-2xl border border-white/30 bg-gradient-to-b from-white to-slate-200 p-5 shadow-2xl">
+            <div className="relative mt-10 h-40 w-56 rounded-b-3xl bg-linear-to-br from-violet-500 to-violet-700 shadow-[0_30px_80px_rgba(124,58,237,0.4)]">
+              <div className="absolute -top-16 left-1/2 h-36 w-40 -translate-x-1/2 rounded-2xl border border-white/30 bg-linear-to-b from-white to-slate-200 p-5 shadow-2xl">
                 <div className="h-2 w-16 rounded-full bg-violet-400" />
                 <div className="mt-5 h-2 w-full rounded-full bg-slate-300" />
                 <div className="mt-3 h-2 w-4/5 rounded-full bg-slate-300" />
                 <div className="mt-3 h-2 w-2/3 rounded-full bg-slate-300" />
               </div>
-              <div className="absolute inset-x-0 bottom-0 h-28 rounded-b-3xl bg-gradient-to-br from-violet-600 to-violet-700 [clip-path:polygon(0_0,50%_58%,100%_0,100%_100%,0_100%)]" />
+              <div className="absolute inset-x-0 bottom-0 h-28 rounded-b-3xl bg-linear-to-br from-violet-600 to-violet-700 [clip-path:polygon(0_0,50%_58%,100%_0,100%_100%,0_100%)]" />
             </div>
             <Send className="absolute right-4 top-5 h-16 w-16 rotate-[-12deg] text-violet-400 drop-shadow-[0_12px_24px_rgba(139,92,246,0.45)]" />
           </div>

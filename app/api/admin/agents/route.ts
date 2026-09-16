@@ -60,14 +60,10 @@ export async function POST(request: Request) {
       );
     }
 
-    const { data: authData, error: authError } =
-      await supabase.auth.getUser();
+    const { data: authData, error: authError } = await supabase.auth.getUser();
 
     if (authError || !authData.user) {
-      return Response.json(
-        { error: "Unauthorized." },
-        { status: 401 },
-      );
+      return Response.json({ error: "Unauthorized." }, { status: 401 });
     }
 
     /*
@@ -82,12 +78,11 @@ export async function POST(request: Request) {
        2. VERIFY CALLER IS AN ACTIVE PLATFORM SUPER ADMIN
        ================================================================ */
 
-    const { data: callerProfile, error: callerProfileError } =
-      await admin
-        .from("profiles")
-        .select("id, platform_role, is_active")
-        .eq("id", authData.user.id)
-        .maybeSingle();
+    const { data: callerProfile, error: callerProfileError } = await admin
+      .from("profiles")
+      .select("id, platform_role, is_active")
+      .eq("id", authData.user.id)
+      .maybeSingle();
 
     if (callerProfileError) {
       throw callerProfileError;
@@ -100,8 +95,7 @@ export async function POST(request: Request) {
     if (!callerIsSuperAdmin) {
       return Response.json(
         {
-          error:
-            "Only an active platform super admin can manage agents.",
+          error: "Only an active platform super admin can manage agents.",
         },
         { status: 403 },
       );
@@ -116,10 +110,7 @@ export async function POST(request: Request) {
     try {
       body = (await request.json()) as CreateAgentRequest;
     } catch {
-      return Response.json(
-        { error: "Invalid request body." },
-        { status: 400 },
-      );
+      return Response.json({ error: "Invalid request body." }, { status: 400 });
     }
 
     const name = body.name?.trim();
@@ -131,9 +122,7 @@ export async function POST(request: Request) {
      * Authorization-related values should always be explicit.
      */
     const requestedRole =
-      typeof body.role === "string"
-        ? body.role.trim().toLowerCase()
-        : "";
+      typeof body.role === "string" ? body.role.trim().toLowerCase() : "";
 
     /*
      * Normalize empty tenant IDs to null.
@@ -175,10 +164,7 @@ export async function POST(request: Request) {
      * because clients can send arbitrary JSON.
      */
     if (!ALLOWED_ROLES.includes(requestedRole as AgentRole)) {
-      return Response.json(
-        { error: "Invalid agent role." },
-        { status: 400 },
-      );
+      return Response.json({ error: "Invalid agent role." }, { status: 400 });
     }
 
     const role = requestedRole as AgentRole;
@@ -243,12 +229,11 @@ export async function POST(request: Request) {
     let tenantName = "Platform";
 
     if (tenantId) {
-      const { data: tenantRow, error: tenantQueryError } =
-        await admin
-          .from("tenants")
-          .select("id, business_name")
-          .eq("id", tenantId)
-          .maybeSingle();
+      const { data: tenantRow, error: tenantQueryError } = await admin
+        .from("tenants")
+        .select("id, business_name")
+        .eq("id", tenantId)
+        .maybeSingle();
 
       if (tenantQueryError) {
         throw tenantQueryError;
@@ -297,12 +282,11 @@ export async function POST(request: Request) {
        * Do NOT reset/rotate an existing user's password here.
        * We only reuse the existing profile ID.
        */
-      const { data: existingProfile, error: existingProfileError } =
-        await admin
-          .from("profiles")
-          .select("id, platform_role")
-          .eq("email", email)
-          .maybeSingle();
+      const { data: existingProfile, error: existingProfileError } = await admin
+        .from("profiles")
+        .select("id, platform_role")
+        .eq("email", email)
+        .maybeSingle();
 
       if (existingProfileError) {
         throw existingProfileError;
@@ -311,9 +295,7 @@ export async function POST(request: Request) {
       if (!existingProfile) {
         return Response.json(
           {
-            error:
-              createAuthError.message ||
-              "Failed to create agent user.",
+            error: createAuthError.message || "Failed to create agent user.",
           },
           { status: 400 },
         );
@@ -322,9 +304,7 @@ export async function POST(request: Request) {
       userId = existingProfile.id;
     } else {
       if (!createdAuth.user) {
-        throw new Error(
-          "Supabase did not return the newly created user.",
-        );
+        throw new Error("Supabase did not return the newly created user.");
       }
 
       userId = createdAuth.user.id;
@@ -335,12 +315,11 @@ export async function POST(request: Request) {
        9. CHECK EXISTING PROFILE PRIVILEGES
        ================================================================ */
 
-    const { data: existingUserProfile, error: userProfileError } =
-      await admin
-        .from("profiles")
-        .select("id, platform_role")
-        .eq("id", userId)
-        .maybeSingle();
+    const { data: existingUserProfile, error: userProfileError } = await admin
+      .from("profiles")
+      .select("id, platform_role")
+      .eq("id", userId)
+      .maybeSingle();
 
     if (userProfileError) {
       throw userProfileError;
@@ -366,15 +345,14 @@ export async function POST(request: Request) {
        10. UPSERT PROFILE
        ================================================================ */
 
-    const { error: profileUpsertError } =
-      await admin.from("profiles").upsert({
-        id: userId,
-        email,
-        full_name: name,
-        platform_role: platformRole,
-        is_active: true,
-        updated_at: new Date().toISOString(),
-      });
+    const { error: profileUpsertError } = await admin.from("profiles").upsert({
+      id: userId,
+      email,
+      full_name: name,
+      platform_role: platformRole,
+      is_active: true,
+      updated_at: new Date().toISOString(),
+    });
 
     if (profileUpsertError) {
       throw profileUpsertError;
@@ -384,9 +362,7 @@ export async function POST(request: Request) {
        11. ASSIGN TENANT ROLE + MEMBERSHIP
        ================================================================ */
 
-    let assignedRoleName = isSuperAdmin
-      ? "Super Admin"
-      : role.toUpperCase();
+    let assignedRoleName = isSuperAdmin ? "Super Admin" : role.toUpperCase();
 
     if (tenantId) {
       const dbRoleName = role.toUpperCase();
@@ -396,13 +372,12 @@ export async function POST(request: Request) {
       /*
        * Look for an existing tenant role first.
        */
-      const { data: existingRole, error: existingRoleError } =
-        await admin
-          .from("roles")
-          .select("id, name")
-          .eq("tenant_id", tenantId)
-          .ilike("name", dbRoleName)
-          .maybeSingle();
+      const { data: existingRole, error: existingRoleError } = await admin
+        .from("roles")
+        .select("id, name")
+        .eq("tenant_id", tenantId)
+        .ilike("name", dbRoleName)
+        .maybeSingle();
 
       if (existingRoleError) {
         throw existingRoleError;
@@ -416,17 +391,16 @@ export async function POST(request: Request) {
          * Preserve your existing behavior:
          * create the role if this tenant does not have it.
          */
-        const { data: insertedRole, error: roleInsertError } =
-          await admin
-            .from("roles")
-            .insert({
-              tenant_id: tenantId,
-              name: dbRoleName,
-              description: `${dbRoleName} role`,
-              is_system_role: dbRoleName === "OWNER",
-            })
-            .select("id, name")
-            .single();
+        const { data: insertedRole, error: roleInsertError } = await admin
+          .from("roles")
+          .insert({
+            tenant_id: tenantId,
+            name: dbRoleName,
+            description: `${dbRoleName} role`,
+            is_system_role: dbRoleName === "OWNER",
+          })
+          .select("id, name")
+          .single();
 
         if (roleInsertError) {
           throw roleInsertError;
@@ -439,8 +413,9 @@ export async function POST(request: Request) {
       /*
        * Create/update membership for this specific tenant.
        */
-      const { error: membershipError } =
-        await admin.from("tenant_memberships").upsert({
+      const { error: membershipError } = await admin
+        .from("tenant_memberships")
+        .upsert({
           tenant_id: tenantId,
           profile_id: userId,
           role_id: roleId,
@@ -467,8 +442,7 @@ export async function POST(request: Request) {
      * Add NEXT_PUBLIC_SITE_URL=https://yuhbusiness.com
      * to production if it is not already configured.
      */
-    const configuredSiteUrl =
-      process.env.NEXT_PUBLIC_SITE_URL?.trim();
+    const configuredSiteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim();
 
     let appOrigin = "http://localhost:3000";
 
@@ -495,8 +469,7 @@ export async function POST(request: Request) {
       }
     }
 
-    const redirectTo =
-      `${appOrigin}/auth/confirm?next=/reset-password`;
+    const redirectTo = `${appOrigin}/auth/confirm?next=/reset-password`;
 
     if (sendPasswordEmail) {
       try {
@@ -550,10 +523,7 @@ export async function POST(request: Request) {
        * Do not fail an otherwise successful account creation merely
        * because the optional audit table is unavailable.
        */
-      console.warn(
-        "Could not record agent audit event:",
-        auditError,
-      );
+      console.warn("Could not record agent audit event:", auditError);
     }
 
     /* ================================================================

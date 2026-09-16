@@ -277,19 +277,13 @@ export async function listProducts(
     productQuery = productQuery.eq("category_id", options.categoryId);
   }
 
-  if (
-    options.availability !== undefined &&
-    options.availability !== "all"
-  ) {
+  if (options.availability !== undefined && options.availability !== "all") {
     productQuery = productQuery.eq("available", options.availability);
   }
 
   if (search) {
     productQuery = productQuery.or(
-      [
-        `name.ilike.%${search}%`,
-        `description.ilike.%${search}%`,
-      ].join(","),
+      [`name.ilike.%${search}%`, `description.ilike.%${search}%`].join(","),
     );
   }
 
@@ -366,8 +360,7 @@ export async function listProducts(
   );
 
   const total = count ?? 0;
-  const totalPages =
-    total === 0 ? 0 : Math.ceil(total / safePageSize);
+  const totalPages = total === 0 ? 0 : Math.ceil(total / safePageSize);
 
   return {
     products: mappedProducts,
@@ -542,10 +535,7 @@ export async function setProductAvailability(
  * configuration, not transaction history. Before enforcing stricter catalog
  * retention, verify the live foreign-key behavior for historical order items.
  */
-export async function deleteProduct(
-  tenantId: string,
-  productId: string,
-) {
+export async function deleteProduct(tenantId: string, productId: string) {
   const { error } = await client()
     .from("products")
     .delete()

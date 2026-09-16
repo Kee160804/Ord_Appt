@@ -22,9 +22,7 @@ const PROTECTED_ROUTES = ["/dashboard", "/admin"] as const;
  */
 function isProtectedRoute(pathname: string): boolean {
   return PROTECTED_ROUTES.some(
-    (route) =>
-      pathname === route ||
-      pathname.startsWith(`${route}/`),
+    (route) => pathname === route || pathname.startsWith(`${route}/`),
   );
 }
 
@@ -85,15 +83,9 @@ export async function updateSession(
 
         response = NextResponse.next({ request });
 
-        cookiesToSet.forEach(
-          ({ name, value, options }) => {
-            response.cookies.set(
-              name,
-              value,
-              options,
-            );
-          },
-        );
+        cookiesToSet.forEach(({ name, value, options }) => {
+          response.cookies.set(name, value, options);
+        });
       },
     },
   });
@@ -142,14 +134,10 @@ export async function updateSession(
      * to it. Never trust a `next` query parameter merely because this
      * proxy normally generates it.
      */
-    const requestedDestination =
-      `${request.nextUrl.pathname}${request.nextUrl.search}`;
+    const requestedDestination = `${request.nextUrl.pathname}${request.nextUrl.search}`;
 
     loginUrl.search = "";
-    loginUrl.searchParams.set(
-      "next",
-      requestedDestination,
-    );
+    loginUrl.searchParams.set("next", requestedDestination);
 
     return NextResponse.redirect(loginUrl);
   }

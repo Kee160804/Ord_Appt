@@ -130,7 +130,8 @@ export function ProductsView({ tenant }: Props) {
 
   const loadProductPage = useCallback(async () => {
     if (!isSupabaseConfigured()) {
-      const source = getStoredProducts(tenant.id) ?? getProductsByTenant(tenant.id);
+      const source =
+        getStoredProducts(tenant.id) ?? getProductsByTenant(tenant.id);
       const normalizedSearch = search.toLowerCase();
       const filteredProducts = source.filter((product) => {
         const matchesSearch =
@@ -180,7 +181,11 @@ export function ProductsView({ tenant }: Props) {
         availability,
       });
 
-      if (result.totalPages > 0 && result.page >= result.totalPages && result.page > 0) {
+      if (
+        result.totalPages > 0 &&
+        result.page >= result.totalPages &&
+        result.page > 0
+      ) {
         setPage(result.totalPages - 1);
         return;
       }
@@ -1094,7 +1099,7 @@ export function ProductsView({ tenant }: Props) {
             </div>
           )}
           {tenant.businessType === "retail" && canUseAdvancedCatalog && (
-            <div className="space-y-3 rounded-lg border border-violet-500/25 bg-violet-500/[0.04] p-3">
+            <div className="space-y-3 rounded-lg border border-violet-500/25 bg-violet-500/4 p-3">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <label className="text-sm font-semibold">
@@ -1300,7 +1305,10 @@ export function ProductsView({ tenant }: Props) {
                     Cancel
                   </Button>
                 )}
-                <Button disabled={isSavingCategory} onClick={() => void saveCategory()}>
+                <Button
+                  disabled={isSavingCategory}
+                  onClick={() => void saveCategory()}
+                >
                   {isSavingCategory
                     ? "Saving..."
                     : editingCategory
@@ -1335,9 +1343,11 @@ export function ProductsView({ tenant }: Props) {
                   </div>
                   <p className="mt-1 text-[10px] text-slate-400">
                     Position {category.sortOrder} ·{" "}
-                    {products.filter(
-                      (product) => product.categoryId === category.id,
-                    ).length}{" "}
+                    {
+                      products.filter(
+                        (product) => product.categoryId === category.id,
+                      ).length
+                    }{" "}
                     on this page
                   </p>
                 </div>
@@ -1461,7 +1471,7 @@ function ProductCard({
               {product.description}
             </p>
           </div>
-          <span className="text-sm font-black text-white light:text-gray-900 flex-shrink-0">
+          <span className="shrink-0 text-sm font-black text-white light:text-gray-900">
             {formatCurrency(product.price)}
           </span>
         </div>

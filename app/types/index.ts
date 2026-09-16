@@ -13,7 +13,6 @@ export type OrderStatus =
 export type AppointmentStatus =
   "pending" | "confirmed" | "cancelled" | "completed" | "no_show";
 export type PaymentStatus = "unpaid" | "partial" | "paid" | "refunded";
-export type TenantStatus = "active" | "inactive" | "suspended";
 export type PermissionType =
   | "view_dashboard"
   | "manage_tenants"

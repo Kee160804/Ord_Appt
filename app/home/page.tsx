@@ -174,8 +174,8 @@ export default function HomePage() {
     <div className="min-h-dvh bg-[#070b14] light:bg-white text-white light:text-gray-900 transition-colors">
       {/* Navbar */}
       <nav className="site-header sticky top-0 z-50 flex flex-wrap items-center justify-between gap-x-2 gap-y-2 border-b border-white/5 bg-[#070b14]/90 backdrop-blur-xl light:border-gray-200 light:bg-white/90 md:flex-nowrap">
-        <div className="flex min-w-0 flex-shrink-0 items-center gap-2 sm:gap-2.5">
-          <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 shadow-lg shadow-violet-900/40 light:shadow-violet-500/30 sm:h-8 sm:w-8">
+        <div className="flex min-w-0 shrink-0 items-center gap-2 sm:gap-2.5">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-violet-500 to-indigo-600 shadow-lg shadow-violet-900/40 light:shadow-violet-500/30 sm:h-8 sm:w-8">
             <Sparkles className="w-3.5 h-3.5 text-white sm:w-4 sm:h-4" />
           </div>
           <span className="whitespace-nowrap text-[15px] font-black tracking-tight text-white light:text-gray-900 sm:text-lg">
@@ -210,10 +210,10 @@ export default function HomePage() {
           </a>
         </div>
 
-        <div className="contents md:flex md:min-w-0 md:flex-shrink-0 md:items-center md:gap-3">
+        <div className="contents md:flex md:min-w-0 md:shrink-0 md:items-center md:gap-3">
           <button
             onClick={toggleTheme}
-            className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl border border-slate-700 bg-transparent text-slate-400 transition-all duration-300 hover:bg-white/10 hover:text-white light:border-gray-300 light:text-gray-600 light:hover:bg-gray-200 light:hover:text-gray-800 md:h-10 md:w-10"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-700 bg-transparent text-slate-400 transition-all duration-300 hover:bg-white/10 hover:text-white light:border-gray-300 light:text-gray-600 light:hover:bg-gray-200 light:hover:text-gray-800 md:h-10 md:w-10"
             aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
             title={`Switch to ${theme === "dark" ? "light" : "dark"} mode (currently ${theme})`}
           >
@@ -255,7 +255,7 @@ export default function HomePage() {
         <h1 className="mb-5 text-[3rem] font-black leading-[0.96] tracking-tight text-white light:text-gray-900 sm:mb-6 sm:text-6xl lg:text-7xl">
           Ready fi grow yuh business?
           <br />
-          <span className="bg-gradient-to-r from-violet-400 to-indigo-400 light:from-violet-600 light:to-indigo-600 bg-clip-text text-transparent">
+          <span className="bg-linear-to-r from-violet-400 to-indigo-400 bg-clip-text text-transparent light:from-violet-600 light:to-indigo-600">
             Yuh Business Online Eena minutes.
           </span>{" "}
         </h1>
@@ -280,7 +280,7 @@ export default function HomePage() {
           </Link>
         </div>
 
-        <div className="mt-6 inline-flex flex-wrap items-center justify-center gap-x-3 gap-y-1 rounded-2xl border border-violet-400/45 bg-gradient-to-r from-violet-600/20 via-purple-500/10 to-indigo-500/20 px-5 py-3 text-sm shadow-[0_0_28px_rgba(139,92,246,0.22)] light:border-violet-300 light:from-violet-100 light:via-white light:to-indigo-100 light:shadow-violet-200/80">
+        <div className="mt-6 inline-flex flex-wrap items-center justify-center gap-x-3 gap-y-1 rounded-2xl border border-violet-400/45 bg-linear-to-r from-violet-600/20 via-purple-500/10 to-indigo-500/20 px-5 py-3 text-sm shadow-[0_0_28px_rgba(139,92,246,0.22)] light:border-violet-300 light:from-violet-100 light:via-white light:to-indigo-100 light:shadow-violet-200/80">
           <span className="flex h-6 w-6 items-center justify-center rounded-full bg-violet-600 text-white shadow-sm shadow-violet-950/30">
             <Check className="h-3.5 w-3.5 stroke-[3]" />
           </span>
@@ -501,7 +501,7 @@ export default function HomePage() {
         <div className="pointer-events-none absolute left-1/2 top-0 h-96 w-96 -translate-x-1/2 rounded-full bg-violet-600/10 blur-3xl light:bg-violet-400/10" />
         <div className="relative max-w-6xl mx-auto px-6 md:px-12">
           <div className="text-center mb-14">
-            <div className="mb-6 inline-flex flex-wrap items-center justify-center gap-x-3 gap-y-1 rounded-2xl border border-violet-400/50 bg-gradient-to-r from-violet-600/25 via-purple-500/10 to-indigo-500/25 px-5 py-3 shadow-[0_0_32px_rgba(139,92,246,0.25)] light:border-violet-300 light:from-violet-100 light:via-white light:to-indigo-100 light:shadow-violet-200/90">
+            <div className="mb-6 inline-flex flex-wrap items-center justify-center gap-x-3 gap-y-1 rounded-2xl border border-violet-400/50 bg-linear-to-r from-violet-600/25 via-purple-500/10 to-indigo-500/25 px-5 py-3 shadow-[0_0_32px_rgba(139,92,246,0.25)] light:border-violet-300 light:from-violet-100 light:via-white light:to-indigo-100 light:shadow-violet-200/90">
               <span className="flex h-7 w-7 items-center justify-center rounded-full bg-violet-600 text-white shadow-md shadow-violet-950/30">
                 <Check className="h-4 w-4 stroke-[3]" />
               </span>
@@ -577,7 +577,7 @@ export default function HomePage() {
                 >
                   {p.priceAnchor}
                 </div>
-                <div className="mt-4 rounded-2xl border border-emerald-500/25 bg-emerald-500/[0.08] p-4 light:border-emerald-200 light:bg-emerald-50">
+                <div className="mt-4 rounded-2xl border border-emerald-500/25 bg-emerald-500/8 p-4 light:border-emerald-200 light:bg-emerald-50">
                   <p className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider text-emerald-400 light:text-emerald-700">
                     <Users className="h-4 w-4" /> Team accounts
                   </p>
@@ -598,7 +598,7 @@ export default function HomePage() {
                       key={f}
                       className="flex items-start gap-3 text-sm leading-5 text-slate-300 light:text-gray-700"
                     >
-                      <div className="mt-0.5 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full border border-emerald-500/30 bg-emerald-500/20 light:border-emerald-300 light:bg-emerald-100">
+                      <div className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-emerald-500/30 bg-emerald-500/20 light:border-emerald-300 light:bg-emerald-100">
                         <Check className="w-2.5 h-2.5 text-emerald-400 light:text-emerald-600" />
                       </div>
                       {f}
@@ -638,7 +638,7 @@ export default function HomePage() {
             ))}
           </div>
 
-          <div className="mx-auto mt-12 grid max-w-4xl gap-4 rounded-2xl border border-violet-500/20 bg-violet-500/[0.07] p-5 sm:grid-cols-[auto_1fr] sm:items-center light:border-violet-200 light:bg-violet-50">
+          <div className="mx-auto mt-12 grid max-w-4xl gap-4 rounded-2xl border border-violet-500/20 bg-violet-500/7 p-5 sm:grid-cols-[auto_1fr] sm:items-center light:border-violet-200 light:bg-violet-50">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-600 text-white shadow-lg shadow-violet-950/20">
               <Zap className="h-5 w-5" />
             </div>
@@ -685,7 +685,7 @@ export default function HomePage() {
       </section> */}
 
       {/* CTA */}
-      <section className="py-20 bg-gradient-to-r from-violet-900/40 to-indigo-900/40 light:from-violet-100 light:to-indigo-100 border-y border-violet-500/20 light:border-violet-200">
+      <section className="border-y border-violet-500/20 bg-linear-to-r from-violet-900/40 to-indigo-900/40 py-20 light:border-violet-200 light:from-violet-100 light:to-indigo-100">
         <div className="max-w-3xl mx-auto px-6 text-center">
           <h2 className="text-3xl md:text-4xl font-black text-white light:text-gray-900 mb-4">
             Ready fi grow yuh business?
@@ -714,7 +714,7 @@ export default function HomePage() {
       <footer className="border-t border-white/5 light:border-gray-200 py-10 px-6 md:px-12">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center">
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-linear-to-br from-violet-500 to-indigo-600">
               <Sparkles className="w-3.5 h-3.5 text-white" />
             </div>
             <span className="font-black text-white light:text-gray-900">

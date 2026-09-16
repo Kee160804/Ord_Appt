@@ -370,13 +370,9 @@ export default function AgentsManagementPage() {
                 }
                 className="w-full rounded-lg border border-slate-600 bg-slate-700 px-4 py-2 text-white focus:border-violet-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
               >
-                <option value="staff">
-                  Staff - Order/Booking management
-                </option>
+                <option value="staff">Staff - Order/Booking management</option>
 
-                <option value="admin">
-                  Admin - Full tenant access
-                </option>
+                <option value="admin">Admin - Full tenant access</option>
               </select>
 
               <p className="mt-2 text-xs text-slate-400">
@@ -414,10 +410,7 @@ export default function AgentsManagementPage() {
       {/* AGENT LIST */}
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
         {filteredAgents.map((agent) => (
-          <Card
-            key={agent.id}
-            className="border-slate-700 bg-slate-800/50"
-          >
+          <Card key={agent.id} className="border-slate-700 bg-slate-800/50">
             <CardBody className="space-y-4">
               {/* AGENT HEADER */}
               <div className="flex items-center justify-between">
@@ -429,9 +422,7 @@ export default function AgentsManagementPage() {
                   <div>
                     <h3 className="font-semibold">{agent.name}</h3>
 
-                    <p className="text-sm text-slate-400">
-                      {agent.email}
-                    </p>
+                    <p className="text-sm text-slate-400">{agent.email}</p>
                   </div>
                 </div>
               </div>
@@ -467,8 +458,8 @@ export default function AgentsManagementPage() {
               {/* TEMPORARILY DISABLED MANAGEMENT ACTIONS */}
               <div className="border-t border-slate-700/50 pt-4">
                 <p className="text-xs text-slate-500">
-                  Editing and deletion are temporarily disabled until
-                  persistent database-backed operations are available.
+                  Editing and deletion are temporarily disabled until persistent
+                  database-backed operations are available.
                 </p>
               </div>
             </CardBody>
@@ -481,13 +472,10 @@ export default function AgentsManagementPage() {
         <div className="rounded-xl border border-slate-700 bg-slate-800/30 p-8 text-center">
           <User className="mx-auto mb-3 h-8 w-8 text-slate-500" />
 
-          <p className="font-semibold text-slate-300">
-            No agents found
-          </p>
+          <p className="font-semibold text-slate-300">No agents found</p>
 
           <p className="mt-1 text-sm text-slate-500">
-            Create a tenant-level staff or administrator account to get
-            started.
+            Create a tenant-level staff or administrator account to get started.
           </p>
         </div>
       )}

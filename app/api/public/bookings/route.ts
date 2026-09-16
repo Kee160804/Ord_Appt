@@ -44,10 +44,7 @@ interface BookingRequest {
 /**
  * Return public API responses without allowing intermediary/browser caching.
  */
-function json(
-  body: Record<string, unknown>,
-  status = 200,
-): Response {
+function json(body: Record<string, unknown>, status = 200): Response {
   return Response.json(body, {
     status,
     headers: {
@@ -67,13 +64,9 @@ function isValidDate(value: string) {
     return false;
   }
 
-  const [year, month, day] = value
-    .split("-")
-    .map(Number);
+  const [year, month, day] = value.split("-").map(Number);
 
-  const date = new Date(
-    Date.UTC(year, month - 1, day),
-  );
+  const date = new Date(Date.UTC(year, month - 1, day));
 
   return (
     date.getUTCFullYear() === year &&
@@ -89,9 +82,7 @@ function isValidDate(value: string) {
  * Supabase.
  */
 function isValidTime(value: string) {
-  return /^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/.test(
-    value,
-  );
+  return /^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/.test(value);
 }
 
 /**
@@ -108,9 +99,7 @@ function isValidTime(value: string) {
  * 6. Apply the distributed public rate limiter.
  * 7. Send normalized values to the authoritative booking RPC.
  */
-export async function POST(
-  request: Request,
-): Promise<Response> {
+export async function POST(request: Request): Promise<Response> {
   if (!requestHasAllowedOrigin(request)) {
     return json(
       {
@@ -125,11 +114,7 @@ export async function POST(
        Read and normalize public input
        ---------------------------------------------------------------------- */
 
-    const body =
-      await readJsonBody<BookingRequest>(
-        request,
-        16_384,
-      );
+    const body = await readJsonBody<BookingRequest>(request, 16_384);
 
     /**
      * Honeypot protection.
@@ -137,44 +122,31 @@ export async function POST(
     if (body.website?.trim()) {
       return json(
         {
-          error:
-            "Unable to create appointment.",
+          error: "Unable to create appointment.",
         },
         400,
       );
     }
 
-    const tenantId =
-      body.tenantId?.trim() || "";
+    const tenantId = body.tenantId?.trim() || "";
 
-    const serviceId =
-      body.serviceId?.trim() || "";
+    const serviceId = body.serviceId?.trim() || "";
 
-    const providerId =
-      body.providerId?.trim() || null;
+    const providerId = body.providerId?.trim() || null;
 
-    const appointmentDate =
-      body.date?.trim() || "";
+    const appointmentDate = body.date?.trim() || "";
 
-    const appointmentTime =
-      body.time?.trim() || "";
+    const appointmentTime = body.time?.trim() || "";
 
-    const customerName =
-      body.customerName?.trim() || "";
+    const customerName = body.customerName?.trim() || "";
 
-    const email =
-      body.customerEmail
-        ?.trim()
-        .toLowerCase() || "";
+    const email = body.customerEmail?.trim().toLowerCase() || "";
 
-    const customerPhone =
-      body.customerPhone?.trim() || "";
+    const customerPhone = body.customerPhone?.trim() || "";
 
-    const notes =
-      body.notes?.trim() || null;
+    const notes = body.notes?.trim() || null;
 
-    const promotionCode =
-      body.promotionCode?.trim() || null;
+    const promotionCode = body.promotionCode?.trim() || null;
 
     /* ----------------------------------------------------------------------
        Validate tenant/resource identifiers
@@ -183,13 +155,11 @@ export async function POST(
     if (
       !isValidUuid(tenantId) ||
       !isValidUuid(serviceId) ||
-      (providerId &&
-        !isValidUuid(providerId))
+      (providerId && !isValidUuid(providerId))
     ) {
       return json(
         {
-          error:
-            "Invalid appointment request.",
+          error: "Invalid appointment request.",
         },
         400,
       );
@@ -199,15 +169,10 @@ export async function POST(
        Validate customer identity fields
        ---------------------------------------------------------------------- */
 
-    if (
-      customerName.length < 2 ||
-      customerName.length >
-        MAX_NAME_LENGTH
-    ) {
+    if (customerName.length < 2 || customerName.length > MAX_NAME_LENGTH) {
       return json(
         {
-          error:
-            "Enter a valid customer name.",
+          error: "Enter a valid customer name.",
         },
         400,
       );
@@ -216,21 +181,16 @@ export async function POST(
     if (!isValidEmail(email)) {
       return json(
         {
-          error:
-            "Enter a valid email address.",
+          error: "Enter a valid email address.",
         },
         400,
       );
     }
 
-    if (
-      customerPhone.length >
-      MAX_PHONE_LENGTH
-    ) {
+    if (customerPhone.length > MAX_PHONE_LENGTH) {
       return json(
         {
-          error:
-            "Enter a valid phone number.",
+          error: "Enter a valid phone number.",
         },
         400,
       );
@@ -251,14 +211,10 @@ export async function POST(
        - duplicate appointments
        ---------------------------------------------------------------------- */
 
-    if (
-      !isValidDate(appointmentDate) ||
-      !isValidTime(appointmentTime)
-    ) {
+    if (!isValidDate(appointmentDate) || !isValidTime(appointmentTime)) {
       return json(
         {
-          error:
-            "Select a valid appointment date and time.",
+          error: "Select a valid appointment date and time.",
         },
         400,
       );
@@ -268,28 +224,19 @@ export async function POST(
        Bound free-form public input
        ---------------------------------------------------------------------- */
 
-    if (
-      notes &&
-      notes.length > MAX_NOTES_LENGTH
-    ) {
+    if (notes && notes.length > MAX_NOTES_LENGTH) {
       return json(
         {
-          error:
-            "Appointment notes are too long.",
+          error: "Appointment notes are too long.",
         },
         400,
       );
     }
 
-    if (
-      promotionCode &&
-      promotionCode.length >
-        MAX_PROMOTION_CODE_LENGTH
-    ) {
+    if (promotionCode && promotionCode.length > MAX_PROMOTION_CODE_LENGTH) {
       return json(
         {
-          error:
-            "The promotion code is invalid.",
+          error: "The promotion code is invalid.",
         },
         400,
       );
@@ -302,20 +249,17 @@ export async function POST(
        minutes.
        ---------------------------------------------------------------------- */
 
-    const rate =
-      await enforcePublicRateLimit(
-        request,
-        "booking",
-        tenantId,
-        email,
-        4,
-        600,
-      );
+    const rate = await enforcePublicRateLimit(
+      request,
+      "booking",
+      tenantId,
+      email,
+      4,
+      600,
+    );
 
     if (!rate.allowed) {
-      return rateLimitResponse(
-        rate.retryAfter,
-      );
+      return rateLimitResponse(rate.retryAfter);
     }
 
     /* ----------------------------------------------------------------------
@@ -325,13 +269,11 @@ export async function POST(
     let supabase;
 
     try {
-      supabase =
-        getSupabaseAdminClient();
+      supabase = getSupabaseAdminClient();
     } catch {
       return json(
         {
-          error:
-            "Online booking is not configured.",
+          error: "Online booking is not configured.",
         },
         503,
       );
@@ -348,48 +290,37 @@ export async function POST(
       p_tenant_id: tenantId,
       p_service_id: serviceId,
 
-      p_appointment_date:
-        appointmentDate,
+      p_appointment_date: appointmentDate,
 
-      p_appointment_time:
-        appointmentTime,
+      p_appointment_time: appointmentTime,
 
-      p_customer_name:
-        customerName,
+      p_customer_name: customerName,
 
-      p_customer_email:
-        email,
+      p_customer_email: email,
 
-      p_customer_phone:
-        customerPhone,
+      p_customer_phone: customerPhone,
 
-      p_notes:
-        notes,
+      p_notes: notes,
 
-      p_staff_id:
-        providerId,
+      p_staff_id: providerId,
 
-      p_promotion_code:
-        promotionCode,
+      p_promotion_code: promotionCode,
 
       /**
        * Real payment-provider methods are intentionally deferred.
        */
       p_payment_method:
-        body.paymentMethod === "mock_card"
-          ? "mock_card"
-          : "pay_later",
+        body.paymentMethod === "mock_card" ? "mock_card" : "pay_later",
     };
 
     /* ----------------------------------------------------------------------
        Create appointment using the newest payment-aware RPC.
        ---------------------------------------------------------------------- */
 
-    let { data, error } =
-      await supabase.rpc(
-        "create_public_appointment_with_payment",
-        payload,
-      );
+    let { data, error } = await supabase.rpc(
+      "create_public_appointment_with_payment",
+      payload,
+    );
 
     /* ----------------------------------------------------------------------
        Rolling database compatibility.
@@ -401,41 +332,30 @@ export async function POST(
        ---------------------------------------------------------------------- */
 
     if (error?.code === "PGRST202") {
-      const fallback =
-        await supabase.rpc(
-          "create_public_appointment_with_provider",
-          {
-            p_tenant_id:
-              payload.p_tenant_id,
+      const fallback = await supabase.rpc(
+        "create_public_appointment_with_provider",
+        {
+          p_tenant_id: payload.p_tenant_id,
 
-            p_service_id:
-              payload.p_service_id,
+          p_service_id: payload.p_service_id,
 
-            p_appointment_date:
-              payload.p_appointment_date,
+          p_appointment_date: payload.p_appointment_date,
 
-            p_appointment_time:
-              payload.p_appointment_time,
+          p_appointment_time: payload.p_appointment_time,
 
-            p_customer_name:
-              payload.p_customer_name,
+          p_customer_name: payload.p_customer_name,
 
-            p_customer_email:
-              payload.p_customer_email,
+          p_customer_email: payload.p_customer_email,
 
-            p_customer_phone:
-              payload.p_customer_phone,
+          p_customer_phone: payload.p_customer_phone,
 
-            p_notes:
-              payload.p_notes,
+          p_notes: payload.p_notes,
 
-            p_staff_id:
-              payload.p_staff_id,
+          p_staff_id: payload.p_staff_id,
 
-            p_promotion_code:
-              payload.p_promotion_code,
-          },
-        );
+          p_promotion_code: payload.p_promotion_code,
+        },
+      );
 
       data = fallback.data;
       error = fallback.error;
@@ -477,8 +397,7 @@ export async function POST(
     if (!result?.appointment_id) {
       return json(
         {
-          error:
-            "The appointment was not confirmed.",
+          error: "The appointment was not confirmed.",
         },
         502,
       );
@@ -489,58 +408,40 @@ export async function POST(
        ---------------------------------------------------------------------- */
 
     return json({
-      appointmentId:
-        result.appointment_id,
+      appointmentId: result.appointment_id,
 
-      paymentStatus:
-        result.payment_status ||
-        "UNPAID",
+      paymentStatus: result.payment_status || "UNPAID",
 
-      paymentReference:
-        result.payment_reference ||
-        null,
+      paymentReference: result.payment_reference || null,
     });
   } catch (error) {
     /* ----------------------------------------------------------------------
        Request parsing errors
        ---------------------------------------------------------------------- */
 
-    if (
-      error instanceof Error &&
-      error.message ===
-        "REQUEST_TOO_LARGE"
-    ) {
+    if (error instanceof Error && error.message === "REQUEST_TOO_LARGE") {
       return json(
         {
-          error:
-            "The booking request is too large.",
+          error: "The booking request is too large.",
         },
         413,
       );
     }
 
-    if (
-      error instanceof Error &&
-      error.message === "INVALID_JSON"
-    ) {
+    if (error instanceof Error && error.message === "INVALID_JSON") {
       return json(
         {
-          error:
-            "Invalid booking request.",
+          error: "Invalid booking request.",
         },
         400,
       );
     }
 
-    console.error(
-      "[public-booking] Unexpected request failure.",
-      error,
-    );
+    console.error("[public-booking] Unexpected request failure.", error);
 
     return json(
       {
-        error:
-          "Invalid booking request.",
+        error: "Invalid booking request.",
       },
       400,
     );

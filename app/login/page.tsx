@@ -5,7 +5,6 @@ import { Sparkles, Eye, EyeOff, AlertCircle, Sun, Moon } from "lucide-react";
 import { useAuth } from "@/app/contexts/auth";
 import { useTheme } from "@/app/contexts/theme";
 
-
 /**
  * Validates a post-login destination.
  *
@@ -16,7 +15,11 @@ import { useTheme } from "@/app/contexts/theme";
  */
 function getSafeInternalPath(value: string | null): string | null {
   if (!value) return null;
-  if (!value.startsWith("/") || value.startsWith("//") || value.includes("\\")) {
+  if (
+    !value.startsWith("/") ||
+    value.startsWith("//") ||
+    value.includes("\\")
+  ) {
     return null;
   }
 
@@ -98,9 +101,9 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-dvh flex-col bg-[#070b14] text-white light:bg-white light:text-gray-900">
       {/* Navbar */}
-      <nav className="site-header sticky top-0 z-50 flex flex-shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-2 border-b border-white/5 bg-[#070b14]/90 backdrop-blur-xl light:border-gray-200 light:bg-white/90 md:flex-nowrap">
-        <div className="flex min-w-0 flex-shrink-0 items-center gap-2 sm:gap-2.5">
-          <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-violet-500 to-indigo-600 shadow-lg shadow-violet-900/40 light:shadow-violet-500/30 sm:h-8 sm:w-8">
+      <nav className="site-header sticky top-0 z-50 flex shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-2 border-b border-white/5 bg-[#070b14]/90 backdrop-blur-xl light:border-gray-200 light:bg-white/90 md:flex-nowrap">
+        <div className="flex min-w-0 shrink-0 items-center gap-2 sm:gap-2.5">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-violet-500 to-indigo-600 shadow-lg shadow-violet-900/40 light:shadow-violet-500/30 sm:h-8 sm:w-8">
             <Sparkles className="w-4 h-4 text-white" />
           </div>
           <span className="whitespace-nowrap text-[15px] font-black tracking-tight text-white light:text-gray-900 sm:text-lg">
@@ -139,10 +142,10 @@ export default function LoginPage() {
           </Link>
         </div>
 
-        <div className="contents md:flex md:min-w-0 md:flex-shrink-0 md:items-center md:gap-3">
+        <div className="contents md:flex md:min-w-0 md:shrink-0 md:items-center md:gap-3">
           <button
             onClick={toggleTheme}
-            className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl border border-slate-700 bg-transparent text-slate-400 transition-colors hover:bg-white/5 light:border-gray-300 light:text-gray-600 light:hover:bg-gray-100 md:h-10 md:w-10"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-700 bg-transparent text-slate-400 transition-colors hover:bg-white/5 light:border-gray-300 light:text-gray-600 light:hover:bg-gray-100 md:h-10 md:w-10"
             aria-label="Toggle main theme"
             title="Toggle main theme"
           >
@@ -153,7 +156,7 @@ export default function LoginPage() {
             )}
           </button>
 
-          <div className="order-last grid w-full grid-cols-2 gap-2 md:order-none md:flex md:w-auto md:items-center md:gap-3">
+          <div className="order-last grid w-full grid-cols-2 gap-2 md:order-0 md:flex md:w-auto md:items-center md:gap-3">
             <Link
               href="/"
               className="inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-xl border border-slate-700 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200 transition-colors hover:bg-white/10 light:border-gray-300 light:bg-white light:text-gray-700 light:hover:bg-gray-100 md:hidden"

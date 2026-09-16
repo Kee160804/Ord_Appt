@@ -92,10 +92,7 @@ type NormalizedOrderItem = {
 /**
  * Creates an uncached JSON response.
  */
-function json(
-  body: Record<string, unknown>,
-  status = 200,
-): Response {
+function json(body: Record<string, unknown>, status = 200): Response {
   return Response.json(body, {
     status,
 
@@ -111,11 +108,7 @@ function json(
 function validOrderType(
   value: unknown,
 ): value is "dine_in" | "pickup" | "delivery" {
-  return (
-    value === "dine_in" ||
-    value === "pickup" ||
-    value === "delivery"
-  );
+  return value === "dine_in" || value === "pickup" || value === "delivery";
 }
 
 /**
@@ -161,8 +154,7 @@ function normalizeItems(
       return null;
     }
 
-    const rawAddons =
-      Array.isArray(item.addons) ? item.addons : [];
+    const rawAddons = Array.isArray(item.addons) ? item.addons : [];
 
     if (rawAddons.length > MAX_ADDONS_PER_ITEM) {
       return null;
@@ -209,9 +201,7 @@ function normalizeItems(
  * 7. Send identifiers only to authoritative pricing/order RPCs.
  * 8. Return a small confirmation payload.
  */
-export async function POST(
-  request: Request,
-): Promise<Response> {
+export async function POST(request: Request): Promise<Response> {
   /* ========================================================================
      1. SAME-ORIGIN PROTECTION
      ======================================================================== */
@@ -230,10 +220,7 @@ export async function POST(
        2. READ BOUNDED JSON BODY
        ====================================================================== */
 
-    const body =
-      await readJsonBody<OrderRequest>(
-        request,
-      );
+    const body = await readJsonBody<OrderRequest>(request);
 
     /* ======================================================================
        3. HONEYPOT / SIMPLE BOT PROTECTION
@@ -252,19 +239,13 @@ export async function POST(
        4. NORMALIZE CORE CUSTOMER/TENANT VALUES
        ====================================================================== */
 
-    const tenantId =
-      body.tenantId?.trim() || "";
+    const tenantId = body.tenantId?.trim() || "";
 
-    const customerName =
-      body.customerName?.trim() || "";
+    const customerName = body.customerName?.trim() || "";
 
-    const email =
-      body.customerEmail
-        ?.trim()
-        .toLowerCase() || "";
+    const email = body.customerEmail?.trim().toLowerCase() || "";
 
-    const customerPhone =
-      body.customerPhone?.trim() || "";
+    const customerPhone = body.customerPhone?.trim() || "";
 
     if (!isValidUuid(tenantId)) {
       return json(
@@ -275,10 +256,7 @@ export async function POST(
       );
     }
 
-    if (
-      customerName.length < 2 ||
-      customerName.length > MAX_NAME_LENGTH
-    ) {
+    if (customerName.length < 2 || customerName.length > MAX_NAME_LENGTH) {
       return json(
         {
           error: "Enter a valid customer name.",
@@ -290,16 +268,13 @@ export async function POST(
     if (!isValidEmail(email)) {
       return json(
         {
-          error:
-            "Enter a valid email address and try again.",
+          error: "Enter a valid email address and try again.",
         },
         400,
       );
     }
 
-    if (
-      customerPhone.length > MAX_PHONE_LENGTH
-    ) {
+    if (customerPhone.length > MAX_PHONE_LENGTH) {
       return json(
         {
           error: "Enter a valid phone number.",
@@ -312,8 +287,7 @@ export async function POST(
        5. VALIDATE ORDER TYPE
        ====================================================================== */
 
-    const orderType =
-      body.orderType ?? "pickup";
+    const orderType = body.orderType ?? "pickup";
 
     if (!validOrderType(orderType)) {
       return json(
@@ -328,14 +302,12 @@ export async function POST(
        6. VALIDATE CART
        ====================================================================== */
 
-    const items =
-      normalizeItems(body.items);
+    const items = normalizeItems(body.items);
 
     if (!items) {
       return json(
         {
-          error:
-            "Your cart contains invalid items.",
+          error: "Your cart contains invalid items.",
         },
         400,
       );
@@ -345,34 +317,22 @@ export async function POST(
        7. VALIDATE OPTIONAL CUSTOMER INPUT
        ====================================================================== */
 
-    const deliveryAddress =
-      body.deliveryAddress?.trim() || null;
+    const deliveryAddress = body.deliveryAddress?.trim() || null;
 
-    const deliveryArea =
-      body.deliveryArea?.trim() || null;
+    const deliveryArea = body.deliveryArea?.trim() || null;
 
-    const deliveryInstructions =
-      body.deliveryInstructions?.trim() ||
-      null;
+    const deliveryInstructions = body.deliveryInstructions?.trim() || null;
 
-    const tableNumber =
-      body.tableNumber?.trim() || null;
+    const tableNumber = body.tableNumber?.trim() || null;
 
-    const notes =
-      body.notes?.trim() || null;
+    const notes = body.notes?.trim() || null;
 
-    const promotionCode =
-      body.promotionCode?.trim() || null;
+    const promotionCode = body.promotionCode?.trim() || null;
 
-    if (
-      deliveryAddress &&
-      deliveryAddress.length >
-        MAX_ADDRESS_LENGTH
-    ) {
+    if (deliveryAddress && deliveryAddress.length > MAX_ADDRESS_LENGTH) {
       return json(
         {
-          error:
-            "The delivery address is too long.",
+          error: "The delivery address is too long.",
         },
         400,
       );
@@ -380,54 +340,38 @@ export async function POST(
 
     if (
       deliveryInstructions &&
-      deliveryInstructions.length >
-        MAX_INSTRUCTIONS_LENGTH
+      deliveryInstructions.length > MAX_INSTRUCTIONS_LENGTH
     ) {
       return json(
         {
-          error:
-            "The delivery instructions are too long.",
+          error: "The delivery instructions are too long.",
         },
         400,
       );
     }
 
-    if (
-      notes &&
-      notes.length > MAX_NOTES_LENGTH
-    ) {
+    if (notes && notes.length > MAX_NOTES_LENGTH) {
       return json(
         {
-          error:
-            "The order notes are too long.",
+          error: "The order notes are too long.",
         },
         400,
       );
     }
 
-    if (
-      promotionCode &&
-      promotionCode.length >
-        MAX_PROMOTION_CODE_LENGTH
-    ) {
+    if (promotionCode && promotionCode.length > MAX_PROMOTION_CODE_LENGTH) {
       return json(
         {
-          error:
-            "The promotion code is invalid.",
+          error: "The promotion code is invalid.",
         },
         400,
       );
     }
 
-    if (
-      tableNumber &&
-      tableNumber.length >
-        MAX_TABLE_NUMBER_LENGTH
-    ) {
+    if (tableNumber && tableNumber.length > MAX_TABLE_NUMBER_LENGTH) {
       return json(
         {
-          error:
-            "The table number is invalid.",
+          error: "The table number is invalid.",
         },
         400,
       );
@@ -438,27 +382,19 @@ export async function POST(
      *
      * The authoritative database RPC should still repeat these checks.
      */
-    if (
-      orderType === "delivery" &&
-      !deliveryAddress
-    ) {
+    if (orderType === "delivery" && !deliveryAddress) {
       return json(
         {
-          error:
-            "A delivery address is required.",
+          error: "A delivery address is required.",
         },
         400,
       );
     }
 
-    if (
-      orderType === "dine_in" &&
-      !tableNumber
-    ) {
+    if (orderType === "dine_in" && !tableNumber) {
       return json(
         {
-          error:
-            "A table number is required.",
+          error: "A table number is required.",
         },
         400,
       );
@@ -468,25 +404,22 @@ export async function POST(
        8. DISTRIBUTED RATE LIMIT
        ====================================================================== */
 
-    const rate =
-      await enforcePublicRateLimit(
-        request,
-        "order",
-        tenantId,
-        email,
+    const rate = await enforcePublicRateLimit(
+      request,
+      "order",
+      tenantId,
+      email,
 
-        /**
-         * Maximum five order attempts per customer fingerprint
-         * within ten minutes.
-         */
-        5,
-        600,
-      );
+      /**
+       * Maximum five order attempts per customer fingerprint
+       * within ten minutes.
+       */
+      5,
+      600,
+    );
 
     if (!rate.allowed) {
-      return rateLimitResponse(
-        rate.retryAfter,
-      );
+      return rateLimitResponse(rate.retryAfter);
     }
 
     /* ======================================================================
@@ -494,9 +427,7 @@ export async function POST(
        ====================================================================== */
 
     const paymentMethod =
-      body.paymentMethod === "mock_card"
-        ? "mock_card"
-        : "pay_later";
+      body.paymentMethod === "mock_card" ? "mock_card" : "pay_later";
 
     /* ======================================================================
        10. BUILD DATABASE RPC PAYLOAD
@@ -510,45 +441,31 @@ export async function POST(
     const payload = {
       p_tenant_id: tenantId,
 
-      p_customer_name:
-        customerName,
+      p_customer_name: customerName,
 
-      p_customer_email:
-        email,
+      p_customer_email: email,
 
-      p_customer_phone:
-        customerPhone,
+      p_customer_phone: customerPhone,
 
-      p_order_type:
-        orderType,
+      p_order_type: orderType,
 
-      p_items:
-        items,
+      p_items: items,
 
-      p_requested_time:
-        body.requestedTime?.trim() ||
-        null,
+      p_requested_time: body.requestedTime?.trim() || null,
 
-      p_delivery_address:
-        deliveryAddress,
+      p_delivery_address: deliveryAddress,
 
-      p_delivery_area:
-        deliveryArea,
+      p_delivery_area: deliveryArea,
 
-      p_delivery_instructions:
-        deliveryInstructions,
+      p_delivery_instructions: deliveryInstructions,
 
-      p_table_number:
-        tableNumber,
+      p_table_number: tableNumber,
 
-      p_notes:
-        notes,
+      p_notes: notes,
 
-      p_promotion_code:
-        promotionCode,
+      p_promotion_code: promotionCode,
 
-      p_payment_method:
-        paymentMethod,
+      p_payment_method: paymentMethod,
     };
 
     /* ======================================================================
@@ -558,13 +475,11 @@ export async function POST(
     let supabase;
 
     try {
-      supabase =
-        getSupabaseAdminClient();
+      supabase = getSupabaseAdminClient();
     } catch {
       return json(
         {
-          error:
-            "Online ordering is not configured.",
+          error: "Online ordering is not configured.",
         },
         503,
       );
@@ -578,39 +493,25 @@ export async function POST(
        modules, catalog, inventory and pricing rules.
        ====================================================================== */
 
-    const {
-      data: tenant,
-      error: tenantError,
-    } = await supabase
+    const { data: tenant, error: tenantError } = await supabase
       .from("tenants")
-      .select(
-        "business_type, is_active, status",
-      )
+      .select("business_type, is_active, status")
       .eq("id", tenantId)
       .maybeSingle();
 
-    if (
-      tenantError ||
-      !tenant
-    ) {
+    if (tenantError || !tenant) {
       return json(
         {
-          error:
-            "Storefront was not found.",
+          error: "Storefront was not found.",
         },
         404,
       );
     }
 
-    if (
-      !tenant.is_active ||
-      tenant.status?.toUpperCase() !==
-        "ACTIVE"
-    ) {
+    if (!tenant.is_active || tenant.status?.toUpperCase() !== "ACTIVE") {
       return json(
         {
-          error:
-            "This storefront is not currently accepting orders.",
+          error: "This storefront is not currently accepting orders.",
         },
         403,
       );
@@ -626,35 +527,22 @@ export async function POST(
 
     let { data, error } =
       tenant.business_type === "retail"
-        ? await supabase.rpc(
-            "create_public_retail_order",
-            {
-              p_tenant_id:
-                payload.p_tenant_id,
+        ? await supabase.rpc("create_public_retail_order", {
+            p_tenant_id: payload.p_tenant_id,
 
-              p_customer_name:
-                payload.p_customer_name,
+            p_customer_name: payload.p_customer_name,
 
-              p_customer_email:
-                payload.p_customer_email,
+            p_customer_email: payload.p_customer_email,
 
-              p_customer_phone:
-                payload.p_customer_phone,
+            p_customer_phone: payload.p_customer_phone,
 
-              p_items:
-                payload.p_items,
+            p_items: payload.p_items,
 
-              p_notes:
-                payload.p_notes,
+            p_notes: payload.p_notes,
 
-              p_payment_method:
-                payload.p_payment_method,
-            },
-          )
-        : await supabase.rpc(
-            "create_public_order_v3",
-            payload,
-          );
+            p_payment_method: payload.p_payment_method,
+          })
+        : await supabase.rpc("create_public_order_v3", payload);
 
     /* ======================================================================
        14. ROLLING-DEPLOYMENT COMPATIBILITY
@@ -666,35 +554,23 @@ export async function POST(
        ====================================================================== */
 
     if (error?.code === "PGRST202") {
-      const fallback =
-        await supabase.rpc(
-          "create_public_order_with_email",
-          {
-            p_tenant_id:
-              payload.p_tenant_id,
+      const fallback = await supabase.rpc("create_public_order_with_email", {
+        p_tenant_id: payload.p_tenant_id,
 
-            p_customer_name:
-              payload.p_customer_name,
+        p_customer_name: payload.p_customer_name,
 
-            p_customer_email:
-              payload.p_customer_email,
+        p_customer_email: payload.p_customer_email,
 
-            p_customer_phone:
-              payload.p_customer_phone,
+        p_customer_phone: payload.p_customer_phone,
 
-            p_order_type:
-              payload.p_order_type,
+        p_order_type: payload.p_order_type,
 
-            p_items:
-              payload.p_items,
+        p_items: payload.p_items,
 
-            p_notes:
-              payload.p_notes,
+        p_notes: payload.p_notes,
 
-            p_promotion_code:
-              payload.p_promotion_code,
-          },
-        );
+        p_promotion_code: payload.p_promotion_code,
+      });
 
       data = fallback.data;
       error = fallback.error;
@@ -720,16 +596,12 @@ export async function POST(
        16. NORMALIZE RPC RESULT
        ====================================================================== */
 
-    const result =
-      Array.isArray(data)
-        ? data[0]
-        : data;
+    const result = Array.isArray(data) ? data[0] : data;
 
     if (!result?.order_id) {
       return json(
         {
-          error:
-            "The order was not confirmed.",
+          error: "The order was not confirmed.",
         },
         502,
       );
@@ -743,50 +615,34 @@ export async function POST(
        ====================================================================== */
 
     return json({
-      orderId:
-        result.order_id,
+      orderId: result.order_id,
 
-      orderNumber:
-        result.order_number,
+      orderNumber: result.order_number,
 
-      total:
-        Number(result.total),
+      total: Number(result.total),
 
-      paymentStatus:
-        result.payment_status ||
-        "UNPAID",
+      paymentStatus: result.payment_status || "UNPAID",
 
-      paymentReference:
-        result.payment_reference ||
-        null,
+      paymentReference: result.payment_reference || null,
     });
   } catch (error) {
     /* ======================================================================
        18. REQUEST PARSING FAILURE
        ====================================================================== */
 
-    if (
-      error instanceof Error &&
-      error.message ===
-        "REQUEST_TOO_LARGE"
-    ) {
+    if (error instanceof Error && error.message === "REQUEST_TOO_LARGE") {
       return json(
         {
-          error:
-            "The order request is too large.",
+          error: "The order request is too large.",
         },
         413,
       );
     }
 
-    if (
-      error instanceof Error &&
-      error.message === "INVALID_JSON"
-    ) {
+    if (error instanceof Error && error.message === "INVALID_JSON") {
       return json(
         {
-          error:
-            "Invalid order request.",
+          error: "Invalid order request.",
         },
         400,
       );
@@ -795,15 +651,11 @@ export async function POST(
     /**
      * Public endpoints must not expose unexpected internal errors.
      */
-    console.error(
-      "[public-order] Unexpected request failure.",
-      error,
-    );
+    console.error("[public-order] Unexpected request failure.", error);
 
     return json(
       {
-        error:
-          "Invalid order request.",
+        error: "Invalid order request.",
       },
       400,
     );

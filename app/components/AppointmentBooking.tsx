@@ -759,7 +759,7 @@ export function AppointmentBooking({
         <aside className="flex min-w-0 flex-col border-t border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900 lg:col-span-2 xl:col-span-1 xl:border-l xl:border-t-0 xl:overflow-y-auto">
           {detailService ? (
             <>
-              <div className="relative h-48 w-full overflow-hidden bg-slate-100 dark:bg-slate-700 flex-shrink-0">
+              <div className="relative h-48 w-full shrink-0 overflow-hidden bg-slate-100 dark:bg-slate-700">
                 <Image
                   src={detailService.image || PLACEHOLDER_IMG}
                   alt={detailService.name}
@@ -870,7 +870,7 @@ export function AppointmentBooking({
                 </div>
               </div>
 
-              <div className="p-5 border-t border-slate-100 dark:border-slate-800 flex-shrink-0">
+              <div className="shrink-0 border-t border-slate-100 p-5 dark:border-slate-800">
                 <button
                   onClick={() => beginBooking()}
                   disabled={viewOnly || !canBook}

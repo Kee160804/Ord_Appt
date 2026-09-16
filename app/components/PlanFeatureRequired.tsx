@@ -16,7 +16,7 @@ export function PlanFeatureRequired({
   const requiredPlan = requiredPlanForFeature(feature);
 
   return (
-    <div className="m-4 flex min-h-[420px] items-center justify-center rounded-2xl border border-violet-500/25 bg-violet-500/5 p-8 text-center light:border-violet-200 light:bg-violet-50/60 md:m-5">
+    <div className="m-4 flex min-h-105 items-center justify-center rounded-2xl border border-violet-500/25 bg-violet-500/5 p-8 text-center light:border-violet-200 light:bg-violet-50/60 md:m-5">
       <div className="max-w-md">
         <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-500/15 text-violet-400 light:text-violet-700">
           <LockKeyhole className="h-6 w-6" />

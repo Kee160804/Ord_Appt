@@ -91,7 +91,7 @@ export function SettingsView({ tenant, user, onTenantUpdated }: Props) {
                       : "text-slate-400 light:text-gray-600 hover:bg-slate-700 light:hover:bg-gray-100",
                   )}
                 >
-                  <Icon className="w-4 h-4 flex-shrink-0" />
+                  <Icon className="h-4 w-4 shrink-0" />
                   <span className="flex-1">{tab.label}</span>
                   {active !== tab.id && (
                     <ChevronRight className="w-3 h-3 text-slate-500 light:text-gray-400" />
@@ -211,7 +211,7 @@ function BusinessTab({
       <CardBody className="space-y-5">
         <div className="flex items-center gap-4">
           <div
-            className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-lg text-sm font-black text-white"
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg text-sm font-black text-white"
             style={{ backgroundColor: tenant.logoBg }}
           >
             {tenant.logo}
@@ -333,7 +333,7 @@ function HoursTab({
       <CardBody className="space-y-3">
         {hours.map((day, i) => (
           <div key={day.day} className="flex items-center gap-4">
-            <span className="w-24 flex-shrink-0 text-xs font-medium text-white light:text-[#566681]">
+            <span className="w-24 shrink-0 text-xs font-medium text-white light:text-[#566681]">
               {day.day}
             </span>
             <input
@@ -603,7 +603,7 @@ function StorefrontTab({
               </span>
               <label
                 htmlFor="storefront-cover-upload"
-                className="inline-flex h-[42px] w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-violet-500/70 bg-violet-500/10 px-4 text-xs font-bold text-violet-300 transition hover:bg-violet-500/20 light:text-violet-700 sm:w-auto"
+                className="inline-flex h-10.5 w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-violet-500/70 bg-violet-500/10 px-4 text-xs font-bold text-violet-300 transition hover:bg-violet-500/20 light:text-violet-700 sm:w-auto"
               >
                 <Upload className="h-4 w-4" /> Choose photo
               </label>

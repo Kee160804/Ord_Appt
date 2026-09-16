@@ -113,8 +113,7 @@ export function ServicesView({ tenant }: Props) {
         const pageSize = 25;
         const totalPages =
           filtered.length === 0 ? 0 : Math.ceil(filtered.length / pageSize);
-        const safePage =
-          totalPages === 0 ? 0 : Math.min(page, totalPages - 1);
+        const safePage = totalPages === 0 ? 0 : Math.min(page, totalPages - 1);
         const from = safePage * pageSize;
         const pageServices = filtered.slice(from, from + pageSize);
 
@@ -222,7 +221,8 @@ export function ServicesView({ tenant }: Props) {
         await setServiceAvailability(tenant.id, id, !current.isActive);
         await loadServicePage();
       } else {
-        const stored = getStoredServices(tenant.id) ?? getServicesByTenant(tenant.id);
+        const stored =
+          getStoredServices(tenant.id) ?? getServicesByTenant(tenant.id);
         setStoredServices(
           tenant.id,
           stored.map((service) =>
@@ -254,7 +254,8 @@ export function ServicesView({ tenant }: Props) {
       if (usesSupabase) {
         await deleteService(tenant.id, id);
       } else {
-        const stored = getStoredServices(tenant.id) ?? getServicesByTenant(tenant.id);
+        const stored =
+          getStoredServices(tenant.id) ?? getServicesByTenant(tenant.id);
         setStoredServices(
           tenant.id,
           stored.filter((service) => service.id !== id),
@@ -285,7 +286,11 @@ export function ServicesView({ tenant }: Props) {
       setError("Enter a valid service price.");
       return;
     }
-    if (!Number.isFinite(duration) || !Number.isInteger(duration) || duration <= 0) {
+    if (
+      !Number.isFinite(duration) ||
+      !Number.isInteger(duration) ||
+      duration <= 0
+    ) {
       setError("Enter a valid whole-number service duration.");
       return;
     }
@@ -351,7 +356,8 @@ export function ServicesView({ tenant }: Props) {
       }
 
       if (!usesSupabase) {
-        const stored = getStoredServices(tenant.id) ?? getServicesByTenant(tenant.id);
+        const stored =
+          getStoredServices(tenant.id) ?? getServicesByTenant(tenant.id);
         const updated = editingId
           ? stored.map((service) =>
               service.id === editingId ? saved : service,
@@ -495,8 +501,7 @@ export function ServicesView({ tenant }: Props) {
       {!isLoading && pagination.total > 0 && (
         <div className="flex flex-col gap-2 rounded-lg border border-slate-800 px-3 py-2 text-[10px] text-slate-400 light:border-slate-200 light:text-slate-600 sm:flex-row sm:items-center sm:justify-between">
           <span>
-            Showing{" "}
-            {pagination.page * pagination.pageSize + 1}–
+            Showing {pagination.page * pagination.pageSize + 1}–
             {Math.min(
               (pagination.page + 1) * pagination.pageSize,
               pagination.total,
@@ -719,7 +724,7 @@ function ServiceCard({
             <Clock className="h-10 w-10" />
           </div>
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
+        <div className="absolute inset-0 bg-linear-to-t from-black/30 to-transparent" />
         <div className="absolute top-3 right-3">
           <Badge variant={service.isActive ? "success" : "default"}>
             {service.isActive ? "Active" : "Off"}

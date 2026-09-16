@@ -202,10 +202,7 @@ export async function listServices(
     query = query.eq("category", options.category);
   }
 
-  if (
-    options.availability !== undefined &&
-    options.availability !== "all"
-  ) {
+  if (options.availability !== undefined && options.availability !== "all") {
     query = query.eq("available", options.availability);
   }
 
@@ -230,8 +227,7 @@ export async function listServices(
 
   const services = ((data ?? []) as ServiceRow[]).map(mapService);
   const total = count ?? 0;
-  const totalPages =
-    total === 0 ? 0 : Math.ceil(total / safePageSize);
+  const totalPages = total === 0 ? 0 : Math.ceil(total / safePageSize);
 
   return {
     services,
@@ -308,10 +304,7 @@ export async function setServiceAvailability(
  * foreign-key behavior for historical appointments during the final database
  * review before changing retention semantics.
  */
-export async function deleteService(
-  tenantId: string,
-  serviceId: string,
-) {
+export async function deleteService(tenantId: string, serviceId: string) {
   const { error } = await client()
     .from("services")
     .delete()

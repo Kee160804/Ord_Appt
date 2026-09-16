@@ -78,7 +78,7 @@ export function TopBar({ title, action }: TopBarProps) {
   };
 
   return (
-    <header className="sticky top-0 z-20 flex min-h-14 flex-shrink-0 items-center justify-between gap-2 border-b border-slate-700/60 bg-[#0b1424]/95 px-2 py-2 backdrop-blur light:border-[#e7ebf2] light:bg-white/95 sm:px-4 md:px-5">
+    <header className="sticky top-0 z-20 flex min-h-14 shrink-0 items-center justify-between gap-2 border-b border-slate-700/60 bg-[#0b1424]/95 px-2 py-2 backdrop-blur light:border-[#e7ebf2] light:bg-white/95 sm:px-4 md:px-5">
       <div className="flex min-w-0 items-center gap-1.5 sm:gap-3">
         <button
           onClick={() =>
@@ -86,7 +86,7 @@ export function TopBar({ title, action }: TopBarProps) {
           }
           aria-label="Toggle sidebar"
           title="Toggle sidebar"
-          className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-800 light:hover:bg-slate-100 hover:text-white light:hover:text-slate-900 sm:h-10 sm:w-10"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-800 hover:text-white light:hover:bg-slate-100 light:hover:text-slate-900 sm:h-10 sm:w-10"
         >
           <Menu className="h-4 w-4" />
         </button>
@@ -95,7 +95,7 @@ export function TopBar({ title, action }: TopBarProps) {
         </h1>
       </div>
 
-      <div className="flex flex-shrink-0 items-center gap-0.5 sm:gap-2">
+      <div className="flex shrink-0 items-center gap-0.5 sm:gap-2">
         <div className="relative hidden md:block">
           <form onSubmit={handleSearch}>
             <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
@@ -133,7 +133,7 @@ export function TopBar({ title, action }: TopBarProps) {
         </button>
 
         <div
-          className="ml-1 hidden h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-amber-200 to-violet-300 text-[9px] font-bold text-slate-800 ring-2 ring-white/10 light:ring-slate-100 sm:flex"
+          className="ml-1 hidden h-7 w-7 items-center justify-center rounded-full bg-linear-to-br from-amber-200 to-violet-300 text-[9px] font-bold text-slate-800 ring-2 ring-white/10 light:ring-slate-100 sm:flex"
           title={user?.name ?? "Account"}
         >
           {user?.avatar ||

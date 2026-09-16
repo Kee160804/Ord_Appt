@@ -187,10 +187,7 @@ export async function readJsonBody<T>(
   if (contentLengthHeader) {
     const contentLength = Number(contentLengthHeader);
 
-    if (
-      Number.isFinite(contentLength) &&
-      contentLength > safeMaximumBytes
-    ) {
+    if (Number.isFinite(contentLength) && contentLength > safeMaximumBytes) {
       throw new Error("REQUEST_TOO_LARGE");
     }
   }
@@ -253,9 +250,7 @@ export async function enforcePublicRateLimit(
   const fingerprint = requestFingerprint(request, identity);
 
   try {
-    const { getSupabaseAdminClient } = await import(
-      "@/app/lib/supabase/admin"
-    );
+    const { getSupabaseAdminClient } = await import("@/app/lib/supabase/admin");
 
     const { data, error } = await getSupabaseAdminClient().rpc(
       "check_public_rate_limit",
@@ -283,13 +278,10 @@ export async function enforcePublicRateLimit(
     };
 
     if (typeof result.allowed !== "boolean") {
-      throw new Error(
-        "Rate-limit RPC did not return a valid allowed flag.",
-      );
+      throw new Error("Rate-limit RPC did not return a valid allowed flag.");
     }
 
-    const rawRetryAfter =
-      result.retryAfter ?? result.retry_after ?? 0;
+    const rawRetryAfter = result.retryAfter ?? result.retry_after ?? 0;
 
     const parsedRetryAfter = Number(rawRetryAfter);
 

@@ -219,7 +219,7 @@ export function Modal({
         )}
       >
         {title && (
-          <div className="flex flex-shrink-0 items-center justify-between gap-3 border-b border-slate-700 px-4 py-4 light:border-[#e8ecf3] sm:px-6">
+          <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-700 px-4 py-4 light:border-[#e8ecf3] sm:px-6">
             <h2 className="min-w-0 truncate text-base font-bold text-white light:text-slate-900">
               {title}
             </h2>
@@ -237,7 +237,7 @@ export function Modal({
           {children}
         </div>
         {footer && (
-          <div className="flex-shrink-0 border-t border-slate-700 px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] light:border-[#e8ecf3] sm:px-6">
+          <div className="shrink-0 border-t border-slate-700 px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] light:border-[#e8ecf3] sm:px-6">
             {footer}
           </div>
         )}

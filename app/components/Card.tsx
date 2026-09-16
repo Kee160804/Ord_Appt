@@ -42,16 +42,3 @@ export function CardHeader({ children, className }: SubProps) {
 export function CardBody({ children, className }: SubProps) {
   return <div className={cn("px-4 py-4 sm:px-5", className)}>{children}</div>;
 }
-
-export function CardFooter({ children, className }: SubProps) {
-  return (
-    <div
-      className={cn(
-        "border-t border-slate-700/50 light:border-[#e8ecf3] px-4 py-4 sm:px-5",
-        className,
-      )}
-    >
-      {children}
-    </div>
-  );
-}

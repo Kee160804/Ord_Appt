@@ -224,7 +224,7 @@ export function DemoDashboardPreview({ tenant }: { tenant: Tenant }) {
     <div className="flex min-h-[calc(100vh-112px)] bg-[#08111f] text-white light:bg-[#f6f8fc] light:text-slate-900">
       <aside className="hidden w-56 shrink-0 flex-col border-r border-white/5 bg-[#111a35] md:flex">
         <div className="flex items-center gap-3 border-b border-white/5 px-5 py-5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-purple-700">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-linear-to-br from-violet-500 to-purple-700">
             <Sparkles className="h-4 w-4" />
           </div>
           <div>
@@ -380,7 +380,7 @@ export function DemoDashboardPreview({ tenant }: { tenant: Tenant }) {
             />
           )}
 
-          <section className="flex flex-col items-center justify-between gap-4 rounded-2xl border border-violet-500/25 bg-gradient-to-r from-violet-950/70 to-indigo-950/50 p-5 text-center sm:flex-row sm:text-left light:from-violet-50 light:to-indigo-50">
+          <section className="flex flex-col items-center justify-between gap-4 rounded-2xl border border-violet-500/25 bg-linear-to-r from-violet-950/70 to-indigo-950/50 p-5 text-center sm:flex-row sm:text-left light:from-violet-50 light:to-indigo-50">
             <div>
               <h3 className="font-bold">Ready to make this dashboard yours?</h3>
               <p className="mt-1 text-xs text-slate-400 light:text-slate-600">
@@ -446,7 +446,7 @@ function OverviewSection({
           className="object-cover opacity-35 light:opacity-25"
           unoptimized
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/90 to-transparent light:from-white light:via-white/90" />
+        <div className="absolute inset-0 bg-linear-to-r from-slate-950 via-slate-950/90 to-transparent light:from-white light:via-white/90" />
         <div className="relative z-10 p-6">
           <p className="text-xs text-slate-400 light:text-slate-600">
             Good morning, Business Owner!
@@ -500,7 +500,7 @@ function OverviewSection({
             {analytics.revenueData.slice(-7).map((point) => (
               <div key={point.date} className="flex h-full flex-1 items-end">
                 <div
-                  className="w-full rounded-t bg-gradient-to-t from-violet-700 to-violet-400"
+                  className="w-full rounded-t bg-linear-to-t from-violet-700 to-violet-400"
                   style={{
                     height: `${Math.max(8, (point.revenue / maxRevenue) * 100)}%`,
                   }}
@@ -760,7 +760,7 @@ function CustomersSection({
         />
       </div>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[600px] text-left text-xs">
+        <table className="w-full min-w-150 text-left text-xs">
           <thead className="border-b border-slate-700 text-[10px] uppercase tracking-wider text-slate-500 light:border-slate-200">
             <tr>
               <th className="px-5 py-3">Customer</th>
@@ -842,7 +842,7 @@ function AnalyticsSection({
               className="group flex h-full flex-1 items-end"
             >
               <div
-                className="relative w-full rounded-t bg-gradient-to-t from-indigo-700 to-violet-400 transition group-hover:from-indigo-600 group-hover:to-violet-300"
+                className="relative w-full rounded-t bg-linear-to-t from-indigo-700 to-violet-400 transition group-hover:from-indigo-600 group-hover:to-violet-300"
                 style={{
                   height: `${Math.max(6, (point.revenue / maxRevenue) * 100)}%`,
                 }}
@@ -1037,7 +1037,7 @@ function SearchBox({
   value: string;
 }) {
   return (
-    <label className="relative min-w-0 flex-1 sm:min-w-[220px]">
+    <label className="relative min-w-0 flex-1 sm:min-w-55">
       <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
       <input
         value={value}

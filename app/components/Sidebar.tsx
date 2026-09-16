@@ -8,7 +8,7 @@ import {
   Calendar,
   ExternalLink,
   LayoutDashboard,
-  ArrowRight,
+  LogOut,
   Package,
   Scissors,
   Settings,
@@ -22,6 +22,7 @@ import { cn } from "../lib/utils";
 import { tenantHasFeature } from "../lib/plans";
 import type { Tenant, User } from "../types/index";
 import { useAuth } from "../contexts/auth";
+import { AccountSwitcher } from "./AccountSwitcher";
 import { BusinessSwitcher } from "./BusinessSwitcher";
 
 interface SidebarProps {
@@ -117,18 +118,18 @@ export function Sidebar({ tenant, user }: SidebarProps) {
       )}
       <aside
         className={cn(
-          "pwa-sidebar-safe fixed inset-y-0 left-0 z-50 flex h-dvh w-[min(86vw,280px)] flex-shrink-0 flex-col overflow-hidden bg-[#111a35] text-white shadow-[6px_0_28px_rgba(8,20,44,0.18)] transition-[transform,width] duration-300 md:relative md:z-30 md:translate-x-0",
+          "pwa-sidebar-safe fixed inset-y-0 left-0 z-50 flex h-dvh w-[min(86vw,280px)] shrink-0 flex-col overflow-hidden bg-[#111a35] text-white shadow-[6px_0_28px_rgba(8,20,44,0.18)] transition-[transform,width] duration-300 md:relative md:z-30 md:translate-x-0",
           mobileOpen ? "translate-x-0" : "-translate-x-full",
-          collapsed ? "md:w-[72px]" : "md:w-[216px]",
+          collapsed ? "md:w-18" : "md:w-54",
         )}
       >
         <div
           className={cn(
-            "flex h-[66px] items-center gap-3 border-b border-white/[0.06] px-5 pt-[max(0.25rem,env(safe-area-inset-top))]",
+            "flex h-16.5 items-center gap-3 border-b border-white/6 px-5 pt-[max(0.25rem,env(safe-area-inset-top))]",
             collapsed && "justify-center px-3",
           )}
         >
-          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-purple-700 shadow-lg shadow-violet-950/30">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-linear-to-br from-violet-500 to-purple-700 shadow-lg shadow-violet-950/30">
             <Sparkles className="h-4 w-4 text-white" />
           </div>
           {!collapsed && (
@@ -145,7 +146,7 @@ export function Sidebar({ tenant, user }: SidebarProps) {
 
         <div
           className={cn(
-            "border-b border-white/[0.06] px-4 py-4",
+            "border-b border-white/6 px-4 py-4",
             collapsed && "px-3",
           )}
         >
@@ -172,13 +173,13 @@ export function Sidebar({ tenant, user }: SidebarProps) {
                   "group flex h-10 items-center gap-3 rounded-lg px-3 text-[12px] font-medium transition-colors",
                   active
                     ? "bg-violet-500/20 text-white"
-                    : "text-slate-300 hover:bg-white/[0.06] hover:text-white",
+                    : "text-slate-300 hover:bg-white/6 hover:text-white",
                   collapsed && "justify-center px-2",
                 )}
               >
                 <Icon
                   className={cn(
-                    "h-[15px] w-[15px] flex-shrink-0",
+                    "h-3.75 w-3.75 shrink-0",
                     active
                       ? "text-violet-300"
                       : "text-slate-400 group-hover:text-white",
@@ -193,14 +194,14 @@ export function Sidebar({ tenant, user }: SidebarProps) {
           })}
         </nav>
 
-        <div className="border-t border-white/[0.06] px-3 py-2">
+        <div className="border-t border-white/6 px-3 py-2">
           <Link
             href={`/store-front/${tenant.slug}`}
             target="_blank"
             rel="noopener noreferrer"
             title={collapsed ? "View Storefront" : undefined}
             className={cn(
-              "flex h-9 items-center gap-3 rounded-lg px-3 text-[11px] font-medium text-slate-400 transition-colors hover:bg-white/[0.06] hover:text-white",
+              "flex h-9 items-center gap-3 rounded-lg px-3 text-[11px] font-medium text-slate-400 transition-colors hover:bg-white/6 hover:text-white",
               collapsed && "justify-center px-2",
             )}
           >
@@ -209,28 +210,21 @@ export function Sidebar({ tenant, user }: SidebarProps) {
           </Link>
         </div>
 
-        <div
-          className={cn(
-            "border-t border-white/[0.06] p-3",
-            collapsed && "px-2",
-          )}
-        >
+        <div className={cn("border-t border-white/6 p-3", collapsed && "px-2")}>
           <div
             className={cn(
-              "flex items-center justify-between gap-3 rounded-2xl border border-white/[0.04] bg-white/[0.02] px-3 py-2.5",
-              collapsed && "justify-center px-2 py-2.5",
+              "flex flex-col gap-2 rounded-2xl border border-white/4 bg-white/2 px-3 py-2.5",
+              collapsed && "items-center px-2 py-2.5",
             )}
           >
-            <div className="flex min-w-0 items-center gap-3">
-              {!collapsed && (
+            {!collapsed && (
+              <div className="flex min-w-0 items-center gap-3">
                 <div
-                  className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-violet-400/30 bg-violet-500/15 text-[10px] font-bold text-violet-100"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-violet-400/30 bg-violet-500/15 text-[10px] font-bold text-violet-100"
                   title={user.name}
                 >
                   {user.avatar}
                 </div>
-              )}
-              {!collapsed && (
                 <div className="min-w-0">
                   <p className="truncate text-[11px] font-semibold text-white">
                     {user.name}
@@ -239,17 +233,35 @@ export function Sidebar({ tenant, user }: SidebarProps) {
                     {user.role}
                   </p>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
 
-            <button
-              onClick={() => void logout()}
-              aria-label="Sign out"
-              title="Sign out"
-              className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-slate-300 transition-colors hover:bg-white/[0.06] hover:text-white"
+            <div
+              className={cn(
+                "flex w-full flex-col gap-1.5",
+                collapsed && "items-center",
+              )}
             >
-              <ArrowRight className="h-3.5 w-3.5" />
-            </button>
+              <AccountSwitcher
+                currentUser={user}
+                collapsed={collapsed}
+                onAccountSelected={() => setMobileOpen(false)}
+              />
+              <button
+                onClick={() => void logout()}
+                aria-label="Sign out"
+                title="Sign out"
+                className={cn(
+                  "flex h-9 shrink-0 items-center gap-2 rounded-lg border border-white/6 bg-white/3 text-slate-300 transition-colors hover:border-rose-400/30 hover:bg-rose-500/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400",
+                  collapsed
+                    ? "w-9 justify-center"
+                    : "w-full justify-start px-3 text-[10px] font-semibold",
+                )}
+              >
+                <LogOut className="h-3.5 w-3.5" />
+                {!collapsed && <span>Sign out</span>}
+              </button>
+            </div>
           </div>
         </div>
       </aside>

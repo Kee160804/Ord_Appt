@@ -273,7 +273,7 @@ export default function StorefrontClient({
         <div className="min-w-0">
           {/* Header */}
           <header className="pwa-header-inset sticky top-0 z-20 border-b border-[#1d2b42] bg-[#08111f]/95 backdrop-blur-xl light:border-slate-200 light:bg-white/95">
-            <div className="mx-auto flex min-h-18 max-w-[1460px] items-center gap-3 px-4 py-2.5 sm:px-6">
+            <div className="mx-auto flex min-h-18 max-w-365 items-center gap-3 px-4 py-2.5 sm:px-6">
               {viewOnly && (
                 <Link
                   href="/login"
@@ -438,7 +438,7 @@ export default function StorefrontClient({
                       "/fallback-product.png";
                   }}
                 />
-                <div className="absolute inset-0 flex items-center bg-gradient-to-r from-black/80 via-black/35 to-black/10">
+                <div className="absolute inset-0 flex items-center bg-linear-to-r from-black/80 via-black/35 to-black/10">
                   <div className="max-w-xl px-6 text-left text-white sm:px-10">
                     <p className="mb-2 text-[10px] font-black uppercase tracking-[0.25em] text-violet-300">
                       {businessTypeLabel}
@@ -456,7 +456,7 @@ export default function StorefrontClient({
 
           {/* Main content */}
           {(!viewOnly || activeDemoView === "storefront") && (
-            <main className="mx-auto max-w-[1460px] px-4 py-5 sm:px-6 sm:py-6">
+            <main className="mx-auto max-w-365 px-4 py-5 sm:px-6 sm:py-6">
               {activeTab === "home" ? (
                 isAppt ? (
                   <AppointmentBooking

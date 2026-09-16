@@ -108,17 +108,13 @@ function orderCreationError(error: unknown) {
     return new Error(error.message);
   }
 
-  return error instanceof Error
-    ? error
-    : new Error("Unable to place order.");
+  return error instanceof Error ? error : new Error("Unable to place order.");
 }
 
 /**
  * Converts database status values into the application's OrderStatus type.
  */
-function normalizeOrderStatus(
-  value: string,
-): OrderStatus {
+function normalizeOrderStatus(value: string): OrderStatus {
   switch (value.toUpperCase()) {
     case "CONFIRMED":
       return "confirmed";
@@ -147,9 +143,7 @@ function normalizeOrderStatus(
 /**
  * Converts database payment states into the application's PaymentStatus type.
  */
-function normalizePaymentStatus(
-  value: string,
-): PaymentStatus {
+function normalizePaymentStatus(value: string): PaymentStatus {
   switch (value.toUpperCase()) {
     case "PAID":
     case "COMPLETED":
@@ -174,9 +168,7 @@ function normalizePaymentStatus(
  *
  * Normalize that relationship into one product row.
  */
-function firstProduct(
-  value: OrderItemRow["products"],
-): OrderProductRow | null {
+function firstProduct(value: OrderItemRow["products"]): OrderProductRow | null {
   if (Array.isArray(value)) {
     return value[0] ?? null;
   }
@@ -187,15 +179,12 @@ function firstProduct(
 /**
  * Maps an order item database row into the application's OrderItem type.
  */
-function mapItem(
-  row: OrderItemRow,
-): OrderItem {
+function mapItem(row: OrderItemRow): OrderItem {
   return {
     id: row.id,
     productId: row.product_id ?? "",
     productName: row.product_name,
-    productImage:
-      firstProduct(row.products)?.image_url ?? "",
+    productImage: firstProduct(row.products)?.image_url ?? "",
     quantity: Number(row.quantity),
     price: Number(row.unit_price),
   };
@@ -204,48 +193,32 @@ function mapItem(
 /**
  * Maps a database order into the application's Order type.
  */
-function mapOrder(
-  row: OrderRow,
-): Order {
+function mapOrder(row: OrderRow): Order {
   return {
     id: row.id,
     tenantId: row.tenant_id,
 
-    customerId:
-      row.customer_id ?? undefined,
+    customerId: row.customer_id ?? undefined,
 
-    orderNumber:
-      row.order_number,
+    orderNumber: row.order_number,
 
-    customerName:
-      row.customer_name?.trim() ||
-      "Customer",
+    customerName: row.customer_name?.trim() || "Customer",
 
-    customerEmail:
-      row.customer_email ?? "",
+    customerEmail: row.customer_email ?? "",
 
-    customerPhone:
-      row.customer_phone ?? "",
+    customerPhone: row.customer_phone ?? "",
 
-    items:
-      (row.order_items ?? []).map(mapItem),
+    items: (row.order_items ?? []).map(mapItem),
 
-    status:
-      normalizeOrderStatus(row.status),
+    status: normalizeOrderStatus(row.status),
 
-    paymentStatus:
-      normalizePaymentStatus(
-        row.payment_status,
-      ),
+    paymentStatus: normalizePaymentStatus(row.payment_status),
 
-    totalAmount:
-      Number(row.total),
+    totalAmount: Number(row.total),
 
-    notes:
-      row.notes ?? undefined,
+    notes: row.notes ?? undefined,
 
-    createdAt:
-      row.created_at,
+    createdAt: row.created_at,
   };
 }
 
@@ -367,10 +340,7 @@ export async function listOrders(
   }
 
   if (options.paymentStatus && options.paymentStatus !== "all") {
-    query = query.eq(
-      "payment_status",
-      options.paymentStatus.toUpperCase(),
-    );
+    query = query.eq("payment_status", options.paymentStatus.toUpperCase());
   }
 
   if (search) {
@@ -417,75 +387,49 @@ export async function listOrders(
 export async function createPublicOrder(
   input: PublicOrderInput,
 ): Promise<PublicOrderResult> {
-  const response =
-    await fetch(
-      "/api/public/orders",
-      {
-        method: "POST",
+  const response = await fetch("/api/public/orders", {
+    method: "POST",
 
-        headers: {
-          "Content-Type":
-            "application/json",
-        },
+    headers: {
+      "Content-Type": "application/json",
+    },
 
-        body:
-          JSON.stringify(input),
-      },
-    );
+    body: JSON.stringify(input),
+  });
 
-  const result =
-    (await response.json()) as {
-      orderId?: string;
-      orderNumber?: string;
+  const result = (await response.json()) as {
+    orderId?: string;
+    orderNumber?: string;
 
-      total?: number;
+    total?: number;
 
-      paymentStatus?: string;
+    paymentStatus?: string;
 
-      paymentReference?:
-        | string
-        | null;
+    paymentReference?: string | null;
 
-      error?: string;
-    };
+    error?: string;
+  };
 
   if (!response.ok) {
     throw orderCreationError(
-      new Error(
-        result.error ||
-          "Unable to place order.",
-      ),
+      new Error(result.error || "Unable to place order."),
     );
   }
 
-  if (
-    !result.orderId ||
-    !result.orderNumber
-  ) {
-    throw new Error(
-      "The order was created without a confirmation number.",
-    );
+  if (!result.orderId || !result.orderNumber) {
+    throw new Error("The order was created without a confirmation number.");
   }
 
   return {
-    orderId:
-      result.orderId,
+    orderId: result.orderId,
 
-    orderNumber:
-      result.orderNumber,
+    orderNumber: result.orderNumber,
 
-    total:
-      Number(result.total),
+    total: Number(result.total),
 
-    paymentStatus:
-      normalizePaymentStatus(
-        result.paymentStatus ||
-          "UNPAID",
-      ),
+    paymentStatus: normalizePaymentStatus(result.paymentStatus || "UNPAID"),
 
-    paymentReference:
-      result.paymentReference ||
-      undefined,
+    paymentReference: result.paymentReference || undefined,
   };
 }
 
@@ -500,81 +444,15 @@ export async function setOrderStatus(
   orderId: string,
   status: OrderStatus,
 ) {
-  const { error } =
-    await client()
-      .from("orders")
-      .update({
-        status:
-          status.toUpperCase(),
-      })
-      .eq(
-        "id",
-        orderId,
-      )
-      .eq(
-        "tenant_id",
-        tenantId,
-      )
-      .select("id")
-      .single();
-
-  if (error) {
-    throw error;
-  }
-}
-
-/**
- * Cancels an order instead of permanently deleting it.
- *
- * SECURITY / DATA-INTEGRITY:
- * ------------------------------------------------------------------
- * Transactional records should remain available for:
- *
- * - payment reconciliation
- * - refunds
- * - dispute handling
- * - customer support
- * - reporting
- * - audit history
- * - email/status history
- *
- * Because OrderStatus already supports "cancelled", the safest
- * immediate replacement for hard deletion is to transition the
- * order into CANCELLED state.
- *
- * IMPORTANT:
- * This does NOT physically delete the order or its order_items.
- * ------------------------------------------------------------------
- */
-export async function cancelOrder(
-  tenantId: string,
-  orderId: string,
-) {
-  const { error } =
-    await client()
-      .from("orders")
-      .update({
-        status: "CANCELLED",
-      })
-      .eq(
-        "id",
-        orderId,
-      )
-      .eq(
-        "tenant_id",
-        tenantId,
-      )
-
-      /**
-       * Prevent repeatedly cancelling an order that is already
-       * cancelled.
-       */
-      .neq(
-        "status",
-        "CANCELLED",
-      )
-      .select("id")
-      .single();
+  const { error } = await client()
+    .from("orders")
+    .update({
+      status: status.toUpperCase(),
+    })
+    .eq("id", orderId)
+    .eq("tenant_id", tenantId)
+    .select("id")
+    .single();
 
   if (error) {
     throw error;

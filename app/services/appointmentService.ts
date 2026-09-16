@@ -12,22 +12,6 @@ import type {
 } from "@/app/types/supabase";
 
 /**
- * Represents the delivery state of an appointment-related email.
- *
- * This allows the UI to determine whether a confirmation email is:
- * - waiting to be processed
- * - currently being processed
- * - successfully sent
- * - permanently failed
- */
-export interface AppointmentEmailDelivery {
-  status: "PENDING" | "PROCESSING" | "SENT" | "FAILED";
-  providerMessageId: string | null;
-  lastError: string | null;
-  sentAt: string | null;
-}
-
-/**
  * Returns the configured Supabase browser client.
  *
  * Appointment management requires Supabase. Throwing here prevents
@@ -223,10 +207,7 @@ function normalizeAppointmentPageSize(value: number | undefined): number {
 
   return Math.min(
     MAX_APPOINTMENT_PAGE_SIZE,
-    Math.max(
-      1,
-      Math.floor(value ?? DEFAULT_APPOINTMENT_PAGE_SIZE),
-    ),
+    Math.max(1, Math.floor(value ?? DEFAULT_APPOINTMENT_PAGE_SIZE)),
   );
 }
 
@@ -250,7 +231,9 @@ function normalizeAppointmentSearch(value: string | undefined): string {
  *
  * Other database failures must not silently fall back to a different query.
  */
-function canFallbackWithoutProvider(error: { message?: string } | null): boolean {
+function canFallbackWithoutProvider(
+  error: { message?: string } | null,
+): boolean {
   const message = error?.message?.toLowerCase() ?? "";
 
   return (
@@ -266,10 +249,12 @@ function canFallbackWithoutProvider(error: { message?: string } | null): boolean
  * Keeping this logic in one helper ensures the preferred and compatibility
  * queries always use the same filters.
  */
-function applyAppointmentFilters<T extends {
-  eq: (column: string, value: string) => T;
-  or: (filters: string) => T;
-}>(
+function applyAppointmentFilters<
+  T extends {
+    eq: (column: string, value: string) => T;
+    or: (filters: string) => T;
+  },
+>(
   query: T,
   tenantId: string,
   options: ListAppointmentsOptions,
@@ -278,10 +263,7 @@ function applyAppointmentFilters<T extends {
   let filtered = query.eq("tenant_id", tenantId);
 
   if (options.status && options.status !== "all") {
-    filtered = filtered.eq(
-      "status",
-      options.status.toUpperCase(),
-    );
+    filtered = filtered.eq("status", options.status.toUpperCase());
   }
 
   if (search) {
@@ -381,8 +363,7 @@ export async function listAppointments(
   }
 
   const appointments = rows.map(mapAppointment);
-  const totalPages =
-    total === 0 ? 0 : Math.ceil(total / safePageSize);
+  const totalPages = total === 0 ? 0 : Math.ceil(total / safePageSize);
 
   return {
     appointments,
@@ -555,61 +536,3 @@ export async function assignAppointmentProvider(
  * payment, email, service-provider and reporting history can remain
  * associated with the original transaction.
  */
-
-/**
- * Returns delivery information for an appointment confirmation email.
- */
-export async function getAppointmentEmailDelivery(
-  appointmentId: string,
-): Promise<AppointmentEmailDelivery | null> {
-  const { data, error } = await client()
-    .from("appointment_email_deliveries")
-    .select("status, provider_message_id, last_error, sent_at")
-    .eq("appointment_id", appointmentId)
-    .eq("event_type", "APPOINTMENT_CONFIRMED")
-    .maybeSingle();
-
-  if (error) {
-    throw error;
-  }
-
-  if (!data) {
-    return null;
-  }
-
-  return {
-    status: data.status as AppointmentEmailDelivery["status"],
-
-    providerMessageId: data.provider_message_id as string | null,
-
-    lastError: data.last_error as string | null,
-
-    sentAt: data.sent_at as string | null,
-  };
-}
-
-/**
- * Polls the appointment email delivery record until the email reaches
- * a terminal state or the maximum number of attempts is reached.
- *
- * This does not send the email itself. It only observes the delivery
- * record maintained by the email processing system.
- */
-export async function waitForAppointmentEmailDelivery(
-  appointmentId: string,
-  attempts = 8,
-): Promise<AppointmentEmailDelivery | null> {
-  let latest: AppointmentEmailDelivery | null = null;
-
-  for (let attempt = 0; attempt < attempts; attempt += 1) {
-    latest = await getAppointmentEmailDelivery(appointmentId);
-
-    if (latest?.status === "SENT" || latest?.status === "FAILED") {
-      return latest;
-    }
-
-    await new Promise((resolve) => window.setTimeout(resolve, 1000));
-  }
-
-  return latest;
-}

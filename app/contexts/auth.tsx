@@ -54,6 +54,11 @@ interface AuthContextType {
     password: string,
     rememberMe?: boolean,
   ) => Promise<AuthActionResult>;
+  switchAccount: (
+    email: string,
+    password: string,
+    rememberMe?: boolean,
+  ) => Promise<AuthActionResult>;
   signup: (
     email: string,
     password: string,
@@ -68,6 +73,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   isLoading: boolean;
   isSwitchingBusiness: boolean;
+  isSwitchingAccount: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -119,6 +125,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [businesses, setBusinesses] = useState<Tenant[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSwitchingBusiness, setIsSwitchingBusiness] = useState(false);
+  const [isSwitchingAccount, setIsSwitchingAccount] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -365,6 +372,69 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { success: true, user: newUser };
   };
 
+  /**
+   * Re-authenticates as a different identity, then hydrates only the tenant
+   * memberships belonging to that identity. Passwords and secondary sessions
+   * are never retained by the account switcher.
+   */
+  const switchAccount = async (
+    email: string,
+    password: string,
+    rememberMe = true,
+  ): Promise<AuthActionResult> => {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (normalizedEmail === user?.email.trim().toLowerCase()) {
+      return {
+        success: false,
+        error: "Enter the email address for a different account.",
+      };
+    }
+
+    setIsSwitchingAccount(true);
+    try {
+      if (isSupabaseConfigured()) {
+        const result = await supabaseLogin(normalizedEmail, password);
+        if (!result.user) {
+          return {
+            success: false,
+            error: result.error ?? "Unable to switch accounts.",
+          };
+        }
+
+        saveSessionPreference(rememberMe);
+        setUser(result.user);
+        setTenant(result.tenant ?? null);
+        setBusinesses(result.businesses ?? []);
+        return { success: true, user: result.user };
+      }
+
+      if (!isDemoModeEnabled()) {
+        return { success: false, error: missingSupabaseConfigMessage };
+      }
+
+      const account = demoAccounts.find(
+        (candidate) =>
+          candidate.email.toLowerCase() === normalizedEmail &&
+          candidate.password === password,
+      );
+      const demoUser = account ? getUserByEmail(account.email) : null;
+      if (!demoUser) {
+        return { success: false, error: "Invalid email or password." };
+      }
+
+      const demoTenant = demoUser.tenantId
+        ? (getTenantById(demoUser.tenantId) ?? null)
+        : null;
+      saveDemoSession(demoUser, rememberMe);
+      setUser(demoUser);
+      setTenant(demoTenant);
+      setBusinesses(demoTenant ? [demoTenant] : []);
+      return { success: true, user: demoUser };
+    } finally {
+      setIsSwitchingAccount(false);
+    }
+  };
+
   const logout = async () => {
     setIsLoading(true);
     if (isSupabaseConfigured()) await supabaseLogout();
@@ -461,10 +531,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         switchBusiness,
         addBusiness,
         login,
+        switchAccount,
         signup,
         logout,
         isLoading,
         isSwitchingBusiness,
+        isSwitchingAccount,
       }}
     >
       {children}

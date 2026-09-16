@@ -247,9 +247,7 @@ export async function sendTransactionalEmail(
       providerError: error?.message ?? "Missing provider message ID",
     });
 
-    throw new Error(
-      error?.message || "Resend did not return a message ID.",
-    );
+    throw new Error(error?.message || "Resend did not return a message ID.");
   }
 
   /* ----------------------------------------------------------------

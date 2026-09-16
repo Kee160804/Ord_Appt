@@ -410,7 +410,7 @@ export function TeamAccessView({ tenant }: { tenant: Tenant }) {
                 key={member.membershipId}
                 className="flex flex-col gap-3 rounded-2xl border border-slate-700 p-4 light:border-slate-200 sm:flex-row sm:items-center"
               >
-                <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-violet-500/15 text-xs font-black text-violet-300 light:text-violet-700">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-violet-500/15 text-xs font-black text-violet-300 light:text-violet-700">
                   {member.name
                     .split(/\s+/)
                     .map((part) => part[0])

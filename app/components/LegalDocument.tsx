@@ -19,7 +19,7 @@ export function LegalDocument({
       <header className="border-b border-white/10 light:border-slate-200">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-5 py-5 sm:px-8">
           <Link href="/" className="flex items-center gap-2 font-black">
-            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 text-white">
+            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-linear-to-br from-violet-500 to-indigo-600 text-white">
               <Sparkles className="h-4 w-4" />
             </span>
             YuhBusiness

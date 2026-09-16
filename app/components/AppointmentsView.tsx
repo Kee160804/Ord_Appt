@@ -106,18 +106,13 @@ export function AppointmentsView({ tenant }: Props) {
               appointment.customerEmail,
               appointment.customerPhone,
               appointment.serviceName,
-            ].some((value) =>
-              value?.toLowerCase().includes(normalizedSearch),
-            );
+            ].some((value) => value?.toLowerCase().includes(normalizedSearch));
           },
         );
 
         const pageSize = 25;
         const from = page * pageSize;
-        const pageAppointments = filteredMock.slice(
-          from,
-          from + pageSize,
-        );
+        const pageAppointments = filteredMock.slice(from, from + pageSize);
         const totalPages =
           filteredMock.length === 0
             ? 0
@@ -135,8 +130,7 @@ export function AppointmentsView({ tenant }: Props) {
           total: filteredMock.length,
           totalPages,
           hasPreviousPage: page > 0,
-          hasNextPage:
-            from + pageAppointments.length < filteredMock.length,
+          hasNextPage: from + pageAppointments.length < filteredMock.length,
         });
         setSelected((current) =>
           current
@@ -344,8 +338,6 @@ export function AppointmentsView({ tenant }: Props) {
     }
   };
 
-
-
   const assignProvider = async (providerId: string) => {
     if (!selected) return;
     setUpdatingId(selected.id);
@@ -541,7 +533,7 @@ export function AppointmentsView({ tenant }: Props) {
               className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-slate-800/70 light:hover:bg-[#fafbfe]"
             >
               {/* Date badge */}
-              <div className="flex h-10 w-10 flex-shrink-0 flex-col items-center justify-center rounded-lg bg-violet-500/20 light:bg-violet-50">
+              <div className="flex h-10 w-10 shrink-0 flex-col items-center justify-center rounded-lg bg-violet-500/20 light:bg-violet-50">
                 <span className="text-xs font-bold text-violet-400 light:text-violet-700 leading-none">
                   {apt.date.split("-")[2]}
                 </span>
@@ -567,7 +559,7 @@ export function AppointmentsView({ tenant }: Props) {
                   {formatDuration(apt.duration)}
                 </p>
               </div>
-              <div className="hidden sm:flex items-center gap-3 flex-shrink-0">
+              <div className="hidden shrink-0 items-center gap-3 sm:flex">
                 <div className="text-right">
                   <p className="text-xs font-bold text-white light:text-[#17223a]">
                     {formatCurrency(apt.servicePrice)}
@@ -575,7 +567,7 @@ export function AppointmentsView({ tenant }: Props) {
                   <StatusBadge status={apt.paymentStatus} />
                 </div>
               </div>
-              <ChevronRight className="w-4 h-4 text-slate-500 light:text-gray-400 flex-shrink-0" />
+              <ChevronRight className="h-4 w-4 shrink-0 text-slate-500 light:text-gray-400" />
             </button>
           ))}
         </div>
@@ -593,9 +585,7 @@ export function AppointmentsView({ tenant }: Props) {
             variant="outline"
             size="sm"
             disabled={isLoading || !pagination.hasPreviousPage}
-            onClick={() =>
-              setPage((current) => Math.max(0, current - 1))
-            }
+            onClick={() => setPage((current) => Math.max(0, current - 1))}
           >
             <ChevronLeft className="mr-1 h-3.5 w-3.5" />
             Previous
@@ -811,7 +801,6 @@ export function AppointmentsView({ tenant }: Props) {
           </div>
         )}
       </Modal>
-
     </div>
   );
 }

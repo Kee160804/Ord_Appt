@@ -105,12 +105,12 @@ export function BusinessSwitcher({
         }
         aria-label={`Switch business. Current business: ${tenant.name}`}
         className={cn(
-          "group flex w-full items-center gap-3 rounded-xl px-1 py-1 text-left transition hover:bg-white/[0.05] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400",
+          "group flex w-full items-center gap-3 rounded-xl px-1 py-1 text-left transition hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400",
           collapsed && "justify-center",
         )}
       >
         <span
-          className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg text-xs font-bold text-white shadow-sm"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-xs font-bold text-white shadow-sm"
           style={{ backgroundColor: tenant.logoBg }}
         >
           {tenant.logo}
@@ -129,7 +129,7 @@ export function BusinessSwitcher({
                     : "Ordering"}
               </span>
             </span>
-            <ChevronRight className="h-3.5 w-3.5 flex-shrink-0 text-slate-500 transition group-hover:text-violet-300" />
+            <ChevronRight className="h-3.5 w-3.5 shrink-0 text-slate-500 transition group-hover:text-violet-300" />
           </>
         )}
       </button>
@@ -218,7 +218,7 @@ export function BusinessSwitcher({
             <label className="block text-xs font-semibold text-slate-200 light:text-slate-700">
               Storefront address
               <div className="mt-1.5 flex min-w-0 items-center rounded-xl border border-slate-600 bg-slate-900/70 px-3 light:border-slate-300 light:bg-white">
-                <span className="flex-shrink-0 text-xs text-slate-500">
+                <span className="shrink-0 text-xs text-slate-500">
                   /store-front/
                 </span>
                 <input
@@ -286,7 +286,7 @@ export function BusinessSwitcher({
                     )}
                   >
                     <span
-                      className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl text-sm font-black text-white"
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-black text-white"
                       style={{ backgroundColor: business.logoBg }}
                     >
                       {business.logo}

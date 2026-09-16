@@ -808,8 +808,12 @@ export function OrderingMenu({
                             </span>
                             <div className="flex items-center gap-2">
                               <button
-                                onClick={() => cartItem && updateQty(cartItem, -1)}
-                                disabled={!cartItem || productCartItems.length > 1}
+                                onClick={() =>
+                                  cartItem && updateQty(cartItem, -1)
+                                }
+                                disabled={
+                                  !cartItem || productCartItems.length > 1
+                                }
                                 className="flex h-7 w-8 items-center justify-center rounded-full bg-[#1a2840] text-[#aab8cc] transition hover:bg-[#243550] disabled:opacity-35 light:bg-slate-100 light:text-slate-600"
                                 aria-label={`Decrease ${product.name} quantity`}
                               >
@@ -837,7 +841,7 @@ export function OrderingMenu({
                           <button
                             onClick={() => openAddModal(product)}
                             disabled={soldOut || stockLimitReached}
-                            className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-violet-700 to-violet-600 px-3 py-2.5 text-xs font-bold text-white shadow-[0_8px_20px_rgba(109,40,217,0.24)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:from-slate-700 disabled:to-slate-700 disabled:text-slate-400"
+                            className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-linear-to-r from-violet-700 to-violet-600 px-3 py-2.5 text-xs font-bold text-white shadow-[0_8px_20px_rgba(109,40,217,0.24)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:from-slate-700 disabled:to-slate-700 disabled:text-slate-400"
                           >
                             <ShoppingCart className="h-3.5 w-3.5" />
                             {soldOut
@@ -1102,7 +1106,7 @@ export function OrderingMenu({
                       key={cartLineKey(item)}
                       className="flex gap-3 rounded-xl border border-[#26364f] bg-[#111d30] p-3 light:border-slate-200 light:bg-slate-50"
                     >
-                      <div className="relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-lg bg-[#172238] light:bg-slate-100">
+                      <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-[#172238] light:bg-slate-100">
                         <Image
                           src={item.image || PLACEHOLDER_IMG}
                           alt={item.name}
@@ -1144,9 +1148,7 @@ export function OrderingMenu({
                         )}
                         <div className="flex items-center gap-1.5 mt-1.5">
                           <button
-                            onClick={() =>
-                              updateQty(item, -1)
-                            }
+                            onClick={() => updateQty(item, -1)}
                             className="w-5 h-5 rounded border border-slate-200 dark:border-slate-600 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-700 transition"
                             aria-label="Decrease quantity"
                           >
@@ -1156,9 +1158,7 @@ export function OrderingMenu({
                             {item.quantity}
                           </span>
                           <button
-                            onClick={() =>
-                              updateQty(item, 1)
-                            }
+                            onClick={() => updateQty(item, 1)}
                             className="w-5 h-5 rounded border border-slate-200 dark:border-slate-600 flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-700 transition"
                             aria-label="Increase quantity"
                           >
@@ -1232,7 +1232,7 @@ export function OrderingMenu({
                     !orderingSettings.enabled ||
                     orderingSettings.paused
                   }
-                  className="w-full rounded-xl bg-gradient-to-r from-violet-700 via-violet-600 to-purple-600 py-3.5 text-sm font-black text-white shadow-[0_12px_30px_rgba(109,40,217,0.3)] hover:brightness-110"
+                  className="w-full rounded-xl bg-linear-to-r from-violet-700 via-violet-600 to-purple-600 py-3.5 text-sm font-black text-white shadow-[0_12px_30px_rgba(109,40,217,0.3)] hover:brightness-110"
                 >
                   <ShoppingCart className="h-5 w-5" />
                   {viewOnly
@@ -1320,7 +1320,7 @@ export function OrderingMenu({
         {currentProduct && (
           <div className="space-y-4">
             <div className="flex flex-col gap-4 sm:flex-row">
-              <div className="relative w-24 h-24 flex-shrink-0 bg-slate-100 dark:bg-slate-700 rounded-xl overflow-hidden">
+              <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-slate-100 dark:bg-slate-700">
                 <Image
                   src={currentProduct.image || PLACEHOLDER_IMG}
                   alt={currentProduct.name}
@@ -1515,8 +1515,7 @@ function RetailProductOptions({
    */
   const existingQuantity = cart
     .filter(
-      (item) =>
-        item.id === product.id && item.variantId === selectedVariantId,
+      (item) => item.id === product.id && item.variantId === selectedVariantId,
     )
     .reduce((sum, item) => sum + item.quantity, 0);
 
@@ -1559,7 +1558,7 @@ function RetailProductOptions({
   return (
     <div className="space-y-6 pb-1">
       <div className="grid gap-5 sm:grid-cols-[180px_minmax(0,1fr)] sm:items-center">
-        <div className="relative mx-auto aspect-square w-full max-w-[240px] overflow-hidden rounded-2xl bg-[#eef1f6] dark:bg-[#111b2c]">
+        <div className="relative mx-auto aspect-square w-full max-w-60 overflow-hidden rounded-2xl bg-[#eef1f6] dark:bg-[#111b2c]">
           <Image
             src={product.image || PLACEHOLDER_IMG}
             alt={product.name}
@@ -1726,7 +1725,7 @@ function RetailProductOptions({
         size="lg"
         onClick={onAddToCart}
         disabled={!canAdd}
-        className="w-full rounded-2xl border-0 bg-gradient-to-r from-violet-700 via-violet-600 to-purple-600 py-3.5 font-black text-white shadow-[0_12px_28px_rgba(109,40,217,0.32)] hover:brightness-110"
+        className="w-full rounded-2xl border-0 bg-linear-to-r from-violet-700 via-violet-600 to-purple-600 py-3.5 font-black text-white shadow-[0_12px_28px_rgba(109,40,217,0.32)] hover:brightness-110"
       >
         <ShoppingBag className="h-5 w-5" />
         {remainingStock === 0 ? "Stock already in bag" : "Add to Bag"} —{" "}
@@ -1773,7 +1772,7 @@ function CategoryPill({
       onClick={onClick}
       className={`shrink-0 rounded-full border px-5 py-2.5 text-xs font-bold transition ${
         active
-          ? "border-violet-500 bg-gradient-to-r from-violet-700 to-violet-600 text-white shadow-[0_8px_22px_rgba(109,40,217,0.28)]"
+          ? "border-violet-500 bg-linear-to-r from-violet-700 to-violet-600 text-white shadow-[0_8px_22px_rgba(109,40,217,0.28)]"
           : "border-[#1f2d43] bg-[#111b2c] text-[#c1ccdd] hover:border-[#354864] hover:bg-[#17243a] light:border-slate-200 light:bg-white light:text-slate-700 light:hover:bg-slate-50"
       }`}
     >

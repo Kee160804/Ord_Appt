@@ -181,7 +181,7 @@ export default function AdminPage() {
           onToggleTheme={toggleTheme}
           theme={theme}
         />
-        <main className="mx-auto max-w-[1600px] px-4 pb-10 pt-5 sm:px-6 lg:px-8">
+        <main className="mx-auto max-w-400 px-4 pb-10 pt-5 sm:px-6 lg:px-8">
           {error && (
             <div className="mb-5 flex items-start gap-3 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300 light:text-red-700">
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -259,7 +259,7 @@ function AdminSidebar({
       )}
     >
       <div className="mb-7 flex items-center gap-3 px-2">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-indigo-700 text-white shadow-lg shadow-violet-900/30">
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-linear-to-br from-violet-500 to-indigo-700 text-white shadow-lg shadow-violet-900/30">
           <Sparkles className="h-5 w-5" />
         </div>
         <div className="min-w-0 flex-1">
@@ -343,11 +343,11 @@ function AdminHeader({
 }) {
   return (
     <header className="pwa-admin-header-safe sticky top-0 z-30 border-b border-slate-800/80 bg-[#070d19]/90 px-4 pb-4 backdrop-blur-xl light:border-slate-200 light:bg-[#f5f7fb]/90 sm:px-6 lg:px-8">
-      <div className="mx-auto flex max-w-[1600px] items-center justify-between gap-2 sm:gap-4">
+      <div className="mx-auto flex max-w-400 items-center justify-between gap-2 sm:gap-4">
         <div className="flex min-w-0 items-center gap-3">
           <button
             aria-label="Open navigation"
-            className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl border border-slate-800 text-slate-400 hover:text-white light:border-slate-200 light:hover:text-slate-900 lg:hidden"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-800 text-slate-400 hover:text-white light:border-slate-200 light:hover:text-slate-900 lg:hidden"
             onClick={onMenu}
           >
             <Menu className="h-5 w-5" />
@@ -365,7 +365,7 @@ function AdminHeader({
             </p>
           </div>
         </div>
-        <div className="flex flex-shrink-0 items-center gap-1.5 sm:gap-2">
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
           <div
             suppressHydrationWarning
             className="hidden items-center gap-2 rounded-xl border border-slate-800 bg-slate-900/50 px-3 py-2 text-xs text-slate-400 light:border-slate-200 light:bg-white light:text-slate-600 md:flex"
@@ -437,7 +437,7 @@ function OverviewView({
     .map((point) => point.activity);
   return (
     <div className="space-y-5">
-      <section className="relative overflow-hidden rounded-2xl border border-violet-500/25 bg-gradient-to-r from-[#14102d] via-[#101736] to-[#102456] p-6 shadow-[0_20px_60px_rgba(37,23,100,0.2)] light:from-violet-50 light:via-indigo-50 light:to-blue-50 sm:p-7">
+      <section className="relative overflow-hidden rounded-2xl border border-violet-500/25 bg-linear-to-r from-[#14102d] via-[#101736] to-[#102456] p-6 shadow-[0_20px_60px_rgba(37,23,100,0.2)] light:from-violet-50 light:via-indigo-50 light:to-blue-50 sm:p-7">
         <div className="relative z-10">
           <p className="text-sm text-slate-300 light:text-slate-600">
             Good day, Super Admin! <span aria-hidden>👋</span>
@@ -455,7 +455,7 @@ function OverviewView({
           {[40, 64, 52, 92, 76, 118].map((height, index) => (
             <span
               key={`${height}-${index}`}
-              className="w-5 rounded-t-md border border-violet-300/40 bg-gradient-to-t from-violet-600/60 to-cyan-400/40"
+              className="w-5 rounded-t-md border border-violet-300/40 bg-linear-to-t from-violet-600/60 to-cyan-400/40"
               style={{ height }}
             />
           ))}
@@ -650,7 +650,7 @@ function PlatformChart({ points }: { points: AdminRevenuePoint[] }) {
     <div className="overflow-x-auto">
       <svg
         aria-label="Revenue and activity over the last 30 days"
-        className="h-[250px] min-w-[620px] w-full"
+        className="h-62.5 min-w-155 w-full"
         preserveAspectRatio="none"
         viewBox="0 0 720 250"
         role="img"
@@ -927,7 +927,7 @@ function TenantView({
         </ManagementFilters>
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[900px] text-left">
+          <table className="w-full min-w-225 text-left">
             <thead>
               <tr className="border-b border-slate-800 text-[10px] uppercase tracking-wider text-slate-500 light:border-slate-200">
                 <th className="px-5 py-3 font-semibold">Tenant</th>
@@ -1101,7 +1101,7 @@ function AgentView({
         </ManagementFilters>
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[850px] text-left">
+          <table className="w-full min-w-212.5 text-left">
             <thead>
               <tr className="border-b border-slate-800 text-[10px] uppercase tracking-wider text-slate-500 light:border-slate-200">
                 <th className="px-5 py-3 font-semibold">Agent</th>
@@ -1603,7 +1603,7 @@ function ManagementPanel({
           (onAction ? (
             <button
               onClick={onAction}
-              className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 px-4 py-2.5 text-xs font-semibold text-white shadow-md transition hover:from-violet-500 hover:to-purple-500 active:scale-95"
+              className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-linear-to-r from-violet-600 to-purple-600 px-4 py-2.5 text-xs font-semibold text-white shadow-md transition hover:from-violet-500 hover:to-purple-500 active:scale-95"
               title={action}
             >
               <Plus className="h-4 w-4" />
@@ -1611,7 +1611,7 @@ function ManagementPanel({
             </button>
           ) : (
             <button
-              className="inline-flex cursor-not-allowed items-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 px-4 py-2.5 text-xs font-semibold text-white opacity-60"
+              className="inline-flex cursor-not-allowed items-center gap-2 rounded-xl bg-linear-to-r from-violet-600 to-purple-600 px-4 py-2.5 text-xs font-semibold text-white opacity-60"
               disabled
               title="Requires a secured and audited admin write action"
             >

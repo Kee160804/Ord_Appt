@@ -1,3 +1,14 @@
 {
-  "deno.enablePaths": ["./supabase/functions", "./supabase/send-appointment-email.ts"]
+  "css.lint.unknownAtRules": "ignore",
+  "deno.enablePaths": ["./supabase/functions"],
+  "deno.lint": true,
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "files.eol": "\n",
+  "[typescript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[typescriptreact]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  }
 }

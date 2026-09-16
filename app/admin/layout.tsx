@@ -55,8 +55,7 @@ export default async function AdminLayout({
    * auth.getUser() verifies the session against Supabase rather than
    * trusting client-side state.
    */
-  const { data: authData, error: authError } =
-    await supabase.auth.getUser();
+  const { data: authData, error: authError } = await supabase.auth.getUser();
 
   if (authError || !authData.user) {
     /**
@@ -116,9 +115,5 @@ export default async function AdminLayout({
      5. RENDER PROTECTED ADMIN AREA
      ================================================================ */
 
-  return (
-    <div className="min-h-dvh bg-slate-50 light:bg-white">
-      {children}
-    </div>
-  );
+  return <div className="min-h-dvh bg-slate-50 light:bg-white">{children}</div>;
 }

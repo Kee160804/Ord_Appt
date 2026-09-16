@@ -34,10 +34,7 @@ interface ContactRequest {
 /**
  * Return uncached responses from this public mutation endpoint.
  */
-function json(
-  body: Record<string, unknown>,
-  status = 200,
-): Response {
+function json(body: Record<string, unknown>, status = 200): Response {
   return Response.json(body, {
     status,
     headers: {
@@ -61,9 +58,7 @@ function json(
  * 6. Apply distributed rate limiting.
  * 7. Submit through the authoritative Supabase RPC.
  */
-export async function POST(
-  request: Request,
-): Promise<Response> {
+export async function POST(request: Request): Promise<Response> {
   /* -----------------------------------------------------------------------
      1. SAME-ORIGIN PROTECTION
      ----------------------------------------------------------------------- */
@@ -82,11 +77,7 @@ export async function POST(
        2. READ BOUNDED JSON BODY
        --------------------------------------------------------------------- */
 
-    const body =
-      await readJsonBody<ContactRequest>(
-        request,
-        16_384,
-      );
+    const body = await readJsonBody<ContactRequest>(request, 16_384);
 
     /* ---------------------------------------------------------------------
        3. HONEYPOT / BASIC BOT PROTECTION
@@ -105,31 +96,21 @@ export async function POST(
        4. NORMALIZE PUBLIC INPUT
        --------------------------------------------------------------------- */
 
-    const tenantId =
-      body.tenantId?.trim() || "";
+    const tenantId = body.tenantId?.trim() || "";
 
-    const name =
-      body.name?.trim() || "";
+    const name = body.name?.trim() || "";
 
-    const email =
-      body.email
-        ?.trim()
-        .toLowerCase() || "";
+    const email = body.email?.trim().toLowerCase() || "";
 
-    const subject =
-      body.subject?.trim() || "";
+    const subject = body.subject?.trim() || "";
 
-    const message =
-      body.message?.trim() || "";
+    const message = body.message?.trim() || "";
 
     /* ---------------------------------------------------------------------
        5. VALIDATE TENANT + EMAIL
        --------------------------------------------------------------------- */
 
-    if (
-      !isValidUuid(tenantId) ||
-      !isValidEmail(email)
-    ) {
+    if (!isValidUuid(tenantId) || !isValidEmail(email)) {
       return json(
         {
           error: "Invalid contact request.",
@@ -142,14 +123,10 @@ export async function POST(
        6. VALIDATE NAME
        --------------------------------------------------------------------- */
 
-    if (
-      name.length < 2 ||
-      name.length > MAX_NAME_LENGTH
-    ) {
+    if (name.length < 2 || name.length > MAX_NAME_LENGTH) {
       return json(
         {
-          error:
-            "Enter a valid name.",
+          error: "Enter a valid name.",
         },
         400,
       );
@@ -159,14 +136,10 @@ export async function POST(
        7. VALIDATE SUBJECT
        --------------------------------------------------------------------- */
 
-    if (
-      subject.length < 2 ||
-      subject.length > MAX_SUBJECT_LENGTH
-    ) {
+    if (subject.length < 2 || subject.length > MAX_SUBJECT_LENGTH) {
       return json(
         {
-          error:
-            "Enter a valid subject.",
+          error: "Enter a valid subject.",
         },
         400,
       );
@@ -180,10 +153,7 @@ export async function POST(
        the actual message.
        --------------------------------------------------------------------- */
 
-    if (
-      message.length < 2 ||
-      message.length > MAX_MESSAGE_LENGTH
-    ) {
+    if (message.length < 2 || message.length > MAX_MESSAGE_LENGTH) {
       return json(
         {
           error:
@@ -205,20 +175,17 @@ export async function POST(
        distributed limiter in production.
        --------------------------------------------------------------------- */
 
-    const rate =
-      await enforcePublicRateLimit(
-        request,
-        "contact",
-        tenantId,
-        email,
-        3,
-        900,
-      );
+    const rate = await enforcePublicRateLimit(
+      request,
+      "contact",
+      tenantId,
+      email,
+      3,
+      900,
+    );
 
     if (!rate.allowed) {
-      return rateLimitResponse(
-        rate.retryAfter,
-      );
+      return rateLimitResponse(rate.retryAfter);
     }
 
     /* ---------------------------------------------------------------------
@@ -228,13 +195,11 @@ export async function POST(
     let supabase;
 
     try {
-      supabase =
-        getSupabaseAdminClient();
+      supabase = getSupabaseAdminClient();
     } catch {
       return json(
         {
-          error:
-            "Storefront messaging is not configured.",
+          error: "Storefront messaging is not configured.",
         },
         503,
       );
@@ -249,26 +214,20 @@ export async function POST(
        remains responsible for tenant/business validation and persistence.
        --------------------------------------------------------------------- */
 
-    const { data, error } =
-      await supabase.rpc(
-        "submit_storefront_contact_message",
-        {
-          p_tenant_id:
-            tenantId,
+    const { data, error } = await supabase.rpc(
+      "submit_storefront_contact_message",
+      {
+        p_tenant_id: tenantId,
 
-          p_sender_name:
-            name,
+        p_sender_name: name,
 
-          p_sender_email:
-            email,
+        p_sender_email: email,
 
-          p_subject:
-            subject,
+        p_subject: subject,
 
-          p_message:
-            message,
-        },
-      );
+        p_message: message,
+      },
+    );
 
     /* ---------------------------------------------------------------------
        12. SAFE BUSINESS-RULE ERROR HANDLING
@@ -296,23 +255,17 @@ export async function POST(
       typeof data === "string"
         ? data
         : Array.isArray(data)
-          ? data[0]?.message_id ??
-            data[0]?.id
-          : data?.message_id ??
-            data?.id;
+          ? (data[0]?.message_id ?? data[0]?.id)
+          : (data?.message_id ?? data?.id);
 
-    if (
-      !messageId ||
-      typeof messageId !== "string"
-    ) {
+    if (!messageId || typeof messageId !== "string") {
       console.error(
         "[public-contact] Contact RPC returned no message identifier.",
       );
 
       return json(
         {
-          error:
-            "Your message could not be confirmed. Please try again.",
+          error: "Your message could not be confirmed. Please try again.",
         },
         502,
       );
@@ -330,42 +283,29 @@ export async function POST(
        15. REQUEST PARSING FAILURES
        --------------------------------------------------------------------- */
 
-    if (
-      error instanceof Error &&
-      error.message ===
-        "REQUEST_TOO_LARGE"
-    ) {
+    if (error instanceof Error && error.message === "REQUEST_TOO_LARGE") {
       return json(
         {
-          error:
-            "The contact request is too large.",
+          error: "The contact request is too large.",
         },
         413,
       );
     }
 
-    if (
-      error instanceof Error &&
-      error.message === "INVALID_JSON"
-    ) {
+    if (error instanceof Error && error.message === "INVALID_JSON") {
       return json(
         {
-          error:
-            "Invalid contact request.",
+          error: "Invalid contact request.",
         },
         400,
       );
     }
 
-    console.error(
-      "[public-contact] Unexpected request failure.",
-      error,
-    );
+    console.error("[public-contact] Unexpected request failure.", error);
 
     return json(
       {
-        error:
-          "Invalid contact request.",
+        error: "Invalid contact request.",
       },
       400,
     );

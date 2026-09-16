@@ -95,12 +95,9 @@ export async function GET(request: NextRequest) {
   const tokenHash = request.nextUrl.searchParams.get("token_hash");
   const code = request.nextUrl.searchParams.get("code");
 
-  const type = request.nextUrl.searchParams.get(
-    "type",
-  ) as EmailOtpType | null;
+  const type = request.nextUrl.searchParams.get("type") as EmailOtpType | null;
 
-  const requestedNext =
-    request.nextUrl.searchParams.get("next");
+  const requestedNext = request.nextUrl.searchParams.get("next");
 
   /**
    * SECURITY FIX:
@@ -118,10 +115,7 @@ export async function GET(request: NextRequest) {
    *
    * which could resolve to an external origin.
    */
-  const next = getSafeRedirectPath(
-    requestedNext,
-    request.url,
-  );
+  const next = getSafeRedirectPath(requestedNext, request.url);
 
   /* ================================================================
      2. ATTEMPT SUPABASE AUTH CONFIRMATION
@@ -156,10 +150,7 @@ export async function GET(request: NextRequest) {
          * request.nextUrl.origin is used explicitly so the callback
          * can never redirect to an external host.
          */
-        const destination = new URL(
-          next,
-          request.nextUrl.origin,
-        );
+        const destination = new URL(next, request.nextUrl.origin);
 
         /**
          * Password recovery links need a recovery flag so the
@@ -170,9 +161,7 @@ export async function GET(request: NextRequest) {
          */
         const isRecoveryFlow =
           type === "recovery" ||
-          destination.pathname.startsWith(
-            "/reset-password",
-          );
+          destination.pathname.startsWith("/reset-password");
 
         destination.searchParams.set(
           isRecoveryFlow ? "recovery" : "confirmed",
@@ -195,16 +184,10 @@ export async function GET(request: NextRequest) {
    * We inspect the already validated destination rather than the raw
    * user-controlled `next` value.
    */
-  const safeNextUrl = new URL(
-    next,
-    request.nextUrl.origin,
-  );
+  const safeNextUrl = new URL(next, request.nextUrl.origin);
 
   const isPasswordRecovery =
-    type === "recovery" ||
-    safeNextUrl.pathname.startsWith(
-      "/reset-password",
-    );
+    type === "recovery" || safeNextUrl.pathname.startsWith("/reset-password");
 
   /**
    * Failed recovery callbacks stay on the reset-password page so the
@@ -213,9 +196,7 @@ export async function GET(request: NextRequest) {
    * Other failed confirmations return to login.
    */
   const errorDestination = new URL(
-    isPasswordRecovery
-      ? "/reset-password"
-      : "/login",
+    isPasswordRecovery ? "/reset-password" : "/login",
     request.nextUrl.origin,
   );
 

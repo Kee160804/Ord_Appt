@@ -323,22 +323,16 @@ export function OrdersView({ tenant }: Props) {
         await loadOrders();
       }
 
-      setNotice(
-        `Order ${order.orderNumber} marked ${capitalise(status)}.`,
-      );
+      setNotice(`Order ${order.orderNumber} marked ${capitalise(status)}.`);
     } catch (updateError) {
       /**
        * Restore the original row when persistence fails.
        */
       setOrders((previous) =>
-        previous.map((candidate) =>
-          candidate.id === id ? order : candidate,
-        ),
+        previous.map((candidate) => (candidate.id === id ? order : candidate)),
       );
 
-      setSelected((current) =>
-        current?.id === id ? order : current,
-      );
+      setSelected((current) => (current?.id === id ? order : current));
 
       setError(
         updateError instanceof Error
@@ -416,31 +410,25 @@ export function OrdersView({ tenant }: Props) {
         </div>
 
         <div className="flex w-fit max-w-full items-center gap-1 overflow-x-auto rounded-lg border border-slate-700/60 bg-slate-900/70 p-1 light:border-[#e5e9f1] light:bg-white">
-          {(["all", ...statusTabs] as (OrderStatus | "all")[]).map(
-            (tab) => (
-              <button
-                key={tab}
-                type="button"
-                onClick={() => changeFilter(tab)}
-                className={cn(
-                  "whitespace-nowrap rounded-md px-3 py-1.5 text-[10px] font-medium capitalize transition-all",
-                  filter === tab
-                    ? "bg-violet-600 text-white shadow-sm light:bg-violet-600 light:text-white"
-                    : "text-slate-400 hover:text-white light:text-slate-600 light:hover:text-gray-900",
-                )}
-              >
-                {tab.replaceAll("_", " ")}
-              </button>
-            ),
-          )}
+          {(["all", ...statusTabs] as (OrderStatus | "all")[]).map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => changeFilter(tab)}
+              className={cn(
+                "whitespace-nowrap rounded-md px-3 py-1.5 text-[10px] font-medium capitalize transition-all",
+                filter === tab
+                  ? "bg-violet-600 text-white shadow-sm light:bg-violet-600 light:text-white"
+                  : "text-slate-400 hover:text-white light:text-slate-600 light:hover:text-gray-900",
+              )}
+            >
+              {tab.replaceAll("_", " ")}
+            </button>
+          ))}
         </div>
       </div>
 
-      {isLoading && (
-        <p className="text-xs text-slate-400">
-          Loading orders...
-        </p>
-      )}
+      {isLoading && <p className="text-xs text-slate-400">Loading orders...</p>}
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* ----------------------------------------------------------------
@@ -472,7 +460,7 @@ export function OrdersView({ tenant }: Props) {
               >
                 <div
                   className={cn(
-                    "flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl border text-sm font-bold",
+                    "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border text-sm font-bold",
                     STATUS_BG[order.status],
                   )}
                 >
@@ -491,13 +479,11 @@ export function OrdersView({ tenant }: Props) {
                   <p className="mt-0.5 text-xs text-slate-400 light:text-gray-600">
                     {order.customerName} · {order.items.length} item
                     {order.items.length !== 1 ? "s" : ""}
-                    {order.pickupTime
-                      ? ` · Pickup ${order.pickupTime}`
-                      : ""}
+                    {order.pickupTime ? ` · Pickup ${order.pickupTime}` : ""}
                   </p>
                 </div>
 
-                <div className="flex-shrink-0 text-right">
+                <div className="shrink-0 text-right">
                   <p className="text-sm font-bold text-white light:text-gray-900">
                     {formatCurrency(order.totalAmount)}
                   </p>
@@ -505,7 +491,7 @@ export function OrdersView({ tenant }: Props) {
                   <StatusBadge status={order.paymentStatus} />
                 </div>
 
-                <ChevronRight className="h-4 w-4 flex-shrink-0 text-slate-500 light:text-gray-400" />
+                <ChevronRight className="h-4 w-4 shrink-0 text-slate-500 light:text-gray-400" />
               </button>
             ))}
           </div>
@@ -524,13 +510,8 @@ export function OrdersView({ tenant }: Props) {
               <Button
                 variant="outline"
                 size="sm"
-                disabled={
-                  isLoading ||
-                  !pagination.hasPreviousPage
-                }
-                onClick={() =>
-                  setPage((current) => Math.max(0, current - 1))
-                }
+                disabled={isLoading || !pagination.hasPreviousPage}
+                onClick={() => setPage((current) => Math.max(0, current - 1))}
               >
                 <ChevronLeft className="mr-1 h-3.5 w-3.5" />
                 Previous
@@ -545,10 +526,7 @@ export function OrdersView({ tenant }: Props) {
               <Button
                 variant="outline"
                 size="sm"
-                disabled={
-                  isLoading ||
-                  !pagination.hasNextPage
-                }
+                disabled={isLoading || !pagination.hasNextPage}
                 onClick={() => setPage((current) => current + 1)}
               >
                 Next
@@ -581,10 +559,7 @@ export function OrdersView({ tenant }: Props) {
 
                 <div className="space-y-2.5">
                   {selected.items.map((item) => (
-                    <div
-                      key={item.id}
-                      className="flex items-center gap-3"
-                    >
+                    <div key={item.id} className="flex items-center gap-3">
                       {item.productImage ? (
                         <Image
                           src={item.productImage}
@@ -592,11 +567,11 @@ export function OrdersView({ tenant }: Props) {
                           width={40}
                           height={40}
                           unoptimized
-                          className="h-10 w-10 flex-shrink-0 rounded-xl bg-slate-700 object-cover light:bg-slate-100"
+                          className="h-10 w-10 shrink-0 rounded-xl bg-slate-700 object-cover light:bg-slate-100"
                         />
                       ) : (
                         <div
-                          className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-slate-700 text-xs font-bold text-slate-300 light:bg-slate-100 light:text-slate-500"
+                          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-700 text-xs font-bold text-slate-300 light:bg-slate-100 light:text-slate-500"
                           aria-hidden="true"
                         >
                           {item.productName.charAt(0).toUpperCase()}
@@ -613,7 +588,7 @@ export function OrdersView({ tenant }: Props) {
                         </p>
                       </div>
 
-                      <span className="flex-shrink-0 text-sm font-bold text-white light:text-gray-900">
+                      <span className="shrink-0 text-sm font-bold text-white light:text-gray-900">
                         {formatCurrency(item.price * item.quantity)}
                       </span>
                     </div>
@@ -660,9 +635,7 @@ export function OrdersView({ tenant }: Props) {
                               size="sm"
                               className="justify-center border-slate-600 text-white hover:bg-slate-700 light:border-slate-300 light:text-gray-800 light:hover:bg-slate-100"
                               disabled={updatingId === selected.id}
-                              onClick={() =>
-                                void advance(selected.id, next)
-                              }
+                              onClick={() => void advance(selected.id, next)}
                             >
                               <RefreshCw className="mr-1 h-3 w-3" />
                               {capitalise(next.replaceAll("_", " "))}
@@ -675,9 +648,7 @@ export function OrdersView({ tenant }: Props) {
                         size="sm"
                         className="w-full justify-center border-red-500/30 bg-red-500/20 text-red-400 hover:bg-red-500/30 light:border-red-200 light:bg-red-50 light:text-red-700 light:hover:bg-red-100"
                         disabled={updatingId === selected.id}
-                        onClick={() =>
-                          void advance(selected.id, "cancelled")
-                        }
+                        onClick={() => void advance(selected.id, "cancelled")}
                       >
                         <XCircle className="mr-1 h-3.5 w-3.5" />
                         Cancel Order

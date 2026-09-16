@@ -1327,8 +1327,6 @@ export const getAppointmentsByTenant = (id: string) =>
   mockAppointments.filter((a) => a.tenantId === id);
 export const getOrdersByTenant = (id: string) =>
   mockOrders.filter((o) => o.tenantId === id);
-export const getUsersByTenant = (id: string) =>
-  mockUsers.filter((u) => u.tenantId === id);
 export const getTenantById = (id: string) =>
   mockTenants.find((t) => t.id === id);
 export const getTenantBySlug = (slug: string) =>

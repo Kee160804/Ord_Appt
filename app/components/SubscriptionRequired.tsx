@@ -54,7 +54,7 @@ export function SubscriptionRequired({
       <div className="mx-auto max-w-5xl">
         <header className="flex flex-wrap items-center justify-between gap-4">
           <Link href="/home" className="flex items-center gap-2.5">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-indigo-700 text-white">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-linear-to-br from-violet-500 to-indigo-700 text-white">
               <Sparkles className="h-4 w-4" />
             </span>
             <span className="font-black">YuhBusiness</span>

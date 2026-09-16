@@ -157,8 +157,7 @@ export async function listCustomers(
 
   const customers = ((data ?? []) as CustomerRow[]).map(mapCustomer);
   const total = count ?? 0;
-  const totalPages =
-    total === 0 ? 0 : Math.ceil(total / safePageSize);
+  const totalPages = total === 0 ? 0 : Math.ceil(total / safePageSize);
 
   return {
     customers,

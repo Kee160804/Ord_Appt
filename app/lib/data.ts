@@ -75,20 +75,6 @@ export function saveStoredTenant(tenant: Tenant) {
   window.localStorage.setItem(STORED_TENANTS_KEY, JSON.stringify(tenants));
 }
 
-export function getAllUsers(): User[] {
-  const storedUsers = getStoredUserRecords().map((user) => ({
-    id: user.id,
-    email: user.email,
-    name: user.name,
-    role: user.role,
-    tenantId: user.tenantId,
-    avatar: user.avatar,
-    createdAt: user.createdAt,
-    lastLogin: user.lastLogin,
-  }));
-  return [...mockUsers, ...storedUsers];
-}
-
 export function getAllTenants(): Tenant[] {
   return [...mockTenants, ...getStoredTenants()];
 }
@@ -165,8 +151,4 @@ export function getUserById(id: string): User | null {
     };
   }
   return mockUsers.find((user) => user.id.toLowerCase() === normalized) ?? null;
-}
-
-export function getTenantCount(): number {
-  return getAllTenants().length;
 }

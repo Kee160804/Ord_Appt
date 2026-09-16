@@ -216,9 +216,7 @@ export default function RolesManagementPage() {
   if (user?.role !== "superadmin") {
     return (
       <div className="pwa-page-safe min-h-dvh bg-[#070b14] p-4 text-white sm:p-8">
-        <p className="text-red-400">
-          Access denied. Super admin only.
-        </p>
+        <p className="text-red-400">Access denied. Super admin only.</p>
       </div>
     );
   }
@@ -233,9 +231,7 @@ export default function RolesManagementPage() {
         <div>
           <h1 className="text-2xl font-black">Role Management</h1>
 
-          <p className="text-slate-400">
-            Define roles and permissions
-          </p>
+          <p className="text-slate-400">Define roles and permissions</p>
         </div>
 
         <button
@@ -261,14 +257,14 @@ export default function RolesManagementPage() {
             </h2>
 
             <p className="mt-1 text-sm leading-6 text-slate-300">
-              Role creation, editing, and deletion are temporarily
-              disabled while this screen is connected to the platform&apos;s
+              Role creation, editing, and deletion are temporarily disabled
+              while this screen is connected to the platform&apos;s
               database-backed role and permission system.
             </p>
 
             <p className="mt-1 text-xs text-slate-400">
-              This prevents local-only changes from appearing successful
-              when they have not actually been saved or enforced.
+              This prevents local-only changes from appearing successful when
+              they have not actually been saved or enforced.
             </p>
           </div>
         </div>
@@ -325,25 +321,21 @@ export default function RolesManagementPage() {
             <CardBody className="space-y-4">
               {/* ROLE DESCRIPTION */}
 
-              <p className="text-sm text-slate-400">
-                {role.description}
-              </p>
+              <p className="text-sm text-slate-400">{role.description}</p>
 
               {/* PERMISSIONS */}
 
               <div>
                 <h4 className="mb-2 flex items-center gap-2 text-xs font-semibold text-slate-300">
                   <Lock className="h-3.5 w-3.5" />
-
                   Permissions ({role.permissions.length})
                 </h4>
 
                 <div className="flex flex-wrap gap-2">
                   {role.permissions.map((permission) => {
-                    const permissionDefinition =
-                      PERMISSION_CATALOG.find(
-                        (item) => item.key === permission,
-                      );
+                    const permissionDefinition = PERMISSION_CATALOG.find(
+                      (item) => item.key === permission,
+                    );
 
                     return (
                       <span
@@ -364,9 +356,7 @@ export default function RolesManagementPage() {
                 <div className="flex items-center gap-2 text-xs text-slate-500">
                   <Lock className="h-3.5 w-3.5" />
 
-                  <span>
-                    Database-backed editing pending
-                  </span>
+                  <span>Database-backed editing pending</span>
                 </div>
               </div>
             </CardBody>
@@ -382,9 +372,7 @@ export default function RolesManagementPage() {
         <div className="rounded-xl border border-slate-700 bg-slate-800/30 p-8 text-center">
           <Lock className="mx-auto mb-3 h-8 w-8 text-slate-500" />
 
-          <p className="font-semibold text-slate-300">
-            No matching roles
-          </p>
+          <p className="font-semibold text-slate-300">No matching roles</p>
 
           <p className="mt-1 text-sm text-slate-500">
             Try another role name or description.
