@@ -28,7 +28,9 @@ export const metadata: Metadata = {
   metadataBase,
   title: "YuhBusiness",
   description:
-    "Platform for local businesses to manage appointments, orders, retail sales, and customer relationships.",
+  "Discover and support Belizean businesses online. Book appointments, place orders, shop local products, and connect with businesses across Belize—all through YuhBusiness.",
+  // description:
+  //   "Platform for local businesses to manage appointments, orders, retail sales, and customer relationships.",
   manifest: "/manifest.webmanifest",
   applicationName: "YuhBusiness",
   icons: {
