@@ -36,6 +36,10 @@ test("installed mobile PWA exposes sign-in and storefront demo controls", async 
     styles,
     /@media \(display-mode: standalone\) and \(max-width: 639px\)/,
   );
+  assert.match(
+    styles,
+    /\.pwa-combined-primary-cta\s*\{\s*display: none !important;/,
+  );
 });
 
 test("registration keeps overflowing content clear of its actions", async () => {

@@ -154,7 +154,7 @@ body {
 
   /* The combined PWA action row replaces the single compact CTA. */
   .pwa-combined-primary-cta {
-    display: none;
+    display: none !important;
   }
 }
 
