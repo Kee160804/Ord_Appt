@@ -104,6 +104,7 @@ export function OrderingMenu({
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [currentProduct, setCurrentProduct] = useState<Product | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [selectedAddons, setSelectedAddons] = useState<AddonOption[]>([]);
@@ -619,6 +620,7 @@ export function OrderingMenu({
       setPaymentMethod("pay_later");
       setPromotionCode("");
       setAppliedPromotion(null);
+      setCheckoutOpen(false);
     } catch (placeError) {
       setOrderError(
         placeError instanceof Error
@@ -632,7 +634,7 @@ export function OrderingMenu({
 
   return (
     <>
-      <div className="grid min-w-0 grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(390px,500px)] xl:items-start">
+      <div className="grid min-w-0 grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_400px] xl:items-start">
         {/* LEFT: Menu */}
         <div className="min-w-0">
           <span
@@ -666,7 +668,7 @@ export function OrderingMenu({
             <span className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,10,20,0.97)_0%,rgba(7,11,24,0.84)_43%,rgba(18,10,44,0.32)_72%,rgba(18,8,42,0.12)_100%)]" />
             <span className="absolute inset-y-0 left-0 flex max-w-[78%] flex-col justify-center px-6 sm:px-9">
               <span className="text-3xl font-black leading-[1.08] tracking-[-0.035em] text-white sm:text-4xl">
-                {isRetail ? "Fresh Styles" : "Great Taste"}
+                {isRetail ? "Fresh Styles" : "Good Food"}
                 <br />
                 {isRetail ? (
                   <>
@@ -674,7 +676,7 @@ export function OrderingMenu({
                   </>
                 ) : (
                   <>
-                    <span className="text-violet-500">Every Day</span>
+                    <span className="text-violet-500">Together</span>
                   </>
                 )}
               </span>
@@ -860,12 +862,12 @@ export function OrderingMenu({
           </div>
         </div>
 
-        {/* RIGHT: Order Summary */}
+        {/* Keep checkout visible while customers browse a long catalog. */}
         <aside
           ref={orderSummaryRef}
           id="order-summary"
           tabIndex={-1}
-          className="scroll-mt-24 flex min-w-0 flex-col rounded-2xl border border-[#26364f] bg-[#0d1829] p-5 outline-none shadow-[0_20px_70px_rgba(0,0,0,0.22)] sm:p-6 light:border-slate-200 light:bg-white xl:sticky xl:top-24"
+          className="scroll-mt-24 flex min-w-0 flex-col rounded-2xl border border-[#26364f] bg-[#0d1829] p-5 outline-none shadow-[0_20px_70px_rgba(0,0,0,0.22)] sm:p-6 light:border-slate-200 light:bg-white xl:sticky xl:top-24 xl:self-start xl:p-5"
         >
           <div className="contents">
             <div className="order-1 flex items-start gap-4">
@@ -889,179 +891,214 @@ export function OrderingMenu({
               </div>
             </div>
 
-            <div className="order-5 mt-5 space-y-3 border-t border-[#26364f] pt-5 light:border-slate-200">
-              <div className="mb-4 flex items-start gap-4">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#142138] text-[#b8c5da] light:bg-slate-100 light:text-slate-600">
-                  <UserRound className="h-5 w-5" />
-                </span>
-                <div>
-                  <h3 className="text-base font-black text-white light:text-slate-950">
-                    Customer Information
-                  </h3>
-                  <p className="mt-0.5 text-xs text-[#90a2bd] light:text-slate-500">
-                    Tell us where to send your order.
-                  </p>
-                </div>
-              </div>
-              <Input
-                label="Full Name"
-                value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
-                placeholder="Enter your name"
-              />
-              <Input
-                label="Email Address"
-                type="email"
-                value={customerEmail}
-                onChange={(e) => setCustomerEmail(e.target.value)}
-                placeholder="you@example.com"
-                autoComplete="email"
-              />
-              <Input
-                label="Phone Number"
-                value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value)}
-                placeholder="Enter Phone Number"
-              />
-              <Select
-                label="Order Type"
-                options={orderingSettings.orderTypes.map((value) => ({
-                  value,
-                  label:
-                    value === "dine_in"
-                      ? "Dine In"
-                      : value === "pickup"
-                        ? "Pickup"
-                        : "Delivery",
-                }))}
-                value={orderType}
-                onChange={(e) => setOrderType(e.target.value)}
-              />
-              {orderType === "dine_in" && (
-                <Input
-                  label="Table Number"
-                  value={tableNumber}
-                  onChange={(event) => setTableNumber(event.target.value)}
-                  placeholder="e.g. 12"
-                />
-              )}
-              {orderType === "pickup" && (
-                <Input
-                  label={`Pickup Time (allow ${orderingSettings.preparationMinutes} min)`}
-                  type="datetime-local"
-                  value={requestedTime}
-                  onChange={(event) => setRequestedTime(event.target.value)}
-                />
-              )}
-              {orderType === "delivery" && (
-                <>
-                  <Input
-                    label="Delivery Address"
-                    value={deliveryAddress}
-                    onChange={(event) => setDeliveryAddress(event.target.value)}
-                    placeholder="Street, building, and landmark"
-                  />
-                  {orderingSettings.deliveryAreas.length ? (
-                    <Select
-                      label="Delivery Area"
-                      value={deliveryArea}
-                      onChange={(event) => setDeliveryArea(event.target.value)}
-                      options={[
-                        { value: "", label: "Choose an area" },
-                        ...orderingSettings.deliveryAreas.map((area) => ({
-                          value: area,
-                          label: area,
-                        })),
-                      ]}
-                    />
-                  ) : (
-                    <Input
-                      label="Delivery Area"
-                      value={deliveryArea}
-                      onChange={(event) => setDeliveryArea(event.target.value)}
-                      placeholder="City, village, or neighbourhood"
-                    />
-                  )}
-                  <Input
-                    label="Delivery Instructions (optional)"
-                    value={deliveryInstructions}
-                    onChange={(event) =>
-                      setDeliveryInstructions(event.target.value)
-                    }
-                    placeholder="Gate, floor, or directions"
-                  />
-                </>
-              )}
-              <Input
-                label="Order Notes (optional)"
-                value={orderNotes}
-                onChange={(event) => setOrderNotes(event.target.value)}
-                placeholder="Allergies or special requests"
-              />
-              <Select
-                label="Payment"
-                value={paymentMethod}
-                onChange={(event) =>
-                  setPaymentMethod(
-                    event.target.value as "pay_later" | "mock_card",
-                  )
-                }
-                options={[
-                  {
-                    value: "pay_later",
-                    label: "Pay at business / on delivery",
-                  },
-                  {
-                    value: "mock_card",
-                    label: "Mock card payment (testing only)",
-                  },
-                ]}
-              />
-              {paymentMethod === "mock_card" && (
-                <p className="rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-[10px] text-amber-300 light:text-amber-700">
-                  Test mode: no card details or real money are used. The ledger
-                  records a simulated approved payment.
-                </p>
-              )}
-              <div>
-                <label className="mb-1.5 block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                  Discount Code
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    value={promotionCode}
-                    onChange={(event) => {
-                      setPromotionCode(
-                        event.target.value.toUpperCase().replace(/\s/g, ""),
-                      );
-                      setAppliedPromotion(null);
-                    }}
-                    placeholder="WELCOME10"
-                    className="min-w-0 flex-1 rounded-lg border border-slate-600 bg-slate-700/50 px-3 py-2.5 text-sm text-white outline-none focus:border-violet-500 light:border-[#dfe5ee] light:bg-white light:text-slate-900"
-                  />
+            <Modal
+              open={checkoutOpen}
+              onClose={() => !isPlacingOrder && setCheckoutOpen(false)}
+              title="Complete your order"
+              maxWidth="max-w-3xl"
+              footer={
+                <div className="flex gap-3">
                   <Button
                     type="button"
-                    size="sm"
                     variant="outline"
-                    loading={isApplyingPromotion}
-                    onClick={() => void applyPromotion()}
+                    disabled={isPlacingOrder}
+                    onClick={() => setCheckoutOpen(false)}
+                    className="flex-1"
                   >
-                    Apply
+                    Back
+                  </Button>
+                  <Button
+                    type="button"
+                    loading={isPlacingOrder}
+                    disabled={viewOnly || !orderingSettings.enabled}
+                    onClick={placeOrder}
+                    className="flex-1"
+                  >
+                    {isPlacingOrder ? "Placing..." : "Place Order"}
                   </Button>
                 </div>
-                {appliedPromotion && (
-                  <p className="mt-1 text-[10px] text-emerald-500">
-                    {appliedPromotion.name} applied
+              }
+            >
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="mb-1 flex items-start gap-4 sm:col-span-2">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#142138] text-[#b8c5da] light:bg-slate-100 light:text-slate-600">
+                    <UserRound className="h-5 w-5" />
+                  </span>
+                  <div>
+                    <h3 className="text-base font-black text-white light:text-slate-950">
+                      Customer Information
+                    </h3>
+                    <p className="mt-0.5 text-xs text-[#90a2bd] light:text-slate-500">
+                      Tell us where to send your order.
+                    </p>
+                  </div>
+                </div>
+                <Input
+                  label="Full Name"
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  placeholder="Enter your name"
+                />
+                <Input
+                  label="Email Address"
+                  type="email"
+                  value={customerEmail}
+                  onChange={(e) => setCustomerEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  autoComplete="email"
+                />
+                <Input
+                  label="Phone Number"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  placeholder="Enter Phone Number"
+                />
+                <Select
+                  label="Order Type"
+                  options={orderingSettings.orderTypes.map((value) => ({
+                    value,
+                    label:
+                      value === "dine_in"
+                        ? "Dine In"
+                        : value === "pickup"
+                          ? "Pickup"
+                          : "Delivery",
+                  }))}
+                  value={orderType}
+                  onChange={(e) => setOrderType(e.target.value)}
+                />
+                {orderType === "dine_in" && (
+                  <Input
+                    label="Table Number"
+                    value={tableNumber}
+                    onChange={(event) => setTableNumber(event.target.value)}
+                    placeholder="e.g. 12"
+                  />
+                )}
+                {orderType === "pickup" && (
+                  <Input
+                    label={`Pickup Time (allow ${orderingSettings.preparationMinutes} min)`}
+                    type="datetime-local"
+                    value={requestedTime}
+                    onChange={(event) => setRequestedTime(event.target.value)}
+                  />
+                )}
+                {orderType === "delivery" && (
+                  <>
+                    <Input
+                      label="Delivery Address"
+                      value={deliveryAddress}
+                      onChange={(event) =>
+                        setDeliveryAddress(event.target.value)
+                      }
+                      placeholder="Street, building, and landmark"
+                    />
+                    {orderingSettings.deliveryAreas.length ? (
+                      <Select
+                        label="Delivery Area"
+                        value={deliveryArea}
+                        onChange={(event) =>
+                          setDeliveryArea(event.target.value)
+                        }
+                        options={[
+                          { value: "", label: "Choose an area" },
+                          ...orderingSettings.deliveryAreas.map((area) => ({
+                            value: area,
+                            label: area,
+                          })),
+                        ]}
+                      />
+                    ) : (
+                      <Input
+                        label="Delivery Area"
+                        value={deliveryArea}
+                        onChange={(event) =>
+                          setDeliveryArea(event.target.value)
+                        }
+                        placeholder="City, village, or neighbourhood"
+                      />
+                    )}
+                    <Input
+                      label="Delivery Instructions (optional)"
+                      value={deliveryInstructions}
+                      onChange={(event) =>
+                        setDeliveryInstructions(event.target.value)
+                      }
+                      placeholder="Gate, floor, or directions"
+                    />
+                  </>
+                )}
+                <Input
+                  label="Order Notes (optional)"
+                  value={orderNotes}
+                  onChange={(event) => setOrderNotes(event.target.value)}
+                  placeholder="Allergies or special requests"
+                />
+                <Select
+                  label="Payment"
+                  value={paymentMethod}
+                  onChange={(event) =>
+                    setPaymentMethod(
+                      event.target.value as "pay_later" | "mock_card",
+                    )
+                  }
+                  options={[
+                    {
+                      value: "pay_later",
+                      label: "Pay at business / on delivery",
+                    },
+                    {
+                      value: "mock_card",
+                      label: "Mock card payment (testing only)",
+                    },
+                  ]}
+                />
+                {paymentMethod === "mock_card" && (
+                  <p className="rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-[10px] text-amber-300 light:text-amber-700 sm:col-span-2">
+                    Test mode: no card details or real money are used. The
+                    ledger records a simulated approved payment.
+                  </p>
+                )}
+                <div className="sm:col-span-2">
+                  <label className="mb-1.5 block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    Discount Code
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      value={promotionCode}
+                      onChange={(event) => {
+                        setPromotionCode(
+                          event.target.value.toUpperCase().replace(/\s/g, ""),
+                        );
+                        setAppliedPromotion(null);
+                      }}
+                      placeholder="WELCOME10"
+                      className="min-w-0 flex-1 rounded-lg border border-slate-600 bg-slate-700/50 px-3 py-2.5 text-sm text-white outline-none focus:border-violet-500 light:border-[#dfe5ee] light:bg-white light:text-slate-900"
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      loading={isApplyingPromotion}
+                      onClick={() => void applyPromotion()}
+                    >
+                      Apply
+                    </Button>
+                  </div>
+                  {appliedPromotion && (
+                    <p className="mt-1 text-[10px] text-emerald-500">
+                      {appliedPromotion.name} applied
+                    </p>
+                  )}
+                </div>
+                {orderError && (
+                  <p className="rounded-lg border border-red-400/20 bg-red-400/10 px-3 py-2 text-xs text-red-300 light:text-red-600 sm:col-span-2">
+                    {orderError}
                   </p>
                 )}
               </div>
-            </div>
+            </Modal>
 
-            {orderError && (
-              <p className="order-6 mt-3 rounded-lg border border-red-400/20 bg-red-400/10 px-3 py-2 text-xs text-red-300 light:text-red-600">
-                {orderError}
-              </p>
-            )}
             {orderConfirmation && (
               <p className="order-6 mt-3 rounded-lg border border-emerald-400/20 bg-emerald-400/10 px-3 py-2 text-xs text-emerald-300 light:text-emerald-700">
                 {orderConfirmation}
@@ -1070,7 +1107,7 @@ export function OrderingMenu({
 
             <div className="hidden" />
 
-            <div className="order-2 mt-5 flex items-center justify-between">
+            <div className="order-2 mt-5 flex items-center justify-between xl:mt-3">
               <span className="sr-only">Order Items</span>
               {cart.length > 0 && (
                 <button
@@ -1085,8 +1122,8 @@ export function OrderingMenu({
             </div>
 
             {cart.length === 0 ? (
-              <div className="order-3 mt-3 rounded-xl border border-dashed border-[#2c3d57] py-9 text-center light:border-slate-300">
-                <ShoppingBag className="w-10 h-10 mx-auto mb-2 text-slate-300 dark:text-slate-600" />
+              <div className="order-3 mt-3 rounded-xl border border-dashed border-[#2c3d57] py-5 text-center light:border-slate-300 xl:mt-2 xl:py-4">
+                <ShoppingBag className="mx-auto mb-1.5 h-8 w-8 text-slate-300 dark:text-slate-600" />
                 <p className="text-xs text-slate-400 dark:text-slate-500">
                   Your cart is empty.
                   <br />
@@ -1094,7 +1131,7 @@ export function OrderingMenu({
                 </p>
               </div>
             ) : (
-              <div className="order-3 mt-3 space-y-3">
+              <div className="order-3 mt-3 max-h-72 space-y-3 overflow-y-auto pr-1">
                 {cart.map((item) => {
                   const addonsTotal = item.addons.reduce(
                     (a, ad) => a + ad.price * item.quantity,
@@ -1216,6 +1253,61 @@ export function OrderingMenu({
                 </div>
               </div>
 
+              <div className="order-5 mt-4 space-y-4 rounded-xl border border-[#26364f] bg-[#111d30] p-3 light:border-slate-200 light:bg-slate-50">
+                <div>
+                  <p className="mb-2 text-[10px] font-black uppercase tracking-wider text-[#8292aa] light:text-slate-500">
+                    Order type
+                  </p>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {orderingSettings.orderTypes.map((value) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setOrderType(value)}
+                        className={`rounded-lg border px-2 py-2 text-[10px] font-bold transition ${
+                          orderType === value
+                            ? "border-violet-500 bg-violet-500/15 text-violet-300 light:text-violet-700"
+                            : "border-[#2b3b55] text-[#9aabc3] hover:border-violet-400 light:border-slate-200 light:text-slate-600"
+                        }`}
+                      >
+                        {value === "dine_in"
+                          ? "Dine In"
+                          : value === "pickup"
+                            ? "Pickup"
+                            : "Delivery"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <p className="mb-2 text-[10px] font-black uppercase tracking-wider text-[#8292aa] light:text-slate-500">
+                    Have a promo code?
+                  </p>
+                  <div className="flex gap-2">
+                    <input
+                      value={promotionCode}
+                      onChange={(event) => {
+                        setPromotionCode(
+                          event.target.value.toUpperCase().replace(/\s/g, ""),
+                        );
+                        setAppliedPromotion(null);
+                      }}
+                      placeholder="WELCOME10"
+                      className="min-w-0 flex-1 rounded-lg border border-[#2b3b55] bg-[#0d1829] px-3 py-2 text-xs text-white outline-none focus:border-violet-500 light:border-slate-200 light:bg-white light:text-slate-900"
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      loading={isApplyingPromotion}
+                      onClick={() => void applyPromotion()}
+                    >
+                      Apply
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
               <div className="order-7 mt-5">
                 <Button
                   onClick={clearCart}
@@ -1225,7 +1317,10 @@ export function OrderingMenu({
                   Clear
                 </Button>
                 <Button
-                  onClick={placeOrder}
+                  onClick={() => {
+                    setOrderError("");
+                    setCheckoutOpen(true);
+                  }}
                   disabled={
                     isPlacingOrder ||
                     viewOnly ||
@@ -1239,9 +1334,7 @@ export function OrderingMenu({
                     ? "Demo Preview"
                     : orderingSettings.paused
                       ? "Ordering Paused"
-                      : isPlacingOrder
-                        ? "Placing..."
-                        : "Place Order"}
+                      : "Proceed to Checkout"}
                 </Button>
                 <p className="mt-3 text-center text-[10px] leading-4 text-[#8292aa] light:text-slate-500">
                   <LockKeyhole className="mr-1 inline h-3.5 w-3.5" /> By placing

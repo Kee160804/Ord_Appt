@@ -115,11 +115,7 @@ export default function StorefrontClient({
 }: StorefrontClientProps) {
   const extendedTenant = tenant as ExtendedTenant;
   const isAppt = tenant.businessType === "appointment";
-  const businessTypeLabel = isAppt
-    ? "Appointments"
-    : tenant.businessType === "retail"
-      ? "Products & Retail"
-      : "Food & Drinks";
+  const todayHours = tenant.businessHours[new Date().getDay()];
 
   const [services, setServices] = useState<Service[]>(() => {
     if (isAppt) {
@@ -350,7 +346,11 @@ export default function StorefrontClient({
                       onClick={() => setActiveTab("home")}
                       className={`relative py-6 text-sm font-semibold transition ${activeTab === "home" ? "text-white light:text-slate-950" : "text-[#aebad0] light:text-slate-600"}`}
                     >
-                      {isAppt ? "Services" : "Menu"}
+                      {isAppt
+                        ? "Services"
+                        : tenant.businessType === "retail"
+                          ? "Shop"
+                          : "Menu"}
                       {activeTab === "home" && (
                         <span className="absolute inset-x-0 bottom-2 h-0.5 rounded-full bg-violet-500" />
                       )}
@@ -415,45 +415,6 @@ export default function StorefrontClient({
             <DemoDashboardPreview tenant={tenant} />
           )}
 
-          {/* Hero (clickable, only on home tab) */}
-          {(!viewOnly || activeDemoView === "storefront") &&
-            activeTab === "home" &&
-            isAppt && (
-              <div
-                className="relative mx-3 mt-3 h-56 cursor-pointer overflow-hidden rounded-2xl border border-slate-800 sm:mx-5 md:h-72"
-                onClick={() => {
-                  setCurrentImageIndex(0);
-                  setGalleryOpen(true);
-                }}
-              >
-                <Image
-                  src={tenant.coverImage || "/fallback-product.png"}
-                  alt={tenant.name}
-                  fill
-                  sizes="100vw"
-                  className="object-cover"
-                  unoptimized
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src =
-                      "/fallback-product.png";
-                  }}
-                />
-                <div className="absolute inset-0 flex items-center bg-linear-to-r from-black/80 via-black/35 to-black/10">
-                  <div className="max-w-xl px-6 text-left text-white sm:px-10">
-                    <p className="mb-2 text-[10px] font-black uppercase tracking-[0.25em] text-violet-300">
-                      {businessTypeLabel}
-                    </p>
-                    <h2 className="text-3xl font-black md:text-5xl">
-                      {tenant.name}
-                    </h2>
-                    <p className="mt-3 max-w-xl text-sm text-slate-200 sm:text-base">
-                      {tenant.description}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-
           {/* Main content */}
           {(!viewOnly || activeDemoView === "storefront") && (
             <main className="mx-auto max-w-365 px-4 py-5 sm:px-6 sm:py-6">
@@ -486,6 +447,26 @@ export default function StorefrontClient({
                 <StorefrontContact tenant={tenant} viewOnly={viewOnly} />
               )}
             </main>
+          )}
+
+          {(!viewOnly || activeDemoView === "storefront") && (
+            <footer className="border-t border-[#1d2b42] bg-[#08111f] light:border-slate-200 light:bg-white">
+              <div className="mx-auto flex max-w-365 flex-col gap-3 px-4 py-5 text-[11px] text-[#8292aa] sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+                  <span className="font-black text-white light:text-slate-950">
+                    {tenant.name}
+                  </span>
+                  <span>
+                    {todayHours?.closed
+                      ? "Closed today"
+                      : `Open today ${todayHours?.open ?? ""} - ${todayHours?.close ?? ""}`}
+                  </span>
+                  <span>{tenant.phone}</span>
+                  <span>{tenant.city}</span>
+                </div>
+                <span>Secure storefront powered by YuhBusiness</span>
+              </div>
+            </footer>
           )}
 
           {/* Image Gallery Modal */}

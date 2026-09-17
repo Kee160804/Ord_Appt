@@ -444,12 +444,15 @@ export function AppointmentBooking({
           )}
         </div>
       )}
-      <div className="grid min-h-[calc(100dvh-260px)] min-w-0 grid-cols-1 gap-0 overflow-hidden rounded-2xl border border-slate-200 shadow-sm dark:border-slate-700 lg:grid-cols-[260px_minmax(0,1fr)] xl:grid-cols-[260px_minmax(0,1fr)_300px]">
+      <div className="grid min-w-0 grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_340px] xl:items-start">
         {/* Left sidebar: Calendar, Time slots, Notes */}
-        <aside className="flex min-w-0 flex-col gap-6 border-b border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900 sm:p-5 lg:border-b-0 lg:border-r lg:overflow-y-auto">
+        <aside
+          id="appointment-booking-panel"
+          className="order-2 flex min-w-0 scroll-mt-24 flex-col gap-5 rounded-2xl border border-[#26364f] bg-[#0d1829] p-5 shadow-[0_20px_70px_rgba(0,0,0,0.22)] light:border-slate-200 light:bg-white xl:sticky xl:top-24 xl:self-start"
+        >
           <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-4">
-              Booking for {tenant.name}
+            <p className="mb-4 text-base font-black text-white light:text-slate-950">
+              Select Date &amp; Time
             </p>
 
             <div className="flex items-center justify-between mb-3">
@@ -511,7 +514,7 @@ export function AppointmentBooking({
                       setSelectedTime(null);
                     }}
                     className={`
-                    aspect-square w-full rounded-full text-[11px] font-medium transition
+                    mx-auto flex h-8 w-8 items-center justify-center rounded-full text-[10px] font-bold transition
                     disabled:opacity-30 disabled:cursor-not-allowed
                     ${
                       isSelected
@@ -572,7 +575,7 @@ export function AppointmentBooking({
                 {availabilityError}
               </p>
             ) : timeSlots.length > 0 ? (
-              <div className="grid grid-cols-2 gap-1.5">
+              <div className="grid grid-cols-3 gap-1.5">
                 {timeSlots.map((slot) => {
                   const isSelected = selectedTime === slot;
                   return (
@@ -580,7 +583,7 @@ export function AppointmentBooking({
                       key={slot}
                       onClick={() => setSelectedTime(slot)}
                       className={`
-                      py-2 rounded-lg text-xs font-semibold transition
+                      rounded-lg py-2 text-[10px] font-semibold transition
                       ${
                         isSelected
                           ? "bg-violet-600 text-white"
@@ -606,7 +609,7 @@ export function AppointmentBooking({
           </div>
 
           {/* Notes */}
-          <div>
+          <div className="hidden">
             <p className="text-xs font-bold text-slate-700 dark:text-slate-300 mb-2">
               Notes / Concerns
             </p>
@@ -620,143 +623,264 @@ export function AppointmentBooking({
               aria-label="Notes or concerns"
             />
           </div>
+
+          <div className="border-t border-[#26364f] pt-5 light:border-slate-200">
+            {selectedService ? (
+              <div className="flex gap-3 rounded-xl border border-[#2b3b55] bg-[#111d30] p-3 light:border-slate-200 light:bg-slate-50">
+                <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-slate-800">
+                  <Image
+                    src={selectedService.image || PLACEHOLDER_IMG}
+                    alt=""
+                    fill
+                    sizes="56px"
+                    className="object-cover"
+                    unoptimized
+                  />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs font-black text-white light:text-slate-950">
+                    {selectedService.name}
+                  </p>
+                  <p className="mt-1 text-[10px] text-[#8292aa]">
+                    {formatCurrency(selectedService.price)} ·{" "}
+                    {selectedService.duration} min
+                  </p>
+                  {selectedDate && selectedTime && (
+                    <p className="mt-1 truncate text-[10px] font-bold text-violet-300 light:text-violet-700">
+                      {formatDate(selectedDate)} at {selectedTime}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <p className="rounded-xl border border-dashed border-[#2b3b55] px-3 py-4 text-center text-xs text-[#71829b] light:border-slate-300">
+                Select a service to begin.
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={() => beginBooking()}
+              disabled={viewOnly || !canBook}
+              className="mt-4 w-full rounded-xl bg-linear-to-r from-violet-700 to-purple-600 py-3 text-xs font-black text-white shadow-lg shadow-violet-900/20 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {viewOnly
+                ? "Demo Preview"
+                : canBook
+                  ? "Confirm Booking"
+                  : "Select service, date & time"}
+            </button>
+            <p className="mt-3 text-center text-[9px] font-semibold text-[#71829b]">
+              Professional staff · Clean &amp; secure · Easy rescheduling
+            </p>
+          </div>
         </aside>
 
         {/* Center: Service list */}
-        <div className="min-w-0 bg-slate-50 p-4 dark:bg-slate-900/50 sm:p-6 xl:overflow-y-auto">
-          <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <h2 className="text-xl font-bold text-slate-900 dark:text-white">
-              Services
-            </h2>
-            <div className="flex min-w-0 items-center gap-2">
-              <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-800 sm:w-48 sm:flex-none">
-                <svg
-                  className="w-3.5 h-3.5 text-slate-400"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <circle cx="11" cy="11" r="8" />
-                  <path d="m21 21-4.35-4.35" />
-                </svg>
-                <input
-                  type="text"
-                  placeholder="Search…"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="bg-transparent text-xs outline-none text-slate-700 dark:text-slate-300 placeholder-slate-400 dark:placeholder-slate-500 w-full"
-                  aria-label="Search services"
-                />
-              </div>
-              <select
-                value={categoryFilter}
-                onChange={(event) => setCategoryFilter(event.target.value)}
-                aria-label="Filter services by department"
-                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 outline-none hover:border-violet-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+        <div className="order-1 min-w-0 space-y-5">
+          <section className="relative min-h-64 overflow-hidden rounded-2xl border border-[#26364f] bg-[#0d1829] light:border-slate-200 light:bg-white">
+            <Image
+              src={tenant.coverImage || PLACEHOLDER_IMG}
+              alt={tenant.name}
+              fill
+              priority
+              sizes="(max-width: 1280px) 100vw, 75vw"
+              className="object-cover"
+              unoptimized
+              onError={(event) => {
+                (event.target as HTMLImageElement).src = PLACEHOLDER_IMG;
+              }}
+            />
+            <div className="absolute inset-0 bg-linear-to-r from-[#080d18]/95 via-[#080d18]/70 to-transparent" />
+            <div className="relative flex min-h-64 max-w-xl flex-col justify-center p-6 sm:p-9">
+              <p className="mb-3 text-[10px] font-black uppercase tracking-[0.22em] text-violet-300">
+                Premium care, made simple
+              </p>
+              <h2 className="text-3xl font-black leading-none text-white sm:text-5xl">
+                Look Good
+                <br />
+                Feel <span className="text-violet-400">Amazing</span>
+              </h2>
+              <p className="mt-4 max-w-md text-sm leading-6 text-slate-200">
+                {tenant.description ||
+                  "Premium services tailored to you. Book your appointment in minutes."}
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  const firstService = extendedServices[0];
+                  if (firstService) {
+                    setSelectedServiceId(firstService.id);
+                    setSelectedProviderId("");
+                    setSelectedTime(null);
+                  }
+                  document
+                    .getElementById("appointment-booking-panel")
+                    ?.scrollIntoView({ behavior: "smooth", block: "start" });
+                }}
+                className="mt-5 w-fit rounded-xl bg-linear-to-r from-violet-700 to-fuchsia-600 px-5 py-3 text-xs font-black text-white shadow-lg shadow-violet-900/30 transition hover:brightness-110"
               >
-                <option value="">All departments</option>
-                {serviceCategories.map((category) => (
-                  <option key={category} value={category}>
-                    {category}
-                  </option>
-                ))}
-              </select>
+                Book Now
+              </button>
             </div>
-          </div>
+          </section>
 
-          <div className="grid sm:grid-cols-2 gap-4">
-            {extendedServices.length === 0 && (
-              <div className="py-16 text-center text-slate-400 dark:text-slate-500 sm:col-span-2">
-                <p className="text-sm">No services found.</p>
+          <div className="rounded-2xl border border-[#26364f] bg-[#091322] p-4 light:border-slate-200 light:bg-slate-50 sm:p-5">
+            <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <h2 className="text-xl font-black text-white light:text-slate-950">
+                Popular Services
+              </h2>
+              <div className="flex min-w-0 items-center gap-2">
+                <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-800 sm:w-48 sm:flex-none">
+                  <svg
+                    className="w-3.5 h-3.5 text-slate-400"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <circle cx="11" cy="11" r="8" />
+                    <path d="m21 21-4.35-4.35" />
+                  </svg>
+                  <input
+                    type="text"
+                    placeholder="Search…"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="bg-transparent text-xs outline-none text-slate-700 dark:text-slate-300 placeholder-slate-400 dark:placeholder-slate-500 w-full"
+                    aria-label="Search services"
+                  />
+                </div>
+                <select
+                  value={categoryFilter}
+                  onChange={(event) => setCategoryFilter(event.target.value)}
+                  aria-label="Filter services by department"
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 outline-none hover:border-violet-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                >
+                  <option value="">All departments</option>
+                  {serviceCategories.map((category) => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
+                  ))}
+                </select>
               </div>
-            )}
-            {extendedServices.map((service) => {
-              const isSelected = selectedServiceId === service.id;
-              return (
-                <div
-                  key={service.id}
-                  className={`bg-white dark:bg-slate-800 rounded-xl border overflow-hidden transition hover:shadow-md ${
-                    isSelected
-                      ? "border-violet-500 ring-1 ring-violet-500"
-                      : "border-slate-200 dark:border-slate-700"
+            </div>
+
+            <div
+              className="mb-5 flex gap-2 overflow-x-auto pb-1"
+              aria-label="Service categories"
+            >
+              {["", ...serviceCategories].map((category) => (
+                <button
+                  key={category || "all"}
+                  type="button"
+                  onClick={() => setCategoryFilter(category)}
+                  className={`shrink-0 rounded-full border px-4 py-2 text-xs font-bold transition ${
+                    categoryFilter === category
+                      ? "border-violet-500 bg-violet-600 text-white"
+                      : "border-[#26364f] bg-[#0d1829] text-[#a9b7ca] hover:border-violet-400 light:border-slate-200 light:bg-white light:text-slate-600"
                   }`}
                 >
-                  <div className="relative h-36 w-full overflow-hidden bg-slate-100 dark:bg-slate-700">
-                    <Image
-                      src={service.image || PLACEHOLDER_IMG}
-                      alt={service.name}
-                      fill
-                      sizes="(max-width: 768px) 100vw, 50vw"
-                      className="object-cover"
-                      unoptimized
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src = PLACEHOLDER_IMG;
-                      }}
-                    />
-                  </div>
-                  <div className="p-4">
-                    <h3 className="font-bold text-slate-900 dark:text-white text-sm">
-                      {service.name}
-                    </h3>
-                    <div className="flex items-center gap-1.5 mt-1 text-slate-500 dark:text-slate-400 text-xs">
-                      <User className="w-3 h-3" />
-                      <span>{service.specialty ?? service.description}</span>
-                    </div>
-                    <div className="flex items-center gap-1 mt-0.5 text-xs font-semibold text-slate-700 dark:text-slate-300">
-                      <DollarSign className="w-3 h-3" />
-                      <span>{formatCurrency(service.price)}</span>
-                      {service.duration > 0 && (
-                        <>
-                          <span className="text-slate-300 dark:text-slate-600 mx-1">
-                            ·
-                          </span>
-                          <Clock className="w-3 h-3" />
-                          <span>{service.duration} min</span>
-                        </>
-                      )}
-                    </div>
-                    <div className="flex gap-2 mt-3">
-                      <button
-                        onClick={() => {
-                          setSelectedServiceId(service.id);
-                          setSelectedProviderId("");
-                          setSelectedTime(null);
-                          setBookingError("");
-                        }}
-                        className="flex-1 py-2 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold transition"
-                        aria-label={`Book ${service.name}`}
-                      >
-                        {viewOnly ? "Preview Service" : "Book Now"}
-                      </button>
-                      <button
-                        onClick={() => {
-                          setSelectedServiceId(service.id);
-                          setSelectedProviderId("");
-                          setSelectedTime(null);
-                          setBookingError("");
-                        }}
-                        className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:border-violet-400 hover:text-violet-600 transition"
-                        aria-label={`View details of ${service.name}`}
-                      >
-                        Detail
-                      </button>
-                      <button
-                        className="w-9 flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 hover:border-violet-400 hover:text-violet-600 dark:text-slate-400 transition"
-                        aria-label={`Send message about ${service.name}`}
-                      >
-                        <MessageCircle className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
+                  {category || "All"}
+                </button>
+              ))}
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {extendedServices.length === 0 && (
+                <div className="py-16 text-center text-slate-400 dark:text-slate-500 sm:col-span-2 lg:col-span-3">
+                  <p className="text-sm">No services found.</p>
                 </div>
-              );
-            })}
+              )}
+              {extendedServices.map((service) => {
+                const isSelected = selectedServiceId === service.id;
+                return (
+                  <div
+                    key={service.id}
+                    className={`overflow-hidden rounded-xl border bg-[#0d1829] transition hover:-translate-y-0.5 hover:shadow-xl light:bg-white ${
+                      isSelected
+                        ? "border-violet-500 ring-1 ring-violet-500"
+                        : "border-[#26364f] light:border-slate-200"
+                    }`}
+                  >
+                    <div className="relative h-40 w-full overflow-hidden bg-[#172238]">
+                      <Image
+                        src={service.image || PLACEHOLDER_IMG}
+                        alt={service.name}
+                        fill
+                        sizes="(max-width: 768px) 100vw, 50vw"
+                        className="object-cover"
+                        unoptimized
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = PLACEHOLDER_IMG;
+                        }}
+                      />
+                    </div>
+                    <div className="p-4">
+                      <h3 className="truncate text-sm font-black text-white light:text-slate-950">
+                        {service.name}
+                      </h3>
+                      <div className="mt-1 flex min-h-8 items-start gap-1.5 text-[11px] leading-4 text-[#8798b2] light:text-slate-500">
+                        <User className="w-3 h-3" />
+                        <span>{service.specialty ?? service.description}</span>
+                      </div>
+                      <div className="mt-2 flex items-center gap-1 text-xs font-semibold text-white light:text-slate-800">
+                        <DollarSign className="w-3 h-3" />
+                        <span>{formatCurrency(service.price)}</span>
+                        {service.duration > 0 && (
+                          <>
+                            <span className="text-slate-300 dark:text-slate-600 mx-1">
+                              ·
+                            </span>
+                            <Clock className="w-3 h-3" />
+                            <span>{service.duration} min</span>
+                          </>
+                        )}
+                      </div>
+                      <div className="flex gap-2 mt-3">
+                        <button
+                          onClick={() => {
+                            setSelectedServiceId(service.id);
+                            setSelectedProviderId("");
+                            setSelectedTime(null);
+                            setBookingError("");
+                          }}
+                          className="flex-1 rounded-lg bg-linear-to-r from-violet-700 to-purple-600 py-2.5 text-xs font-black text-white transition hover:brightness-110"
+                          aria-label={`Book ${service.name}`}
+                        >
+                          {viewOnly ? "Preview Service" : "Book Now"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedServiceId(service.id);
+                            setSelectedProviderId("");
+                            setSelectedTime(null);
+                            setBookingError("");
+                          }}
+                          className="rounded-lg border border-[#2b3b55] px-3 py-2 text-xs font-semibold text-[#9aabc3] transition hover:border-violet-400 hover:text-violet-300 light:border-slate-200 light:text-slate-600"
+                          aria-label={`View details of ${service.name}`}
+                        >
+                          Detail
+                        </button>
+                        <button
+                          type="button"
+                          className="w-9 flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 hover:border-violet-400 hover:text-violet-600 dark:text-slate-400 transition"
+                          aria-label={`Send message about ${service.name}`}
+                        >
+                          <MessageCircle className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
 
-        {/* Right panel: Service detail */}
-        <aside className="flex min-w-0 flex-col border-t border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900 lg:col-span-2 xl:col-span-1 xl:border-l xl:border-t-0 xl:overflow-y-auto">
+        {/* Keep service details visible while customers browse the service list. */}
+        <aside className="hidden">
           {detailService ? (
             <>
               <div className="relative h-48 w-full shrink-0 overflow-hidden bg-slate-100 dark:bg-slate-700">
@@ -885,7 +1009,7 @@ export function AppointmentBooking({
               </div>
             </>
           ) : (
-            <div className="flex flex-col items-center justify-center h-full gap-3 text-slate-400 dark:text-slate-500 px-6 text-center">
+            <div className="flex min-h-96 flex-col items-center justify-center gap-3 px-6 text-center text-slate-400 dark:text-slate-500">
               <div className="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-2xl">
                 📋
               </div>
@@ -902,7 +1026,7 @@ export function AppointmentBooking({
 
         {/* Floating confirmation bar */}
         {canBook && !viewOnly && (
-          <div className="fixed bottom-3 left-1/2 z-50 flex w-[calc(100%-1.5rem)] max-w-3xl -translate-x-1/2 flex-col items-stretch gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] text-sm shadow-xl dark:border-slate-700 dark:bg-slate-800 sm:bottom-6 sm:w-auto sm:flex-row sm:items-center sm:gap-4 sm:rounded-full sm:px-5 sm:py-2.5">
+          <div className="hidden">
             <span className="truncate font-semibold text-slate-800 dark:text-white">
               {detailService?.name}
             </span>
@@ -997,6 +1121,19 @@ export function AppointmentBooking({
               }))
             }
           />
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-slate-300">
+              Notes / Concerns (optional)
+            </label>
+            <textarea
+              value={concerns}
+              onChange={(event) => setConcerns(event.target.value)}
+              placeholder="Describe any concerns or special requests"
+              rows={3}
+              maxLength={2000}
+              className="w-full resize-none rounded-xl border border-slate-700 bg-slate-800 px-3 py-2.5 text-sm text-white outline-none placeholder:text-slate-500 focus:border-violet-500"
+            />
+          </div>
           <Input
             label="Discount Code (optional)"
             value={promotionCode}

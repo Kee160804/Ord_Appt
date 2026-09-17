@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, Sparkles } from "lucide-react";
+import { PublicHeader } from "@/app/components/PublicHeader";
 
 interface LegalDocumentProps {
   title: string;
@@ -16,22 +16,7 @@ export function LegalDocument({
 }: LegalDocumentProps) {
   return (
     <div className="min-h-dvh bg-slate-950 text-slate-200 light:bg-white light:text-slate-800">
-      <header className="border-b border-white/10 light:border-slate-200">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-5 py-5 sm:px-8">
-          <Link href="/" className="flex items-center gap-2 font-black">
-            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-linear-to-br from-violet-500 to-indigo-600 text-white">
-              <Sparkles className="h-4 w-4" />
-            </span>
-            YuhBusiness
-          </Link>
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 text-sm font-semibold text-violet-300 hover:text-white light:text-violet-700 light:hover:text-violet-900"
-          >
-            <ArrowLeft className="h-4 w-4" /> Home
-          </Link>
-        </div>
-      </header>
+      <PublicHeader showSignIn />
 
       <main className="mx-auto max-w-4xl px-5 py-12 sm:px-8 sm:py-16">
         <p className="text-sm font-bold uppercase tracking-[0.18em] text-violet-400">

@@ -20,7 +20,6 @@ import {
   Rocket,
   ShieldCheck,
   ShoppingBag,
-  Sparkles,
   Store,
   Upload,
   UserRound,
@@ -28,6 +27,7 @@ import {
 } from "lucide-react";
 
 import { useAuth } from "@/app/contexts/auth";
+import { PublicHeader } from "@/app/components/PublicHeader";
 import { cn } from "@/app/lib/utils";
 import { resendSignupConfirmation } from "@/app/services/authService";
 import type { BusinessType } from "@/app/types";
@@ -271,148 +271,133 @@ export default function RegisterPage() {
   };
 
   return (
-    <main className="registration-shell pwa-page-safe relative h-dvh overflow-hidden bg-[#070b14] px-3 py-2 text-white sm:px-6">
-      <div className="pointer-events-none absolute -left-16 -top-20 h-56 w-56 rounded-full bg-violet-700/30 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-32 right-[-5rem] h-80 w-80 rounded-full bg-indigo-800/25 blur-3xl" />
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(124,58,237,0.08),transparent_38%)]" />
+    <div className="flex h-dvh flex-col overflow-hidden bg-[#070b14] text-white">
+      <PublicHeader ctaHref="/login" ctaLabel="Sign In" />
+      <main className="registration-shell pwa-page-safe relative min-h-0 flex-1 overflow-hidden px-3 py-2 sm:px-6">
+        <div className="pointer-events-none absolute -left-16 -top-20 h-56 w-56 rounded-full bg-violet-700/30 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-32 right-[-5rem] h-80 w-80 rounded-full bg-indigo-800/25 blur-3xl" />
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(124,58,237,0.08),transparent_38%)]" />
 
-      <div className="relative mx-auto flex h-full w-full max-w-125 flex-col">
-        <BrandHeader />
+        <div className="relative mx-auto flex h-full w-full max-w-125 flex-col">
+          <div className="mb-2 shrink-0 text-center">
+            <h1 className="text-3xl font-black tracking-tight text-white sm:text-[2rem]">
+              Mek yuh business
+            </h1>
+            <p className="mt-1.5 text-sm text-[#8298c2] sm:text-base">
+              Set up your digital storefront in minutes
+            </p>
+          </div>
 
-        <div className="mb-2 shrink-0 text-center">
-          <h1 className="text-3xl font-black tracking-tight text-white sm:text-[2rem]">
-            Mek yuh business
-          </h1>
-          <p className="mt-1.5 text-sm text-[#8298c2] sm:text-base">
-            Set up your digital storefront in minutes
-          </p>
-        </div>
+          <Progress step={step} />
 
-        <Progress step={step} />
+          <form onSubmit={handleSubmit} className="min-h-0 flex-1">
+            <section className="flex h-full flex-col overflow-hidden rounded-[20px] border border-[#273858] bg-[linear-gradient(145deg,rgba(17,29,51,0.98),rgba(9,19,36,0.98))] p-3 shadow-[0_30px_90px_rgba(0,0,0,0.35)] sm:p-4">
+              {error && (
+                <div
+                  role="alert"
+                  aria-live="assertive"
+                  className="mb-3 shrink-0 rounded-xl border border-rose-500/40 bg-[#2a101d] px-4 py-2.5 text-sm text-rose-200 shadow-lg"
+                >
+                  {error}
+                </div>
+              )}
 
-        <form onSubmit={handleSubmit} className="min-h-0 flex-1">
-          <section className="flex h-full flex-col overflow-hidden rounded-[20px] border border-[#273858] bg-[linear-gradient(145deg,rgba(17,29,51,0.98),rgba(9,19,36,0.98))] p-3 shadow-[0_30px_90px_rgba(0,0,0,0.35)] sm:p-4">
-            {error && (
-              <div
-                role="alert"
-                aria-live="assertive"
-                className="mb-3 shrink-0 rounded-xl border border-rose-500/40 bg-[#2a101d] px-4 py-2.5 text-sm text-rose-200 shadow-lg"
+              {confirmationEmail ? (
+                <ConfirmationPanel
+                  email={confirmationEmail}
+                  message={successMessage}
+                  resending={isResending}
+                  onResend={() => void resendConfirmation()}
+                />
+              ) : step === 1 ? (
+                <AccountStep
+                  form={form}
+                  update={update}
+                  passwordChecks={passwordChecks}
+                  showPassword={showPassword}
+                  showConfirmation={showConfirmation}
+                  togglePassword={() => setShowPassword((current) => !current)}
+                  toggleConfirmation={() =>
+                    setShowConfirmation((current) => !current)
+                  }
+                />
+              ) : step === 2 ? (
+                <BusinessTypeStep
+                  selected={businessType}
+                  onSelect={(value) => {
+                    setBusinessType(value);
+                    setError("");
+                  }}
+                />
+              ) : (
+                <BusinessDetailsStep
+                  form={form}
+                  update={update}
+                  businessType={businessType}
+                  logoPreview={logoPreview}
+                  logoName={logoName}
+                  onLogoSelected={selectLogo}
+                  acceptedLegal={acceptedLegal}
+                  onLegalChange={setAcceptedLegal}
+                />
+              )}
+
+              {!confirmationEmail && (
+                <div className="mt-3 flex shrink-0 gap-3">
+                  <button
+                    type="button"
+                    onClick={goBack}
+                    className="flex h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-[#7990b8] text-sm font-bold text-slate-200 transition hover:border-violet-400 hover:bg-violet-500/10"
+                  >
+                    <ArrowLeft className="h-4 w-4" /> Back
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={loading || (step === 2 && !businessType)}
+                    className="flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 text-sm font-bold text-white shadow-lg shadow-violet-950/40 transition hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-45"
+                  >
+                    {loading ? (
+                      <>
+                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                        Creating...
+                      </>
+                    ) : step === 3 ? (
+                      <>
+                        Launch My Business <Rocket className="h-4 w-4" />
+                      </>
+                    ) : (
+                      <>
+                        Continue <ArrowRight className="h-4 w-4" />
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+            </section>
+          </form>
+
+          <footer className="shrink-0 pb-1 pt-2 text-center">
+            <p className="text-sm text-[#91a4c6]">
+              Already have an account?{" "}
+              <Link
+                href="/login"
+                className="font-bold text-violet-400 transition hover:text-violet-300"
               >
-                {error}
-              </div>
-            )}
-
-            {confirmationEmail ? (
-              <ConfirmationPanel
-                email={confirmationEmail}
-                message={successMessage}
-                resending={isResending}
-                onResend={() => void resendConfirmation()}
-              />
-            ) : step === 1 ? (
-              <AccountStep
-                form={form}
-                update={update}
-                passwordChecks={passwordChecks}
-                showPassword={showPassword}
-                showConfirmation={showConfirmation}
-                togglePassword={() => setShowPassword((current) => !current)}
-                toggleConfirmation={() =>
-                  setShowConfirmation((current) => !current)
-                }
-              />
-            ) : step === 2 ? (
-              <BusinessTypeStep
-                selected={businessType}
-                onSelect={(value) => {
-                  setBusinessType(value);
-                  setError("");
-                }}
-              />
-            ) : (
-              <BusinessDetailsStep
-                form={form}
-                update={update}
-                businessType={businessType}
-                logoPreview={logoPreview}
-                logoName={logoName}
-                onLogoSelected={selectLogo}
-                acceptedLegal={acceptedLegal}
-                onLegalChange={setAcceptedLegal}
-              />
-            )}
-
-            {!confirmationEmail && (
-              <div className="mt-3 flex shrink-0 gap-3">
-                <button
-                  type="button"
-                  onClick={goBack}
-                  className="flex h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-[#7990b8] text-sm font-bold text-slate-200 transition hover:border-violet-400 hover:bg-violet-500/10"
-                >
-                  <ArrowLeft className="h-4 w-4" /> Back
-                </button>
-                <button
-                  type="submit"
-                  disabled={loading || (step === 2 && !businessType)}
-                  className="flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 text-sm font-bold text-white shadow-lg shadow-violet-950/40 transition hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-45"
-                >
-                  {loading ? (
-                    <>
-                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                      Creating...
-                    </>
-                  ) : step === 3 ? (
-                    <>
-                      Launch My Business <Rocket className="h-4 w-4" />
-                    </>
-                  ) : (
-                    <>
-                      Continue <ArrowRight className="h-4 w-4" />
-                    </>
-                  )}
-                </button>
-              </div>
-            )}
-          </section>
-        </form>
-
-        <footer className="shrink-0 pb-1 pt-2 text-center">
-          <p className="text-sm text-[#91a4c6]">
-            Already have an account?{" "}
-            <Link
-              href="/login"
-              className="font-bold text-violet-400 transition hover:text-violet-300"
-            >
-              Sign in
-            </Link>
-          </p>
-          <p className="mt-2 text-xs text-[#536889]">
-            <Link href="/privacy" className="hover:text-violet-300">
-              Privacy Policy
-            </Link>{" "}
-            ·{" "}
-            <Link href="/terms" className="hover:text-violet-300">
-              Terms of Service
-            </Link>
-          </p>
-        </footer>
-      </div>
-    </main>
-  );
-}
-
-function BrandHeader() {
-  return (
-    <div className="mb-2 flex shrink-0 items-center justify-center gap-3">
-      <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-violet-500 bg-violet-950/80 shadow-lg shadow-violet-950/30">
-        <Sparkles className="h-6 w-6 text-fuchsia-300" />
-      </div>
-      <div>
-        <p className="text-[22px] font-black leading-none tracking-tight">
-          Yuh<span className="text-violet-500">Business</span>
-        </p>
-        <p className="mt-1.5 text-xs text-slate-300">Launch. Serve. Grow.</p>
-      </div>
+                Sign in
+              </Link>
+            </p>
+            <p className="mt-2 text-xs text-[#536889]">
+              <Link href="/privacy" className="hover:text-violet-300">
+                Privacy Policy
+              </Link>{" "}
+              ·{" "}
+              <Link href="/terms" className="hover:text-violet-300">
+                Terms of Service
+              </Link>
+            </p>
+          </footer>
+        </div>
+      </main>
     </div>
   );
 }

@@ -14,15 +14,11 @@ import {
   BarChart3,
   Users,
   ChevronRight,
-  Sun,
-  Moon,
 } from "lucide-react";
-import { useTheme } from "@/app/contexts/theme";
+import { PublicHeader } from "@/app/components/PublicHeader";
 import { PLAN_DEFINITIONS } from "@/app/lib/plans";
 
 export default function HomePage() {
-  const { theme, toggleTheme } = useTheme();
-
   const teamAccess = (plan: keyof typeof PLAN_DEFINITIONS) => {
     const definition = PLAN_DEFINITIONS[plan];
     const totalIncludedAccounts = definition.includedStaffSeats + 1;
@@ -172,75 +168,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-dvh bg-[#070b14] light:bg-white text-white light:text-gray-900 transition-colors">
-      {/* Navbar */}
-      <nav className="site-header sticky top-0 z-50 flex flex-wrap items-center justify-between gap-x-2 gap-y-2 border-b border-white/5 bg-[#070b14]/90 backdrop-blur-xl light:border-gray-200 light:bg-white/90 md:flex-nowrap">
-        <div className="flex min-w-0 shrink-0 items-center gap-2 sm:gap-2.5">
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-violet-500 to-indigo-600 shadow-lg shadow-violet-900/40 light:shadow-violet-500/30 sm:h-8 sm:w-8">
-            <Sparkles className="w-3.5 h-3.5 text-white sm:w-4 sm:h-4" />
-          </div>
-          <span className="whitespace-nowrap text-[15px] font-black tracking-tight text-white light:text-gray-900 sm:text-lg">
-            YuhBusiness
-          </span>
-        </div>
-
-        <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-400 light:text-gray-600">
-          <Link
-            href="/"
-            className="hover:text-white light:hover:text-gray-900 transition-colors"
-          >
-            Home
-          </Link>
-          <a
-            href="#features"
-            className="hover:text-white light:hover:text-gray-900 transition-colors"
-          >
-            Features
-          </a>
-          <a
-            href="#demos"
-            className="hover:text-white light:hover:text-gray-900 transition-colors"
-          >
-            Live Demos
-          </a>
-          <a
-            href="#pricing"
-            className="hover:text-white light:hover:text-gray-900 transition-colors"
-          >
-            Pricing
-          </a>
-        </div>
-
-        <div className="contents md:flex md:min-w-0 md:shrink-0 md:items-center md:gap-3">
-          <button
-            onClick={toggleTheme}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-700 bg-transparent text-slate-400 transition-all duration-300 hover:bg-white/10 hover:text-white light:border-gray-300 light:text-gray-600 light:hover:bg-gray-200 light:hover:text-gray-800 md:h-10 md:w-10"
-            aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
-            title={`Switch to ${theme === "dark" ? "light" : "dark"} mode (currently ${theme})`}
-          >
-            {theme === "dark" ? (
-              <Sun className="h-4 w-4 text-yellow-400 sm:h-5 sm:w-5" />
-            ) : (
-              <Moon className="h-4 w-4 text-slate-600 sm:h-5 sm:w-5" />
-            )}
-          </button>
-
-          <div className="order-last grid w-full grid-cols-2 gap-2 md:order-none md:flex md:w-auto md:items-center md:gap-3">
-            <Link
-              href="/login"
-              className="inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-xl border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-200 transition-colors hover:bg-white/5 hover:text-white light:border-gray-300 light:text-gray-700 light:hover:bg-gray-100 light:hover:text-gray-900 md:min-h-0 md:border-transparent"
-            >
-              Sign In
-            </Link>
-
-            <Link
-              href="/register"
-              className="inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-xl bg-violet-600 px-4 py-2 text-sm font-bold text-white shadow-sm shadow-violet-900/30 transition-colors hover:bg-violet-500 light:bg-violet-600 light:shadow-violet-600/30 light:hover:bg-violet-700 md:min-h-0"
-            >
-              Get Started Free
-            </Link>
-          </div>
-        </div>
-      </nav>
+      <PublicHeader showSignIn />
 
       {/* Hero */}
       <section className="relative mx-auto max-w-6xl overflow-hidden px-4 pb-12 pt-10 text-center sm:px-6 sm:pb-20 sm:pt-24 md:px-12">
@@ -711,7 +639,10 @@ export default function HomePage() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-white/5 light:border-gray-200 py-10 px-6 md:px-12">
+      <footer
+        id="help"
+        className="border-t border-white/5 light:border-gray-200 py-10 px-6 md:px-12"
+      >
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-2">
             <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-linear-to-br from-violet-500 to-indigo-600">

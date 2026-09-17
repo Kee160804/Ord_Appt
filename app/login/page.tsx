@@ -1,21 +1,30 @@
 "use client";
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import { Sparkles, Eye, EyeOff, AlertCircle, Sun, Moon } from "lucide-react";
-import { useAuth } from "@/app/contexts/auth";
-import { useTheme } from "@/app/contexts/theme";
 
-/**
- * Validates a post-login destination.
- *
- * SECURITY:
- * Only application-relative paths beginning with exactly one forward slash
- * are accepted. Protocol-relative URLs, absolute URLs, and backslash-based
- * paths are rejected.
- */
+import { useEffect, useState } from "react";
+import Image from "next/image";
+import Link from "next/link";
+import {
+  ArrowRight,
+  BarChart3,
+  CalendarDays,
+  Eye,
+  EyeOff,
+  Heart,
+  Mail,
+  ShieldCheck,
+  ShoppingBag,
+  Sparkles,
+  Store,
+  Zap,
+} from "lucide-react";
+
+import { PublicHeader } from "@/app/components/PublicHeader";
+import { useAuth } from "@/app/contexts/auth";
+
+/** Only permit redirects to routes within this YuhBusiness deployment. */
 function getSafeInternalPath(value: string | null): string | null {
-  if (!value) return null;
   if (
+    !value ||
     !value.startsWith("/") ||
     value.startsWith("//") ||
     value.includes("\\")
@@ -26,19 +35,63 @@ function getSafeInternalPath(value: string | null): string | null {
   try {
     const resolved = new URL(value, window.location.origin);
     if (resolved.origin !== window.location.origin) return null;
-
     return `${resolved.pathname}${resolved.search}${resolved.hash}`;
   } catch {
     return null;
   }
 }
 
+const BUSINESS_CARDS = [
+  {
+    title: "Restaurants",
+    description: "Order for pickup or delivery",
+    image:
+      "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=700&q=80",
+    icon: ShoppingBag,
+    accent: "from-orange-500 to-amber-600",
+  },
+  {
+    title: "Salons & Studios",
+    description: "Book appointments in minutes",
+    image:
+      "https://images.unsplash.com/photo-1560066984-138dadb4c035?w=700&q=80",
+    icon: CalendarDays,
+    accent: "from-violet-500 to-purple-700",
+  },
+  {
+    title: "Retail Stores",
+    description: "Sell products online 24/7",
+    image:
+      "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=700&q=80",
+    icon: Store,
+    accent: "from-emerald-500 to-teal-700",
+  },
+];
+
+const PLATFORM_FEATURES = [
+  { title: "Quick Setup", description: "Get online in minutes", icon: Zap },
+  {
+    title: "Secure & Reliable",
+    description: "Your data is safe",
+    icon: ShieldCheck,
+  },
+  {
+    title: "Built for Growth",
+    description: "Reach more customers",
+    icon: BarChart3,
+  },
+  {
+    title: "Local Support",
+    description: "Real people. Real help.",
+    icon: Heart,
+  },
+];
+
 export default function LoginPage() {
   const { login, isLoading: isAuthLoading } = useAuth();
-  const { theme, toggleTheme } = useTheme();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [showPw, setShowPw] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -61,10 +114,11 @@ export default function LoginPage() {
 
   const handleLogin = async () => {
     if (loading || isAuthLoading) return;
-    if (!email) {
+    if (!email.trim()) {
       setError("Please enter your email.");
       return;
     }
+
     setError("");
     setLoading(true);
     const result = await login(email, password, rememberMe);
@@ -87,10 +141,8 @@ export default function LoginPage() {
       return;
     }
 
-    // A full navigation guarantees that the Supabase auth cookies written by
-    // signInWithPassword reach the server proxy before it evaluates the
-    // protected dashboard route. This avoids a mobile/PWA redirect loop that
-    // otherwise appears to resolve only after a manual refresh or tab switch.
+    // Full navigation makes the new Supabase cookies available to the route
+    // proxy immediately, preventing mobile/PWA authentication redirect loops.
     const dashboardDestination =
       safeNextPath === "/dashboard" || safeNextPath?.startsWith("/dashboard/")
         ? safeNextPath
@@ -98,287 +150,255 @@ export default function LoginPage() {
     window.location.replace(dashboardDestination);
   };
 
+  const submitOnEnter = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter" && !isAuthLoading && !loading) {
+      void handleLogin();
+    }
+  };
+
   return (
-    <div className="flex min-h-dvh flex-col bg-[#070b14] text-white light:bg-white light:text-gray-900">
-      {/* Navbar */}
-      <nav className="site-header sticky top-0 z-50 flex shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-2 border-b border-white/5 bg-[#070b14]/90 backdrop-blur-xl light:border-gray-200 light:bg-white/90 md:flex-nowrap">
-        <div className="flex min-w-0 shrink-0 items-center gap-2 sm:gap-2.5">
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-violet-500 to-indigo-600 shadow-lg shadow-violet-900/40 light:shadow-violet-500/30 sm:h-8 sm:w-8">
-            <Sparkles className="w-4 h-4 text-white" />
-          </div>
-          <span className="whitespace-nowrap text-[15px] font-black tracking-tight text-white light:text-gray-900 sm:text-lg">
-            YuhBusiness
-          </span>
-        </div>
+    <div className="min-h-dvh bg-[#070b14] text-white transition-colors light:bg-white light:text-slate-950">
+      <PublicHeader />
 
-        <div className="hidden md:flex items-center gap-8 text-sm font-medium">
-          {/* Home link - active */}
-          <Link
-            href="/"
-            className="text-slate-400 light:text-gray-600 hover:text-white light:hover:text-gray-900 transition-colors"
-          >
-            Home
-          </Link>
+      <main className="relative grid min-h-[calc(100dvh-85px)] overflow-hidden lg:grid-cols-[minmax(0,1.05fr)_minmax(520px,0.95fr)]">
+        <section className="relative hidden overflow-hidden border-r border-[#1b2940] px-8 py-12 lg:block xl:px-14 xl:py-14 light:border-slate-200 light:bg-slate-50">
+          <span className="pointer-events-none absolute -left-28 -top-28 h-72 w-72 rounded-full bg-violet-700/25 blur-3xl" />
+          <span className="pointer-events-none absolute -bottom-36 right-6 h-80 w-80 rounded-full bg-indigo-800/20 blur-3xl" />
 
-          <Link
-            href="/home#features"
-            className="text-slate-400 light:text-gray-600 hover:text-white light:hover:text-gray-900 transition-colors"
-          >
-            Features
-          </Link>
-
-          <Link
-            href="/home#demos"
-            className="text-slate-400 light:text-gray-600 hover:text-white light:hover:text-gray-900 transition-colors"
-          >
-            Live Demos
-          </Link>
-
-          <Link
-            href="/home#pricing"
-            className="text-slate-400 light:text-gray-600 hover:text-white light:hover:text-gray-900 transition-colors"
-          >
-            Pricing
-          </Link>
-        </div>
-
-        <div className="contents md:flex md:min-w-0 md:shrink-0 md:items-center md:gap-3">
-          <button
-            onClick={toggleTheme}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-700 bg-transparent text-slate-400 transition-colors hover:bg-white/5 light:border-gray-300 light:text-gray-600 light:hover:bg-gray-100 md:h-10 md:w-10"
-            aria-label="Toggle main theme"
-            title="Toggle main theme"
-          >
-            {theme === "dark" ? (
-              <Sun className="h-4 w-4 sm:h-5 sm:w-5" />
-            ) : (
-              <Moon className="h-4 w-4 sm:h-5 sm:w-5" />
-            )}
-          </button>
-
-          <div className="order-last grid w-full grid-cols-2 gap-2 md:order-0 md:flex md:w-auto md:items-center md:gap-3">
-            <Link
-              href="/"
-              className="inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-xl border border-slate-700 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200 transition-colors hover:bg-white/10 light:border-gray-300 light:bg-white light:text-gray-700 light:hover:bg-gray-100 md:hidden"
-              aria-label="Back to home"
-            >
-              Home
-            </Link>
-
-            <Link
-              href="/register"
-              className="inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-xl bg-violet-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition-colors hover:bg-violet-500 light:bg-violet-600 light:hover:bg-violet-700 md:min-h-0"
-            >
-              Get Started Free
-            </Link>
-          </div>
-        </div>
-      </nav>
-
-      {/* Main content (two columns) */}
-      <div className="flex flex-1 flex-col lg:flex-row">
-        {/* Left panel - hidden on mobile */}
-        <div className="hidden lg:flex lg:w-1/2 flex-col justify-between p-14 relative overflow-hidden bg-linear-to-br from-[#0d1020] to-[#0a0f1a] light:from-gray-50 light:to-white border-r border-white/5 light:border-gray-200">
-          <div className="absolute top-0 left-0 w-full h-full -z-10">
-            <div className="absolute top-20 left-20 w-96 h-96 bg-violet-600/10 rounded-full blur-3xl" />
-            <div className="absolute bottom-20 right-10 w-64 h-64 bg-indigo-600/10 rounded-full blur-3xl" />
-          </div>
-          <div className="space-y-8">
-            <div className="space-y-4">
-              <h2 className="text-4xl font-black text-white light:text-gray-900 leading-tight">
-                Find weh yuh need.
-                <br /> Book it.
-                <br />
-                <span className="bg-linear-to-r from-violet-400 to-indigo-400 light:from-violet-600 light:to-indigo-600 bg-clip-text text-transparent">
-                  Order it.
-                </span>
-              </h2>
-              <p className="text-slate-400 light:text-gray-700 leading-relaxed max-w-sm font-medium">
-                Thousands of local businesses use YuhBusiness to accept bookings
-                and orders online — without building a website.
-              </p>
+          <div className="relative mx-auto max-w-2xl">
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#334766] bg-[#0d1829]/80 px-3 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[#9fb2ce] light:border-slate-300 light:bg-white light:text-slate-600">
+              <Store className="h-3.5 w-3.5 text-violet-400" />
+              For local business owners
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                "💅 Nail Salons",
-                "💈 Barbershops",
-                "🍕 Restaurants",
-                "🥐 Bakeries",
-                "🧘 Yoga Studios",
-                "☕ Cafes",
-              ].map((e) => (
-                <div
-                  key={e}
-                  className="flex items-center gap-2 bg-white/5 light:bg-gray-200 border border-white/5 light:border-gray-300 rounded-xl px-3 py-2.5 text-sm text-slate-300 light:text-gray-800 font-medium"
-                >
-                  {e}
+
+            <h1 className="mt-6 text-4xl font-black leading-[1.08] tracking-tight text-white xl:text-5xl light:text-slate-950">
+              Your Business Online.
+              <br />
+              <span className="text-violet-500">Made Simple.</span>
+            </h1>
+            <p className="mt-5 max-w-xl text-base leading-7 text-[#9aabc3] xl:text-lg light:text-slate-600">
+              Join thousands of local business owners using YuhBusiness to
+              accept bookings and orders, manage their business, and grow online
+              — without building a website.
+            </p>
+
+            <div className="mt-7 grid grid-cols-4 gap-4">
+              {PLATFORM_FEATURES.map(({ title, description, icon: Icon }) => (
+                <div key={title} className="flex items-center gap-3">
+                  <span className="flex h-11 w-11 items-center justify-center rounded-full bg-violet-500/15 text-violet-300 ring-1 ring-violet-400/15">
+                    <Icon className="h-5 w-5" />
+                  </span>
+                  <div>
+                    <p className="text-xs font-black text-white light:text-slate-950">
+                      {title}
+                    </p>
+                    <p className="mt-1 text-[10px] leading-4 text-[#8292aa] light:text-slate-500">
+                      {description}
+                    </p>
+                  </div>
                 </div>
               ))}
             </div>
-          </div>
-          <p className="text-slate-600 light:text-gray-600 text-sm font-medium">
-            © 2025 YuhBusiness Platform
-          </p>
-        </div>
 
-        {/* Right form */}
-        <div className="flex flex-1 items-center justify-center p-4 sm:p-8">
-          <div className="w-full max-w-sm space-y-7">
-            {/* Mobile logo */}
-            <div className="flex lg:hidden items-center gap-3 justify-center mb-6">
-              <div className="w-9 h-9 bg-violet-600/20 border border-violet-500/30 rounded-xl flex items-center justify-center">
-                <Sparkles className="w-4 h-4 text-violet-400" />
-              </div>
-              <span className="font-black text-xl text-white light:text-gray-900">
-                YuhBusiness
+            <div className="mt-8 grid grid-cols-3 gap-4">
+              {BUSINESS_CARDS.map(
+                ({ title, description, image, icon: Icon, accent }) => (
+                  <article
+                    key={title}
+                    className="overflow-hidden rounded-2xl border border-[#2a3b56] bg-[#0b1525] shadow-xl light:border-slate-200 light:bg-white"
+                  >
+                    <div className="relative h-36 overflow-hidden bg-[#142138]">
+                      <Image
+                        src={image}
+                        alt=""
+                        fill
+                        sizes="220px"
+                        className="object-cover"
+                        unoptimized
+                      />
+                    </div>
+                    <div className="flex gap-3 p-3.5">
+                      <span
+                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-linear-to-br ${accent} text-white shadow-lg`}
+                      >
+                        <Icon className="h-4 w-4" />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate text-xs font-black text-white light:text-slate-950">
+                          {title}
+                        </p>
+                        <p className="mt-1 text-[10px] leading-4 text-[#8fa0b9] light:text-slate-500">
+                          {description}
+                        </p>
+                      </div>
+                    </div>
+                  </article>
+                ),
+              )}
+            </div>
+
+            <blockquote className="mt-8 text-sm italic leading-6 text-[#8fa4c3] light:text-slate-500">
+              “YuhBusiness made it so easy to get my business online.
+              <br /> Now I can focus on what I love.”
+              <br />
+              <span className="mt-2 block not-italic">
+                — Local Business Owner
               </span>
-            </div>
+            </blockquote>
+          </div>
+        </section>
 
-            <div>
-              <h1 className="text-2xl font-black text-white light:text-gray-900">
-                Welcome bak
-              </h1>
-              <p className="text-slate-500 light:text-gray-700 text-sm mt-1 font-medium">
-                Sign in to your business dashboard
-              </p>
+        <section className="relative flex items-center justify-center px-4 py-8 sm:px-8 lg:px-10">
+          <span className="pointer-events-none absolute right-0 top-1/4 h-80 w-80 rounded-full bg-violet-700/10 blur-3xl" />
+          <div className="relative w-full max-w-2xl rounded-3xl border border-[#2b3c58] bg-[linear-gradient(145deg,rgba(15,28,48,0.94),rgba(7,15,27,0.96))] p-5 shadow-[0_30px_100px_rgba(0,0,0,0.38)] sm:p-8 lg:p-9 light:border-slate-200 light:bg-white">
+            <div className="mb-7 flex items-center gap-3">
+              <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-linear-to-br from-violet-500 to-purple-700 text-white shadow-lg shadow-violet-900/30">
+                <Sparkles className="h-5 w-5" />
+              </span>
+              <div>
+                <p className="text-lg font-black text-white light:text-slate-950">
+                  Yuh<span className="text-violet-500">Business</span>
+                </p>
+                <p className="text-[10px] text-[#8292aa] light:text-slate-500">
+                  Built for Local Business Owners
+                </p>
+              </div>
             </div>
+            <h2 className="text-3xl font-black tracking-tight text-white light:text-slate-950">
+              Welcome back
+            </h2>
+            <p className="mt-2 text-base text-[#9aabc3] light:text-slate-600">
+              Sign in to your YuhBusiness account
+            </p>
 
-            <div className="space-y-4">
+            <div className="mt-7 space-y-5">
               {error && (
-                <div className="flex items-center gap-2 p-3 bg-red-900/20 light:bg-red-50 border border-red-500/30 light:border-red-200 rounded-xl text-red-400 light:text-red-600 text-sm font-medium">
-                  <AlertCircle className="w-4 h-4 shrink-0" /> {error}
+                <div
+                  role="alert"
+                  className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm font-medium text-red-300 light:text-red-700"
+                >
+                  {error}
                 </div>
               )}
               {notice && (
-                <div className="rounded-xl border border-violet-500/30 bg-violet-500/10 p-3 text-sm font-medium text-violet-200 light:border-violet-200 light:bg-violet-50 light:text-violet-700">
+                <div className="rounded-xl border border-violet-500/30 bg-violet-500/10 px-4 py-3 text-sm font-medium text-violet-200 light:text-violet-700">
                   {notice}
                 </div>
               )}
 
-              <div className="space-y-1.5">
-                <label
-                  htmlFor="login-email"
-                  className="text-sm font-semibold text-slate-300 light:text-gray-800"
-                >
-                  Email Address
-                </label>
-                <input
-                  id="login-email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  disabled={isAuthLoading || loading}
-                  onKeyDown={(e) =>
-                    e.key === "Enter" &&
-                    !isAuthLoading &&
-                    !loading &&
-                    handleLogin()
-                  }
-                  placeholder="you@business.com"
-                  className="w-full px-4 py-2.5 text-sm border border-slate-600 light:border-gray-400 rounded-xl bg-slate-800/50 light:bg-gray-50 text-white light:text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500 transition placeholder:text-slate-600 light:placeholder:text-gray-500"
-                />
-              </div>
+              <label className="block text-sm font-bold text-slate-200 light:text-slate-800">
+                Email Address
+                <span className="relative mt-2 block">
+                  <Mail className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#71839e]" />
+                  <input
+                    id="login-email"
+                    name="email"
+                    type="email"
+                    autoComplete="email"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    onKeyDown={submitOnEnter}
+                    disabled={isAuthLoading || loading}
+                    placeholder="you@business.com"
+                    className="w-full rounded-xl border border-[#3a4e6c] bg-[#17243a] py-3.5 pl-12 pr-4 text-sm font-medium text-white outline-none transition placeholder:text-[#6f819c] focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 disabled:opacity-60 light:border-slate-300 light:bg-slate-50 light:text-slate-950"
+                  />
+                </span>
+              </label>
 
-              <div className="space-y-1.5">
-                <label
-                  htmlFor="login-password"
-                  className="text-sm font-semibold text-slate-300 light:text-gray-800"
-                >
-                  Password
-                </label>
-                <div className="relative">
+              <label className="block text-sm font-bold text-slate-200 light:text-slate-800">
+                Password
+                <span className="relative mt-2 block">
+                  <ShieldCheck className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#71839e]" />
                   <input
                     id="login-password"
                     name="password"
-                    type={showPw ? "text" : "password"}
+                    type={showPassword ? "text" : "password"}
                     autoComplete="current-password"
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={(event) => setPassword(event.target.value)}
+                    onKeyDown={submitOnEnter}
                     disabled={isAuthLoading || loading}
-                    onKeyDown={(e) =>
-                      e.key === "Enter" &&
-                      !isAuthLoading &&
-                      !loading &&
-                      handleLogin()
-                    }
-                    placeholder="••••••••"
-                    className="w-full px-4 py-2.5 pr-10 text-sm border border-slate-600 light:border-gray-400 rounded-xl bg-slate-800/50 light:bg-gray-50 text-white light:text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500 transition placeholder:text-slate-600 light:placeholder:text-gray-500"
+                    placeholder="Enter your password"
+                    className="w-full rounded-xl border border-[#3a4e6c] bg-[#17243a] py-3.5 pl-12 pr-12 text-sm font-medium text-white outline-none transition placeholder:text-[#6f819c] focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 disabled:opacity-60 light:border-slate-300 light:bg-slate-50 light:text-slate-950"
                   />
                   <button
                     type="button"
-                    onClick={() => setShowPw(!showPw)}
-                    aria-label={showPw ? "Hide password" : "Show password"}
-                    aria-pressed={showPw}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 light:text-gray-600 hover:text-slate-300 light:hover:text-gray-800 transition-colors"
+                    onClick={() => setShowPassword((current) => !current)}
+                    aria-label={
+                      showPassword ? "Hide password" : "Show password"
+                    }
+                    aria-pressed={showPassword}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-[#71839e] transition hover:text-white light:hover:text-slate-950"
                   >
-                    {showPw ? (
-                      <EyeOff className="w-4 h-4" />
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4" />
                     ) : (
-                      <Eye className="w-4 h-4" />
+                      <Eye className="h-4 w-4" />
                     )}
                   </button>
-                </div>
-              </div>
+                </span>
+              </label>
 
               <div className="flex items-center justify-between gap-3 text-xs sm:text-sm">
-                <label className="flex items-center gap-2 text-slate-400 light:text-gray-700 cursor-pointer font-medium">
+                <label className="flex cursor-pointer items-center gap-2 font-medium text-[#9aabc3] light:text-slate-600">
                   <input
                     id="remember-me"
                     name="remember-me"
                     type="checkbox"
                     checked={rememberMe}
                     onChange={(event) => setRememberMe(event.target.checked)}
-                    className="w-4 h-4 accent-violet-500 rounded"
-                  />{" "}
+                    className="h-4 w-4 rounded accent-violet-500"
+                  />
                   Remember me
                 </label>
                 <Link
                   href="/forgot-password"
-                  className="text-violet-400 light:text-violet-600 hover:text-violet-300 light:hover:text-violet-700 font-semibold transition-colors"
+                  className="font-bold text-violet-400 transition hover:text-violet-300 light:text-violet-700"
                 >
                   Forgot password?
                 </Link>
               </div>
 
               <button
-                onClick={handleLogin}
+                type="button"
+                onClick={() => void handleLogin()}
                 disabled={loading || isAuthLoading}
-                className="w-full py-3 bg-violet-600 hover:bg-violet-500 light:bg-violet-600 light:hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2 shadow-lg shadow-violet-900/30 light:shadow-violet-600/30"
+                className="flex w-full items-center justify-center gap-3 rounded-xl bg-linear-to-r from-violet-600 via-purple-600 to-violet-600 py-4 text-sm font-black text-white shadow-[0_14px_35px_rgba(124,58,237,0.35)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {loading || isAuthLoading ? (
                   <>
-                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />{" "}
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
                     {loading ? "Signing in..." : "Preparing sign in..."}
                   </>
                 ) : (
-                  "Sign een"
+                  <>
+                    Sign in <ArrowRight className="h-4 w-4" />
+                  </>
                 )}
               </button>
             </div>
 
-            <p className="text-center text-sm text-slate-500 light:text-gray-700 font-medium">
-              Don&apos;t have an account?{" "}
+            <p className="mt-7 text-center text-sm font-medium text-[#91a2ba] light:text-slate-600">
+              New to YuhBusiness?{" "}
               <Link
                 href="/register"
-                className="text-violet-400 light:text-violet-600 font-bold hover:text-violet-300 light:hover:text-violet-700 transition-colors"
+                className="font-black text-violet-400 hover:text-violet-300 light:text-violet-700"
               >
-                Mek one free
+                Create your business <ArrowRight className="inline h-4 w-4" />
               </Link>
             </p>
-            <p className="text-center text-xs text-slate-600 light:text-slate-500">
-              <Link href="/privacy" className="hover:text-violet-500">
+            <p className="mt-5 text-center text-xs text-[#5e728f] light:text-slate-500">
+              <Link href="/privacy" className="hover:text-violet-400">
                 Privacy Policy
               </Link>{" "}
               ·{" "}
-              <Link href="/terms" className="hover:text-violet-500">
+              <Link href="/terms" className="hover:text-violet-400">
                 Terms of Service
               </Link>
             </p>
           </div>
-        </div>
-      </div>
+        </section>
+      </main>
     </div>
   );
 }
