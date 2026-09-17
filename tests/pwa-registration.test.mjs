@@ -23,6 +23,21 @@ test("offline fallback can recover when the app server returns", async () => {
   assert.match(offline, /location\.reload\(\)/);
 });
 
+test("installed mobile PWA exposes sign-in and storefront demo controls", async () => {
+  const header = await readFile("app/components/PublicHeader.tsx", "utf8");
+  const storefront = await readFile("app/components/store.tsx", "utf8");
+  const styles = await readFile("app/styles/global.css", "utf8");
+
+  assert.match(header, /pwa-public-actions/);
+  assert.match(header, /href="\/login"/);
+  assert.match(storefront, /pwa-demo-view-switcher/);
+  assert.match(storefront, /> Storefront/);
+  assert.match(
+    styles,
+    /@media \(display-mode: standalone\) and \(max-width: 639px\)/,
+  );
+});
+
 test("registration keeps overflowing content clear of its actions", async () => {
   const registration = await readFile("app/register/page.tsx", "utf8");
   const styles = await readFile("app/styles/global.css", "utf8");

@@ -80,12 +80,29 @@ export function PublicHeader({
           </button>
           <Link
             href={ctaHref}
-            className="inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-xl bg-linear-to-r from-violet-600 to-purple-600 px-4 text-xs font-black text-white shadow-[0_10px_28px_rgba(124,58,237,0.28)] transition hover:brightness-110 sm:px-6 sm:text-sm"
+            className={`inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-xl bg-linear-to-r from-violet-600 to-purple-600 px-4 text-xs font-black text-white shadow-[0_10px_28px_rgba(124,58,237,0.28)] transition hover:brightness-110 sm:px-6 sm:text-sm ${showSignIn ? "pwa-combined-primary-cta" : ""}`}
           >
             {ctaLabel}
           </Link>
         </div>
       </div>
+
+      {showSignIn && (
+        <div className="pwa-public-actions mx-auto w-full max-w-7xl grid-cols-2 gap-2 pt-3">
+          <Link
+            href="/login"
+            className="inline-flex min-h-11 items-center justify-center rounded-xl border border-[#33445f] bg-[#0d1728] px-4 text-sm font-bold text-white transition hover:border-violet-400 light:border-slate-300 light:bg-white light:text-slate-800"
+          >
+            Sign In
+          </Link>
+          <Link
+            href={ctaHref}
+            className="inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-xl bg-linear-to-r from-violet-600 to-purple-600 px-4 text-sm font-black text-white shadow-[0_10px_28px_rgba(124,58,237,0.28)] transition hover:brightness-110"
+          >
+            {ctaLabel}
+          </Link>
+        </div>
+      )}
     </header>
   );
 }

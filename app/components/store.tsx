@@ -402,6 +402,33 @@ export default function StorefrontClient({
                 </button>
               </div>
             </div>
+
+            {viewOnly && (
+              <div
+                className="pwa-demo-view-switcher mx-auto w-full max-w-365 grid-cols-2 gap-2 px-4 pb-3 sm:px-6"
+                role="tablist"
+                aria-label="Demo view"
+              >
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeDemoView === "dashboard"}
+                  onClick={() => setActiveDemoView("dashboard")}
+                  className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-3 py-2 text-xs font-bold transition ${activeDemoView === "dashboard" ? "border-violet-500 bg-violet-600 text-white" : "border-[#29384f] bg-[#0b1525] text-slate-300 light:border-slate-200 light:bg-slate-100 light:text-slate-700"}`}
+                >
+                  <LayoutDashboard className="h-4 w-4" /> Dashboard
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeDemoView === "storefront"}
+                  onClick={() => setActiveDemoView("storefront")}
+                  className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-3 py-2 text-xs font-bold transition ${activeDemoView === "storefront" ? "border-violet-500 bg-violet-600 text-white" : "border-[#29384f] bg-[#0b1525] text-slate-300 light:border-slate-200 light:bg-slate-100 light:text-slate-700"}`}
+                >
+                  <Store className="h-4 w-4" /> Storefront
+                </button>
+              </div>
+            )}
           </header>
 
           {viewOnly && (

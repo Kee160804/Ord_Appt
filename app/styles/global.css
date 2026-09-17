@@ -140,6 +140,24 @@ body {
   padding-bottom: max(2rem, env(safe-area-inset-bottom, 0px));
 }
 
+/* These compact controls are exclusive to installed, phone-sized PWAs. */
+.pwa-public-actions,
+.pwa-demo-view-switcher {
+  display: none;
+}
+
+@media (display-mode: standalone) and (max-width: 639px) {
+  .pwa-public-actions,
+  .pwa-demo-view-switcher {
+    display: grid;
+  }
+
+  /* The combined PWA action row replaces the single compact CTA. */
+  .pwa-combined-primary-cta {
+    display: none;
+  }
+}
+
 @media (min-width: 640px) {
   .pwa-page-safe {
     padding-top: max(2rem, env(safe-area-inset-top, 0px));
