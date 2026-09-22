@@ -11,6 +11,9 @@ import {
   CreditCard,
   ShoppingBag,
   X,
+  Move,
+  RotateCcw,
+  ZoomIn,
 } from "lucide-react";
 import { Card, CardHeader, CardBody } from "../components/Card";
 import { Button } from "../components/Button";
@@ -18,6 +21,7 @@ import { Input, Textarea } from "../components/input";
 import { formatCurrency, cn } from "../lib/utils";
 import { PLAN_DEFINITIONS, PLAN_ORDER, tenantHasFeature } from "../lib/plans";
 import { PlanFeatureRequired } from "./PlanFeatureRequired";
+import { BusinessLogo } from "./BusinessLogo";
 import { TeamAccessView } from "./TeamAccessView";
 import {
   updateBusinessDetails,
@@ -210,14 +214,12 @@ function BusinessTab({
       </CardHeader>
       <CardBody className="space-y-5">
         <div className="flex items-center gap-4">
-          <div
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg text-sm font-black text-white"
-            style={{ backgroundColor: tenant.logoBg }}
-          >
-            {tenant.logo}
-          </div>
+          <BusinessLogo
+            tenant={tenant}
+            className="h-12 w-12 rounded-lg text-sm font-black"
+          />
           <p className="text-[10px] text-slate-400 light:text-[#71809a]">
-            Your business initial is used until image uploads are enabled.
+            Your signup logo and business details are kept in sync here.
           </p>
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -415,10 +417,18 @@ function StorefrontTab({
 }) {
   const [slug, setSlug] = useState(tenant.slug);
   const [coverImage, setCoverImage] = useState(tenant.coverImage);
+  const [coverImagePositionX, setCoverImagePositionX] = useState(
+    tenant.coverImagePositionX ?? 50,
+  );
+  const [coverImagePositionY, setCoverImagePositionY] = useState(
+    tenant.coverImagePositionY ?? 50,
+  );
+  const [coverImageZoom, setCoverImageZoom] = useState(
+    tenant.coverImageZoom ?? 100,
+  );
   const [primaryColor, setPrimaryColor] = useState(tenant.primaryColor);
   const [accentColor, setAccentColor] = useState(tenant.accentColor);
   const [socialLinks, setSocialLinks] = useState(tenant.socialLinks);
-  const [customDomain, setCustomDomain] = useState(tenant.customDomain ?? "");
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -469,6 +479,13 @@ function StorefrontTab({
     setSuccess("");
   };
 
+  const resetCoverFraming = () => {
+    setCoverImagePositionX(50);
+    setCoverImagePositionY(50);
+    setCoverImageZoom(100);
+    setSuccess("");
+  };
+
   const save = async () => {
     setIsSaving(true);
     setError("");
@@ -485,25 +502,24 @@ function StorefrontTab({
       const saved = await updateStorefrontSettings(tenant.id, {
         slug,
         coverImage: uploadedCoverImage || coverImage,
+        coverImagePositionX,
+        coverImagePositionY,
+        coverImageZoom,
         primaryColor,
         accentColor,
         socialLinks,
-        customDomain,
       });
       setSlug(saved.slug);
       setCoverImage(saved.coverImage);
+      setCoverImagePositionX(saved.coverImagePositionX);
+      setCoverImagePositionY(saved.coverImagePositionY);
+      setCoverImageZoom(saved.coverImageZoom);
       clearSelectedFile();
       onTenantUpdated({
         ...tenant,
         ...saved,
-        domain:
-          saved.customDomain === tenant.customDomain && tenant.domain
-            ? tenant.domain
-            : undefined,
-        customDomainVerified:
-          saved.customDomain === tenant.customDomain
-            ? tenant.customDomainVerified
-            : false,
+        domain: saved.customDomain,
+        customDomainVerified: saved.customDomainVerified,
       });
       if (uploadedCoverImage && tenant.coverImage !== uploadedCoverImage) {
         await deleteStorefrontCoverImage(tenant.id, tenant.coverImage);
@@ -571,16 +587,22 @@ function StorefrontTab({
             )}
           </div>
 
-          <div
-            className="relative flex min-h-36 items-center justify-center overflow-hidden rounded-2xl border border-slate-600 bg-slate-800 bg-cover bg-center light:border-slate-300 light:bg-slate-100"
-            style={
-              coverPreview || coverImage
-                ? {
-                    backgroundImage: `linear-gradient(rgba(8,17,31,.12),rgba(8,17,31,.4)),url(${JSON.stringify(coverPreview || coverImage)})`,
-                  }
-                : undefined
-            }
-          >
+          <div className="relative flex aspect-[16/7] min-h-36 items-center justify-center overflow-hidden rounded-2xl border border-slate-600 bg-slate-800 light:border-slate-300 light:bg-slate-100">
+            {(coverPreview || coverImage) && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={coverPreview || coverImage}
+                alt="Cover image framing preview"
+                className="absolute inset-0 h-full w-full object-cover"
+                style={{
+                  objectPosition: `${coverImagePositionX}% ${coverImagePositionY}%`,
+                  transform: `scale(${coverImageZoom / 100})`,
+                }}
+              />
+            )}
+            {(coverPreview || coverImage) && (
+              <div className="pointer-events-none absolute inset-0 bg-linear-to-b from-[#08111f]/10 to-[#08111f]/40" />
+            )}
             {!coverPreview && !coverImage && (
               <div className="text-center text-slate-500">
                 <ImageIcon className="mx-auto h-7 w-7" />
@@ -634,6 +656,110 @@ function StorefrontTab({
             JPG, PNG, or WebP · Maximum 5 MB. Recommended wide format: 1600 ×
             700.
           </p>
+
+          {(coverPreview || coverImage) && (
+            <div className="space-y-3 rounded-2xl border border-slate-700 bg-slate-900/35 p-4 light:border-slate-200 light:bg-slate-50">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="flex items-center gap-2 text-xs font-bold text-white light:text-slate-900">
+                    <ZoomIn className="h-4 w-4 text-violet-400" /> Perfect fit
+                  </p>
+                  <p className="mt-1 text-[11px] text-slate-500 light:text-slate-600">
+                    Choose a size, then fine-tune the visible area.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={resetCoverFraming}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-slate-600 px-2.5 py-1.5 text-[11px] font-semibold text-slate-300 transition hover:border-violet-500 hover:text-white light:border-slate-300 light:text-slate-600"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" /> Reset
+                </button>
+              </div>
+              <div
+                className="grid grid-cols-3 gap-2"
+                aria-label="Cover size presets"
+              >
+                {[
+                  { label: "Full", value: 100 },
+                  { label: "Balanced", value: 125 },
+                  { label: "Close-up", value: 150 },
+                ].map((preset) => (
+                  <button
+                    key={preset.value}
+                    type="button"
+                    onClick={() => {
+                      setCoverImageZoom(preset.value);
+                      setSuccess("");
+                    }}
+                    aria-pressed={coverImageZoom === preset.value}
+                    className={cn(
+                      "rounded-lg border px-3 py-2 text-xs font-bold transition",
+                      coverImageZoom === preset.value
+                        ? "border-violet-400 bg-violet-500/20 text-violet-200 light:text-violet-700"
+                        : "border-slate-700 text-slate-400 hover:border-slate-500 light:border-slate-300 light:text-slate-600",
+                    )}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+              <label className="block text-[11px] font-semibold text-slate-300 light:text-slate-700">
+                Zoom <span className="float-right">{coverImageZoom}%</span>
+                <input
+                  type="range"
+                  min="100"
+                  max="200"
+                  value={coverImageZoom}
+                  onChange={(event) => {
+                    setCoverImageZoom(Number(event.target.value));
+                    setSuccess("");
+                  }}
+                  className="mt-2 w-full accent-violet-500"
+                />
+              </label>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="block text-[11px] font-semibold text-slate-300 light:text-slate-700">
+                  <span className="flex items-center justify-between gap-2">
+                    <span className="inline-flex items-center gap-1.5">
+                      <Move className="h-3.5 w-3.5" /> Left / right
+                    </span>
+                    <span>{coverImagePositionX}%</span>
+                  </span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={coverImagePositionX}
+                    onChange={(event) => {
+                      setCoverImagePositionX(Number(event.target.value));
+                      setSuccess("");
+                    }}
+                    className="mt-2 w-full accent-violet-500"
+                  />
+                </label>
+                <label className="block text-[11px] font-semibold text-slate-300 light:text-slate-700">
+                  <span className="flex items-center justify-between gap-2">
+                    <span className="inline-flex items-center gap-1.5">
+                      <Move className="h-3.5 w-3.5 rotate-90" /> Up / down
+                    </span>
+                    <span>{coverImagePositionY}%</span>
+                  </span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={coverImagePositionY}
+                    onChange={(event) => {
+                      setCoverImagePositionY(Number(event.target.value));
+                      setSuccess("");
+                    }}
+                    className="mt-2 w-full accent-violet-500"
+                  />
+                </label>
+              </div>
+            </div>
+          )}
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
@@ -742,30 +868,36 @@ function StorefrontTab({
           </div>
         </div>
         <div className="rounded-2xl border border-slate-700 p-4 light:border-slate-200">
-          <Input
-            label="Custom domain (optional)"
-            value={customDomain}
-            onChange={(event) => setCustomDomain(event.target.value)}
-            placeholder="bookings.example.com"
-          />
+          <label
+            htmlFor="business-domain"
+            className="mb-1.5 block text-sm font-medium text-slate-300 light:text-gray-700"
+          >
+            Custom domain
+          </label>
+          <div className="flex min-w-0 items-center overflow-hidden rounded-xl border border-slate-600 bg-slate-700 focus-within:ring-2 focus-within:ring-violet-500/30 light:border-gray-300 light:bg-white">
+            <input
+              id="business-domain"
+              aria-label="Custom domain prefix"
+              value={slug}
+              onChange={(event) => {
+                setSlug(event.target.value);
+                setSuccess("");
+              }}
+              placeholder="your-business"
+              className="min-w-0 flex-1 bg-transparent px-3 py-2.5 text-sm text-white outline-none light:text-gray-900 sm:px-4"
+            />
+            <span className="shrink-0 border-l border-slate-600 bg-slate-800/60 px-3 py-2.5 text-sm font-semibold text-slate-300 light:border-gray-300 light:bg-gray-100 light:text-gray-600">
+              .yuhbusiness.com
+            </span>
+          </div>
           <p className="mt-2 text-[11px] text-slate-500 light:text-slate-600">
-            Add a CNAME record pointing this hostname to your Vercel domain,
-            then add and verify it in Vercel. Saving a changed domain marks it
-            unverified until an administrator confirms the DNS setup.
+            Your YuhBusiness address is created automatically from your business
+            name. You can change the first part; the .yuhbusiness.com ending
+            stays fixed.
           </p>
-          {tenant.customDomain && (
-            <p
-              className={`mt-2 text-xs font-semibold ${
-                tenant.customDomainVerified
-                  ? "text-emerald-400"
-                  : "text-amber-400"
-              }`}
-            >
-              {tenant.customDomainVerified
-                ? "Domain verified and active"
-                : "Domain awaiting verification"}
-            </p>
-          )}
+          <p className="mt-2 text-xs font-semibold text-emerald-400">
+            {slug || "your-business"}.yuhbusiness.com
+          </p>
         </div>
         {error && <p className="text-sm text-red-400">{error}</p>}
         {success && <p className="text-sm text-emerald-400">{success}</p>}

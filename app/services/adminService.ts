@@ -161,6 +161,7 @@ function mapTenant(row: TenantRow): Tenant {
           ? "retail"
           : "appointment",
     logo: row.logo ?? (businessName.charAt(0).toUpperCase() || "B"),
+    logoImage: row.logo_url ?? undefined,
     logoBg: row.logo_bg ?? row.primary_color ?? "#8b5cf6",
     description: row.description ?? "",
     phone: row.phone ?? "",
@@ -168,6 +169,9 @@ function mapTenant(row: TenantRow): Tenant {
     address: row.address ?? "",
     city: row.city ?? "",
     coverImage: row.cover_image ?? "",
+    coverImagePositionX: row.cover_image_position_x ?? 50,
+    coverImagePositionY: row.cover_image_position_y ?? 50,
+    coverImageZoom: row.cover_image_zoom ?? 100,
     businessHours: [],
     socialLinks: parseSocialLinks(row.social_links),
     primaryColor: row.primary_color ?? "#8b5cf6",

@@ -45,6 +45,9 @@ export interface TenantRow {
   logo_url?: string | null;
   logo_bg?: string | null;
   cover_image?: string | null;
+  cover_image_position_x?: number | null;
+  cover_image_position_y?: number | null;
+  cover_image_zoom?: number | null;
   primary_color?: string | null;
   accent_color?: string | null;
   plan?: string | null;

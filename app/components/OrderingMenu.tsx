@@ -67,9 +67,9 @@ function cartAddonIds(item: Pick<CartItem, "addons">): string[] {
  * could both be changed or removed by a single button click.
  */
 function cartLineKey(
-  item: Pick<CartItem, "id" | "variantId" | "addons">,
+  item: Pick<CartItem, "id" | "variantId" | "variantLabel" | "addons">,
 ): string {
-  return `${item.id}::${item.variantId ?? ""}::${cartAddonIds(item).join(",")}`;
+  return `${item.id}::${item.variantId ?? ""}::${item.variantLabel ?? ""}::${cartAddonIds(item).join(",")}`;
 }
 
 interface OrderingMenuProps {
@@ -85,6 +85,67 @@ interface OrderingMenuProps {
 }
 
 const PLACEHOLDER_IMG = "/fallback-product.png";
+const COLORS_ATTRIBUTE = "colors";
+
+function decodedVariantColors(value: string) {
+  try {
+    const parsed = JSON.parse(value);
+    if (Array.isArray(parsed)) {
+      return parsed.filter(
+        (color): color is string => typeof color === "string" && Boolean(color),
+      );
+    }
+  } catch {
+    // Older variants use a single color string and are handled below.
+  }
+  return value ? [value] : [];
+}
+
+function selectableVariantAttributes(
+  productVariant: NonNullable<Product["variants"]>[number],
+) {
+  const groups = new Map<string, string[]>();
+  Object.entries(productVariant.attributes).forEach(([key, value]) => {
+    const normalizedKey = key.toLowerCase();
+    const optionKey =
+      normalizedKey === COLORS_ATTRIBUTE || normalizedKey === "colour"
+        ? "color"
+        : key;
+    const values =
+      normalizedKey === COLORS_ATTRIBUTE
+        ? decodedVariantColors(value)
+        : value
+          ? [value]
+          : [];
+    const current = groups.get(optionKey) ?? [];
+    values.forEach((optionValue) => {
+      if (!current.includes(optionValue)) current.push(optionValue);
+    });
+    groups.set(optionKey, current);
+  });
+  return groups;
+}
+
+function defaultVariantSelection(
+  productVariant: NonNullable<Product["variants"]>[number],
+) {
+  return Object.fromEntries(
+    Array.from(selectableVariantAttributes(productVariant), ([key, values]) => [
+      key,
+      values[0] ?? "",
+    ]),
+  );
+}
+
+function variantSupportsOption(
+  productVariant: NonNullable<Product["variants"]>[number],
+  attribute: string,
+  value: string,
+) {
+  return selectableVariantAttributes(productVariant)
+    .get(attribute)
+    ?.includes(value);
+}
 
 export function OrderingMenu({
   tenant,
@@ -348,7 +409,11 @@ export function OrderingMenu({
     setQuantity(1);
     setSelectedAddons([]);
     setSelectedVariantId(firstAvailableVariant?.id ?? "");
-    setSelectedVariantAttributes(firstAvailableVariant?.attributes ?? {});
+    setSelectedVariantAttributes(
+      firstAvailableVariant
+        ? defaultVariantSelection(firstAvailableVariant)
+        : {},
+    );
     setOrderError("");
     setModalOpen(true);
   };
@@ -363,20 +428,39 @@ export function OrderingMenu({
     const attributeNames = Array.from(
       new Set(
         currentProduct.variants.flatMap((variant) =>
-          Object.keys(variant.attributes),
+          Array.from(selectableVariantAttributes(variant).keys()),
         ),
       ),
     );
-    const matchingVariant = currentProduct.variants.find(
+    const exactVariant = currentProduct.variants.find(
       (variant) =>
         variant.isActive &&
         variant.stock > 0 &&
         attributeNames.every(
-          (name) => variant.attributes[name] === nextAttributes[name],
+          (name) =>
+            Boolean(nextAttributes[name]) &&
+            variantSupportsOption(variant, name, nextAttributes[name]),
         ),
     );
+    const matchingVariant =
+      exactVariant ??
+      currentProduct.variants.find(
+        (variant) =>
+          variant.isActive &&
+          variant.stock > 0 &&
+          variantSupportsOption(variant, attribute, value),
+      );
 
-    setSelectedVariantAttributes(nextAttributes);
+    setSelectedVariantAttributes(
+      exactVariant
+        ? nextAttributes
+        : matchingVariant
+          ? {
+              ...defaultVariantSelection(matchingVariant),
+              [attribute]: value,
+            }
+          : nextAttributes,
+    );
     setSelectedVariantId(matchingVariant?.id ?? "");
     setQuantity(1);
     setOrderError("");
@@ -422,7 +506,7 @@ export function OrderingMenu({
       id: currentProduct.id,
       variantId: selectedVariant?.id,
       variantLabel: selectedVariant
-        ? Object.entries(selectedVariant.attributes)
+        ? Object.entries(selectedVariantAttributes)
             .map(
               ([key, value]) =>
                 `${key.charAt(0).toUpperCase()}${key.slice(1)}: ${value}`,
@@ -658,7 +742,11 @@ export function OrderingMenu({
               alt={tenant.name}
               fill
               sizes="(max-width: 1280px) 100vw, 900px"
-              className="object-cover transition duration-500 group-hover:scale-[1.02]"
+              className="object-cover transition duration-500"
+              style={{
+                objectPosition: `${tenant.coverImagePositionX ?? 50}% ${tenant.coverImagePositionY ?? 50}%`,
+                transform: `scale(${(tenant.coverImageZoom ?? 100) / 100})`,
+              }}
               priority
               unoptimized
               onError={(event) => {
@@ -1396,8 +1484,6 @@ export function OrderingMenu({
               selectedVariantId={selectedVariantId}
               selectedAttributes={selectedVariantAttributes}
               onSelectAttribute={selectVariantAttribute}
-              selectedAddons={selectedAddons}
-              setSelectedAddons={setSelectedAddons}
               onAddToCart={handleAddToCart}
             />
           )}
@@ -1564,8 +1650,6 @@ function RetailProductOptions({
   selectedVariantId,
   selectedAttributes,
   onSelectAttribute,
-  selectedAddons,
-  setSelectedAddons,
   onAddToCart,
 }: {
   product: Product;
@@ -1575,16 +1659,16 @@ function RetailProductOptions({
   selectedVariantId: string;
   selectedAttributes: Record<string, string>;
   onSelectAttribute: (attribute: string, value: string) => void;
-  selectedAddons: AddonOption[];
-  setSelectedAddons: (addons: AddonOption[]) => void;
   onAddToCart: () => void;
 }) {
   const variants = product.variants ?? [];
   const attributeGroups = Array.from(
     variants.reduce((groups, variant) => {
-      Object.entries(variant.attributes).forEach(([key, value]) => {
+      selectableVariantAttributes(variant).forEach((optionValues, key) => {
         const values = groups.get(key) ?? [];
-        if (!values.includes(value)) values.push(value);
+        optionValues.forEach((value) => {
+          if (!values.includes(value)) values.push(value);
+        });
         groups.set(key, values);
       });
       return groups;
@@ -1622,14 +1706,10 @@ function RetailProductOptions({
     ? Math.max(0, availableStock - existingQuantity)
     : Number.POSITIVE_INFINITY;
   const unitPrice = selectedVariant?.price ?? product.price;
-  const addOnPrice = selectedAddons.reduce(
-    (sum, addon) => sum + addon.price,
-    0,
-  );
   const hasValidSelection = variants.length === 0 || Boolean(selectedVariant);
   const canAdd = hasValidSelection && remainingStock >= quantity;
   const selectionSummary = selectedVariant
-    ? Object.entries(selectedVariant.attributes)
+    ? Object.entries(selectedAttributes)
         .map(([key, value]) => `${key.toLowerCase()} ${value}`)
         .join(" · ")
     : "";
@@ -1639,13 +1719,7 @@ function RetailProductOptions({
       (variant) =>
         variant.isActive &&
         variant.stock > 0 &&
-        variant.attributes[attribute] === value &&
-        attributeGroups.every(
-          (group) =>
-            group.key === attribute ||
-            !selectedAttributes[group.key] ||
-            variant.attributes[group.key] === selectedAttributes[group.key],
-        ),
+        variantSupportsOption(variant, attribute, value),
     );
 
   return (
@@ -1778,41 +1852,6 @@ function RetailProductOptions({
         </div>
       </div>
 
-      {(product.addons ?? []).length > 0 && (
-        <fieldset className="border-t border-[#2a3950] pt-5 light:border-slate-200">
-          <legend className="mb-2.5 text-sm font-bold text-white light:text-[#18304b]">
-            Add-ons
-          </legend>
-          <div className="grid gap-2 sm:grid-cols-2">
-            {(product.addons ?? []).map((addon) => (
-              <label
-                key={addon.id}
-                className="flex cursor-pointer items-center gap-3 rounded-xl border border-[#34445d] bg-[#142137] p-3 text-sm light:border-slate-200 light:bg-slate-50"
-              >
-                <input
-                  type="checkbox"
-                  checked={selectedAddons.some((item) => item.id === addon.id)}
-                  onChange={(event) =>
-                    setSelectedAddons(
-                      event.target.checked
-                        ? [...selectedAddons, addon]
-                        : selectedAddons.filter((item) => item.id !== addon.id),
-                    )
-                  }
-                  className="h-4 w-4 accent-violet-600"
-                />
-                <span className="font-semibold text-white light:text-[#18304b]">
-                  {addon.name}
-                  <span className="ml-1 font-medium text-[#91a1ba] light:text-slate-500">
-                    +{formatCurrency(addon.price)}
-                  </span>
-                </span>
-              </label>
-            ))}
-          </div>
-        </fieldset>
-      )}
-
       <Button
         type="button"
         size="lg"
@@ -1822,7 +1861,7 @@ function RetailProductOptions({
       >
         <ShoppingBag className="h-5 w-5" />
         {remainingStock === 0 ? "Stock already in bag" : "Add to Bag"} —{" "}
-        {formatCurrency((unitPrice + addOnPrice) * quantity)}
+        {formatCurrency(unitPrice * quantity)}
       </Button>
     </div>
   );

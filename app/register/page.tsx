@@ -28,7 +28,7 @@ import {
 
 import { useAuth } from "@/app/contexts/auth";
 import { PublicHeader } from "@/app/components/PublicHeader";
-import { cn } from "@/app/lib/utils";
+import { cn, slugify } from "@/app/lib/utils";
 import { resendSignupConfirmation } from "@/app/services/authService";
 import type { BusinessType } from "@/app/types";
 
@@ -86,6 +86,7 @@ export default function RegisterPage() {
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [logoPreview, setLogoPreview] = useState("");
   const [logoName, setLogoName] = useState("");
+  const [logoFile, setLogoFile] = useState<File | null>(null);
   const [form, setForm] = useState({
     firstName: "",
     lastName: "",
@@ -116,7 +117,16 @@ export default function RegisterPage() {
   );
 
   const update = (key: keyof typeof form, value: string) => {
-    setForm((current) => ({ ...current, [key]: value }));
+    setForm((current) => {
+      const next = { ...current, [key]: value };
+      if (
+        key === "businessName" &&
+        (!current.slug || current.slug === slugify(current.businessName))
+      ) {
+        next.slug = slugify(value);
+      }
+      return next;
+    });
     setError("");
   };
 
@@ -188,6 +198,7 @@ export default function RegisterPage() {
     reader.onload = () => {
       setLogoPreview(typeof reader.result === "string" ? reader.result : "");
       setLogoName(file.name);
+      setLogoFile(file);
       setError("");
     };
     reader.onerror = () => setError("Unable to preview that logo.");
@@ -222,6 +233,7 @@ export default function RegisterPage() {
       form.phone.trim(),
       form.slug.trim(),
       new Date().toISOString(),
+      logoFile,
     );
 
     if (result.success) {
@@ -763,21 +775,27 @@ function BusinessDetailsStep({
 
       <div className="mt-3">
         <label className="mb-2 block text-xs font-bold text-slate-200">
-          Storefront URL
+          Custom domain
         </label>
         <div className="flex h-10 min-w-0 overflow-hidden rounded-xl border border-[#41577b] bg-[#13213a] focus-within:border-violet-500 focus-within:ring-2 focus-within:ring-violet-500/20">
-          <span className="flex shrink-0 items-center gap-2 border-r border-[#41577b] px-3 text-xs text-[#8196b9] sm:px-4">
+          <span className="flex shrink-0 items-center border-r border-[#41577b] px-3 text-[#8196b9]">
             <Link2 className="h-4 w-4 text-slate-300" />
-            <span className="hidden sm:inline">yuhbusiness.com/</span>
           </span>
           <input
-            aria-label="Storefront URL"
+            aria-label="Custom domain prefix"
             value={form.slug}
             onChange={(event) => update("slug", event.target.value)}
             placeholder="your-business"
             className="min-w-0 flex-1 bg-transparent px-3 text-base text-white outline-none placeholder:text-[#60769a] sm:text-sm"
           />
+          <span className="flex shrink-0 items-center border-l border-[#41577b] bg-[#0f1b30] px-3 text-xs font-semibold text-[#a9b8d1]">
+            .yuhbusiness.com
+          </span>
         </div>
+        <p className="mt-1.5 text-[10px] text-[#7186aa]">
+          We create this from your business name. You can edit the first part;
+          .yuhbusiness.com stays fixed.
+        </p>
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-3">
@@ -844,9 +862,8 @@ function BusinessDetailsStep({
       </label>
       {logoPreview && (
         <p className="mt-2 flex items-center gap-2 text-[10px] leading-4 text-[#7186aa]">
-          <Upload className="h-3.5 w-3.5" /> Your selected logo is a preview.
-          Save it permanently from Storefront Settings after confirming your
-          account.
+          <Upload className="h-3.5 w-3.5" /> Your selected logo will be saved to
+          your business after your account is confirmed.
         </p>
       )}
     </div>

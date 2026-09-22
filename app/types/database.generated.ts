@@ -2373,6 +2373,9 @@ export type Database = {
           business_type: string;
           city: string | null;
           cover_image: string | null;
+          cover_image_position_x: number | null;
+          cover_image_position_y: number | null;
+          cover_image_zoom: number | null;
           created_at: string | null;
           created_by: string | null;
           custom_domain: string | null;
@@ -2406,6 +2409,9 @@ export type Database = {
           business_type?: string;
           city?: string | null;
           cover_image?: string | null;
+          cover_image_position_x?: number | null;
+          cover_image_position_y?: number | null;
+          cover_image_zoom?: number | null;
           created_at?: string | null;
           created_by?: string | null;
           custom_domain?: string | null;
@@ -2439,6 +2445,9 @@ export type Database = {
           business_type?: string;
           city?: string | null;
           cover_image?: string | null;
+          cover_image_position_x?: number | null;
+          cover_image_position_y?: number | null;
+          cover_image_zoom?: number | null;
           created_at?: string | null;
           created_by?: string | null;
           custom_domain?: string | null;

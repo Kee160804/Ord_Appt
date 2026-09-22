@@ -48,6 +48,131 @@ interface Props {
   tenant: Tenant;
 }
 
+const PRODUCT_COLOR_SUGGESTIONS = [
+  "Black",
+  "White",
+  "Gray",
+  "Brown",
+  "Red",
+  "Orange",
+  "Yellow",
+  "Green",
+  "Blue",
+  "Navy",
+  "Purple",
+  "Pink",
+  "Beige",
+  "Gold",
+  "Silver",
+];
+const ONE_SIZE_OPTION = "One size";
+const COLORS_ATTRIBUTE = "colors";
+
+function variantAttribute(
+  attributes: Record<string, string>,
+  attributeName: "size" | "color",
+) {
+  const acceptedNames =
+    attributeName === "color" ? ["color", "colour"] : [attributeName];
+  const entry = Object.entries(attributes).find(([key]) =>
+    acceptedNames.includes(key.trim().toLowerCase()),
+  );
+  return entry?.[1] ?? "";
+}
+
+function uniqueOptionValues(values: string[]) {
+  const seen = new Set<string>();
+  return values.reduce<string[]>((options, value) => {
+    const trimmed = value.trim();
+    const normalized = trimmed.toLowerCase();
+    if (!trimmed || seen.has(normalized)) return options;
+    seen.add(normalized);
+    options.push(trimmed);
+    return options;
+  }, []);
+}
+
+function skuPart(value: string) {
+  return value
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+function variantSizeGroup(variant: ProductVariant) {
+  return variantAttribute(variant.attributes, "size") || ONE_SIZE_OPTION;
+}
+
+function variantColors(variant: ProductVariant) {
+  const encodedColors = variant.attributes[COLORS_ATTRIBUTE];
+  if (encodedColors) {
+    try {
+      const parsed = JSON.parse(encodedColors);
+      if (Array.isArray(parsed)) {
+        return uniqueOptionValues(
+          parsed.filter((color): color is string => typeof color === "string"),
+        );
+      }
+    } catch {
+      // Fall back to the legacy single-color attribute below.
+    }
+  }
+
+  return uniqueOptionValues([
+    variantAttribute(variant.attributes, "color"),
+  ]);
+}
+
+function attributesForSize(size: string, colors: string[]) {
+  const attributes: Record<string, string> = {};
+  if (size !== ONE_SIZE_OPTION) attributes.size = size;
+  if (colors.length > 0) {
+    attributes[COLORS_ATTRIBUTE] = JSON.stringify(uniqueOptionValues(colors));
+  }
+  return attributes;
+}
+
+function variantBelongsToSize(variant: ProductVariant, size: string) {
+  return variantSizeGroup(variant).toLowerCase() === size.toLowerCase();
+}
+
+function createRetailVariant(
+  size: string,
+  productName: string,
+  productId: string,
+): ProductVariant {
+  const skuBase = skuPart(productName) || "PRODUCT";
+
+  return {
+    id: `variant-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    productId,
+    sku: [skuBase, skuPart(size)].filter(Boolean).join("-"),
+    attributes: attributesForSize(size, []),
+    stock: 0,
+    isActive: true,
+  };
+}
+
+function collapseVariantsBySize(variants: ProductVariant[]) {
+  const groups = new Map<string, ProductVariant[]>();
+  variants.forEach((variant) => {
+    const size = variantSizeGroup(variant);
+    groups.set(size, [...(groups.get(size) ?? []), variant]);
+  });
+
+  return Array.from(groups, ([size, sizeVariants]) => {
+    const representative = sizeVariants[0];
+    const colors = uniqueOptionValues(sizeVariants.flatMap(variantColors));
+    return {
+      ...representative,
+      attributes: attributesForSize(size, colors),
+      stock: sizeVariants.reduce((total, variant) => total + variant.stock, 0),
+      isActive: sizeVariants.some((variant) => variant.isActive),
+    };
+  });
+}
+
 export function ProductsView({ tenant }: Props) {
   const canUseAdvancedCatalog = tenantHasFeature(tenant, "advanced_catalog");
 
@@ -83,6 +208,9 @@ export function ProductsView({ tenant }: Props) {
   const [categorySortOrder, setCategorySortOrder] = useState("");
   const [isSavingCategory, setIsSavingCategory] = useState(false);
   const [variants, setVariants] = useState<ProductVariant[]>([]);
+  const [variantSizes, setVariantSizes] = useState<string[]>([]);
+  const [sizeDraft, setSizeDraft] = useState("");
+  const [colorDrafts, setColorDrafts] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -298,6 +426,9 @@ export function ProductsView({ tenant }: Props) {
       addons: [],
     });
     setVariants([]);
+    setVariantSizes([]);
+    setSizeDraft("");
+    setColorDrafts({});
     setError("");
     setShowAdd(true);
   };
@@ -313,11 +444,97 @@ export function ProductsView({ tenant }: Props) {
       trackInventory: product.trackInventory !== false,
       image: product.image,
       tags: product.tags,
-      addons: product.addons ?? [],
+      addons: tenant.businessType === "retail" ? [] : (product.addons ?? []),
     });
-    setVariants(product.variants ?? []);
+    const productVariants = collapseVariantsBySize(product.variants ?? []);
+    const productSizes = uniqueOptionValues(
+      productVariants.map(variantSizeGroup),
+    );
+    setVariants(productVariants);
+    setVariantSizes(productSizes);
+    setSizeDraft("");
+    setColorDrafts({});
     setError("");
     setShowAdd(true);
+  };
+
+  const addVariantSizes = () => {
+    const additions = uniqueOptionValues(sizeDraft.split(","));
+    if (additions.length === 0) return;
+    const nextSizes = uniqueOptionValues([...variantSizes, ...additions]);
+    const newSizes = nextSizes.filter(
+      (size) =>
+        !variantSizes.some(
+          (existingSize) => existingSize.toLowerCase() === size.toLowerCase(),
+        ),
+    );
+    setVariantSizes(nextSizes);
+    setVariants((current) => [
+      ...current,
+      ...newSizes.map((size) =>
+        createRetailVariant(
+          size,
+          newProduct.name,
+          editingProduct?.id ?? "",
+        ),
+      ),
+    ]);
+    setColorDrafts((current) =>
+      Object.fromEntries(nextSizes.map((size) => [size, current[size] ?? ""])),
+    );
+    setSizeDraft("");
+  };
+
+  const removeVariantSize = (size: string) => {
+    setVariantSizes((current) =>
+      current.filter((candidate) => candidate !== size),
+    );
+    setVariants((current) =>
+      current.filter((variant) => !variantBelongsToSize(variant, size)),
+    );
+    setColorDrafts((current) => {
+      const next = { ...current };
+      delete next[size];
+      return next;
+    });
+  };
+
+  const addColorsToSize = (size: string) => {
+    const additions = uniqueOptionValues((colorDrafts[size] ?? "").split(","));
+    if (additions.length === 0) return;
+
+    setVariants((current) => {
+      return current.map((variant) =>
+        variantBelongsToSize(variant, size)
+          ? {
+              ...variant,
+              attributes: attributesForSize(size, [
+                ...variantColors(variant),
+                ...additions,
+              ]),
+            }
+          : variant,
+      );
+    });
+    setColorDrafts((current) => ({ ...current, [size]: "" }));
+  };
+
+  const removeColorFromSize = (size: string, color: string) => {
+    setVariants((current) =>
+      current.map((variant) =>
+        variantBelongsToSize(variant, size)
+          ? {
+              ...variant,
+              attributes: attributesForSize(
+                size,
+                variantColors(variant).filter(
+                  (candidate) => candidate !== color,
+                ),
+              ),
+            }
+          : variant,
+      ),
+    );
   };
 
   const handleSaveProduct = async () => {
@@ -329,6 +546,17 @@ export function ProductsView({ tenant }: Props) {
     const price = Number(newProduct.price);
     if (!Number.isFinite(price) || price < 0) {
       setError("Enter a valid product price.");
+      return;
+    }
+
+    if (
+      tenant.businessType === "retail" &&
+      variantSizes.length > 0 &&
+      variants.length === 0
+    ) {
+      setError(
+        "Keep at least one stock combination for the sizes and colors on this product.",
+      );
       return;
     }
 
@@ -356,6 +584,7 @@ export function ProductsView({ tenant }: Props) {
     }
 
     if (
+      tenant.businessType !== "retail" &&
       newProduct.addons.some(
         (addon) =>
           !addon.name.trim() ||
@@ -381,7 +610,7 @@ export function ProductsView({ tenant }: Props) {
       )
     ) {
       setError(
-        "Each retail variant needs a SKU, at least one option, and a whole-number stock value.",
+        "Each retail variant needs a SKU, a size or color, and a whole-number stock value.",
       );
       return;
     }
@@ -404,9 +633,7 @@ export function ProductsView({ tenant }: Props) {
           .join("|"),
       );
       if (new Set(optionCombinations).size !== optionCombinations.length) {
-        setError(
-          "Each retail size, color, or style combination must be unique.",
-        );
+        setError("Each retail size and color combination must be unique.");
         return;
       }
     }
@@ -427,10 +654,13 @@ export function ProductsView({ tenant }: Props) {
         categoryId: newProduct.categoryId,
         inventory,
         trackInventory: newProduct.trackInventory,
-        addons: newProduct.addons.map((addon) => ({
-          ...addon,
-          name: addon.name.trim(),
-        })),
+        addons:
+          tenant.businessType === "retail"
+            ? []
+            : newProduct.addons.map((addon) => ({
+                ...addon,
+                name: addon.name.trim(),
+              })),
       };
       if (isSupabaseConfigured()) {
         product = editingProduct
@@ -462,7 +692,7 @@ export function ProductsView({ tenant }: Props) {
           inventory: inventory ?? undefined,
           trackInventory: newProduct.trackInventory,
           tags: newProduct.tags,
-          addons: newProduct.addons,
+          addons: input.addons,
           variants:
             tenant.businessType === "retail"
               ? variants.map((variant) => ({
@@ -527,6 +757,10 @@ export function ProductsView({ tenant }: Props) {
         tags: [],
         addons: [],
       });
+      setVariants([]);
+      setVariantSizes([]);
+      setSizeDraft("");
+      setColorDrafts({});
       setEditingProduct(null);
       setShowAdd(false);
     } catch (createError) {
@@ -551,7 +785,7 @@ export function ProductsView({ tenant }: Props) {
   const openCategoryManager = () => {
     if (!canUseAdvancedCatalog) {
       setError(
-        "Categories, inventory tracking, and product add-ons are available on the Pro plan.",
+        `Categories, inventory tracking, and ${tenant.businessType === "retail" ? "product variants" : "product add-ons"} are available on the Pro plan.`,
       );
       return;
     }
@@ -857,6 +1091,7 @@ export function ProductsView({ tenant }: Props) {
         open={showAdd}
         onClose={() => setShowAdd(false)}
         title={editingProduct ? "Edit Product" : "Add New Product"}
+        maxWidth="max-w-2xl"
         footer={
           <div className="flex gap-3">
             <Button
@@ -1000,8 +1235,11 @@ export function ProductsView({ tenant }: Props) {
           ) : (
             <div className="rounded-lg border border-violet-500/25 bg-violet-500/10 p-3 text-xs text-violet-200 light:border-violet-200 light:bg-violet-50 light:text-violet-800">
               Upgrade to Pro to organize products into categories, track
-              inventory, and configure add-ons. Basic product details remain
-              available on Beginner.
+              inventory, and configure{" "}
+              {tenant.businessType === "retail"
+                ? "product variants"
+                : "add-ons"}
+              . Basic product details remain available on Beginner.
             </div>
           )}
           <div>
@@ -1014,7 +1252,7 @@ export function ProductsView({ tenant }: Props) {
               }
             />
           </div>
-          {canUseAdvancedCatalog && (
+          {canUseAdvancedCatalog && tenant.businessType !== "retail" && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-semibold">Add-ons</label>
@@ -1100,167 +1338,227 @@ export function ProductsView({ tenant }: Props) {
           )}
           {tenant.businessType === "retail" && canUseAdvancedCatalog && (
             <div className="space-y-3 rounded-lg border border-violet-500/25 bg-violet-500/4 p-3">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <label className="text-sm font-semibold">
-                    Product variants
-                  </label>
-                  <p className="text-[10px] text-slate-400">
-                    Add size, color, style, price, and stock combinations. The
-                    storefront turns these options into customer-friendly
-                    buttons and color swatches automatically.
-                  </p>
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="xs"
-                  onClick={() =>
-                    setVariants((current) => [
-                      ...current,
-                      {
-                        id: `variant-${Date.now()}`,
-                        productId: editingProduct?.id ?? "",
-                        sku: "",
-                        attributes: { size: "" },
-                        stock: 0,
-                        isActive: true,
-                      },
-                    ])
-                  }
-                >
-                  <Plus className="h-3.5 w-3.5" /> Add variant
-                </Button>
-              </div>
-              {variants.length === 0 && (
-                <p className="rounded-lg border border-dashed border-slate-600 px-3 py-4 text-center text-xs text-slate-400 light:border-slate-300 light:text-slate-500">
-                  No variants yet. Add one when this product has selectable
-                  sizes, colors, or styles.
+              <div>
+                <label className="text-sm font-semibold">Product options</label>
+                <p className="text-[10px] text-slate-400">
+                  Add a size, then choose only the colors stocked in that size.
+                  Each new size starts with its own empty color list.
                 </p>
-              )}
-              {variants.map((variant, index) => (
-                <div
-                  key={variant.id}
-                  className="grid gap-2 rounded-lg border border-slate-700 p-2 sm:grid-cols-[1fr_1fr_90px_80px_auto]"
-                >
+              </div>
+              <datalist id="product-variant-color-options">
+                {Array.from(
+                  new Set([
+                    ...PRODUCT_COLOR_SUGGESTIONS,
+                    ...variants.flatMap(variantColors),
+                  ]),
+                ).map((color) => (
+                  <option key={color} value={color} />
+                ))}
+              </datalist>
+              <div className="space-y-2 rounded-lg border border-slate-700 p-3 light:border-slate-300">
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2">
                   <Input
-                    label={index === 0 ? "SKU" : undefined}
-                    placeholder="SKU-001"
-                    value={variant.sku}
-                    onChange={(event) =>
-                      setVariants((current) =>
-                        current.map((item) =>
-                          item.id === variant.id
-                            ? { ...item, sku: event.target.value }
-                            : item,
-                        ),
-                      )
-                    }
-                  />
-                  <Input
-                    label={index === 0 ? "Size / Color options" : undefined}
-                    placeholder="size:M,color:Red"
-                    value={Object.entries(variant.attributes)
-                      .map(([key, value]) => `${key}:${value}`)
-                      .join(",")}
-                    onChange={(event) =>
-                      setVariants((current) =>
-                        current.map((item) =>
-                          item.id === variant.id
-                            ? {
-                                ...item,
-                                attributes: Object.fromEntries(
-                                  event.target.value
-                                    .split(",")
-                                    .map((entry) => entry.split(":"))
-                                    .filter(
-                                      ([key, value]) =>
-                                        key?.trim() && value?.trim(),
-                                    )
-                                    .map(([key, value]) => [
-                                      key.trim(),
-                                      value.trim(),
-                                    ]),
-                                ),
-                              }
-                            : item,
-                        ),
-                      )
-                    }
-                  />
-                  <Input
-                    label={index === 0 ? "Price" : undefined}
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    placeholder="Base"
-                    value={variant.price ?? ""}
-                    onChange={(event) =>
-                      setVariants((current) =>
-                        current.map((item) =>
-                          item.id === variant.id
-                            ? {
-                                ...item,
-                                price: event.target.value
-                                  ? Number(event.target.value)
-                                  : undefined,
-                              }
-                            : item,
-                        ),
-                      )
-                    }
-                  />
-                  <Input
-                    label={index === 0 ? "Stock" : undefined}
-                    type="number"
-                    min="0"
-                    step="1"
-                    value={variant.stock}
-                    onChange={(event) =>
-                      setVariants((current) =>
-                        current.map((item) =>
-                          item.id === variant.id
-                            ? {
-                                ...item,
-                                stock: Number(event.target.value) || 0,
-                              }
-                            : item,
-                        ),
-                      )
-                    }
+                    label="Add product sizes"
+                    placeholder="S, M, L or 8, 9, 10"
+                    value={sizeDraft}
+                    onChange={(event) => setSizeDraft(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key !== "Enter") return;
+                      event.preventDefault();
+                      addVariantSizes();
+                    }}
                   />
                   <Button
                     type="button"
-                    variant="ghost"
-                    size="xs"
-                    aria-label="Remove variant"
-                    onClick={() =>
-                      setVariants((current) =>
-                        current.filter((item) => item.id !== variant.id),
-                      )
-                    }
+                    variant="outline"
+                    size="sm"
+                    onClick={addVariantSizes}
                   >
-                    <Trash2 className="h-4 w-4 text-red-400" />
+                    <Plus className="h-3.5 w-3.5" /> Add size
                   </Button>
-                  <label className="flex cursor-pointer items-center gap-2 text-xs font-medium text-slate-300 light:text-slate-700 sm:col-span-full">
-                    <input
-                      type="checkbox"
-                      checked={variant.isActive}
-                      onChange={(event) =>
-                        setVariants((current) =>
-                          current.map((item) =>
-                            item.id === variant.id
-                              ? { ...item, isActive: event.target.checked }
-                              : item,
-                          ),
-                        )
-                      }
-                      className="h-4 w-4 accent-violet-600"
-                    />
-                    Available on storefront
-                  </label>
                 </div>
-              ))}
+                <p className="text-[10px] text-slate-400">
+                  Add one size at a time or separate several sizes with commas.
+                </p>
+              </div>
+              {variantSizes.length === 0 ? (
+                <p className="rounded-lg border border-dashed border-slate-600 px-3 py-4 text-center text-xs text-slate-400 light:border-slate-300 light:text-slate-500">
+                  Add a size to configure its colors and inventory.
+                </p>
+              ) : null}
+              {variantSizes.map((size) => {
+                const sizeVariants = variants.filter((variant) =>
+                  variantBelongsToSize(variant, size),
+                );
+                const variant = sizeVariants[0];
+                const configuredColors = variant ? variantColors(variant) : [];
+                if (!variant) return null;
+
+                return (
+                  <div
+                    key={size}
+                    className="space-y-3 rounded-xl border border-slate-700 bg-slate-900/20 p-3 light:border-slate-300 light:bg-white/60"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold">Size {size}</span>
+                        <Badge variant="purple">
+                          {configuredColors.length > 0
+                            ? `${configuredColors.length} color${configuredColors.length === 1 ? "" : "s"}`
+                            : "No color option"}
+                        </Badge>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="xs"
+                        aria-label={`Remove size ${size}`}
+                        title={`Remove size ${size}`}
+                        onClick={() => removeVariantSize(size)}
+                      >
+                        <Trash2 className="h-4 w-4 text-red-400" />
+                      </Button>
+                    </div>
+                    <div className="rounded-lg border border-slate-700/80 p-3 light:border-slate-200">
+                      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2">
+                        <Input
+                          label={`Add colors available in size ${size}`}
+                          list="product-variant-color-options"
+                          placeholder="Blue, Green, Navy"
+                          value={colorDrafts[size] ?? ""}
+                          onChange={(event) =>
+                            setColorDrafts((current) => ({
+                              ...current,
+                              [size]: event.target.value,
+                            }))
+                          }
+                          onKeyDown={(event) => {
+                            if (event.key !== "Enter") return;
+                            event.preventDefault();
+                            addColorsToSize(size);
+                          }}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => addColorsToSize(size)}
+                        >
+                          <Plus className="h-3.5 w-3.5" /> Add color
+                        </Button>
+                      </div>
+                      <p className="mt-2 text-[10px] text-slate-400">
+                        These colors apply only to size {size}. Select a
+                        suggestion, type a custom color, or use commas.
+                      </p>
+                    </div>
+                    <div className="rounded-lg border border-slate-700 px-3 py-2.5 light:border-slate-200">
+                      {configuredColors.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {configuredColors.map((color) => (
+                            <button
+                              key={color}
+                              type="button"
+                              aria-label={`Remove ${color} from size ${size}`}
+                              title={`Remove ${color} from size ${size}`}
+                              onClick={() => removeColorFromSize(size, color)}
+                              className="inline-flex items-center gap-2 rounded-full border border-slate-600 bg-slate-700/70 px-3 py-1.5 text-xs font-semibold text-slate-100 transition hover:border-red-400 hover:bg-red-500/10 light:border-slate-300 light:bg-slate-100 light:text-slate-700"
+                            >
+                              <span
+                                aria-hidden="true"
+                                className="h-3.5 w-3.5 rounded-full border border-white/40"
+                                style={{ backgroundColor: color }}
+                              />
+                              {color}
+                              <span aria-hidden="true" className="text-red-300">
+                                ×
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-slate-400">
+                          No colors added. Customers will select only the size.
+                        </p>
+                      )}
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <Input
+                        label="SKU"
+                        placeholder="SKU-001"
+                        value={variant.sku}
+                        onChange={(event) =>
+                          setVariants((current) =>
+                            current.map((item) =>
+                              item.id === variant.id
+                                ? { ...item, sku: event.target.value }
+                                : item,
+                            ),
+                          )
+                        }
+                      />
+                      <Input
+                        label="Price override"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="Use base price"
+                        value={variant.price ?? ""}
+                        onChange={(event) =>
+                          setVariants((current) =>
+                            current.map((item) =>
+                              item.id === variant.id
+                                ? {
+                                    ...item,
+                                    price: event.target.value
+                                      ? Number(event.target.value)
+                                      : undefined,
+                                  }
+                                : item,
+                            ),
+                          )
+                        }
+                      />
+                      <Input
+                        label="Stock"
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={variant.stock}
+                        onChange={(event) =>
+                          setVariants((current) =>
+                            current.map((item) =>
+                              item.id === variant.id
+                                ? {
+                                    ...item,
+                                    stock: Number(event.target.value) || 0,
+                                  }
+                                : item,
+                            ),
+                          )
+                        }
+                      />
+                    </div>
+                    <label className="flex cursor-pointer items-center gap-2 text-xs font-medium text-slate-300 light:text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={variant.isActive}
+                        onChange={(event) =>
+                          setVariants((current) =>
+                            current.map((item) =>
+                              item.id === variant.id
+                                ? { ...item, isActive: event.target.checked }
+                                : item,
+                            ),
+                          )
+                        }
+                        className="h-4 w-4 accent-violet-600"
+                      />
+                      Size available on storefront
+                    </label>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

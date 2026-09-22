@@ -33,6 +33,10 @@ import {
   supabaseSignup,
   type CreateBusinessInput,
 } from "@/app/services/authService";
+import {
+  applyPendingBusinessLogo,
+  queuePendingBusinessLogo,
+} from "@/app/services/onboardingAssets";
 import type { BusinessType, Tenant, User } from "@/app/types/index";
 
 interface AuthActionResult {
@@ -69,6 +73,7 @@ interface AuthContextType {
     phone: string,
     slug: string,
     legalAcceptedAt: string,
+    logoFile?: File | null,
   ) => Promise<AuthActionResult>;
   logout: () => Promise<void>;
   isLoading: boolean;
@@ -117,6 +122,16 @@ function createUniqueSlug(initial: string) {
   let suffix = 2;
   while (existing.includes(`${baseSlug}-${suffix}`)) suffix += 1;
   return `${baseSlug}-${suffix}`;
+}
+
+function fileToDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () =>
+      resolve(typeof reader.result === "string" ? reader.result : "");
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -174,9 +189,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       const result = await loadAuthenticatedAppSession();
       if (!active) return;
+      let hydratedTenant = result.tenant ?? null;
+      if (result.user && hydratedTenant) {
+        try {
+          hydratedTenant = await applyPendingBusinessLogo(
+            result.user.email,
+            hydratedTenant,
+          );
+        } catch {
+          // Keep the pending file so a later authenticated hydration can retry.
+        }
+      }
+      const hydratedBusinesses = (result.businesses ?? []).map((business) =>
+        business.id === hydratedTenant?.id ? hydratedTenant : business,
+      );
       setUser(result.user ?? null);
-      setTenant(result.tenant ?? null);
-      setBusinesses(result.businesses ?? []);
+      setTenant(hydratedTenant);
+      setBusinesses(hydratedBusinesses);
       setIsLoading(false);
     };
 
@@ -268,6 +297,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     phone: string,
     slug: string,
     legalAcceptedAt: string,
+    logoFile?: File | null,
   ): Promise<AuthActionResult> => {
     setIsLoading(true);
     const normalizedEmail = email.trim().toLowerCase();
@@ -281,6 +311,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     if (isSupabaseConfigured()) {
+      if (logoFile) {
+        try {
+          await queuePendingBusinessLogo(normalizedEmail, logoFile);
+        } catch {
+          // Account creation should continue if this browser cannot retain the file.
+        }
+      }
       const result = await supabaseSignup(
         normalizedEmail,
         password,
@@ -292,17 +329,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         slug,
         legalAcceptedAt,
       );
-      setIsLoading(false);
-
       if (result.requiresEmailConfirmation) {
+        setIsLoading(false);
         return { success: true, requiresEmailConfirmation: true };
       }
-      if (!result.user)
+      if (!result.user) {
+        setIsLoading(false);
         return { success: false, error: result.error ?? "Unable to sign up." };
+      }
+
+      let createdTenant = result.tenant ?? null;
+      if (createdTenant && logoFile) {
+        try {
+          createdTenant = await applyPendingBusinessLogo(
+            result.user.email,
+            createdTenant,
+          );
+        } catch {
+          // The pending logo remains available for the next authenticated load.
+        }
+      }
+      const createdBusinesses = (result.businesses ?? []).map((business) =>
+        business.id === createdTenant?.id ? createdTenant : business,
+      );
 
       setUser(result.user);
-      setTenant(result.tenant ?? null);
-      setBusinesses(result.businesses ?? []);
+      setTenant(createdTenant);
+      setBusinesses(createdBusinesses);
+      setIsLoading(false);
       return { success: true, user: result.user };
     }
 
@@ -318,12 +372,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const tenantId = `tenant-${Date.now()}`;
     const tenantSlug = createUniqueSlug(slug || businessName);
     const createdAt = new Date().toISOString();
+    const logoImage = logoFile ? await fileToDataUrl(logoFile) : undefined;
     const newTenant: Tenant = {
       id: tenantId,
       name: businessName.trim(),
       slug: tenantSlug,
       businessType,
       logo: businessName.trim().charAt(0).toUpperCase() || "B",
+      logoImage,
       logoBg: "#8b5cf6",
       description: `Welcome to ${businessName.trim()}!`,
       phone: phone.trim(),

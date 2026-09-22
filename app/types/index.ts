@@ -62,6 +62,7 @@ export interface Tenant {
   customDomainVerified?: boolean;
   businessType: BusinessType;
   logo: string;
+  logoImage?: string;
   logoBg: string;
   description: string;
   phone: string;
@@ -69,6 +70,9 @@ export interface Tenant {
   address: string;
   city: string;
   coverImage: string;
+  coverImagePositionX?: number;
+  coverImagePositionY?: number;
+  coverImageZoom?: number;
   businessHours: BusinessHours[];
   socialLinks: SocialLinks;
   primaryColor: string;

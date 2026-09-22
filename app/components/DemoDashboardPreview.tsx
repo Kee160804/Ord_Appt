@@ -444,6 +444,10 @@ function OverviewSection({
           fill
           sizes="100vw"
           className="object-cover opacity-35 light:opacity-25"
+          style={{
+            objectPosition: `${tenant.coverImagePositionX ?? 50}% ${tenant.coverImagePositionY ?? 50}%`,
+            transform: `scale(${(tenant.coverImageZoom ?? 100) / 100})`,
+          }}
           unoptimized
         />
         <div className="absolute inset-0 bg-linear-to-r from-slate-950 via-slate-950/90 to-transparent light:from-white light:via-white/90" />

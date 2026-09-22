@@ -110,6 +110,7 @@ function mapTenant(row: TenantRow, hours: BusinessHourRow[]): Tenant {
           ? "retail"
           : "appointment",
     logo: row.logo ?? businessName.charAt(0).toUpperCase(),
+    logoImage: row.logo_url ?? undefined,
     logoBg: row.logo_bg ?? row.primary_color ?? "#8b5cf6",
     description: row.description ?? `Welcome to ${businessName}.`,
     phone: row.phone ?? "",
@@ -119,6 +120,9 @@ function mapTenant(row: TenantRow, hours: BusinessHourRow[]): Tenant {
     coverImage:
       row.cover_image ??
       "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=1200&q=80",
+    coverImagePositionX: row.cover_image_position_x ?? 50,
+    coverImagePositionY: row.cover_image_position_y ?? 50,
+    coverImageZoom: row.cover_image_zoom ?? 100,
     businessHours: [...hours]
       .sort((a, b) => a.day_of_week - b.day_of_week)
       .map((hour) => ({

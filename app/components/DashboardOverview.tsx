@@ -120,8 +120,12 @@ export function DashboardOverview({ tenant }: OverviewProps) {
     <div className="space-y-3.5 p-4 md:p-5">
       <section className="relative min-h-31 overflow-hidden rounded-xl border border-slate-700/60 bg-slate-900 shadow-sm light:border-[#e4e9f1] light:bg-white">
         <div
-          className="absolute inset-y-0 right-0 w-[58%] bg-cover bg-center opacity-50 light:opacity-75"
-          style={{ backgroundImage: `url("${tenant.coverImage}")` }}
+          className="absolute inset-y-0 right-0 w-[58%] bg-cover opacity-50 light:opacity-75"
+          style={{
+            backgroundImage: `url("${tenant.coverImage}")`,
+            backgroundPosition: `${tenant.coverImagePositionX ?? 50}% ${tenant.coverImagePositionY ?? 50}%`,
+            transform: `scale(${(tenant.coverImageZoom ?? 100) / 100})`,
+          }}
         />
         <div className="absolute inset-0 bg-linear-to-r from-slate-950 via-slate-950/95 to-slate-950/25 light:from-white light:via-white/95 light:to-white/15" />
         <div className="relative z-10 flex min-h-31 items-center justify-between gap-4 px-6 py-5">

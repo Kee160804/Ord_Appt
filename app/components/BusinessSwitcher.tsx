@@ -16,6 +16,7 @@ import { PLAN_DEFINITIONS } from "@/app/lib/plans";
 import type { BusinessType, Tenant } from "@/app/types";
 import { Modal } from "@/app/components/Modal";
 import { cn } from "@/app/lib/utils";
+import { BusinessLogo } from "@/app/components/BusinessLogo";
 
 interface BusinessSwitcherProps {
   tenant: Tenant;
@@ -100,12 +101,10 @@ export function BusinessSwitcher({
           collapsed && "justify-center",
         )}
       >
-        <span
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-xs font-bold text-white shadow-sm"
-          style={{ backgroundColor: tenant.logoBg }}
-        >
-          {tenant.logo}
-        </span>
+        <BusinessLogo
+          tenant={tenant}
+          className="h-9 w-9 rounded-lg text-xs font-bold shadow-sm"
+        />
         {!collapsed && (
           <>
             <span className="min-w-0 flex-1">
@@ -276,12 +275,10 @@ export function BusinessSwitcher({
                         : "border-slate-700 hover:border-slate-500 hover:bg-slate-700/40 light:border-slate-200 light:hover:bg-slate-50",
                     )}
                   >
-                    <span
-                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-black text-white"
-                      style={{ backgroundColor: business.logoBg }}
-                    >
-                      {business.logo}
-                    </span>
+                    <BusinessLogo
+                      tenant={business}
+                      className="h-10 w-10 rounded-xl text-sm font-black"
+                    />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-bold text-white light:text-slate-900">
                         {business.name}

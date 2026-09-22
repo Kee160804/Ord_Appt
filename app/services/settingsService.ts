@@ -19,10 +19,12 @@ export interface BusinessDetailsInput {
 export interface StorefrontSettingsInput {
   slug: string;
   coverImage: string;
+  coverImagePositionX: number;
+  coverImagePositionY: number;
+  coverImageZoom: number;
   primaryColor: string;
   accentColor: string;
   socialLinks: SocialLinks;
-  customDomain: string;
 }
 
 const DAYS = [
@@ -36,35 +38,12 @@ const DAYS = [
 ];
 const STOREFRONT_MEDIA_BUCKET = "storefront-media";
 const MAX_COVER_IMAGE_BYTES = 5 * 1024 * 1024;
+const MAX_LOGO_IMAGE_BYTES = 2 * 1024 * 1024;
 const COVER_IMAGE_EXTENSIONS: Record<string, string> = {
   "image/jpeg": "jpg",
   "image/png": "png",
   "image/webp": "webp",
 };
-
-function normalizeCustomDomain(value: string) {
-  const input = value.trim().toLowerCase();
-  if (!input) return "";
-  let url: URL;
-  try {
-    url = new URL(input.includes("://") ? input : `https://${input}`);
-  } catch {
-    throw new Error(
-      "Enter a valid custom domain, such as bookings.example.com.",
-    );
-  }
-  const hostname = url.hostname.replace(/\.$/, "");
-  if (
-    !hostname.includes(".") ||
-    hostname === "localhost" ||
-    !/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i.test(
-      hostname,
-    )
-  ) {
-    throw new Error("Enter a valid public custom domain.");
-  }
-  return hostname;
-}
 
 export function validateStorefrontCoverImage(file: File) {
   if (!COVER_IMAGE_EXTENSIONS[file.type]) {
@@ -73,6 +52,48 @@ export function validateStorefrontCoverImage(file: File) {
   if (file.size > MAX_COVER_IMAGE_BYTES) {
     throw new Error("Cover images must be 5 MB or smaller.");
   }
+}
+
+export function validateBusinessLogo(file: File) {
+  if (!COVER_IMAGE_EXTENSIONS[file.type]) {
+    throw new Error("Choose a JPG, PNG, or WebP logo.");
+  }
+  if (file.size > MAX_LOGO_IMAGE_BYTES) {
+    throw new Error("Business logos must be 2 MB or smaller.");
+  }
+}
+
+export async function uploadBusinessLogo(tenantId: string, file: File) {
+  validateBusinessLogo(file);
+  const extension = COVER_IMAGE_EXTENSIONS[file.type];
+  const objectPath = `${tenantId}/logos/${crypto.randomUUID()}.${extension}`;
+  const supabase = client();
+  const { error: uploadError } = await supabase.storage
+    .from(STOREFRONT_MEDIA_BUCKET)
+    .upload(objectPath, file, {
+      cacheControl: "3600",
+      contentType: file.type,
+      upsert: false,
+    });
+
+  if (uploadError) throw uploadError;
+  const { data } = supabase.storage
+    .from(STOREFRONT_MEDIA_BUCKET)
+    .getPublicUrl(objectPath);
+  if (!data.publicUrl)
+    throw new Error("The uploaded logo URL could not be created.");
+
+  const { error: updateError } = await supabase
+    .from("tenants")
+    .update({ logo_url: data.publicUrl })
+    .eq("id", tenantId)
+    .select("id")
+    .single();
+  if (updateError) {
+    await supabase.storage.from(STOREFRONT_MEDIA_BUCKET).remove([objectPath]);
+    throw updateError;
+  }
+  return data.publicUrl;
 }
 
 export async function uploadStorefrontCoverImage(tenantId: string, file: File) {
@@ -155,8 +176,26 @@ export async function updateStorefrontSettings(
 ) {
   const slug = slugify(input.slug);
   if (!slug) throw new Error("Storefront URL is required.");
-  const customDomain = normalizeCustomDomain(input.customDomain);
+  if (slug.length > 63) {
+    throw new Error(
+      "Your YuhBusiness domain prefix must be 63 characters or fewer.",
+    );
+  }
+  const customDomain = `${slug}.yuhbusiness.com`;
   const socialLinks = cleanSocialLinks(input.socialLinks);
+  const coverImagePositionX = Math.round(input.coverImagePositionX);
+  const coverImagePositionY = Math.round(input.coverImagePositionY);
+  const coverImageZoom = Math.round(input.coverImageZoom);
+  if (
+    coverImagePositionX < 0 ||
+    coverImagePositionX > 100 ||
+    coverImagePositionY < 0 ||
+    coverImagePositionY > 100 ||
+    coverImageZoom < 100 ||
+    coverImageZoom > 200
+  ) {
+    throw new Error("Choose a valid cover image position and zoom level.");
+  }
 
   const coverImage = input.coverImage.trim();
   if (coverImage) {
@@ -177,6 +216,9 @@ export async function updateStorefrontSettings(
       slug,
       subdomain: slug,
       cover_image: coverImage || null,
+      cover_image_position_x: coverImagePositionX,
+      cover_image_position_y: coverImagePositionY,
+      cover_image_zoom: coverImageZoom,
       primary_color: input.primaryColor,
       accent_color: input.accentColor,
       social_links: socialLinks,
@@ -187,7 +229,17 @@ export async function updateStorefrontSettings(
     .single();
 
   if (error) throw error;
-  return { ...input, slug, coverImage, socialLinks, customDomain };
+  return {
+    ...input,
+    slug,
+    coverImage,
+    coverImagePositionX,
+    coverImagePositionY,
+    coverImageZoom,
+    socialLinks,
+    customDomain,
+    customDomainVerified: true,
+  };
 }
 
 export async function updateBusinessHours(

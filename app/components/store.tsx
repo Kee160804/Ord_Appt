@@ -23,6 +23,7 @@ import { getStoredProducts, getStoredServices } from "@/app/lib/storage";
 import { isSupabaseConfigured } from "@/app/lib/supabase/config";
 import { AppointmentBooking } from "../components/AppointmentBooking";
 import { OrderingMenu } from "../components/OrderingMenu";
+import { BusinessLogo } from "../components/BusinessLogo";
 import { DemoDashboardPreview } from "../components/DemoDashboardPreview";
 import { StorefrontContact } from "../components/StorefrontContact";
 import { useTheme } from "@/app/contexts/theme";
@@ -281,14 +282,10 @@ export default function StorefrontClient({
               )}
 
               <div className="flex min-w-0 items-center gap-3">
-                <div
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-lg font-black text-white shadow-[0_8px_24px_rgba(124,58,237,0.3)]"
-                  style={{
-                    background: `linear-gradient(145deg, ${tenant.primaryColor}, ${tenant.accentColor})`,
-                  }}
-                >
-                  {tenant.logo}
-                </div>
+                <BusinessLogo
+                  tenant={tenant}
+                  className="h-11 w-11 rounded-xl text-lg font-black shadow-[0_8px_24px_rgba(124,58,237,0.3)]"
+                />
                 <div className="min-w-0">
                   <h1 className="truncate text-base font-black text-white light:text-slate-950">
                     {tenant.name}

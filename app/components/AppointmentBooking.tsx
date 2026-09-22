@@ -685,6 +685,10 @@ export function AppointmentBooking({
               priority
               sizes="(max-width: 1280px) 100vw, 75vw"
               className="object-cover"
+              style={{
+                objectPosition: `${tenant.coverImagePositionX ?? 50}% ${tenant.coverImagePositionY ?? 50}%`,
+                transform: `scale(${(tenant.coverImageZoom ?? 100) / 100})`,
+              }}
               unoptimized
               onError={(event) => {
                 (event.target as HTMLImageElement).src = PLACEHOLDER_IMG;
