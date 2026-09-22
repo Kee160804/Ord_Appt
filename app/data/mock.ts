@@ -10,6 +10,8 @@ import type {
 } from "../types/index";
 
 const ACTIVE_DEMO_TENANT_IDS = new Set(["apt-001", "ord-001", "ret-001"]);
+const DEMO_PERIOD_START = new Date().toISOString();
+const DEMO_PERIOD_END = new Date(Date.now() + 30 * 86_400_000).toISOString();
 
 const allMockTenants: Tenant[] = [
   {
@@ -47,6 +49,8 @@ const allMockTenants: Tenant[] = [
     plan: "pro",
     stripeConnected: true,
     subscriptionStatus: "active",
+    currentPeriodStart: DEMO_PERIOD_START,
+    currentPeriodEnd: DEMO_PERIOD_END,
     monthlyRevenue: 4820,
   },
   {
@@ -116,6 +120,8 @@ const allMockTenants: Tenant[] = [
     plan: "pro",
     stripeConnected: true,
     subscriptionStatus: "active",
+    currentPeriodStart: DEMO_PERIOD_START,
+    currentPeriodEnd: DEMO_PERIOD_END,
     monthlyRevenue: 12480,
   },
   {
@@ -188,6 +194,8 @@ const allMockTenants: Tenant[] = [
     plan: "pro",
     stripeConnected: false,
     subscriptionStatus: "active",
+    currentPeriodStart: DEMO_PERIOD_START,
+    currentPeriodEnd: DEMO_PERIOD_END,
     monthlyRevenue: 8420,
   },
 ];

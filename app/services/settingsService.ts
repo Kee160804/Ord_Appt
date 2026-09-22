@@ -115,7 +115,7 @@ export async function uploadStorefrontCoverImage(tenantId: string, file: File) {
         "Photo uploads are not installed yet. Apply the storefront media migration in Supabase.",
       );
     }
-    throw error;
+    throw new Error(error.message || "Unable to upload the storefront photo.");
   }
 
   const { data } = supabase.storage
@@ -228,7 +228,7 @@ export async function updateStorefrontSettings(
     .select("id")
     .single();
 
-  if (error) throw error;
+  if (error) throw new Error(error.message || "Unable to save storefront settings.");
   return {
     ...input,
     slug,

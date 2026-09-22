@@ -159,7 +159,7 @@ export async function POST(request: Request) {
       admin
         .from("tenants")
         .select(
-          "id, business_name, email, is_active, status, subscription_status, trial_ends_at",
+          "id, business_name, email, is_active, status, subscription_status, trial_ends_at, current_period_end",
         )
         .eq("id", tenantId)
         .maybeSingle(),
@@ -210,7 +210,18 @@ export async function POST(request: Request) {
       !Number.isNaN(trialEndsAt.getTime()) &&
       trialEndsAt > new Date();
 
-    const subscriptionActive = subscriptionStatus === "active" || validTrial;
+    const currentPeriodEnd = tenant.current_period_end
+      ? new Date(tenant.current_period_end)
+      : null;
+    const validPaidPeriod =
+      (subscriptionStatus === "active" ||
+        subscriptionStatus === "cancelled" ||
+        subscriptionStatus === "canceled") &&
+      currentPeriodEnd !== null &&
+      !Number.isNaN(currentPeriodEnd.getTime()) &&
+      currentPeriodEnd > new Date();
+
+    const subscriptionActive = validPaidPeriod || validTrial;
 
     if (
       !tenant.is_active ||

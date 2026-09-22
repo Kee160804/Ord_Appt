@@ -20,7 +20,7 @@ import {
   Twitter,
   UserRound,
 } from "lucide-react";
-import { planHasFeature } from "@/app/lib/plans";
+import { tenantHasFeature } from "@/app/lib/plans";
 import { submitStorefrontContactMessage } from "@/app/services/contactService";
 import type { BusinessHours, Tenant } from "@/app/types";
 
@@ -95,7 +95,7 @@ export function StorefrontContact({
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
   const [isSending, setIsSending] = useState(false);
-  const canSendMessage = planHasFeature(tenant.plan, "storefront_contact_form");
+  const canSendMessage = tenantHasFeature(tenant, "storefront_contact_form");
   const hours = useMemo(
     () => compactHours(tenant.businessHours),
     [tenant.businessHours],

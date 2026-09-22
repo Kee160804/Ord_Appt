@@ -680,11 +680,20 @@ export function AppointmentBooking({
           <section className="relative min-h-64 overflow-hidden rounded-2xl border border-[#26364f] bg-[#0d1829] light:border-slate-200 light:bg-white">
             <Image
               src={tenant.coverImage || PLACEHOLDER_IMG}
+              alt=""
+              fill
+              sizes="(max-width: 1280px) 100vw, 75vw"
+              className="pointer-events-none object-cover opacity-55 blur-xl scale-110"
+              aria-hidden="true"
+              unoptimized
+            />
+            <Image
+              src={tenant.coverImage || PLACEHOLDER_IMG}
               alt={tenant.name}
               fill
               priority
               sizes="(max-width: 1280px) 100vw, 75vw"
-              className="object-cover"
+              className="object-contain"
               style={{
                 objectPosition: `${tenant.coverImagePositionX ?? 50}% ${tenant.coverImagePositionY ?? 50}%`,
                 transform: `scale(${(tenant.coverImageZoom ?? 100) / 100})`,
@@ -694,17 +703,17 @@ export function AppointmentBooking({
                 (event.target as HTMLImageElement).src = PLACEHOLDER_IMG;
               }}
             />
-            <div className="absolute inset-0 bg-linear-to-r from-[#080d18]/95 via-[#080d18]/70 to-transparent" />
+            <div className="absolute inset-0 bg-linear-to-r from-[#080d18]/45 via-[#080d18]/15 to-transparent" />
             <div className="relative flex min-h-64 max-w-xl flex-col justify-center p-6 sm:p-9">
               <p className="mb-3 text-[10px] font-black uppercase tracking-[0.22em] text-violet-300">
                 Premium care, made simple
               </p>
-              <h2 className="text-3xl font-black leading-none text-white sm:text-5xl">
+              <h2 className="text-3xl font-black leading-none text-white [text-shadow:0_2px_14px_rgba(0,0,0,0.7)] sm:text-5xl">
                 Look Good
                 <br />
                 Feel <span className="text-violet-400">Amazing</span>
               </h2>
-              <p className="mt-4 max-w-md text-sm leading-6 text-slate-200">
+              <p className="mt-4 max-w-md text-sm leading-6 text-white/90 [text-shadow:0_1px_8px_rgba(0,0,0,0.72)]">
                 {tenant.description ||
                   "Premium services tailored to you. Book your appointment in minutes."}
               </p>

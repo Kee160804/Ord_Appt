@@ -20,6 +20,7 @@ import {
 } from "@/app/lib/data";
 import { getSupabaseBrowserClient } from "@/app/lib/supabase/client";
 import { PRIVACY_VERSION, TERMS_VERSION } from "@/app/lib/legal";
+import { TRIAL_ENTITLEMENTS } from "@/app/lib/plans";
 import {
   isDemoModeEnabled,
   isSupabaseConfigured,
@@ -397,7 +398,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       plan: "starter",
       stripeConnected: false,
       subscriptionStatus: "trial",
-      trialEndsAt: new Date(Date.now() + 14 * 86_400_000).toISOString(),
+      trialEndsAt: new Date(
+        Date.now() + TRIAL_ENTITLEMENTS.lengthDays * 86_400_000,
+      ).toISOString(),
     };
     const newUser: User = {
       id: normalizedEmail,

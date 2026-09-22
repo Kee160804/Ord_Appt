@@ -8,10 +8,16 @@ and production projects.
 project can be reproduced by applying every file in `supabase/migrations` in
 filename order; no SQL Editor history or external schema file is required.
 
-The final mock-payment migration adds a provider-neutral BZD ledger, invoices,
-full-model public checkout functions, and distributed rate-limit storage. Mock
-transactions are always labelled `MOCK` and never collect payment credentials
-or move money. Replace the adapter only after the bank supplies sandbox APIs.
+The payment migrations add a provider-neutral BZD ledger, invoices, full-model
+public checkout functions, and distributed rate-limit storage. Mock transactions
+are always labelled `MOCK` and never collect payment credentials or move money.
+
+Apply `202609210001_subscription_entitlements_and_billing.sql` last. It adds the
+period-aware subscription lifecycle, canonical database plan catalog, safe
+backfill, trial overrides, owner cancellation, automated staff-seat billing,
+variant protection, and complete branding-field enforcement. It deliberately
+expires legacy `active` rows that have no current paid invoice period rather
+than granting permanent access.
 
 After connecting the Supabase CLI, generate the canonical TypeScript database
 types whenever the schema changes:
@@ -86,10 +92,12 @@ If the original Team & Access migration was already applied, also apply
 `202609030003_staff_seat_totals_include_owner.sql`. It corrects the Enterprise
 limit so the published 10-account maximum includes the owner.
 
-Pending invitations reserve available capacity but are not billed. Paid-seat
-requests do not grant capacity until a SUPER_ADMIN confirms payment and
-approves the request from the tenant administration page. Deactivating a team
-member preserves the membership and audit history.
+Pending invitations reserve available capacity but are not billed. After the
+subscription lifecycle migration, owners change paid-seat quantity through
+Billing & Payments and the server charges the updated base-plus-seat recurring
+total; legacy pending requests remain visible for migration history. Capacity
+cannot be reduced below active staff. Deactivating a member preserves the
+membership and audit history.
 
 Team invitations return through `/team/invite`. Add the deployed and local
 paths to **Authentication > URL Configuration > Redirect URLs** in Supabase:

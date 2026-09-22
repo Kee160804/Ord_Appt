@@ -739,10 +739,19 @@ export function OrderingMenu({
           >
             <Image
               src={tenant.coverImage || PLACEHOLDER_IMG}
+              alt=""
+              fill
+              sizes="(max-width: 1280px) 100vw, 900px"
+              className="pointer-events-none object-cover opacity-55 blur-xl scale-110"
+              aria-hidden="true"
+              unoptimized
+            />
+            <Image
+              src={tenant.coverImage || PLACEHOLDER_IMG}
               alt={tenant.name}
               fill
               sizes="(max-width: 1280px) 100vw, 900px"
-              className="object-cover transition duration-500"
+              className="object-contain transition duration-500"
               style={{
                 objectPosition: `${tenant.coverImagePositionX ?? 50}% ${tenant.coverImagePositionY ?? 50}%`,
                 transform: `scale(${(tenant.coverImageZoom ?? 100) / 100})`,
@@ -753,9 +762,9 @@ export function OrderingMenu({
                 (event.target as HTMLImageElement).src = PLACEHOLDER_IMG;
               }}
             />
-            <span className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,10,20,0.97)_0%,rgba(7,11,24,0.84)_43%,rgba(18,10,44,0.32)_72%,rgba(18,8,42,0.12)_100%)]" />
+            <span className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,10,20,0.46)_0%,rgba(7,11,24,0.24)_43%,rgba(18,10,44,0.06)_72%,rgba(18,8,42,0.02)_100%)]" />
             <span className="absolute inset-y-0 left-0 flex max-w-[78%] flex-col justify-center px-6 sm:px-9">
-              <span className="text-3xl font-black leading-[1.08] tracking-[-0.035em] text-white sm:text-4xl">
+              <span className="text-3xl font-black leading-[1.08] tracking-[-0.035em] text-white [text-shadow:0_2px_12px_rgba(0,0,0,0.72)] sm:text-4xl">
                 {isRetail ? "Fresh Styles" : "Good Food"}
                 <br />
                 {isRetail ? (
@@ -768,7 +777,7 @@ export function OrderingMenu({
                   </>
                 )}
               </span>
-              <span className="mt-3 max-w-sm text-xs leading-5 text-[#c2cce0] sm:text-sm">
+              <span className="mt-3 max-w-sm text-xs leading-5 text-white/90 [text-shadow:0_1px_8px_rgba(0,0,0,0.75)] sm:text-sm">
                 {tenant.description}
               </span>
             </span>

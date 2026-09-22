@@ -54,6 +54,16 @@ export interface TenantRow {
   subscription_status?: string | null;
   stripe_connected?: boolean | null;
   trial_ends_at?: string | null;
+  current_period_start?: string | null;
+  current_period_end?: string | null;
+  cancel_at_period_end?: boolean | null;
+  canceled_at?: string | null;
+  provider_customer_id?: string | null;
+  provider_subscription_id?: string | null;
+  subscription_base_amount?: number | string | null;
+  subscription_seat_amount?: number | string | null;
+  subscription_recurring_total?: number | string | null;
+  subscription_paid_staff_seats?: number | null;
   created_at?: string | null;
   updated_at?: string | null;
   is_active: boolean;

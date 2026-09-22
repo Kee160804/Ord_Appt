@@ -2378,6 +2378,10 @@ export type Database = {
           cover_image_zoom: number | null;
           created_at: string | null;
           created_by: string | null;
+          cancel_at_period_end: boolean | null;
+          canceled_at: string | null;
+          current_period_end: string | null;
+          current_period_start: string | null;
           custom_domain: string | null;
           custom_domain_verified_at: string | null;
           description: string | null;
@@ -2391,12 +2395,19 @@ export type Database = {
           phone: string | null;
           plan: string | null;
           primary_color: string | null;
+          provider_customer_id: string | null;
+          provider_subscription_id: string | null;
           slug: string;
           social_links: Json;
           status: string;
           stripe_connected: boolean | null;
           subdomain: string;
           subscription_status: string | null;
+          subscription_base_amount: number | null;
+          subscription_paid_staff_seats: number | null;
+          subscription_recurring_total: number | null;
+          subscription_seat_amount: number | null;
+          subscription_updated_at: string | null;
           trial_ends_at: string | null;
           updated_at: string | null;
           website: string | null;
@@ -2414,6 +2425,10 @@ export type Database = {
           cover_image_zoom?: number | null;
           created_at?: string | null;
           created_by?: string | null;
+          cancel_at_period_end?: boolean | null;
+          canceled_at?: string | null;
+          current_period_end?: string | null;
+          current_period_start?: string | null;
           custom_domain?: string | null;
           custom_domain_verified_at?: string | null;
           description?: string | null;
@@ -2427,12 +2442,19 @@ export type Database = {
           phone?: string | null;
           plan?: string | null;
           primary_color?: string | null;
+          provider_customer_id?: string | null;
+          provider_subscription_id?: string | null;
           slug: string;
           social_links?: Json;
           status?: string;
           stripe_connected?: boolean | null;
           subdomain: string;
           subscription_status?: string | null;
+          subscription_base_amount?: number | null;
+          subscription_paid_staff_seats?: number | null;
+          subscription_recurring_total?: number | null;
+          subscription_seat_amount?: number | null;
+          subscription_updated_at?: string | null;
           trial_ends_at?: string | null;
           updated_at?: string | null;
           website?: string | null;
@@ -2450,6 +2472,10 @@ export type Database = {
           cover_image_zoom?: number | null;
           created_at?: string | null;
           created_by?: string | null;
+          cancel_at_period_end?: boolean | null;
+          canceled_at?: string | null;
+          current_period_end?: string | null;
+          current_period_start?: string | null;
           custom_domain?: string | null;
           custom_domain_verified_at?: string | null;
           description?: string | null;
@@ -2463,12 +2489,19 @@ export type Database = {
           phone?: string | null;
           plan?: string | null;
           primary_color?: string | null;
+          provider_customer_id?: string | null;
+          provider_subscription_id?: string | null;
           slug?: string;
           social_links?: Json;
           status?: string;
           stripe_connected?: boolean | null;
           subdomain?: string;
           subscription_status?: string | null;
+          subscription_base_amount?: number | null;
+          subscription_paid_staff_seats?: number | null;
+          subscription_recurring_total?: number | null;
+          subscription_seat_amount?: number | null;
+          subscription_updated_at?: string | null;
           trial_ends_at?: string | null;
           updated_at?: string | null;
           website?: string | null;
@@ -2707,6 +2740,26 @@ export type Database = {
         Args: { p_membership_id: string; p_tenant_id: string };
         Returns: undefined;
       };
+      cancel_tenant_subscription_at_period_end: {
+        Args: { p_tenant_id: string };
+        Returns: Json;
+      };
+      complete_subscription_checkout_v2: {
+        Args: {
+          p_expected_base_amount: number;
+          p_expected_seat_amount: number;
+          p_expected_total: number;
+          p_idempotency_key: string;
+          p_paid_staff_seats: number;
+          p_plan: string;
+          p_provider: string;
+          p_provider_customer_id: string;
+          p_provider_reference: string;
+          p_provider_subscription_id: string;
+          p_tenant_id: string;
+        };
+        Returns: Json;
+      };
       enqueue_due_trial_emails: { Args: never; Returns: number };
       get_public_appointment_availability: {
         Args: {
@@ -2747,6 +2800,14 @@ export type Database = {
         Returns: Json;
       };
       get_tenant_team_summary: { Args: { p_tenant_id: string }; Returns: Json };
+      tenant_effective_entitlements: {
+        Args: { p_tenant_id: string };
+        Returns: Json;
+      };
+      tenant_subscription_allows_access: {
+        Args: { p_tenant_id: string };
+        Returns: boolean;
+      };
       growth_tools_subscription_allows_access: {
         Args: { p_tenant_id: string };
         Returns: boolean;

@@ -16,7 +16,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { PublicHeader } from "@/app/components/PublicHeader";
-import { PLAN_DEFINITIONS } from "@/app/lib/plans";
+import { PLAN_DEFINITIONS, approximateDailyPrice } from "@/app/lib/plans";
 
 export default function HomePage() {
   const teamAccess = (plan: keyof typeof PLAN_DEFINITIONS) => {
@@ -74,13 +74,13 @@ export default function HomePage() {
 
   const plans = [
     {
+      id: "starter" as const,
       name: PLAN_DEFINITIONS.starter.name,
       price: String(PLAN_DEFINITIONS.starter.price),
       audience: "For new and side businesses",
       description: "Launch your storefront and start serving customers online.",
-      dailyPrice: "About $0.30 a day",
+      dailyPrice: `About $${approximateDailyPrice(PLAN_DEFINITIONS.starter.price).toFixed(2)} a day`,
       priceAnchor: "Everything needed to get online",
-      checkoutUrl: process.env.NEXT_PUBLIC_BEGINNER_CHECKOUT_URL,
       color: "border-slate-700 light:border-gray-200",
       badge: null,
       cta: "Start with Beginner",
@@ -94,14 +94,14 @@ export default function HomePage() {
       ],
     },
     {
+      id: "pro" as const,
       name: PLAN_DEFINITIONS.pro.name,
       price: String(PLAN_DEFINITIONS.pro.price),
       audience: "For growing local businesses",
       description:
         "Unlock the controls and insights that help you grow faster.",
-      dailyPrice: "Less than $0.40 a day",
+      dailyPrice: `About $${approximateDailyPrice(PLAN_DEFINITIONS.pro.price).toFixed(2)} a day`,
       priceAnchor: "Only $3 more than Beginner",
-      checkoutUrl: process.env.NEXT_PUBLIC_PRO_CHECKOUT_URL,
       color: "border-violet-500 light:border-violet-300",
       badge: "Best Value · Most Popular",
       cta: "Choose Pro",
@@ -117,13 +117,13 @@ export default function HomePage() {
       ],
     },
     {
+      id: "enterprise" as const,
       name: PLAN_DEFINITIONS.enterprise.name,
       price: String(PLAN_DEFINITIONS.enterprise.price),
       audience: "For established, high-volume businesses",
       description: "Remove the limits and get extra help as demand increases.",
-      dailyPrice: "About $0.53 a day",
+      dailyPrice: `About $${approximateDailyPrice(PLAN_DEFINITIONS.enterprise.price).toFixed(2)} a day`,
       priceAnchor: "Just $4 more than Pro",
-      checkoutUrl: process.env.NEXT_PUBLIC_ENTERPRISE_CHECKOUT_URL,
       color: "border-indigo-500/70 light:border-indigo-300",
       badge: "Maximum Scale",
       cta: "Go Enterprise",
@@ -131,10 +131,9 @@ export default function HomePage() {
       features: [
         "Everything in Pro",
         "Unlimited orders or appointments",
-        "Unlimited products or services",
+        "Highest team capacity: up to 10 accounts total",
         "Complete customer management and history",
-        "Priority onboarding assistance",
-        "Priority product support",
+        "All analytics, catalog, booking, and branding controls",
       ],
     },
   ];
@@ -533,35 +532,21 @@ export default function HomePage() {
                     </li>
                   ))}
                 </ul>
-                {p.checkoutUrl ? (
-                  <a
-                    href={p.checkoutUrl}
-                    aria-label={`Pay for the ${p.name} plan at $${p.price} per month`}
-                    className={`mt-auto block rounded-xl py-3.5 text-center text-sm font-bold transition-all ${
-                      p.name === "Pro"
-                        ? "bg-violet-600 text-white shadow-lg shadow-violet-950/30 hover:bg-violet-500 light:bg-violet-600 light:shadow-violet-300/30 light:hover:bg-violet-700"
-                        : "bg-slate-700 light:bg-gray-200 hover:bg-slate-600 light:hover:bg-gray-300 text-white light:text-gray-900"
-                    }`}
-                  >
-                    Pay ${p.price} / month
-                  </a>
-                ) : (
-                  <Link
-                    href="/register?mode=trial"
-                    aria-label={`Start a free trial before choosing the ${p.name} plan`}
-                    className={`mt-auto block rounded-xl py-3.5 text-center text-sm font-bold transition-all ${
-                      p.name === "Pro"
-                        ? "bg-violet-600 text-white shadow-lg shadow-violet-950/30 hover:bg-violet-500 light:bg-violet-600 light:shadow-violet-300/30 light:hover:bg-violet-700"
-                        : "bg-slate-700 light:bg-gray-200 hover:bg-slate-600 light:hover:bg-gray-300 text-white light:text-gray-900"
-                    }`}
-                  >
-                    {p.name === "Pro"
-                      ? "Choose Pro — di best value"
-                      : p.name === "Enterprise"
-                        ? "Go big wid Enterprise"
-                        : "Start wid Beginner"}
-                  </Link>
-                )}
+                <Link
+                  href={`/register?mode=trial&plan=${p.id}`}
+                  aria-label={`Start a free trial before choosing the ${p.name} plan`}
+                  className={`mt-auto block rounded-xl py-3.5 text-center text-sm font-bold transition-all ${
+                    p.name === "Pro"
+                      ? "bg-violet-600 text-white shadow-lg shadow-violet-950/30 hover:bg-violet-500 light:bg-violet-600 light:shadow-violet-300/30 light:hover:bg-violet-700"
+                      : "bg-slate-700 light:bg-gray-200 hover:bg-slate-600 light:hover:bg-gray-300 text-white light:text-gray-900"
+                  }`}
+                >
+                  {p.name === "Pro"
+                    ? "Start Pro trial — di best value"
+                    : p.name === "Enterprise"
+                      ? "Start Enterprise trial"
+                      : "Start wid Beginner"}
+                </Link>
               </div>
             ))}
           </div>
@@ -575,9 +560,9 @@ export default function HomePage() {
                 Why Pro da di smartest place fi start
               </p>
               <p className="mt-1 text-sm leading-6 text-slate-400 light:text-gray-600">
-                For only $3 more than Beginner, you get 5× the monthly activity,
+                For only $3 more than Beginner, you get 3× the monthly activity,
                 live analytics, and advanced ordering or booking controls—while
-                still paying less than $0.40 per day.
+                still paying about $0.40 per day.
               </p>
             </div>
           </div>

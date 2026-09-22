@@ -1,4 +1,8 @@
 import { authCallbackUrl } from "@/app/lib/platform";
+import {
+  TRIAL_ENTITLEMENTS,
+  calculateSubscriptionAmounts,
+} from "@/app/lib/plans";
 import { authorizeActiveSuperAdmin } from "@/app/lib/server/admin-authorization";
 import { slugify } from "@/app/lib/utils";
 import {
@@ -53,7 +57,7 @@ export async function POST(request: Request) {
     const trialDays =
       Number.isInteger(body.trialDays) && Number(body.trialDays) > 0
         ? Number(body.trialDays)
-        : 14;
+        : TRIAL_ENTITLEMENTS.lengthDays;
     const sendPasswordEmail = body.sendPasswordEmail !== false;
 
     if (!businessName || businessName.length < 2) {
@@ -161,6 +165,10 @@ export async function POST(request: Request) {
       subscriptionStatus === "trial"
         ? new Date(Date.now() + trialDays * 86_400_000).toISOString()
         : null;
+    const periodStart = new Date();
+    const periodEnd = new Date(periodStart);
+    periodEnd.setUTCMonth(periodEnd.getUTCMonth() + 1);
+    const amounts = calculateSubscriptionAmounts(plan, 0);
 
     const { data: newTenant, error: tenantInsertError } = await admin
       .from("tenants")
@@ -178,6 +186,16 @@ export async function POST(request: Request) {
         plan,
         subscription_status: subscriptionStatus,
         trial_ends_at: trialEndsAt,
+        current_period_start:
+          subscriptionStatus === "active" ? periodStart.toISOString() : null,
+        current_period_end:
+          subscriptionStatus === "active" ? periodEnd.toISOString() : null,
+        subscription_base_amount:
+          subscriptionStatus === "active" ? amounts.baseAmount : 0,
+        subscription_seat_amount: 0,
+        subscription_recurring_total:
+          subscriptionStatus === "active" ? amounts.recurringTotal : 0,
+        subscription_paid_staff_seats: 0,
       })
       .select(
         "id, business_name, slug, business_type, plan, subscription_status, trial_ends_at",

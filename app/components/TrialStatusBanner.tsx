@@ -25,8 +25,7 @@ export function TrialStatusBanner({ tenant }: { tenant: Tenant }) {
   const entitlement = getTenantEntitlement(tenant, now);
   const trialEndsAt = getTrialEndDate(tenant);
   const remainingMs = trialEndsAt ? trialEndsAt.getTime() - now.getTime() : 0;
-  const isBeginnerTrialWindow = tenant.plan === "starter" && remainingMs > 0;
-  const isTrial = entitlement.state === "trial" || isBeginnerTrialWindow;
+  const isTrial = entitlement.state === "trial";
   if (!isTrial || !trialEndsAt) return null;
 
   const daysRemaining = Math.max(1, Math.ceil(remainingMs / 86_400_000));

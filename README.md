@@ -44,6 +44,8 @@ SUPABASE_SECRET_KEY
 CRON_SECRET
 EMAIL_WEBHOOK_SECRET
 NEXT_PUBLIC_APP_URL
+# Set only after a real server-side billing adapter is installed.
+BILLING_PROVIDER
 ```
 
 Use the same URL and publishable key as `.env.local`. Never place a Supabase
@@ -90,7 +92,10 @@ unless `NEXT_PUBLIC_ENABLE_DEMO_MODE=true` is explicitly set.
 - Recipient-scoped Supabase Realtime in-app notifications with personal read state and tenant-isolated links.
 - Full public ordering checkout for dine-in, pickup, and delivery, including server-authoritative taxes, discounts, fees, minimums, and inventory.
 - Protected public order, booking, promotion, and contact APIs with distributed throttling and abuse controls.
-- Provider-neutral BZD payment and invoice ledger with an explicitly labelled mock gateway for bank-integration testing.
+- Provider-neutral monthly subscription lifecycle, BZD invoice/payment ledger, automated $2 staff-seat totals, owner cancellation at period end, and an explicitly labelled development mock gateway.
 - Reproducible baseline schema for new Supabase projects.
 
-Real-money payments remain disabled until bank sandbox and production credentials are configured. Mock payments never collect card details or move money.
+Real-money payments remain disabled until a provider adapter, verified webhook,
+sandbox/production credentials, and `BILLING_PROVIDER` are configured. Development
+may use `BILLING_PROVIDER=mock`; production rejects mock billing and never silently
+activates a mock subscription.

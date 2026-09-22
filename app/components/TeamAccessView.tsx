@@ -25,7 +25,6 @@ import {
   createBusinessTeamInvitation,
   getBusinessTeamSummary,
   removeBusinessTeamMember,
-  requestPaidStaffSeats,
   revokeBusinessTeamInvitation,
   type BusinessTeamRole,
   type BusinessTeamSummary,
@@ -40,7 +39,6 @@ export function TeamAccessView({ tenant }: { tenant: Tenant }) {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<BusinessTeamRole>("staff");
   const [invitationLink, setInvitationLink] = useState("");
-  const [requestedPaidSeats, setRequestedPaidSeats] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [busyId, setBusyId] = useState("");
   const [error, setError] = useState("");
@@ -52,12 +50,6 @@ export function TeamAccessView({ tenant }: { tenant: Tenant }) {
     try {
       const result = await getBusinessTeamSummary(tenant.id);
       setSummary(result);
-      setRequestedPaidSeats(
-        Math.min(
-          Math.max(result.paidStaffSeats + 1, 1),
-          Math.max(result.maxStaff - result.includedStaff, 1),
-        ),
-      );
     } catch (loadError) {
       setError(
         loadError instanceof Error
@@ -202,27 +194,6 @@ export function TeamAccessView({ tenant }: { tenant: Tenant }) {
         revokeError instanceof Error
           ? revokeError.message
           : "Unable to revoke this invitation.",
-      );
-    } finally {
-      setBusyId("");
-    }
-  };
-
-  const requestSeats = async () => {
-    setBusyId("seats");
-    setError("");
-    setSuccess("");
-    try {
-      await requestPaidStaffSeats(tenant.id, requestedPaidSeats);
-      setSuccess(
-        `Request submitted for ${requestedPaidSeats} paid staff seat${requestedPaidSeats === 1 ? "" : "s"}. Access is added only after payment is confirmed.`,
-      );
-      await load();
-    } catch (requestError) {
-      setError(
-        requestError instanceof Error
-          ? requestError.message
-          : "Unable to request paid seats.",
       );
     } finally {
       setBusyId("");
@@ -524,13 +495,13 @@ export function TeamAccessView({ tenant }: { tenant: Tenant }) {
           </CardHeader>
           <CardBody>
             <p className="text-xs leading-5 text-slate-400 light:text-slate-600">
-              Each paid staff seat is $2 BZD per month for this business. A
-              request does not grant access until the platform administrator
-              confirms payment.
+              Each additional staff seat is $2 BZD per month for this business.
+              The owner can change paid seats through Billing & Payments; the
+              subscription total updates only after checkout is confirmed.
             </p>
             {summary.pendingSeatRequest ? (
               <div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-100 light:text-amber-800">
-                Payment confirmation pending for{" "}
+                A legacy seat request is still pending for{" "}
                 {summary.pendingSeatRequest.requestedPaidSeats} paid seat
                 {summary.pendingSeatRequest.requestedPaidSeats === 1
                   ? ""
@@ -540,46 +511,17 @@ export function TeamAccessView({ tenant }: { tenant: Tenant }) {
                   summary.additionalSeatPrice}{" "}
                 BZD/month).
               </div>
-            ) : summary.paidStaffSeats < maxPaidSeats ? (
-              <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
-                <label className="block sm:w-56">
-                  <span className="mb-1.5 block text-[11px] font-semibold">
-                    Total paid seats requested
-                  </span>
-                  <select
-                    value={requestedPaidSeats}
-                    onChange={(event) =>
-                      setRequestedPaidSeats(Number(event.target.value))
-                    }
-                    className={inputClass}
-                  >
-                    {Array.from(
-                      { length: maxPaidSeats - summary.paidStaffSeats },
-                      (_, index) => summary.paidStaffSeats + index + 1,
-                    ).map((count) => (
-                      <option key={count} value={count}>
-                        {count} seat{count === 1 ? "" : "s"} · ${count * 2}{" "}
-                        BZD/month
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <button
-                  type="button"
-                  disabled={busyId === "seats"}
-                  onClick={() => void requestSeats()}
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 text-xs font-bold text-white hover:bg-emerald-500 disabled:opacity-50"
-                >
-                  {busyId === "seats" && (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  )}{" "}
-                  Request paid seats
-                </button>
-              </div>
             ) : (
-              <p className="mt-4 rounded-xl bg-slate-800/60 p-3 text-xs text-slate-300 light:bg-slate-100 light:text-slate-700">
-                This business has the maximum paid seats allowed on {planName}.
-              </p>
+              <div className="mt-4 rounded-xl bg-slate-800/60 p-3 text-xs text-slate-300 light:bg-slate-100 light:text-slate-700">
+                <p>
+                  Current paid seats: <strong>{summary.paidStaffSeats}</strong>{" "}
+                  of {maxPaidSeats} available on {planName}.
+                </p>
+                <p className="mt-1 font-semibold text-violet-300 light:text-violet-700">
+                  Open the Billing & Payments tab to change seats and pay the
+                  updated monthly total.
+                </p>
+              </div>
             )}
           </CardBody>
         </Card>

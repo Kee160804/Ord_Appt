@@ -1,11 +1,24 @@
 import { authorizeActiveSuperAdmin } from "@/app/lib/server/admin-authorization";
+import {
+  PLAN_DEFINITIONS,
+  TRIAL_ENTITLEMENTS,
+  calculateSubscriptionAmounts,
+} from "@/app/lib/plans";
 import { isValidUuid, safeServerError } from "@/app/lib/server/security";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const VALID_PLANS = new Set(["starter", "pro", "enterprise"]);
-const VALID_STATUSES = new Set(["trial", "active", "cancelled", "past_due"]);
+const VALID_STATUSES = new Set([
+  "trial",
+  "trialing",
+  "active",
+  "cancelled",
+  "canceled",
+  "past_due",
+  "expired",
+]);
 
 type RouteContext = { params: Promise<{ tenantId: string }> };
 
@@ -52,23 +65,64 @@ export async function PATCH(request: Request, context: RouteContext) {
       );
     }
 
-    const updates: Record<string, string> = {
+    const { data: existingTenant, error: existingTenantError } = await admin
+      .from("tenants")
+      .select("id,subscription_paid_staff_seats")
+      .eq("id", tenantId)
+      .maybeSingle();
+    if (existingTenantError) throw existingTenantError;
+    if (!existingTenant) {
+      return Response.json({ error: "Business not found." }, { status: 404 });
+    }
+
+    const planDefinition =
+      PLAN_DEFINITIONS[plan as keyof typeof PLAN_DEFINITIONS];
+    const maximumPaidSeats =
+      planDefinition.maxStaffSeats - planDefinition.includedStaffSeats;
+    const paidStaffSeats = Math.min(
+      Number(existingTenant.subscription_paid_staff_seats ?? 0),
+      maximumPaidSeats,
+    );
+    const amounts = calculateSubscriptionAmounts(
+      plan as keyof typeof PLAN_DEFINITIONS,
+      paidStaffSeats,
+    );
+    const updates: Record<string, unknown> = {
       plan,
       subscription_status: status,
+      subscription_base_amount: amounts.baseAmount,
+      subscription_seat_amount: amounts.seatAmount,
+      subscription_recurring_total: amounts.recurringTotal,
+      subscription_paid_staff_seats: paidStaffSeats,
+      subscription_updated_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
-    if (status === "trial") {
-      const days = trialDays ?? 14;
+    if (status === "trial" || status === "trialing") {
+      const days = trialDays ?? TRIAL_ENTITLEMENTS.lengthDays;
       updates.trial_ends_at = new Date(
         Date.now() + days * 86_400_000,
       ).toISOString();
+      updates.current_period_start = null;
+      updates.current_period_end = null;
+      updates.cancel_at_period_end = false;
+      updates.canceled_at = null;
+    } else if (status === "active") {
+      const periodStart = new Date();
+      const periodEnd = new Date(periodStart);
+      periodEnd.setUTCMonth(periodEnd.getUTCMonth() + 1);
+      updates.current_period_start = periodStart.toISOString();
+      updates.current_period_end = periodEnd.toISOString();
+      updates.cancel_at_period_end = false;
+      updates.canceled_at = null;
     }
 
     const { data: tenant, error: updateError } = await admin
       .from("tenants")
       .update(updates)
       .eq("id", tenantId)
-      .select("id, plan, subscription_status, trial_ends_at")
+      .select(
+        "id,plan,subscription_status,trial_ends_at,current_period_start,current_period_end,cancel_at_period_end,subscription_base_amount,subscription_seat_amount,subscription_recurring_total,subscription_paid_staff_seats",
+      )
       .maybeSingle();
     if (updateError) {
       const message =
@@ -93,6 +147,7 @@ export async function PATCH(request: Request, context: RouteContext) {
           plan: tenant.plan,
           subscriptionStatus: tenant.subscription_status,
           trialEndsAt: tenant.trial_ends_at,
+          currentPeriodEnd: tenant.current_period_end,
           source: "super_admin_testing_control",
         },
       });
@@ -105,6 +160,13 @@ export async function PATCH(request: Request, context: RouteContext) {
         plan: tenant.plan,
         subscriptionStatus: tenant.subscription_status,
         trialEndsAt: tenant.trial_ends_at ?? undefined,
+        currentPeriodStart: tenant.current_period_start ?? undefined,
+        currentPeriodEnd: tenant.current_period_end ?? undefined,
+        cancelAtPeriodEnd: tenant.cancel_at_period_end,
+        baseAmount: Number(tenant.subscription_base_amount ?? 0),
+        seatAmount: Number(tenant.subscription_seat_amount ?? 0),
+        recurringTotal: Number(tenant.subscription_recurring_total ?? 0),
+        paidStaffSeats: Number(tenant.subscription_paid_staff_seats ?? 0),
       },
     });
   } catch (error) {

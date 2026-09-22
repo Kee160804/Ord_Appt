@@ -19,7 +19,12 @@ import { Card, CardHeader, CardBody } from "../components/Card";
 import { Button } from "../components/Button";
 import { Input, Textarea } from "../components/input";
 import { formatCurrency, cn } from "../lib/utils";
-import { PLAN_DEFINITIONS, PLAN_ORDER, tenantHasFeature } from "../lib/plans";
+import {
+  PLAN_DEFINITIONS,
+  PLAN_ORDER,
+  calculateSubscriptionAmounts,
+  tenantHasFeature,
+} from "../lib/plans";
 import { PlanFeatureRequired } from "./PlanFeatureRequired";
 import { BusinessLogo } from "./BusinessLogo";
 import { TeamAccessView } from "./TeamAccessView";
@@ -34,9 +39,12 @@ import {
   updateOrderingSettings,
 } from "../services/settingsService";
 import {
+  cancelSubscriptionAtPeriodEnd,
+  getSubscriptionSummary,
   listBillingLedger,
-  runMockSubscriptionCheckout,
+  startSubscriptionCheckout,
   type BillingInvoice,
+  type SubscriptionSummary,
   type BillingTransaction,
 } from "../services/billingService";
 import type { Tenant, User } from "../types/index";
@@ -131,9 +139,19 @@ export function SettingsView({ tenant, user, onTenantUpdated }: Props) {
                 </CardBody>
               </Card>
             ))}
-          {active === "payments" && (
-            <PaymentsTab tenant={tenant} onTenantUpdated={onTenantUpdated} />
-          )}
+          {active === "payments" &&
+            (user.role === "owner" ? (
+              <PaymentsTab tenant={tenant} onTenantUpdated={onTenantUpdated} />
+            ) : (
+              <Card>
+                <CardBody>
+                  <p className="text-sm text-slate-400 light:text-slate-600">
+                    Only the business owner can manage the subscription and
+                    billing.
+                  </p>
+                </CardBody>
+              </Card>
+            ))}
           {active === "ordering" &&
             (tenant.businessType === "ordering" ? (
               <OrderingTab tenant={tenant} onTenantUpdated={onTenantUpdated} />
@@ -589,19 +607,28 @@ function StorefrontTab({
 
           <div className="relative flex aspect-[16/7] min-h-36 items-center justify-center overflow-hidden rounded-2xl border border-slate-600 bg-slate-800 light:border-slate-300 light:bg-slate-100">
             {(coverPreview || coverImage) && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={coverPreview || coverImage}
-                alt="Cover image framing preview"
-                className="absolute inset-0 h-full w-full object-cover"
-                style={{
-                  objectPosition: `${coverImagePositionX}% ${coverImagePositionY}%`,
-                  transform: `scale(${coverImageZoom / 100})`,
-                }}
-              />
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={coverPreview || coverImage}
+                  alt=""
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-0 h-full w-full scale-110 object-cover opacity-55 blur-xl"
+                />
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={coverPreview || coverImage}
+                  alt="Cover image framing preview"
+                  className="absolute inset-0 h-full w-full object-contain"
+                  style={{
+                    objectPosition: `${coverImagePositionX}% ${coverImagePositionY}%`,
+                    transform: `scale(${coverImageZoom / 100})`,
+                  }}
+                />
+              </>
             )}
             {(coverPreview || coverImage) && (
-              <div className="pointer-events-none absolute inset-0 bg-linear-to-b from-[#08111f]/10 to-[#08111f]/40" />
+              <div className="pointer-events-none absolute inset-0 bg-linear-to-b from-[#08111f]/5 to-[#08111f]/20" />
             )}
             {!coverPreview && !coverImage && (
               <div className="text-center text-slate-500">
@@ -923,17 +950,30 @@ function PaymentsTab({
 }) {
   const [transactions, setTransactions] = useState<BillingTransaction[]>([]);
   const [invoices, setInvoices] = useState<BillingInvoice[]>([]);
+  const [subscription, setSubscription] = useState<SubscriptionSummary | null>(
+    null,
+  );
   const [selectedPlan, setSelectedPlan] = useState(tenant.plan);
+  const [paidStaffSeats, setPaidStaffSeats] = useState(
+    tenant.subscriptionPaidStaffSeats ?? 0,
+  );
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const refresh = useCallback(async () => {
     setLoading(true);
+    setError("");
     try {
-      const ledger = await listBillingLedger(tenant.id);
+      const [ledger, currentSubscription] = await Promise.all([
+        listBillingLedger(tenant.id),
+        getSubscriptionSummary(tenant.id),
+      ]);
       setTransactions(ledger.transactions);
       setInvoices(ledger.invoices);
+      setSubscription(currentSubscription);
+      setSelectedPlan(currentSubscription.plan);
+      setPaidStaffSeats(currentSubscription.paidStaffSeats);
     } catch (loadError) {
       setError(
         loadError instanceof Error
@@ -952,14 +992,35 @@ function PaymentsTab({
     setError("");
     setMessage("");
     try {
-      const result = await runMockSubscriptionCheckout(tenant.id, selectedPlan);
+      const result = await startSubscriptionCheckout(
+        tenant.id,
+        selectedPlan,
+        paidStaffSeats,
+      );
+      if (result.status === "pending" && result.redirectUrl) {
+        window.location.assign(result.redirectUrl);
+        return;
+      }
+      const updated = result.subscription;
+      if (!updated) {
+        throw new Error("The payment provider returned no subscription.");
+      }
       onTenantUpdated({
         ...tenant,
-        plan: selectedPlan,
+        plan: updated.plan ?? selectedPlan,
         subscriptionStatus: "active",
+        currentPeriodStart: updated.currentPeriodStart,
+        currentPeriodEnd: updated.currentPeriodEnd,
+        cancelAtPeriodEnd: false,
+        subscriptionBaseAmount: updated.baseAmount,
+        subscriptionSeatAmount: updated.seatAmount,
+        subscriptionRecurringTotal: updated.recurringTotal,
+        subscriptionPaidStaffSeats: updated.paidStaffSeats,
       });
       setMessage(
-        `Mock payment ${result.paymentReference ?? ""} approved. No real money was processed.`,
+        result.isMock
+          ? "Development payment approved. No real money was processed."
+          : "Payment approved and subscription updated.",
       );
       await refresh();
     } catch (checkoutError) {
@@ -972,6 +1033,50 @@ function PaymentsTab({
       setProcessing(false);
     }
   };
+  const cancel = async () => {
+    if (
+      !window.confirm(
+        "Schedule cancellation for the end of the current billing period? Access will continue until then.",
+      )
+    ) {
+      return;
+    }
+    setProcessing(true);
+    setError("");
+    setMessage("");
+    try {
+      const updated = await cancelSubscriptionAtPeriodEnd(tenant.id);
+      setSubscription((current) =>
+        current
+          ? {
+              ...current,
+              cancelAtPeriodEnd: true,
+              currentPeriodEnd:
+                updated.currentPeriodEnd ?? current.currentPeriodEnd,
+            }
+          : current,
+      );
+      onTenantUpdated({ ...tenant, cancelAtPeriodEnd: true });
+      setMessage(
+        "Cancellation scheduled. Access remains active through the current period.",
+      );
+    } catch (cancelError) {
+      setError(
+        cancelError instanceof Error
+          ? cancelError.message
+          : "Unable to schedule cancellation.",
+      );
+    } finally {
+      setProcessing(false);
+    }
+  };
+  const selectedDefinition = PLAN_DEFINITIONS[selectedPlan];
+  const maximumPaidSeats =
+    selectedDefinition.maxStaffSeats - selectedDefinition.includedStaffSeats;
+  const selectedAmounts = calculateSubscriptionAmounts(
+    selectedPlan,
+    Math.min(paidStaffSeats, maximumPaidSeats),
+  );
   return (
     <div className="space-y-4">
       <Card>
@@ -981,12 +1086,42 @@ function PaymentsTab({
           </h3>
         </CardHeader>
         <CardBody className="space-y-4">
-          <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 p-3 text-xs text-amber-200 light:text-amber-800">
-            <strong>Mock payment mode.</strong> This exercises invoices, payment
-            records, and plan activation without collecting card details or
-            moving money. Replace the provider adapter when the bank supplies
-            its sandbox package.
-          </div>
+          {subscription && (
+            <div className="rounded-xl border border-slate-700 bg-slate-900/35 p-4 text-xs leading-5 light:border-slate-200 light:bg-slate-50">
+              <p>
+                Current status:{" "}
+                <strong className="capitalize">
+                  {subscription.status.replaceAll("_", " ")}
+                </strong>
+              </p>
+              <p className="text-slate-400 light:text-slate-600">
+                {PLAN_DEFINITIONS[subscription.plan].name}:{" "}
+                {formatCurrency(subscription.baseAmount)} base
+                {" + "}
+                {subscription.paidStaffSeats} paid seat
+                {subscription.paidStaffSeats === 1 ? "" : "s"} (
+                {formatCurrency(subscription.seatAmount)}){" = "}
+                <strong>
+                  {formatCurrency(subscription.recurringTotal)} / month
+                </strong>
+              </p>
+              {subscription.currentPeriodEnd && (
+                <p className="text-slate-400 light:text-slate-600">
+                  {subscription.cancelAtPeriodEnd
+                    ? "Cancels after"
+                    : "Current period ends"}{" "}
+                  {new Date(subscription.currentPeriodEnd).toLocaleDateString()}
+                  .
+                </p>
+              )}
+              {subscription.cancelAtPeriodEnd && (
+                <p className="mt-1 font-semibold text-amber-300 light:text-amber-700">
+                  Cancellation is scheduled; access remains available until the
+                  date above.
+                </p>
+              )}
+            </div>
+          )}
           <div className="grid gap-3 sm:grid-cols-3">
             {PLAN_ORDER.map((planId) => {
               const plan = PLAN_DEFINITIONS[planId];
@@ -994,7 +1129,15 @@ function PaymentsTab({
                 <button
                   type="button"
                   key={planId}
-                  onClick={() => setSelectedPlan(planId)}
+                  onClick={() => {
+                    setSelectedPlan(planId);
+                    setPaidStaffSeats((current) =>
+                      Math.min(
+                        current,
+                        plan.maxStaffSeats - plan.includedStaffSeats,
+                      ),
+                    );
+                  }}
                   className={cn(
                     "rounded-xl border p-4 text-left",
                     selectedPlan === planId
@@ -1017,11 +1160,56 @@ function PaymentsTab({
               );
             })}
           </div>
+          {maximumPaidSeats > 0 && (
+            <label className="block max-w-sm">
+              <span className="mb-1.5 block text-xs font-bold">
+                Additional staff seats ($2 BZD each / month)
+              </span>
+              <select
+                value={paidStaffSeats}
+                onChange={(event) =>
+                  setPaidStaffSeats(Number(event.target.value))
+                }
+                className="h-11 w-full rounded-xl border border-slate-600 bg-slate-900 px-3 text-sm text-white light:border-slate-300 light:bg-white light:text-slate-900"
+              >
+                {Array.from({ length: maximumPaidSeats + 1 }, (_, count) => (
+                  <option key={count} value={count}>
+                    {count} paid seat{count === 1 ? "" : "s"}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-[11px] text-slate-500">
+                {selectedDefinition.includedStaffSeats} staff included; up to{" "}
+                {selectedDefinition.maxStaffSeats} staff total.
+              </p>
+            </label>
+          )}
+          <div className="rounded-xl border border-violet-500/25 bg-violet-500/10 p-3 text-sm">
+            <span className="font-bold">
+              Monthly total: {formatCurrency(selectedAmounts.recurringTotal)}
+            </span>
+            {selectedAmounts.seatAmount > 0 && (
+              <span className="text-slate-400 light:text-slate-600">
+                {" "}
+                ({formatCurrency(selectedAmounts.baseAmount)} plan +{" "}
+                {formatCurrency(selectedAmounts.seatAmount)} seats)
+              </span>
+            )}
+          </div>
           {error && <p className="text-sm text-red-400">{error}</p>}
           {message && <p className="text-sm text-emerald-400">{message}</p>}
-          <Button type="button" loading={processing} onClick={checkout}>
-            Run Mock Checkout
-          </Button>
+          <div className="flex flex-wrap gap-3">
+            <Button type="button" loading={processing} onClick={checkout}>
+              Continue to secure checkout
+            </Button>
+            {subscription?.status === "active" &&
+              subscription.currentPeriodEnd &&
+              !subscription.cancelAtPeriodEnd && (
+                <Button type="button" disabled={processing} onClick={cancel}>
+                  Cancel at period end
+                </Button>
+              )}
+          </div>
         </CardBody>
       </Card>
       <Card>

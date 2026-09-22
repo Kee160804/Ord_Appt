@@ -183,10 +183,23 @@ function mapTenant(row: TenantRow): Tenant {
     subscriptionStatus:
       subscription === "active" ||
       subscription === "cancelled" ||
-      subscription === "past_due"
+      subscription === "canceled" ||
+      subscription === "past_due" ||
+      subscription === "expired" ||
+      subscription === "trialing"
         ? subscription
         : "trial",
     trialEndsAt: row.trial_ends_at ?? undefined,
+    currentPeriodStart: row.current_period_start ?? undefined,
+    currentPeriodEnd: row.current_period_end ?? undefined,
+    cancelAtPeriodEnd: row.cancel_at_period_end ?? false,
+    canceledAt: row.canceled_at ?? undefined,
+    providerCustomerId: row.provider_customer_id ?? undefined,
+    providerSubscriptionId: row.provider_subscription_id ?? undefined,
+    subscriptionBaseAmount: Number(row.subscription_base_amount ?? 0),
+    subscriptionSeatAmount: Number(row.subscription_seat_amount ?? 0),
+    subscriptionRecurringTotal: Number(row.subscription_recurring_total ?? 0),
+    subscriptionPaidStaffSeats: row.subscription_paid_staff_seats ?? 0,
   };
 }
 

@@ -2,6 +2,14 @@
 export type BusinessType = "appointment" | "ordering" | "retail";
 export type UserRole = "owner" | "admin" | "manager" | "staff" | "superadmin";
 export type PlanType = "starter" | "pro" | "enterprise";
+export type SubscriptionStatus =
+  | "trial"
+  | "trialing"
+  | "active"
+  | "past_due"
+  | "cancelled"
+  | "canceled"
+  | "expired";
 export type OrderStatus =
   | "pending"
   | "confirmed"
@@ -81,8 +89,18 @@ export interface Tenant {
   isActive: boolean;
   plan: PlanType;
   stripeConnected: boolean;
-  subscriptionStatus: "active" | "trial" | "cancelled" | "past_due";
+  subscriptionStatus: SubscriptionStatus;
   trialEndsAt?: string;
+  currentPeriodStart?: string;
+  currentPeriodEnd?: string;
+  cancelAtPeriodEnd?: boolean;
+  canceledAt?: string;
+  providerCustomerId?: string;
+  providerSubscriptionId?: string;
+  subscriptionBaseAmount?: number;
+  subscriptionSeatAmount?: number;
+  subscriptionRecurringTotal?: number;
+  subscriptionPaidStaffSeats?: number;
   monthlyRevenue?: number;
   orderingSettings?: OrderingSettings;
 }

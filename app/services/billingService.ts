@@ -1,6 +1,21 @@
 import { getSupabaseBrowserClient } from "@/app/lib/supabase/client";
 import type { PlanType } from "@/app/types";
 
+export interface SubscriptionSummary {
+  tenantId: string;
+  plan: PlanType;
+  status: string;
+  trialEndsAt?: string;
+  currentPeriodStart?: string;
+  currentPeriodEnd?: string;
+  cancelAtPeriodEnd: boolean;
+  canceledAt?: string;
+  baseAmount: number;
+  seatAmount: number;
+  recurringTotal: number;
+  paidStaffSeats: number;
+}
+
 export interface BillingTransaction {
   id: string;
   tenantId: string;
@@ -85,22 +100,60 @@ export async function listBillingLedger(tenantId?: string) {
   };
 }
 
-export async function runMockSubscriptionCheckout(
+export async function startSubscriptionCheckout(
   tenantId: string,
   plan: PlanType,
+  paidStaffSeats: number,
+  requestId: string = crypto.randomUUID(),
 ) {
-  const response = await fetch("/api/billing/mock-checkout", {
+  const response = await fetch("/api/billing/checkout", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ tenantId, plan }),
+    body: JSON.stringify({ tenantId, plan, paidStaffSeats, requestId }),
   });
   const result = (await response.json()) as {
     error?: string;
-    paymentReference?: string;
-    plan?: PlanType;
-    status?: string;
+    status?: "completed" | "pending";
+    isMock?: boolean;
+    redirectUrl?: string;
+    subscription?: SubscriptionSummary & {
+      paymentReference?: string;
+    };
   };
   if (!response.ok)
-    throw new Error(result.error || "Unable to complete mock checkout.");
+    throw new Error(
+      result.error || "Unable to complete subscription checkout.",
+    );
   return result;
+}
+
+export async function getSubscriptionSummary(tenantId: string) {
+  const response = await fetch(
+    `/api/billing/subscription?tenantId=${encodeURIComponent(tenantId)}`,
+    { cache: "no-store" },
+  );
+  const result = (await response.json()) as {
+    error?: string;
+    subscription?: SubscriptionSummary;
+  };
+  if (!response.ok || !result.subscription) {
+    throw new Error(result.error || "Unable to load subscription details.");
+  }
+  return result.subscription;
+}
+
+export async function cancelSubscriptionAtPeriodEnd(tenantId: string) {
+  const response = await fetch("/api/billing/subscription", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ tenantId, action: "cancel_at_period_end" }),
+  });
+  const result = (await response.json()) as {
+    error?: string;
+    subscription?: { cancelAtPeriodEnd?: boolean; currentPeriodEnd?: string };
+  };
+  if (!response.ok || !result.subscription) {
+    throw new Error(result.error || "Unable to schedule cancellation.");
+  }
+  return result.subscription;
 }
