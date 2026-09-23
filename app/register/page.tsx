@@ -303,7 +303,7 @@ export default function RegisterPage() {
           <Progress step={step} />
 
           <form onSubmit={handleSubmit} className="min-h-0 flex-1">
-            <section className="flex h-full flex-col overflow-hidden rounded-[20px] border border-[#273858] bg-[linear-gradient(145deg,rgba(17,29,51,0.98),rgba(9,19,36,0.98))] p-3 shadow-[0_30px_90px_rgba(0,0,0,0.35)] sm:p-4">
+            <section className="flex max-h-full flex-col overflow-hidden rounded-[20px] border border-[#273858] bg-[linear-gradient(145deg,rgba(17,29,51,0.98),rgba(9,19,36,0.98))] p-3 shadow-[0_30px_90px_rgba(0,0,0,0.35)] sm:p-4">
               {error && (
                 <div
                   role="alert"
