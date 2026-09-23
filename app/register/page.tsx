@@ -283,7 +283,7 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="flex h-dvh flex-col overflow-hidden bg-[#070b14] text-white">
+    <div className="flex h-dvh flex-col overflow-hidden bg-[#070b14] text-white transition-colors light:bg-slate-50 light:text-slate-950">
       <PublicHeader ctaHref="/login" ctaLabel="Sign In" />
       <main className="registration-shell pwa-page-safe relative min-h-0 flex-1 overflow-hidden px-3 py-2 sm:px-6">
         <div className="pointer-events-none absolute -left-16 -top-20 h-56 w-56 rounded-full bg-violet-700/30 blur-3xl" />
@@ -292,10 +292,10 @@ export default function RegisterPage() {
 
         <div className="relative mx-auto flex h-full w-full max-w-125 flex-col">
           <div className="mb-2 shrink-0 text-center">
-            <h1 className="text-3xl font-black tracking-tight text-white sm:text-[2rem]">
+            <h1 className="text-3xl font-black tracking-tight text-white sm:text-[2rem] light:text-slate-950">
               Mek yuh business
             </h1>
-            <p className="mt-1.5 text-sm text-[#8298c2] sm:text-base">
+            <p className="mt-1.5 text-sm text-[#8298c2] sm:text-base light:text-slate-600">
               Set up your digital storefront in minutes
             </p>
           </div>
@@ -303,12 +303,12 @@ export default function RegisterPage() {
           <Progress step={step} />
 
           <form onSubmit={handleSubmit} className="min-h-0 flex-1">
-            <section className="flex max-h-full flex-col overflow-hidden rounded-[20px] border border-[#273858] bg-[linear-gradient(145deg,rgba(17,29,51,0.98),rgba(9,19,36,0.98))] p-3 shadow-[0_30px_90px_rgba(0,0,0,0.35)] sm:p-4">
+            <section className="flex max-h-full flex-col overflow-hidden rounded-[20px] border border-[#273858] bg-[linear-gradient(145deg,rgba(17,29,51,0.98),rgba(9,19,36,0.98))] p-3 shadow-[0_30px_90px_rgba(0,0,0,0.35)] sm:p-4 light:border-slate-200 light:bg-none light:bg-white light:shadow-[0_24px_70px_rgba(15,23,42,0.12)]">
               {error && (
                 <div
                   role="alert"
                   aria-live="assertive"
-                  className="mb-3 shrink-0 rounded-xl border border-rose-500/40 bg-[#2a101d] px-4 py-2.5 text-sm text-rose-200 shadow-lg"
+                  className="mb-3 shrink-0 rounded-xl border border-rose-500/40 bg-[#2a101d] px-4 py-2.5 text-sm text-rose-200 shadow-lg light:bg-rose-50 light:text-rose-700"
                 >
                   {error}
                 </div>
@@ -359,7 +359,7 @@ export default function RegisterPage() {
                   <button
                     type="button"
                     onClick={goBack}
-                    className="flex h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-[#7990b8] text-sm font-bold text-slate-200 transition hover:border-violet-400 hover:bg-violet-500/10"
+                    className="flex h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-[#7990b8] text-sm font-bold text-slate-200 transition hover:border-violet-400 hover:bg-violet-500/10 light:border-slate-300 light:text-slate-700"
                   >
                     <ArrowLeft className="h-4 w-4" /> Back
                   </button>
@@ -389,16 +389,16 @@ export default function RegisterPage() {
           </form>
 
           <footer className="shrink-0 pb-1 pt-2 text-center">
-            <p className="text-sm text-[#91a4c6]">
+            <p className="text-sm text-[#91a4c6] light:text-slate-600">
               Already have an account?{" "}
               <Link
                 href="/login"
-                className="font-bold text-violet-400 transition hover:text-violet-300"
+                className="font-bold text-violet-400 transition hover:text-violet-300 light:text-violet-700 light:hover:text-violet-800"
               >
                 Sign in
               </Link>
             </p>
-            <p className="mt-2 text-xs text-[#536889]">
+            <p className="mt-2 text-xs text-[#536889] light:text-slate-500">
               <Link href="/privacy" className="hover:text-violet-300">
                 Privacy Policy
               </Link>{" "}
@@ -430,7 +430,9 @@ function Progress({ step }: { step: number }) {
               <span
                 className={cn(
                   "absolute right-1/2 top-3.5 h-px w-full",
-                  step > index ? "bg-emerald-400" : "bg-[#3a4c6b]",
+                  step > index
+                    ? "bg-emerald-400"
+                    : "bg-[#3a4c6b] light:bg-slate-300",
                 )}
               />
             )}
@@ -441,7 +443,7 @@ function Progress({ step }: { step: number }) {
                   ? "border-emerald-400 bg-emerald-500 text-white shadow-emerald-950/30"
                   : current
                     ? "border-violet-400 bg-violet-600 text-white shadow-violet-950/40"
-                    : "border-[#395174] bg-[#14233e] text-[#86a0c9]",
+                    : "border-[#395174] bg-[#14233e] text-[#86a0c9] light:border-slate-300 light:bg-white light:text-slate-500",
               )}
               aria-current={current ? "step" : undefined}
             >
@@ -450,7 +452,9 @@ function Progress({ step }: { step: number }) {
             <span
               className={cn(
                 "relative z-10 mt-2 text-xs",
-                current ? "font-bold text-white" : "text-[#91a4c6]",
+                current
+                  ? "font-bold text-white light:text-slate-950"
+                  : "text-[#91a4c6] light:text-slate-500",
               )}
             >
               {label}
@@ -565,17 +569,19 @@ function AccountStep({
           }
         />
       </div>
-      <div className="mt-3 rounded-xl border border-[#60769b] bg-[#101d33]/70 p-2.5">
-        <div className="flex items-center gap-2 text-sm font-bold text-fuchsia-300">
+      <div className="mt-3 rounded-xl border border-[#60769b] bg-[#101d33]/70 p-2.5 light:border-violet-200 light:bg-violet-50">
+        <div className="flex items-center gap-2 text-sm font-bold text-fuchsia-300 light:text-violet-700">
           <ShieldCheck className="h-5 w-5" /> Strong password keeps you safe
         </div>
-        <ul className="mt-2 space-y-1 pl-7 text-xs text-[#9cb0d1]">
+        <ul className="mt-2 space-y-1 pl-7 text-xs text-[#9cb0d1] light:text-slate-600">
           {passwordChecks.map((check) => (
             <li key={check.label} className="flex items-center gap-2">
               <Check
                 className={cn(
                   "h-3.5 w-3.5",
-                  check.valid ? "text-emerald-400" : "text-[#6480aa]",
+                  check.valid
+                    ? "text-emerald-400"
+                    : "text-[#6480aa] light:text-slate-400",
                 )}
               />
               {check.label}
@@ -612,7 +618,7 @@ function BusinessTypeStep({
               onClick={() => onSelect(option.type)}
               aria-pressed={active}
               className={cn(
-                "group w-full rounded-xl border bg-[#0d192c]/80 p-3 text-left transition",
+                "group w-full rounded-xl border bg-[#0d192c]/80 p-3 text-left transition light:bg-white",
                 option.theme === "violet" &&
                   "border-violet-600/80 hover:bg-violet-500/10",
                 option.theme === "orange" &&
@@ -621,10 +627,10 @@ function BusinessTypeStep({
                   "border-emerald-700/70 hover:bg-emerald-500/10",
                 active &&
                   (option.theme === "violet"
-                    ? "bg-violet-500/15 ring-1 ring-violet-400"
-                    : option.theme === "orange"
-                      ? "bg-orange-500/15 ring-1 ring-orange-400"
-                      : "bg-emerald-500/15 ring-1 ring-emerald-400"),
+                      ? "bg-violet-500/15 ring-1 ring-violet-400 light:bg-violet-50"
+                      : option.theme === "orange"
+                        ? "bg-orange-500/15 ring-1 ring-orange-400 light:bg-orange-50"
+                        : "bg-emerald-500/15 ring-1 ring-emerald-400 light:bg-emerald-50"),
               )}
             >
               <span className="flex items-center gap-4">
@@ -632,26 +638,26 @@ function BusinessTypeStep({
                   className={cn(
                     "flex h-11 w-11 shrink-0 items-center justify-center rounded-full border",
                     option.theme === "violet" &&
-                      "border-violet-500 bg-violet-700/60 text-violet-200",
+                      "border-violet-500 bg-violet-700/60 text-violet-200 light:bg-violet-100 light:text-violet-700",
                     option.theme === "orange" &&
-                      "border-orange-600 bg-orange-800/50 text-orange-300",
+                      "border-orange-600 bg-orange-800/50 text-orange-300 light:bg-orange-100 light:text-orange-700",
                     option.theme === "emerald" &&
-                      "border-emerald-600 bg-emerald-800/50 text-emerald-300",
+                      "border-emerald-600 bg-emerald-800/50 text-emerald-300 light:bg-emerald-100 light:text-emerald-700",
                   )}
                 >
                   <Icon className="h-6 w-6" />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block font-black text-white">
+                  <span className="block font-black text-white light:text-slate-950">
                     {option.label}
                   </span>
-                  <span className="mt-0.5 block text-xs leading-5 text-[#91a8ce]">
+                  <span className="mt-0.5 block text-xs leading-5 text-[#91a8ce] light:text-slate-600">
                     {option.description}
                   </span>
                 </span>
                 <span
                   className={cn(
-                    "flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#1b2846] transition group-hover:translate-x-0.5",
+                    "flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#1b2846] transition group-hover:translate-x-0.5 light:bg-slate-100 light:text-slate-600",
                     active && "bg-violet-600",
                   )}
                 >
@@ -669,11 +675,11 @@ function BusinessTypeStep({
                     className={cn(
                       "rounded-full border px-2.5 py-1 text-[10px]",
                       option.theme === "violet" &&
-                        "border-violet-700/70 bg-violet-950/70 text-violet-200",
+                        "border-violet-700/70 bg-violet-950/70 text-violet-200 light:border-violet-200 light:bg-violet-50 light:text-violet-700",
                       option.theme === "orange" &&
-                        "border-orange-700/70 bg-orange-950/60 text-orange-300",
+                        "border-orange-700/70 bg-orange-950/60 text-orange-300 light:border-orange-200 light:bg-orange-50 light:text-orange-700",
                       option.theme === "emerald" &&
-                        "border-emerald-700/70 bg-emerald-950/60 text-emerald-300",
+                        "border-emerald-700/70 bg-emerald-950/60 text-emerald-300 light:border-emerald-200 light:bg-emerald-50 light:text-emerald-700",
                     )}
                   >
                     {feature}
@@ -726,10 +732,10 @@ function BusinessDetailsStep({
 
       <div className="mt-3 grid grid-cols-[100px_minmax(0,1fr)] gap-3 sm:grid-cols-[120px_minmax(0,1fr)]">
         <div>
-          <label className="mb-2 block text-xs font-bold text-slate-200">
+          <label className="mb-2 block text-xs font-bold text-slate-200 light:text-slate-800">
             Business Logo
           </label>
-          <label className="flex h-16 cursor-pointer flex-col items-center justify-center overflow-hidden rounded-xl border border-dashed border-fuchsia-500 bg-violet-950/20 text-center transition hover:bg-violet-500/10">
+          <label className="flex h-16 cursor-pointer flex-col items-center justify-center overflow-hidden rounded-xl border border-dashed border-fuchsia-500 bg-violet-950/20 text-center transition hover:bg-violet-500/10 light:bg-violet-50">
             {logoPreview ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
@@ -743,7 +749,7 @@ function BusinessDetailsStep({
                 <span className="mt-2 text-xs font-bold text-fuchsia-400">
                   Upload logo
                 </span>
-                <span className="mt-1 text-[9px] text-[#91a4c6]">
+                <span className="mt-1 text-[9px] text-[#91a4c6] light:text-slate-500">
                   PNG, JPG (Max 2MB)
                 </span>
               </>
@@ -758,7 +764,7 @@ function BusinessDetailsStep({
             />
           </label>
           {logoName && (
-            <p className="mt-1 truncate text-[9px] text-[#7388aa]">
+            <p className="mt-1 truncate text-[9px] text-[#7388aa] light:text-slate-500">
               Preview: {logoName}
             </p>
           )}
@@ -774,25 +780,25 @@ function BusinessDetailsStep({
       </div>
 
       <div className="mt-3">
-        <label className="mb-2 block text-xs font-bold text-slate-200">
+        <label className="mb-2 block text-xs font-bold text-slate-200 light:text-slate-800">
           Custom domain
         </label>
-        <div className="flex h-10 min-w-0 overflow-hidden rounded-xl border border-[#41577b] bg-[#13213a] focus-within:border-violet-500 focus-within:ring-2 focus-within:ring-violet-500/20">
-          <span className="flex shrink-0 items-center border-r border-[#41577b] px-3 text-[#8196b9]">
-            <Link2 className="h-4 w-4 text-slate-300" />
+        <div className="flex h-10 min-w-0 overflow-hidden rounded-xl border border-[#41577b] bg-[#13213a] focus-within:border-violet-500 focus-within:ring-2 focus-within:ring-violet-500/20 light:border-slate-300 light:bg-white">
+          <span className="flex shrink-0 items-center border-r border-[#41577b] px-3 text-[#8196b9] light:border-slate-300 light:text-slate-500">
+            <Link2 className="h-4 w-4 text-slate-300 light:text-slate-500" />
           </span>
           <input
             aria-label="Custom domain prefix"
             value={form.slug}
             onChange={(event) => update("slug", event.target.value)}
             placeholder="your-business"
-            className="min-w-0 flex-1 bg-transparent px-3 text-base text-white outline-none placeholder:text-[#60769a] sm:text-sm"
+            className="min-w-0 flex-1 bg-transparent px-3 text-base text-white outline-none placeholder:text-[#60769a] sm:text-sm light:text-slate-950 light:placeholder:text-slate-400"
           />
-          <span className="flex shrink-0 items-center border-l border-[#41577b] bg-[#0f1b30] px-3 text-xs font-semibold text-[#a9b8d1]">
+          <span className="flex shrink-0 items-center border-l border-[#41577b] bg-[#0f1b30] px-3 text-xs font-semibold text-[#a9b8d1] light:border-slate-300 light:bg-slate-100 light:text-slate-600">
             .yuhbusiness.com
           </span>
         </div>
-        <p className="mt-1.5 text-[10px] text-[#7186aa]">
+        <p className="mt-1.5 text-[10px] text-[#7186aa] light:text-slate-500">
           We create this from your business name. You can edit the first part;
           .yuhbusiness.com stays fixed.
         </p>
@@ -818,13 +824,13 @@ function BusinessDetailsStep({
         />
       </div>
 
-      <div className="mt-3 flex gap-2 rounded-xl border border-fuchsia-600 bg-[linear-gradient(110deg,rgba(86,20,158,0.42),rgba(124,58,237,0.2))] p-2.5">
+      <div className="mt-3 flex gap-2 rounded-xl border border-fuchsia-600 bg-[linear-gradient(110deg,rgba(86,20,158,0.42),rgba(124,58,237,0.2))] p-2.5 light:border-violet-200 light:bg-none light:bg-violet-50">
         <Rocket className="mt-0.5 h-6 w-6 shrink-0 text-fuchsia-400" />
         <div>
-          <p className="text-sm font-black text-fuchsia-300">
+          <p className="text-sm font-black text-fuchsia-300 light:text-violet-700">
             You&apos;re almost done!
           </p>
-          <p className="mt-1 text-xs leading-4 text-violet-200/80">
+          <p className="mt-1 text-xs leading-4 text-violet-200/80 light:text-slate-600">
             Your {businessDescription} storefront will be live after signup.
             You&apos;ll get 14 days to explore all features. No credit card is
             required today.
@@ -832,7 +838,7 @@ function BusinessDetailsStep({
         </div>
       </div>
 
-      <label className="mt-2 flex cursor-pointer items-start gap-3 text-xs leading-5 text-slate-300">
+      <label className="mt-2 flex cursor-pointer items-start gap-3 text-xs leading-5 text-slate-300 light:text-slate-600">
         <input
           required
           type="checkbox"
@@ -861,7 +867,7 @@ function BusinessDetailsStep({
         </span>
       </label>
       {logoPreview && (
-        <p className="mt-2 flex items-center gap-2 text-[10px] leading-4 text-[#7186aa]">
+        <p className="mt-2 flex items-center gap-2 text-[10px] leading-4 text-[#7186aa] light:text-slate-500">
           <Upload className="h-3.5 w-3.5" /> Your selected logo will be saved to
           your business after your account is confirmed.
         </p>
@@ -885,8 +891,8 @@ function PanelHeading({
         <Icon className="h-7 w-7" />
       </div>
       <div className="pt-1">
-        <h2 className="text-lg font-black text-white">{title}</h2>
-        <p className="mt-1 text-sm leading-5 text-[#91a5c8]">{description}</p>
+        <h2 className="text-lg font-black text-white light:text-slate-950">{title}</h2>
+        <p className="mt-1 text-sm leading-5 text-[#91a5c8] light:text-slate-600">{description}</p>
       </div>
     </div>
   );
@@ -910,15 +916,15 @@ function FormField({
 }) {
   return (
     <label className="block">
-      <span className="mb-2 block text-xs font-bold text-slate-200">
+      <span className="mb-2 block text-xs font-bold text-slate-200 light:text-slate-800">
         {label}
       </span>
-      <span className="flex h-10 items-center rounded-xl border border-[#41577b] bg-[#13213a] px-3 transition focus-within:border-violet-500 focus-within:ring-2 focus-within:ring-violet-500/20">
-        <Icon className="mr-3 h-4 w-4 shrink-0 text-slate-300" />
+      <span className="flex h-10 items-center rounded-xl border border-[#41577b] bg-[#13213a] px-3 transition focus-within:border-violet-500 focus-within:ring-2 focus-within:ring-violet-500/20 light:border-slate-300 light:bg-white">
+        <Icon className="mr-3 h-4 w-4 shrink-0 text-slate-300 light:text-slate-500" />
         <input
           {...inputProps}
           onChange={(event) => onChange(event.target.value)}
-          className="min-w-0 flex-1 bg-transparent text-base text-white outline-none placeholder:text-[#60769a] sm:text-sm"
+          className="min-w-0 flex-1 bg-transparent text-base text-white outline-none placeholder:text-[#60769a] sm:text-sm light:text-slate-950 light:placeholder:text-slate-400"
         />
         {action}
       </span>
@@ -941,7 +947,7 @@ function VisibilityButton({
       type="button"
       onClick={onClick}
       aria-label={`${visible ? "Hide" : "Show"} ${label}`}
-      className="ml-2 rounded-md p-1 text-slate-300 transition hover:bg-white/5 hover:text-white"
+      className="ml-2 rounded-md p-1 text-slate-300 transition hover:bg-white/5 hover:text-white light:text-slate-500 light:hover:bg-slate-100 light:hover:text-slate-950"
     >
       <Icon className="h-4 w-4" />
     </button>
@@ -965,17 +971,17 @@ function ConfirmationPanel({
         <Mail className="h-8 w-8" />
       </div>
       <h2 className="mt-5 text-2xl font-black">Check your email</h2>
-      <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-[#91a5c8]">
+      <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-[#91a5c8] light:text-slate-600">
         {message}
       </p>
-      <p className="mt-3 break-all text-sm font-bold text-violet-300">
+      <p className="mt-3 break-all text-sm font-bold text-violet-300 light:text-violet-700">
         {email}
       </p>
       <button
         type="button"
         disabled={resending}
         onClick={onResend}
-        className="mt-6 rounded-xl border border-violet-500 px-5 py-2.5 text-sm font-bold text-violet-200 transition hover:bg-violet-500/10 disabled:opacity-50"
+        className="mt-6 rounded-xl border border-violet-500 px-5 py-2.5 text-sm font-bold text-violet-200 transition hover:bg-violet-500/10 disabled:opacity-50 light:text-violet-700"
       >
         {resending ? "Resending..." : "Resend confirmation email"}
       </button>

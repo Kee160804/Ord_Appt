@@ -217,6 +217,14 @@ body {
   transition: background-color 9999s ease-out 0s;
 }
 
+html.light .registration-shell input:-webkit-autofill,
+html.light .registration-shell input:-webkit-autofill:hover,
+html.light .registration-shell input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #0f172a;
+  caret-color: #0f172a;
+  box-shadow: 0 0 0 1000px #ffffff inset;
+}
+
 button,
 input,
 textarea,

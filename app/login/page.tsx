@@ -250,7 +250,7 @@ export default function LoginPage() {
 
         <section className="relative flex items-center justify-center px-4 py-8 sm:px-8 lg:px-10">
           <span className="pointer-events-none absolute right-0 top-1/4 h-80 w-80 rounded-full bg-violet-700/10 blur-3xl" />
-          <div className="relative w-full max-w-2xl rounded-3xl border border-[#2b3c58] bg-[linear-gradient(145deg,rgba(15,28,48,0.94),rgba(7,15,27,0.96))] p-5 shadow-[0_30px_100px_rgba(0,0,0,0.38)] sm:p-8 lg:p-9 light:border-slate-200 light:bg-white">
+          <div className="relative w-full max-w-2xl rounded-3xl border border-[#2b3c58] bg-[linear-gradient(145deg,rgba(15,28,48,0.94),rgba(7,15,27,0.96))] p-5 shadow-[0_30px_100px_rgba(0,0,0,0.38)] sm:p-8 lg:p-9 light:border-slate-200 light:bg-none light:bg-white light:shadow-[0_30px_100px_rgba(15,23,42,0.14)]">
             <div className="mb-7 flex items-center gap-3">
               <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-linear-to-br from-violet-500 to-purple-700 text-white shadow-lg shadow-violet-900/30">
                 <Sparkles className="h-5 w-5" />
