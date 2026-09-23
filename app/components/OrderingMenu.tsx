@@ -18,12 +18,17 @@ import {
 } from "lucide-react";
 import { Button } from "@/app/components/Button";
 import { Modal } from "@/app/components/Modal";
+import { StorefrontOffers } from "@/app/components/StorefrontOffers";
 import { Input, Select } from "@/app/components/input";
+import {
+  MAX_PROMOTION_CODE_LENGTH,
+  normalizePromotionCode,
+} from "@/app/lib/promotions";
 import { formatCurrency } from "@/app/lib/utils";
 import { isSupabaseConfigured } from "@/app/lib/supabase/config";
 import { createPublicOrder } from "@/app/services/orderService";
 import { validatePromotion } from "@/app/services/businessToolsService";
-import { Product, Tenant } from "@/app/types/index";
+import { Product, PublicPromotion, Tenant } from "@/app/types/index";
 
 interface CartItem {
   id: string;
@@ -76,6 +81,7 @@ interface OrderingMenuProps {
   tenant: Tenant;
   products: Product[];
   categories: { id: string; name: string }[];
+  promotions?: PublicPromotion[];
   onAddToCart: (item: CartItem) => void;
   cart: CartItem[];
   updateCart: (items: CartItem[]) => void;
@@ -151,6 +157,7 @@ export function OrderingMenu({
   tenant,
   products,
   categories,
+  promotions = [],
   onAddToCart,
   cart,
   updateCart,
@@ -269,7 +276,7 @@ export function OrderingMenu({
       "dine_in" | "pickup" | "delivery"
     >,
     taxRate: 10,
-    discountEnabled: true,
+    discountEnabled: false,
     discountThreshold: 100,
     discountRate: 5,
     minimumOrder: 0,
@@ -734,37 +741,48 @@ export function OrderingMenu({
             }}
             role="button"
             tabIndex={0}
-            className="group relative mb-6 block h-52 w-full overflow-hidden rounded-2xl border border-[#26344a] bg-[#10192a] text-left shadow-[0_20px_70px_rgba(0,0,0,0.2)] sm:h-56 light:border-slate-200 light:bg-white"
+            className="group relative mb-6 block h-52 w-full overflow-hidden rounded-[1.35rem] border border-violet-500/55 bg-[#0a1322] p-1.5 text-left shadow-[0_22px_70px_rgba(0,0,0,0.38),0_0_32px_rgba(124,58,237,0.08)] transition-colors sm:h-56 light:border-white light:bg-white light:shadow-[0_18px_55px_rgba(15,23,42,0.16)]"
             aria-label={`View ${tenant.name} gallery`}
           >
-            <Image
-              src={tenant.coverImage || PLACEHOLDER_IMG}
-              alt=""
-              fill
-              sizes="(max-width: 1280px) 100vw, 900px"
-              className="pointer-events-none object-cover opacity-55 blur-xl scale-110"
-              aria-hidden="true"
-              unoptimized
-            />
-            <Image
-              src={tenant.coverImage || PLACEHOLDER_IMG}
-              alt={tenant.name}
-              fill
-              sizes="(max-width: 1280px) 100vw, 900px"
-              className="object-contain transition duration-500"
-              style={{
-                objectPosition: `${tenant.coverImagePositionX ?? 50}% ${tenant.coverImagePositionY ?? 50}%`,
-                transform: `scale(${(tenant.coverImageZoom ?? 100) / 100})`,
-              }}
-              priority
-              unoptimized
-              onError={(event) => {
-                (event.target as HTMLImageElement).src = PLACEHOLDER_IMG;
-              }}
-            />
-            <span className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,10,20,0.46)_0%,rgba(7,11,24,0.24)_43%,rgba(18,10,44,0.06)_72%,rgba(18,8,42,0.02)_100%)]" />
-            <span className="absolute inset-y-0 left-0 flex max-w-[78%] flex-col justify-center px-6 sm:px-9">
-              <span className="text-3xl font-black leading-[1.08] tracking-[-0.035em] text-white [text-shadow:0_2px_12px_rgba(0,0,0,0.72)] sm:text-4xl">
+            <span className="absolute inset-1.5 overflow-hidden rounded-[1rem] bg-[#111827] light:bg-[#f8fafc]">
+              <Image
+                src={tenant.coverImage || PLACEHOLDER_IMG}
+                alt=""
+                fill
+                sizes="(max-width: 1280px) 100vw, 900px"
+                className="pointer-events-none object-cover opacity-80 blur-sm"
+                style={{
+                  objectPosition: `${tenant.coverImagePositionX ?? 50}% ${tenant.coverImagePositionY ?? 50}%`,
+                  transform: `scale(${Math.max(100, tenant.coverImageZoom ?? 100) / 100})`,
+                }}
+                aria-hidden="true"
+                unoptimized
+              />
+              <Image
+                src={tenant.coverImage || PLACEHOLDER_IMG}
+                alt={tenant.name}
+                fill
+                sizes="(max-width: 1280px) 100vw, 900px"
+                className="object-contain object-right transition duration-500"
+                style={{
+                  objectPosition: `${tenant.coverImagePositionX ?? 50}% ${tenant.coverImagePositionY ?? 50}%`,
+                  WebkitMaskImage:
+                    "linear-gradient(to right, transparent 0%, transparent 54%, rgba(0,0,0,0.18) 63%, rgba(0,0,0,0.62) 74%, black 88%)",
+                  maskImage:
+                    "linear-gradient(to right, transparent 0%, transparent 54%, rgba(0,0,0,0.18) 63%, rgba(0,0,0,0.62) 74%, black 88%)",
+                }}
+                priority
+                unoptimized
+                onError={(event) => {
+                  (event.target as HTMLImageElement).src = PLACEHOLDER_IMG;
+                }}
+              />
+              <span className="absolute inset-y-0 left-0 w-[48%] bg-[#091322]/96 [clip-path:polygon(0_0,100%_0,78%_100%,0_100%)] light:bg-transparent" />
+              <span className="absolute inset-0 bg-[linear-gradient(90deg,#091322_0%,rgba(9,19,34,0.92)_34%,rgba(9,19,34,0.48)_50%,rgba(9,19,34,0.14)_64%,transparent_76%)] light:bg-[linear-gradient(90deg,#ffffff_0%,rgba(255,255,255,0.94)_32%,rgba(255,255,255,0.50)_50%,rgba(255,255,255,0.12)_66%,transparent_78%)]" />
+              <span className="absolute inset-0 bg-black/5 light:bg-white/5" />
+            </span>
+            <span className="absolute inset-y-1.5 left-1.5 flex max-w-[82%] flex-col justify-center px-5 sm:max-w-[42%] sm:px-9">
+              <span className="text-3xl font-black leading-[1.08] tracking-[-0.035em] text-white [text-shadow:0_2px_12px_rgba(0,0,0,0.72)] sm:text-4xl light:text-[#171b24] light:[text-shadow:none]">
                 {isRetail ? "Fresh Styles" : "Good Food"}
                 <br />
                 {isRetail ? (
@@ -777,11 +795,28 @@ export function OrderingMenu({
                   </>
                 )}
               </span>
-              <span className="mt-3 max-w-sm text-xs leading-5 text-white/90 [text-shadow:0_1px_8px_rgba(0,0,0,0.75)] sm:text-sm">
+              <span className="mt-3 max-w-sm text-xs leading-5 text-slate-300 [text-shadow:0_1px_8px_rgba(0,0,0,0.75)] sm:text-sm light:text-slate-600 light:[text-shadow:none]">
                 {tenant.description}
               </span>
             </span>
           </span>
+          <StorefrontOffers
+            promotions={promotions}
+            automaticDiscount={
+              orderingSettings.discountEnabled &&
+              orderingSettings.discountRate > 0
+                ? {
+                    rate: orderingSettings.discountRate,
+                    threshold: orderingSettings.discountThreshold,
+                  }
+                : undefined
+            }
+            onSelectCode={(code) => {
+              setPromotionCode(code);
+              setAppliedPromotion(null);
+              setOrderError("");
+            }}
+          />
           <div className="mb-4 flex items-center gap-3">
             <h2 className="sr-only">
               {catalogLabel} for {tenant.name}
@@ -974,7 +1009,7 @@ export function OrderingMenu({
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-3">
                   <h3 className="text-lg font-black text-white light:text-slate-950">
-                    Order Summary
+                    Cart
                   </h3>
                   {itemCount > 0 && (
                     <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-violet-600 px-1.5 text-[11px] font-black text-white">
@@ -1163,9 +1198,10 @@ export function OrderingMenu({
                   <div className="flex gap-2">
                     <input
                       value={promotionCode}
+                      maxLength={MAX_PROMOTION_CODE_LENGTH}
                       onChange={(event) => {
                         setPromotionCode(
-                          event.target.value.toUpperCase().replace(/\s/g, ""),
+                          normalizePromotionCode(event.target.value),
                         );
                         setAppliedPromotion(null);
                       }}
@@ -1383,9 +1419,10 @@ export function OrderingMenu({
                   <div className="flex gap-2">
                     <input
                       value={promotionCode}
+                      maxLength={MAX_PROMOTION_CODE_LENGTH}
                       onChange={(event) => {
                         setPromotionCode(
-                          event.target.value.toUpperCase().replace(/\s/g, ""),
+                          normalizePromotionCode(event.target.value),
                         );
                         setAppliedPromotion(null);
                       }}

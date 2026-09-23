@@ -10,6 +10,7 @@ const files = {
   bookingApi: "app/api/public/bookings/route.ts",
   promotionApi: "app/api/public/promotions/route.ts",
   contactApi: "app/api/public/contact/route.ts",
+  privacyApi: "app/api/privacy/requests/route.ts",
 };
 
 test("admin provisioning uses cryptographic randomness and does not return credentials", async () => {
@@ -32,11 +33,12 @@ test("every mutating public route applies origin, body, and rate-limit checks", 
     files.bookingApi,
     files.promotionApi,
     files.contactApi,
+    files.privacyApi,
   ]) {
     const source = await readFile(path, "utf8");
     assert.match(source, /requestHasAllowedOrigin/);
     assert.match(source, /readJsonBody/);
-    assert.match(source, /enforcePublicRateLimit/);
+    assert.match(source, /enforce(?:Public|Platform)RateLimit/);
     assert.match(source, /rateLimitResponse/);
     assert.match(source, /getSupabaseAdminClient/);
     assert.doesNotMatch(source, /getSupabasePublicClient/);

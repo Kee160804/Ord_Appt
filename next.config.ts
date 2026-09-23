@@ -245,6 +245,15 @@ const nextConfig: NextConfig = {
   },
 
   /**
+   * Abort superseded React Server Component refreshes cleanly during HMR.
+   * Without this, Next 16.3 can report an expected browser cancellation as
+   * "The destination stream closed early" and race an App Router refresh.
+   */
+  experimental: {
+    serverComponentsHmrCancellation: true,
+  },
+
+  /**
    * ------------------------------------------------------------------------
    * Next.js Image Optimization
    * ------------------------------------------------------------------------

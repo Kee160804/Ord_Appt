@@ -17,6 +17,11 @@ that every operational compliance task is complete.
 - Legal links on the marketing, login, registration, and invitation surfaces.
 - Clear disclosure that mock payments do not move money or collect card data.
 - Legal pages included in the public sitemap.
+- A rate-limited public privacy-request form with reference codes and Resend
+  acknowledgements.
+- A protected super-admin request queue with identity-verification state,
+  target dates, resolution notes, and an append-only case event trail.
+- A documented privacy operations and incident-response runbook.
 
 ## Required before accepting real payments
 
@@ -50,8 +55,9 @@ table.
    roles, and retention period for each processing activity.
 3. Execute appropriate processor/vendor agreements and document international
    transfer safeguards.
-4. Establish verified workflows for access, correction, erasure, objection,
-   consent withdrawal, export, and business-to-platform privacy requests.
+4. Operate and periodically test the implemented workflow for access,
+   correction, erasure, objection, restriction, consent withdrawal, export,
+   and business-to-platform privacy requests.
 5. Establish record-specific retention schedules and automated deletion or
    anonymisation where appropriate. Ensure backup expiry follows the schedule.
 6. Maintain an incident-response plan covering containment, investigation,

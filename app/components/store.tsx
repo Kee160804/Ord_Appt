@@ -33,6 +33,7 @@ import type {
   Tenant,
   Service,
   Product,
+  PublicPromotion,
   PublicServiceProvider,
 } from "@/app/types/index";
 
@@ -102,6 +103,7 @@ interface StorefrontClientProps {
   initialServices?: Service[];
   initialProviders?: PublicServiceProvider[];
   initialReviews?: BusinessReview[];
+  initialPromotions?: PublicPromotion[];
   viewOnly?: boolean;
 }
 
@@ -112,6 +114,7 @@ export default function StorefrontClient({
   initialServices,
   initialProviders = [],
   initialReviews = [],
+  initialPromotions = [],
   viewOnly = false,
 }: StorefrontClientProps) {
   const extendedTenant = tenant as ExtendedTenant;
@@ -449,6 +452,7 @@ export default function StorefrontClient({
                     services={services}
                     providers={initialProviders}
                     reviews={initialReviews}
+                    promotions={initialPromotions}
                     viewOnly={viewOnly}
                   />
                 ) : (
@@ -456,6 +460,7 @@ export default function StorefrontClient({
                     tenant={tenant}
                     products={products}
                     categories={categories}
+                    promotions={initialPromotions}
                     onAddToCart={handleAddToCart}
                     cart={cart}
                     updateCart={setCart}

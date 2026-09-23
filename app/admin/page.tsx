@@ -24,6 +24,7 @@ import {
   CreditCard,
   Eye,
   EyeOff,
+  FileLock2,
   FileClock,
   Filter,
   Handshake,
@@ -45,6 +46,7 @@ import {
   UsersRound,
   X,
 } from "lucide-react";
+import { AdminPrivacyRequests } from "@/app/components/AdminPrivacyRequests";
 import { useAuth } from "@/app/contexts/auth";
 import { PLATFORM } from "@/app/lib/platform";
 import { useTheme } from "@/app/contexts/theme";
@@ -78,6 +80,7 @@ type AdminView =
   | "roles"
   | "analytics"
   | "activity"
+  | "privacy"
   | "billing"
   | "settings"
   | "integrations";
@@ -95,6 +98,7 @@ const NAVIGATION: NavigationItem[] = [
   { id: "roles", label: "Access Oversight", icon: ShieldCheck },
   { id: "analytics", label: "System Analytics", icon: Activity },
   { id: "activity", label: "Activity Logs", icon: FileClock },
+  { id: "privacy", label: "Privacy Requests", icon: FileLock2 },
   { id: "billing", label: "Billing & Plans", icon: CreditCard },
   { id: "settings", label: "Settings", icon: Settings },
   { id: "integrations", label: "Integrations", icon: Handshake },
@@ -225,6 +229,7 @@ export default function AdminPage() {
               isLoading={isLoading}
             />
           )}
+          {activeView === "privacy" && <AdminPrivacyRequests />}
           {activeView === "billing" && (
             <AdminBillingView tenants={platformData.tenants} />
           )}

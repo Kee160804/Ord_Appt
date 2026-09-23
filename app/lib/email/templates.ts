@@ -15,6 +15,7 @@ export type TransactionalEmailEvent =
   | "APPOINTMENT_CANCELLED"
   | "APPOINTMENT_REMINDER"
   | "CONTACT_FORM_MESSAGE"
+  | "PRIVACY_REQUEST_RECEIVED"
   | "TRIAL_EXPIRING"
   | "TRIAL_EXPIRED"
   | "SUBSCRIPTION_ACTIVATED"
@@ -334,6 +335,24 @@ export function buildTransactionalEmail(
         ["Subject", stringValue(payload, "message_subject")],
       ]) +
       `<div style="margin-top:18px;padding:18px;border-radius:14px;background:#f8fafc;color:#334155;font-size:14px;line-height:1.7;white-space:pre-wrap">${escapeHtml(stringValue(payload, "message"))}</div>`;
+  } else if (input.eventType === "PRIVACY_REQUEST_RECEIVED") {
+    const reference = stringValue(payload, "reference_code");
+    subject =
+      input.subject?.trim() || `Privacy request received · ${reference}`;
+    title = "We received your privacy request";
+    preview = `Keep reference ${reference} for future communication.`;
+    content =
+      paragraph(
+        `Hi ${name}, YuhBusiness recorded your request. This acknowledgement does not verify identity or guarantee deletion of records that must be retained for security, transactions, disputes, or legal obligations.`,
+      ) +
+      detailRows([
+        ["Reference", reference],
+        ["Request", stringValue(payload, "request_type").replaceAll("_", " ")],
+        ["Submitted", dateTime(stringValue(payload, "submitted_at"))],
+      ]) +
+      paragraph(
+        "We may contact you from privacy@yuhbusiness.com if identity or request details must be verified.",
+      );
   } else if (
     input.eventType === "TRIAL_EXPIRING" ||
     input.eventType === "TRIAL_EXPIRED"

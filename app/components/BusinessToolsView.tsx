@@ -17,6 +17,12 @@ import { Button } from "@/app/components/Button";
 import { Card, CardBody, CardHeader } from "@/app/components/Card";
 import { Input, Select, Textarea } from "@/app/components/input";
 import { Modal } from "@/app/components/Modal";
+import { storefrontUrl as canonicalStorefrontUrl } from "@/app/lib/platform";
+import {
+  isValidPromotionCode,
+  MAX_PROMOTION_CODE_LENGTH,
+  normalizePromotionCode,
+} from "@/app/lib/promotions";
 import { listProducts } from "@/app/services/productService";
 import { listServices } from "@/app/services/serviceService";
 import {
@@ -122,11 +128,8 @@ export function BusinessToolsView({ tenant }: { tenant: Tenant }) {
   const [message, setMessage] = useState("");
 
   const storefrontUrl = useMemo(
-    () =>
-      typeof window === "undefined"
-        ? `/store-front/${tenant.slug}`
-        : `${window.location.origin}/store-front/${tenant.slug}`,
-    [tenant.slug],
+    () => canonicalStorefrontUrl(tenant.slug, tenant.domain),
+    [tenant.domain, tenant.slug],
   );
   const reload = useCallback(async () => {
     setIsLoading(true);
@@ -214,6 +217,24 @@ export function BusinessToolsView({ tenant }: { tenant: Tenant }) {
       promotionForm.discountValue <= 0
     )
       return setError("Code, name, and a positive discount are required.");
+    if (!isValidPromotionCode(promotionForm.code)) {
+      return setError(
+        "Codes must be 2–32 characters using letters, numbers, hyphens, or underscores.",
+      );
+    }
+    if (
+      promotionForm.discountType === "PERCENTAGE" &&
+      promotionForm.discountValue > 100
+    ) {
+      return setError("Percentage discounts cannot exceed 100%.");
+    }
+    if (
+      promotionForm.startsAt &&
+      promotionForm.endsAt &&
+      new Date(promotionForm.endsAt) <= new Date(promotionForm.startsAt)
+    ) {
+      return setError("The promotion end date must be after its start date.");
+    }
     setIsSaving(true);
     setError("");
     try {
@@ -934,10 +955,11 @@ export function BusinessToolsView({ tenant }: { tenant: Tenant }) {
                 label="Code"
                 placeholder="WELCOME10"
                 value={promotionForm.code}
+                maxLength={MAX_PROMOTION_CODE_LENGTH}
                 onChange={(event) =>
                   setPromotionForm({
                     ...promotionForm,
-                    code: event.target.value.toUpperCase().replace(/\s/g, ""),
+                    code: normalizePromotionCode(event.target.value),
                   })
                 }
               />

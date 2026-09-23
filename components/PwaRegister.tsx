@@ -10,7 +10,9 @@ export function PwaRegister() {
 
     // A development worker can outlive `next dev` and make localhost serve
     // stale production responses. Keep service workers production-only and
-    // clean up any worker/cache left behind by an earlier local build.
+    // clean up any worker/cache left behind by an earlier local build. Wait
+    // until the initial document has loaded so this cleanup cannot compete
+    // with App Router initialization or hydration.
     if (process.env.NODE_ENV !== "production") {
       const clearDevelopmentPwaState = async () => {
         const registrations = await navigator.serviceWorker.getRegistrations();
@@ -28,10 +30,21 @@ export function PwaRegister() {
         }
       };
 
-      void clearDevelopmentPwaState().catch((error) => {
-        console.warn("Unable to clear local PWA state:", error);
-      });
-      return;
+      const handleDevelopmentLoad = () => {
+        void clearDevelopmentPwaState().catch((error) => {
+          console.warn("Unable to clear local PWA state:", error);
+        });
+      };
+
+      if (document.readyState === "complete") {
+        handleDevelopmentLoad();
+      } else {
+        window.addEventListener("load", handleDevelopmentLoad, { once: true });
+      }
+
+      return () => {
+        window.removeEventListener("load", handleDevelopmentLoad);
+      };
     }
 
     const registerServiceWorker = async () => {

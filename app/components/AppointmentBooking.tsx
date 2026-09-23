@@ -19,8 +19,15 @@ import { isSupabaseConfigured } from "@/app/lib/supabase/config";
 import { Button } from "@/app/components/Button";
 import { Input } from "@/app/components/input";
 import { Modal } from "@/app/components/Modal";
+import { StorefrontOffers } from "@/app/components/StorefrontOffers";
+import {
+  MAX_PROMOTION_CODE_LENGTH,
+  normalizePromotionCode,
+} from "@/app/lib/promotions";
+import { validatePromotion } from "@/app/services/businessToolsService";
 import type {
   BusinessReview,
+  PublicPromotion,
   PublicServiceProvider,
   Service,
   Tenant,
@@ -38,6 +45,7 @@ interface AppointmentBookingProps {
   services: Service[];
   providers?: PublicServiceProvider[];
   reviews?: BusinessReview[];
+  promotions?: PublicPromotion[];
   viewOnly?: boolean;
 }
 
@@ -110,6 +118,7 @@ export function AppointmentBooking({
   services,
   providers = [],
   reviews = [],
+  promotions = [],
   viewOnly = false,
 }: AppointmentBookingProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -135,6 +144,12 @@ export function AppointmentBooking({
   const [availabilityError, setAvailabilityError] = useState("");
   const [selectedProviderId, setSelectedProviderId] = useState("");
   const [promotionCode, setPromotionCode] = useState("");
+  const [appliedPromotion, setAppliedPromotion] = useState<{
+    code: string;
+    name: string;
+    discountAmount: number;
+  } | null>(null);
+  const [isApplyingPromotion, setIsApplyingPromotion] = useState(false);
 
   const calendarDays = useMemo(
     () => buildCalendarDays(currentMonth),
@@ -164,6 +179,9 @@ export function AppointmentBooking({
       setSelectedTime(null);
     }
   }, [eligibleProviders, selectedProviderId]);
+  useEffect(() => {
+    setAppliedPromotion(null);
+  }, [selectedServiceId]);
   useEffect(() => {
     if (
       viewOnly ||
@@ -294,6 +312,38 @@ export function AppointmentBooking({
     setBookingOpen(true);
   };
 
+  const applyPromotion = async () => {
+    if (!selectedService || !promotionCode.trim()) return;
+    setIsApplyingPromotion(true);
+    setBookingError("");
+    try {
+      const validated = await validatePromotion(
+        tenant.id,
+        promotionCode,
+        selectedService.price,
+        [],
+        selectedService.id,
+      );
+      setAppliedPromotion({
+        code: validated.code,
+        name: validated.name,
+        discountAmount: Math.min(
+          selectedService.price,
+          validated.discountAmount,
+        ),
+      });
+    } catch (promotionError) {
+      setAppliedPromotion(null);
+      setBookingError(
+        promotionError instanceof Error
+          ? promotionError.message
+          : "That discount code is not valid.",
+      );
+    } finally {
+      setIsApplyingPromotion(false);
+    }
+  };
+
   const submitBooking = async () => {
     if (viewOnly) {
       setBookingError(
@@ -336,10 +386,6 @@ export function AppointmentBooking({
     const customerEmail = customer.email.trim().toLowerCase();
     const customerPhone = customer.phone.trim();
     const bookingNotes = concerns.trim();
-    const normalizedPromotionCode = promotionCode
-      .trim()
-      .toUpperCase()
-      .replace(/\s/g, "");
 
     if (customerName.length < 2 || customerName.length > 120) {
       setBookingError("Enter a valid full name.");
@@ -361,8 +407,13 @@ export function AppointmentBooking({
       return;
     }
 
-    if (normalizedPromotionCode.length > 100) {
-      setBookingError("The discount code is too long.");
+    if (
+      promotionCode.trim() &&
+      appliedPromotion?.code !== normalizePromotionCode(promotionCode)
+    ) {
+      setBookingError(
+        "Apply the discount code before requesting the appointment.",
+      );
       return;
     }
 
@@ -391,7 +442,7 @@ export function AppointmentBooking({
         notes: bookingNotes,
         providerId:
           eligibleProviders.length > 0 ? selectedProviderId : undefined,
-        promotionCode: normalizedPromotionCode || undefined,
+        promotionCode: appliedPromotion?.code,
         paymentMethod,
       });
 
@@ -409,6 +460,7 @@ export function AppointmentBooking({
       setConcerns("");
       setSelectedProviderId("");
       setPromotionCode("");
+      setAppliedPromotion(null);
       setPaymentMethod("pay_later");
     } catch (submitError) {
       setBookingError(
@@ -444,6 +496,14 @@ export function AppointmentBooking({
           )}
         </div>
       )}
+      <StorefrontOffers
+        promotions={promotions}
+        onSelectCode={(code) => {
+          setPromotionCode(code);
+          setAppliedPromotion(null);
+          setBookingError("");
+        }}
+      />
       <div className="grid min-w-0 grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_340px] xl:items-start">
         {/* Left sidebar: Calendar, Time slots, Notes */}
         <aside
@@ -1093,7 +1153,22 @@ export function AppointmentBooking({
               {selectedService?.duration ?? 0} min
             </p>
             <p className="mt-1 font-semibold">
-              {formatCurrency(selectedService?.price ?? 0)}
+              {appliedPromotion ? (
+                <>
+                  <span className="mr-2 text-violet-300 line-through">
+                    {formatCurrency(selectedService?.price ?? 0)}
+                  </span>
+                  {formatCurrency(
+                    Math.max(
+                      0,
+                      (selectedService?.price ?? 0) -
+                        appliedPromotion.discountAmount,
+                    ),
+                  )}
+                </>
+              ) : (
+                formatCurrency(selectedService?.price ?? 0)
+              )}
             </p>
           </div>
           <Input
@@ -1147,17 +1222,39 @@ export function AppointmentBooking({
               className="w-full resize-none rounded-xl border border-slate-700 bg-slate-800 px-3 py-2.5 text-sm text-white outline-none placeholder:text-slate-500 focus:border-violet-500"
             />
           </div>
-          <Input
-            label="Discount Code (optional)"
-            value={promotionCode}
-            maxLength={100}
-            onChange={(event) =>
-              setPromotionCode(
-                event.target.value.toUpperCase().replace(/\s/g, ""),
-              )
-            }
-            placeholder="WELCOME10"
-          />
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-slate-300">
+              Discount Code (optional)
+            </label>
+            <div className="flex gap-2">
+              <input
+                value={promotionCode}
+                maxLength={MAX_PROMOTION_CODE_LENGTH}
+                onChange={(event) => {
+                  setPromotionCode(normalizePromotionCode(event.target.value));
+                  setAppliedPromotion(null);
+                }}
+                placeholder="WELCOME10"
+                className="min-w-0 flex-1 rounded-xl border border-slate-700 bg-slate-800 px-3 py-2.5 text-sm text-white outline-none placeholder:text-slate-500 focus:border-violet-500"
+              />
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                loading={isApplyingPromotion}
+                disabled={!selectedService || !promotionCode.trim()}
+                onClick={() => void applyPromotion()}
+              >
+                Apply
+              </Button>
+            </div>
+            {appliedPromotion && (
+              <p className="mt-1.5 text-xs text-emerald-400">
+                {appliedPromotion.name} applied · You save{" "}
+                {formatCurrency(appliedPromotion.discountAmount)}
+              </p>
+            )}
+          </div>
           <div>
             <label className="mb-1.5 block text-sm font-medium text-slate-300">
               Payment

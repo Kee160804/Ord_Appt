@@ -1375,6 +1375,125 @@ export type Database = {
           },
         ];
       };
+      privacy_request_events: {
+        Row: {
+          actor_profile_id: string | null;
+          created_at: string;
+          event_type: string;
+          id: string;
+          new_value: string | null;
+          notes: string | null;
+          old_value: string | null;
+          request_id: string;
+        };
+        Insert: {
+          actor_profile_id?: string | null;
+          created_at?: string;
+          event_type: string;
+          id?: string;
+          new_value?: string | null;
+          notes?: string | null;
+          old_value?: string | null;
+          request_id: string;
+        };
+        Update: {
+          actor_profile_id?: string | null;
+          created_at?: string;
+          event_type?: string;
+          id?: string;
+          new_value?: string | null;
+          notes?: string | null;
+          old_value?: string | null;
+          request_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "privacy_request_events_actor_profile_id_fkey";
+            columns: ["actor_profile_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "privacy_request_events_request_id_fkey";
+            columns: ["request_id"];
+            isOneToOne: false;
+            referencedRelation: "privacy_requests";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      privacy_requests: {
+        Row: {
+          acknowledgement_message_id: string | null;
+          assigned_to: string | null;
+          business_reference: string | null;
+          created_at: string;
+          details: string;
+          id: string;
+          identity_status: string;
+          identity_verified_at: string | null;
+          reference_code: string;
+          relationship: string;
+          request_type: string;
+          requester_email: string;
+          requester_name: string;
+          resolution_notes: string | null;
+          resolved_at: string | null;
+          status: string;
+          target_due_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          acknowledgement_message_id?: string | null;
+          assigned_to?: string | null;
+          business_reference?: string | null;
+          created_at?: string;
+          details: string;
+          id?: string;
+          identity_status?: string;
+          identity_verified_at?: string | null;
+          reference_code: string;
+          relationship: string;
+          request_type: string;
+          requester_email: string;
+          requester_name: string;
+          resolution_notes?: string | null;
+          resolved_at?: string | null;
+          status?: string;
+          target_due_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          acknowledgement_message_id?: string | null;
+          assigned_to?: string | null;
+          business_reference?: string | null;
+          created_at?: string;
+          details?: string;
+          id?: string;
+          identity_status?: string;
+          identity_verified_at?: string | null;
+          reference_code?: string;
+          relationship?: string;
+          request_type?: string;
+          requester_email?: string;
+          requester_name?: string;
+          resolution_notes?: string | null;
+          resolved_at?: string | null;
+          status?: string;
+          target_due_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "privacy_requests_assigned_to_fkey";
+            columns: ["assigned_to"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       products: {
         Row: {
           addons: Json;
@@ -2623,6 +2742,15 @@ export type Database = {
         Returns: Json;
       };
       claim_email_jobs: { Args: { p_limit?: number }; Returns: Json[] };
+      check_platform_public_rate_limit: {
+        Args: {
+          p_action: string;
+          p_fingerprint: string;
+          p_limit: number;
+          p_window_seconds: number;
+        };
+        Returns: Json;
+      };
       create_additional_owner_business: {
         Args: {
           p_business_name: string;
@@ -2727,6 +2855,25 @@ export type Database = {
           total: number;
         }[];
       };
+      create_public_retail_order_v2: {
+        Args: {
+          p_customer_email: string;
+          p_customer_name: string;
+          p_customer_phone: string;
+          p_items: Json;
+          p_notes?: string;
+          p_payment_method?: string;
+          p_promotion_code?: string;
+          p_tenant_id: string;
+        };
+        Returns: {
+          order_id: string;
+          order_number: string;
+          payment_reference: string;
+          payment_status: string;
+          total: number;
+        }[];
+      };
       create_team_invitation: {
         Args: { p_email: string; p_role_name: string; p_tenant_id: string };
         Returns: Json;
@@ -2780,6 +2927,20 @@ export type Database = {
         };
         Returns: {
           appointment_time: string;
+        }[];
+      };
+      list_public_storefront_promotions: {
+        Args: { p_tenant_id: string };
+        Returns: {
+          applicable_product_ids: string[];
+          applicable_service_ids: string[];
+          code: string;
+          discount_type: string;
+          discount_value: number;
+          ends_at: string;
+          id: string;
+          name: string;
+          starts_at: string;
         }[];
       };
       get_tenant_crm_summary: { Args: { p_tenant_id: string }; Returns: Json };

@@ -1271,7 +1271,7 @@ function OrderingTab({
     paused: false,
     orderTypes: ["dine_in", "pickup", "delivery"] as const,
     taxRate: 10,
-    discountEnabled: true,
+    discountEnabled: false,
     discountThreshold: 100,
     discountRate: 5,
     minimumOrder: 0,

@@ -45,6 +45,18 @@ export interface BusinessReview {
   createdAt: string;
 }
 
+export interface PublicPromotion {
+  id: string;
+  code: string;
+  name: string;
+  discountType: "PERCENTAGE" | "FIXED";
+  discountValue: number;
+  startsAt?: string;
+  endsAt?: string;
+  applicableProductIds: string[];
+  applicableServiceIds: string[];
+}
+
 export interface OrderingSettings {
   enabled: boolean;
   paused: boolean;

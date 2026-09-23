@@ -1,4 +1,5 @@
 import { getSupabaseAdminClient } from "@/app/lib/supabase/admin";
+import { isValidPromotionCode } from "@/app/lib/promotions";
 
 import {
   enforcePublicRateLimit,
@@ -112,7 +113,7 @@ export async function POST(request: Request): Promise<Response> {
        5. VALIDATE TENANT + PROMOTION CODE
        --------------------------------------------------------------------- */
 
-    if (!isValidUuid(tenantId) || !/^[A-Z0-9_-]{2,32}$/.test(code)) {
+    if (!isValidUuid(tenantId) || !isValidPromotionCode(code)) {
       return json(
         {
           error: "Invalid discount code.",

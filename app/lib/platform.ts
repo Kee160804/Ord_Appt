@@ -1,3 +1,5 @@
+import { appRootDomain } from "@/app/lib/tenant";
+
 export const PLATFORM = {
   name: "YuhBusiness",
   currency: "BZD",
@@ -79,4 +81,33 @@ export function authCallbackUrl(nextPath: string, fallbackOrigin?: string) {
 
 export function storefrontPath(slug: string) {
   return `/store-front/${encodeURIComponent(slug)}`;
+}
+
+export function storefrontUrl(slug: string, customDomain?: string) {
+  if (customDomain?.trim()) {
+    return `https://${customDomain.trim().toLowerCase()}`;
+  }
+
+  const appUrl = publicAppUrl() || PRODUCTION_APP_ORIGIN;
+  const rootDomain = appRootDomain(appUrl);
+  const normalizedSlug = slug.trim().toLowerCase();
+
+  if (
+    rootDomain &&
+    rootDomain !== "localhost" &&
+    !rootDomain.endsWith(".localhost") &&
+    !rootDomain.endsWith(".vercel.app") &&
+    /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(normalizedSlug)
+  ) {
+    try {
+      const protocol =
+        new URL(appUrl).protocol === "http:" ? "http:" : "https:";
+      return `${protocol}//${normalizedSlug}.${rootDomain}`;
+    } catch {
+      // Fall through to a valid production path when hosting configuration is malformed.
+    }
+  }
+
+  const safeAppUrl = validHttpOrigin(appUrl) || PRODUCTION_APP_ORIGIN;
+  return `${safeAppUrl}${storefrontPath(slug)}`;
 }

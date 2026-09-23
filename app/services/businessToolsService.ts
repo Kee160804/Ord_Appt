@@ -1,4 +1,5 @@
 import { requireSupabaseBrowserClient as client } from "@/app/lib/supabase/client";
+import { isValidPromotionCode } from "@/app/lib/promotions";
 
 export interface ServiceProvider {
   id: string;
@@ -265,9 +266,35 @@ export async function savePromotion(
   tenantId: string,
   promotion: Omit<Promotion, "tenantId" | "usageCount">,
 ) {
+  const code = promotion.code.trim().toUpperCase();
+  if (!isValidPromotionCode(code)) {
+    throw new Error(
+      "Promotion codes must be 2–32 characters using letters, numbers, hyphens, or underscores.",
+    );
+  }
+  if (!promotion.name.trim()) throw new Error("Promotion name is required.");
+  if (
+    !Number.isFinite(promotion.discountValue) ||
+    promotion.discountValue <= 0
+  ) {
+    throw new Error("Enter a positive discount value.");
+  }
+  if (
+    promotion.discountType === "PERCENTAGE" &&
+    promotion.discountValue > 100
+  ) {
+    throw new Error("Percentage discounts cannot exceed 100%.");
+  }
+  if (
+    promotion.startsAt &&
+    promotion.endsAt &&
+    new Date(promotion.endsAt) <= new Date(promotion.startsAt)
+  ) {
+    throw new Error("The promotion end date must be after its start date.");
+  }
   const values = {
     tenant_id: tenantId,
-    code: promotion.code.trim().toUpperCase(),
+    code,
     name: promotion.name.trim(),
     discount_type: promotion.discountType,
     discount_value: promotion.discountValue,

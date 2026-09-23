@@ -6,6 +6,7 @@ import type {
   BusinessReview,
   Category,
   Product,
+  PublicPromotion,
   PublicServiceProvider,
   Service,
   Tenant,
@@ -27,11 +28,13 @@ export interface PublicStorefrontData {
   services: Service[];
   providers: PublicServiceProvider[];
   reviews: BusinessReview[];
+  promotions: PublicPromotion[];
 }
 
 export interface PublicStorefrontEntry {
   slug: string;
   updatedAt: string;
+  customDomain?: string;
 }
 
 type PublicOrderingSettingsRow = {
@@ -48,6 +51,18 @@ type PublicOrderingSettingsRow = {
   preparation_minutes: number | null;
   ordering_open_time: string | null;
   ordering_close_time: string | null;
+};
+
+type PublicPromotionRow = {
+  id: string;
+  code: string;
+  name: string;
+  discount_type: string;
+  discount_value: number | string;
+  starts_at: string | null;
+  ends_at: string | null;
+  applicable_product_ids: string[] | null;
+  applicable_service_ids: string[] | null;
 };
 
 const DAYS = [
@@ -169,7 +184,7 @@ export async function listPublicStorefrontEntries(): Promise<
   if (!supabase) return [];
   const { data, error } = await supabase
     .from("tenants")
-    .select("slug, updated_at")
+    .select("slug, updated_at, custom_domain, custom_domain_verified_at")
     .eq("is_active", true)
     .eq("status", "ACTIVE")
     .order("updated_at", { ascending: false })
@@ -177,12 +192,15 @@ export async function listPublicStorefrontEntries(): Promise<
   if (error) throw error;
   return (data ?? [])
     .filter(
-      (row): row is { slug: string; updated_at: string | null } =>
+      (row): row is typeof row & { slug: string } =>
         typeof row.slug === "string" && row.slug.trim().length > 0,
     )
     .map((row) => ({
       slug: row.slug,
       updatedAt: row.updated_at ?? new Date().toISOString(),
+      customDomain: row.custom_domain_verified_at
+        ? (row.custom_domain ?? undefined)
+        : undefined,
     }));
 }
 
@@ -225,6 +243,7 @@ export async function getPublicStorefront(
     assignmentsResult,
     orderingSettingsResult,
     reviewsResult,
+    promotionsResult,
   ] = await Promise.all([
     supabase
       .from("business_hours")
@@ -286,6 +305,9 @@ export async function getPublicStorefront(
       .eq("is_published", true)
       .order("created_at", { ascending: false })
       .range(0, PUBLIC_REVIEW_LIMIT - 1),
+    supabase.rpc("list_public_storefront_promotions", {
+      p_tenant_id: tenantRow.id,
+    }),
   ]);
 
   /**
@@ -343,7 +365,7 @@ export async function getPublicStorefront(
       ["dine_in", "pickup", "delivery"].includes(value),
     ),
     taxRate: percentage(ordering.tax_rate, 10),
-    discountEnabled: ordering.discount_enabled !== false,
+    discountEnabled: ordering.discount_enabled === true,
     discountThreshold: nonNegativeNumber(ordering.discount_threshold, 100),
     discountRate: percentage(ordering.discount_rate, 5),
     minimumOrder: nonNegativeNumber(ordering.minimum_order, 0),
@@ -450,5 +472,25 @@ export async function getPublicStorefront(
         };
       },
     ),
+    promotions: (promotionsResult.error
+      ? []
+      : (promotionsResult.data ?? [])
+    ).map((raw: unknown) => {
+      const row = raw as PublicPromotionRow;
+      return {
+        id: row.id,
+        code: row.code,
+        name: row.name,
+        discountType:
+          row.discount_type === "FIXED"
+            ? ("FIXED" as const)
+            : ("PERCENTAGE" as const),
+        discountValue: nonNegativeNumber(row.discount_value, 0),
+        startsAt: row.starts_at ?? undefined,
+        endsAt: row.ends_at ?? undefined,
+        applicableProductIds: row.applicable_product_ids ?? [],
+        applicableServiceIds: row.applicable_service_ids ?? [],
+      };
+    }),
   };
 }

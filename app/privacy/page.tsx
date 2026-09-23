@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { LegalDocument } from "@/app/components/LegalDocument";
-import { LEGAL_EFFECTIVE_DATE, PRIVACY_CONTACT_EMAIL } from "@/app/lib/legal";
+import { PRIVACY_CONTACT_EMAIL, PRIVACY_EFFECTIVE_DATE } from "@/app/lib/legal";
 
 export const metadata: Metadata = {
   title: "Privacy Policy | YuhBusiness",
@@ -13,7 +14,7 @@ export default function PrivacyPage() {
     <LegalDocument
       title="Privacy Policy"
       summary="This policy explains how personal data is handled when businesses use YuhBusiness and when customers place orders, request appointments, or contact those businesses."
-      effectiveDate={LEGAL_EFFECTIVE_DATE}
+      effectiveDate={PRIVACY_EFFECTIVE_DATE}
     >
       <section>
         <h2>1. Who this policy covers</h2>
@@ -176,6 +177,11 @@ export default function PrivacyPage() {
             {PRIVACY_CONTACT_EMAIL}
           </a>
           . We may need to verify identity before completing a request.
+        </p>
+        <p>
+          You may also use the secure{" "}
+          <Link href="/privacy/request">privacy request form</Link> to receive a
+          reference code and place the request in our review queue.
         </p>
       </section>
 

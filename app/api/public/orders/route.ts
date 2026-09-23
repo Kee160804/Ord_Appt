@@ -9,6 +9,7 @@ import {
   readJsonBody,
   requestHasAllowedOrigin,
 } from "@/app/lib/server/security";
+import { isValidPromotionCode } from "@/app/lib/promotions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,7 +28,6 @@ const MAX_PHONE_LENGTH = 40;
 const MAX_ADDRESS_LENGTH = 500;
 const MAX_INSTRUCTIONS_LENGTH = 1_000;
 const MAX_NOTES_LENGTH = 2_000;
-const MAX_PROMOTION_CODE_LENGTH = 100;
 const MAX_TABLE_NUMBER_LENGTH = 50;
 
 /**
@@ -327,7 +327,7 @@ export async function POST(request: Request): Promise<Response> {
 
     const notes = body.notes?.trim() || null;
 
-    const promotionCode = body.promotionCode?.trim() || null;
+    const promotionCode = body.promotionCode?.trim().toUpperCase() || null;
 
     if (deliveryAddress && deliveryAddress.length > MAX_ADDRESS_LENGTH) {
       return json(
@@ -359,7 +359,7 @@ export async function POST(request: Request): Promise<Response> {
       );
     }
 
-    if (promotionCode && promotionCode.length > MAX_PROMOTION_CODE_LENGTH) {
+    if (promotionCode && !isValidPromotionCode(promotionCode)) {
       return json(
         {
           error: "The promotion code is invalid.",
@@ -525,24 +525,26 @@ export async function POST(request: Request): Promise<Response> {
        Ordering businesses use create_public_order_v3.
        ====================================================================== */
 
-    let { data, error } =
-      tenant.business_type === "retail"
-        ? await supabase.rpc("create_public_retail_order", {
-            p_tenant_id: payload.p_tenant_id,
+    const isRetail = tenant.business_type === "retail";
+    let { data, error } = isRetail
+      ? await supabase.rpc("create_public_retail_order_v2", {
+          p_tenant_id: payload.p_tenant_id,
 
-            p_customer_name: payload.p_customer_name,
+          p_customer_name: payload.p_customer_name,
 
-            p_customer_email: payload.p_customer_email,
+          p_customer_email: payload.p_customer_email,
 
-            p_customer_phone: payload.p_customer_phone,
+          p_customer_phone: payload.p_customer_phone,
 
-            p_items: payload.p_items,
+          p_items: payload.p_items,
 
-            p_notes: payload.p_notes,
+          p_notes: payload.p_notes,
 
-            p_payment_method: payload.p_payment_method,
-          })
-        : await supabase.rpc("create_public_order_v3", payload);
+          p_promotion_code: payload.p_promotion_code,
+
+          p_payment_method: payload.p_payment_method,
+        })
+      : await supabase.rpc("create_public_order_v3", payload);
 
     /* ======================================================================
        14. ROLLING-DEPLOYMENT COMPATIBILITY
@@ -553,24 +555,37 @@ export async function POST(request: Request): Promise<Response> {
        migrated. It supports fewer fields than the v3 endpoint.
        ====================================================================== */
 
+    if (error?.code === "PGRST202" && isRetail && promotionCode) {
+      return json(
+        {
+          error:
+            "Promotion checkout is being updated. Please try again shortly.",
+        },
+        503,
+      );
+    }
+
     if (error?.code === "PGRST202") {
-      const fallback = await supabase.rpc("create_public_order_with_email", {
-        p_tenant_id: payload.p_tenant_id,
-
-        p_customer_name: payload.p_customer_name,
-
-        p_customer_email: payload.p_customer_email,
-
-        p_customer_phone: payload.p_customer_phone,
-
-        p_order_type: payload.p_order_type,
-
-        p_items: payload.p_items,
-
-        p_notes: payload.p_notes,
-
-        p_promotion_code: payload.p_promotion_code,
-      });
+      const fallback = isRetail
+        ? await supabase.rpc("create_public_retail_order", {
+            p_tenant_id: payload.p_tenant_id,
+            p_customer_name: payload.p_customer_name,
+            p_customer_email: payload.p_customer_email,
+            p_customer_phone: payload.p_customer_phone,
+            p_items: payload.p_items,
+            p_notes: payload.p_notes,
+            p_payment_method: payload.p_payment_method,
+          })
+        : await supabase.rpc("create_public_order_with_email", {
+            p_tenant_id: payload.p_tenant_id,
+            p_customer_name: payload.p_customer_name,
+            p_customer_email: payload.p_customer_email,
+            p_customer_phone: payload.p_customer_phone,
+            p_order_type: payload.p_order_type,
+            p_items: payload.p_items,
+            p_notes: payload.p_notes,
+            p_promotion_code: payload.p_promotion_code,
+          });
 
       data = fallback.data;
       error = fallback.error;

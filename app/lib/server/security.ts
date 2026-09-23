@@ -319,6 +319,84 @@ export async function enforcePublicRateLimit(
   }
 }
 
+/**
+ * Enforces a distributed limit for public platform actions that are not yet
+ * associated with a tenant, such as a privacy-rights request.
+ */
+export async function enforcePlatformRateLimit(
+  request: Request,
+  action: string,
+  identity: string,
+  limit: number,
+  windowSeconds: number,
+): Promise<PublicRateLimitResult> {
+  const normalizedAction = action.trim();
+
+  if (
+    !normalizedAction ||
+    !Number.isInteger(limit) ||
+    limit <= 0 ||
+    !Number.isInteger(windowSeconds) ||
+    windowSeconds <= 0
+  ) {
+    console.error("[platform-rate-limit] Invalid limiter configuration.");
+    return {
+      allowed: false,
+      retryAfter: DEFAULT_RATE_LIMIT_RETRY_SECONDS,
+    };
+  }
+
+  const fingerprint = requestFingerprint(request, identity);
+
+  try {
+    const { getSupabaseAdminClient } = await import("@/app/lib/supabase/admin");
+    const { data, error } = await getSupabaseAdminClient().rpc(
+      "check_platform_public_rate_limit",
+      {
+        p_action: normalizedAction,
+        p_fingerprint: fingerprint,
+        p_limit: limit,
+        p_window_seconds: windowSeconds,
+      },
+    );
+
+    if (error) throw error;
+    if (!data || typeof data !== "object" || Array.isArray(data)) {
+      throw new Error("Rate-limit RPC returned an invalid response.");
+    }
+
+    const result = data as {
+      allowed?: unknown;
+      retryAfter?: unknown;
+      retry_after?: unknown;
+    };
+    if (typeof result.allowed !== "boolean") {
+      throw new Error("Rate-limit RPC did not return a valid allowed flag.");
+    }
+
+    const rawRetryAfter = result.retryAfter ?? result.retry_after ?? 0;
+    const parsedRetryAfter = Number(rawRetryAfter);
+    return {
+      allowed: result.allowed,
+      retryAfter:
+        Number.isFinite(parsedRetryAfter) && parsedRetryAfter > 0
+          ? Math.ceil(parsedRetryAfter)
+          : result.allowed
+            ? 0
+            : Math.max(1, windowSeconds),
+    };
+  } catch (error) {
+    console.error(
+      "[platform-rate-limit] Distributed rate limiter unavailable.",
+      error,
+    );
+    if (process.env.NODE_ENV !== "production") {
+      return { allowed: true, retryAfter: 0 };
+    }
+    return { allowed: false, retryAfter: Math.max(1, windowSeconds) };
+  }
+}
+
 export function rateLimitResponse(retryAfter: number) {
   const safeRetryAfter =
     Number.isFinite(retryAfter) && retryAfter > 0

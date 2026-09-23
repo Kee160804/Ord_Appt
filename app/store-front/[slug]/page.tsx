@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import StorefrontClient from "@/app/components/store";
 import { getTenantBySlug } from "@/app/lib/data";
 import { isSupabaseConfigured } from "@/app/lib/supabase/config";
-import { publicAppUrl, storefrontPath } from "@/app/lib/platform";
+import { storefrontUrl } from "@/app/lib/platform";
 import { getPublicStorefront } from "@/app/services/storefrontService";
 import {
   getCategoriesByTenant,
@@ -39,8 +39,65 @@ function storefrontDescription(
 }
 
 function canonicalStorefrontUrl(slug: string, customDomain?: string) {
-  if (customDomain) return `https://${customDomain}`;
-  return `${publicAppUrl() || "https://yuhbusiness.com"}${storefrontPath(slug)}`;
+  return storefrontUrl(slug, customDomain);
+}
+
+function storefrontStructuredData(
+  storefront: NonNullable<Awaited<ReturnType<typeof getPublicStorefront>>>,
+) {
+  const { tenant } = storefront;
+  const url = canonicalStorefrontUrl(tenant.slug, tenant.domain);
+  const sameAs = Object.values(tenant.socialLinks).filter(
+    (value): value is string =>
+      typeof value === "string" && /^https?:\/\//i.test(value),
+  );
+  const openingHoursSpecification = tenant.businessHours
+    .filter((hours) => !hours.closed && hours.open && hours.close)
+    .map((hours) => ({
+      "@type": "OpeningHoursSpecification",
+      dayOfWeek: `https://schema.org/${hours.day}`,
+      opens: hours.open,
+      closes: hours.close,
+    }));
+
+  return {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "LocalBusiness",
+        "@id": `${url}/#business`,
+        name: tenant.name,
+        url,
+        description: storefrontDescription(tenant.name, tenant.description),
+        image: tenant.coverImage || tenant.logoImage || undefined,
+        logo: tenant.logoImage || undefined,
+        telephone: tenant.phone || undefined,
+        email: tenant.email || undefined,
+        address:
+          tenant.address || tenant.city
+            ? {
+                "@type": "PostalAddress",
+                streetAddress: tenant.address || undefined,
+                addressLocality: tenant.city || undefined,
+                addressCountry: "BZ",
+              }
+            : undefined,
+        openingHoursSpecification:
+          openingHoursSpecification.length > 0
+            ? openingHoursSpecification
+            : undefined,
+        sameAs: sameAs.length > 0 ? sameAs : undefined,
+      },
+      {
+        "@type": "WebSite",
+        "@id": `${url}/#website`,
+        name: tenant.name,
+        url,
+        publisher: { "@id": `${url}/#business` },
+        inLanguage: "en-BZ",
+      },
+    ],
+  };
 }
 
 /**
@@ -232,16 +289,26 @@ export default async function StorePage({
   if (isSupabaseConfigured()) {
     const storefront = await getPublicStorefront(slug);
     if (!storefront) notFound();
+    const structuredData = storefrontStructuredData(storefront);
 
     return (
-      <StorefrontClient
-        tenant={storefront.tenant}
-        initialCategories={storefront.categories}
-        initialProducts={storefront.products}
-        initialServices={storefront.services}
-        initialProviders={storefront.providers}
-        initialReviews={storefront.reviews}
-      />
+      <>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(structuredData).replaceAll("<", "\\u003c"),
+          }}
+        />
+        <StorefrontClient
+          tenant={storefront.tenant}
+          initialCategories={storefront.categories}
+          initialProducts={storefront.products}
+          initialServices={storefront.services}
+          initialProviders={storefront.providers}
+          initialReviews={storefront.reviews}
+          initialPromotions={storefront.promotions}
+        />
+      </>
     );
   }
 

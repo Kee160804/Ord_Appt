@@ -37,7 +37,10 @@ async function customDomainSlug(hostname: string) {
 
 export async function proxy(request: NextRequest) {
   const sessionResponse = await updateSession(request);
-  if (request.nextUrl.pathname !== "/" || sessionResponse.status >= 300) {
+  const storefrontSystemPath = ["/", "/robots.txt", "/sitemap.xml"].includes(
+    request.nextUrl.pathname,
+  );
+  if (!storefrontSystemPath || sessionResponse.status >= 300) {
     return sessionResponse;
   }
 
@@ -54,7 +57,10 @@ export async function proxy(request: NextRequest) {
   if (!slug) return sessionResponse;
 
   const storefrontUrl = request.nextUrl.clone();
-  storefrontUrl.pathname = `/store-front/${encodeURIComponent(slug)}`;
+  storefrontUrl.pathname =
+    request.nextUrl.pathname === "/"
+      ? `/store-front/${encodeURIComponent(slug)}`
+      : `/store-front/${encodeURIComponent(slug)}${request.nextUrl.pathname}`;
   const rewriteResponse = NextResponse.rewrite(storefrontUrl);
   for (const cookie of sessionResponse.cookies.getAll()) {
     rewriteResponse.cookies.set(cookie);

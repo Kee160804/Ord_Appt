@@ -1,19 +1,10 @@
 "use client";
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { useAuth } from "@/app/contexts/auth";
 import { TopBar } from "@/app/components/TopBar";
 import { DashboardOverview } from "@/app/components/DashboardOverview";
 
 export default function DashboardPage() {
   const { user, tenant, isLoading } = useAuth();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (!isLoading && !user) {
-      router.push("/login");
-    }
-  }, [isLoading, user, router]);
 
   if (isLoading) {
     return (
@@ -26,7 +17,8 @@ export default function DashboardPage() {
   }
 
   if (!user) {
-    return null; // Will redirect via useEffect
+    // DashboardLayout owns authentication redirects for every dashboard page.
+    return null;
   }
 
   if (!tenant) {

@@ -8,6 +8,7 @@ import {
   readJsonBody,
   requestHasAllowedOrigin,
 } from "@/app/lib/server/security";
+import { isValidPromotionCode } from "@/app/lib/promotions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,7 +16,6 @@ export const dynamic = "force-dynamic";
 const MAX_NAME_LENGTH = 120;
 const MAX_PHONE_LENGTH = 40;
 const MAX_NOTES_LENGTH = 2_000;
-const MAX_PROMOTION_CODE_LENGTH = 100;
 
 interface BookingRequest {
   tenantId?: string;
@@ -146,7 +146,7 @@ export async function POST(request: Request): Promise<Response> {
 
     const notes = body.notes?.trim() || null;
 
-    const promotionCode = body.promotionCode?.trim() || null;
+    const promotionCode = body.promotionCode?.trim().toUpperCase() || null;
 
     /* ----------------------------------------------------------------------
        Validate tenant/resource identifiers
@@ -233,7 +233,7 @@ export async function POST(request: Request): Promise<Response> {
       );
     }
 
-    if (promotionCode && promotionCode.length > MAX_PROMOTION_CODE_LENGTH) {
+    if (promotionCode && !isValidPromotionCode(promotionCode)) {
       return json(
         {
           error: "The promotion code is invalid.",

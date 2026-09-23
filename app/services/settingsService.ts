@@ -228,7 +228,8 @@ export async function updateStorefrontSettings(
     .select("id")
     .single();
 
-  if (error) throw new Error(error.message || "Unable to save storefront settings.");
+  if (error)
+    throw new Error(error.message || "Unable to save storefront settings.");
   return {
     ...input,
     slug,
@@ -287,7 +288,7 @@ export async function getOrderingSettings(
       "delivery",
     ]) as OrderingSettings["orderTypes"],
     taxRate: Number(data?.tax_rate ?? 10),
-    discountEnabled: data?.discount_enabled !== false,
+    discountEnabled: data?.discount_enabled === true,
     discountThreshold: Number(data?.discount_threshold ?? 100),
     discountRate: Number(data?.discount_rate ?? 5),
     minimumOrder: Number(data?.minimum_order ?? 0),
