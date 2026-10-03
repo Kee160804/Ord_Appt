@@ -14,8 +14,8 @@ import {
 } from "@/app/data/mock";
 
 interface StorePageProps {
-  params: Promise<{ slug: string }> | { slug: string };
-  searchParams?: Promise<{ demo?: string }> | { demo?: string };
+  params: Promise<{ slug: string }>;
+  searchParams?: Promise<{ demo?: string }>;
 }
 
 const SITE_NAME = "YuhBusiness";
@@ -24,6 +24,10 @@ const DEFAULT_DESCRIPTION =
 
 function normalizeSlug(value: string): string {
   return value.trim().toLowerCase();
+}
+
+function isValidStorefrontSlug(value: string): boolean {
+  return /^[a-z0-9](?:[a-z0-9-]{0,98}[a-z0-9])?$/.test(value);
 }
 
 function isDemoRequest(demo: string | undefined): boolean {
@@ -118,23 +122,15 @@ export async function generateMetadata({
   const resolvedSearchParams = searchParams ? await searchParams : {};
   const slug = normalizeSlug(resolvedParams.slug);
 
-  if (!slug) {
-    return {
-      title: `Storefront | ${SITE_NAME}`,
-      description: DEFAULT_DESCRIPTION,
-      robots: { index: false, follow: false },
-    };
+  if (!isValidStorefrontSlug(slug)) {
+    notFound();
   }
 
   if (isDemoRequest(resolvedSearchParams.demo)) {
     const demoTenant = getDemoTenantBySlug(slug);
 
     if (!demoTenant) {
-      return {
-        title: `Storefront | ${SITE_NAME}`,
-        description: DEFAULT_DESCRIPTION,
-        robots: { index: false, follow: false },
-      };
+      notFound();
     }
 
     const description = storefrontDescription(
@@ -143,49 +139,17 @@ export async function generateMetadata({
     );
 
     return {
-      title: `${demoTenant.name} | ${SITE_NAME}`,
+      title: demoTenant.name,
       description,
       robots: { index: false, follow: false },
     };
   }
 
   if (isSupabaseConfigured()) {
+    let storefront: Awaited<ReturnType<typeof getPublicStorefront>>;
+
     try {
-      const storefront = await getPublicStorefront(slug);
-
-      if (!storefront) {
-        return {
-          title: `Storefront | ${SITE_NAME}`,
-          description: DEFAULT_DESCRIPTION,
-          robots: { index: false, follow: false },
-        };
-      }
-
-      const { tenant } = storefront;
-      const description = storefrontDescription(
-        tenant.name,
-        tenant.description,
-      );
-      const canonical = canonicalStorefrontUrl(tenant.slug, tenant.domain);
-
-      return {
-        title: `${tenant.name} | ${SITE_NAME}`,
-        description,
-        alternates: { canonical },
-        openGraph: {
-          title: tenant.name,
-          description,
-          type: "website",
-          url: canonical,
-          images: tenant.coverImage ? [{ url: tenant.coverImage }] : undefined,
-        },
-        twitter: {
-          card: tenant.coverImage ? "summary_large_image" : "summary",
-          title: tenant.name,
-          description,
-          images: tenant.coverImage ? [tenant.coverImage] : undefined,
-        },
-      };
+      storefront = await getPublicStorefront(slug);
     } catch {
       /**
        * Metadata generation should not replace the page's real error behavior.
@@ -193,29 +157,52 @@ export async function generateMetadata({
        * storefront failure normally.
        */
       return {
-        title: `Storefront | ${SITE_NAME}`,
+        title: "Storefront",
         description: DEFAULT_DESCRIPTION,
       };
     }
+
+    if (!storefront) notFound();
+
+    const { tenant } = storefront;
+    const description = storefrontDescription(tenant.name, tenant.description);
+    const canonical = canonicalStorefrontUrl(tenant.slug, tenant.domain);
+
+    return {
+      title: tenant.name,
+      description,
+      alternates: { canonical },
+      robots: { index: true, follow: true },
+      openGraph: {
+        title: tenant.name,
+        description,
+        type: "website",
+        url: canonical,
+        images: tenant.coverImage ? [{ url: tenant.coverImage }] : undefined,
+      },
+      twitter: {
+        card: tenant.coverImage ? "summary_large_image" : "summary",
+        title: tenant.name,
+        description,
+        images: tenant.coverImage ? [tenant.coverImage] : undefined,
+      },
+    };
   }
 
   const tenant = getTenantBySlug(slug);
 
-  if (!tenant) {
-    return {
-      title: `Storefront | ${SITE_NAME}`,
-      description: DEFAULT_DESCRIPTION,
-      robots: { index: false, follow: false },
-    };
+  if (!tenant || !tenant.isActive) {
+    notFound();
   }
 
   const description = storefrontDescription(tenant.name, tenant.description);
   const canonical = canonicalStorefrontUrl(tenant.slug, tenant.domain);
 
   return {
-    title: `${tenant.name} | ${SITE_NAME}`,
+    title: tenant.name,
     description,
     alternates: { canonical },
+    robots: { index: true, follow: true },
     openGraph: {
       title: tenant.name,
       description,
@@ -240,7 +227,7 @@ export default async function StorePage({
   const resolvedSearchParams = searchParams ? await searchParams : {};
   const slug = normalizeSlug(resolvedParams.slug);
 
-  if (!slug) notFound();
+  if (!isValidStorefrontSlug(slug)) notFound();
 
   /**
    * Demo mode is deliberately isolated from the production storefront loader.
@@ -318,7 +305,7 @@ export default async function StorePage({
    */
   const tenant = getTenantBySlug(slug);
 
-  if (!tenant) {
+  if (!tenant || !tenant.isActive) {
     notFound();
   }
 

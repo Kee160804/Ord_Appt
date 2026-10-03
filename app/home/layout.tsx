@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 
-import HomePage from "@/app/home/page";
-
 export const metadata: Metadata = {
   alternates: { canonical: "/" },
   robots: { index: true, follow: true },
 };
 
-export default function RootPage() {
-  return <HomePage />;
+export default function HomeLayout({
+  children,
+}: Readonly<{ children: React.ReactNode }>) {
+  return children;
 }

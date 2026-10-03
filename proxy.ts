@@ -35,7 +35,57 @@ async function customDomainSlug(hostname: string) {
   }
 }
 
+/**
+ * Distinguish a confirmed missing/inactive storefront from a temporary
+ * Supabase failure. Unknown availability falls through to the page so an
+ * outage is not incorrectly cached or reported as a deleted business.
+ */
+async function publicStorefrontExists(slug: string): Promise<boolean | null> {
+  if (!isSupabaseConfigured()) return null;
+  const { url, key } = getSupabaseConfig();
+  const query = new URL(`${url}/rest/v1/tenants`);
+  query.searchParams.set("select", "id");
+  query.searchParams.set("slug", `eq.${slug}`);
+  query.searchParams.set("is_active", "eq.true");
+  query.searchParams.set("status", "eq.ACTIVE");
+  query.searchParams.set("limit", "1");
+
+  try {
+    const response = await fetch(query, {
+      headers: { apikey: key, Authorization: `Bearer ${key}` },
+      cache: "no-store",
+    });
+    if (!response.ok) return null;
+    const rows = (await response.json()) as Array<{ id?: unknown }>;
+    return typeof rows[0]?.id === "string";
+  } catch {
+    return null;
+  }
+}
+
 export async function proxy(request: NextRequest) {
+  const storefrontMatch = request.nextUrl.pathname.match(
+    /^\/store-front\/([^/]+)\/?$/,
+  );
+  if (storefrontMatch && request.nextUrl.searchParams.get("demo") !== "1") {
+    let slug = "";
+    try {
+      slug = decodeURIComponent(storefrontMatch[1]).trim().toLowerCase();
+    } catch {
+      // Invalid percent-encoding cannot identify a storefront.
+    }
+
+    const exists = /^[a-z0-9](?:[a-z0-9-]{0,98}[a-z0-9])?$/.test(slug)
+      ? await publicStorefrontExists(slug)
+      : false;
+    if (exists === false) {
+      return NextResponse.next({
+        status: 404,
+        headers: { "X-Robots-Tag": "noindex, nofollow" },
+      });
+    }
+  }
+
   const sessionResponse = await updateSession(request);
   const storefrontSystemPath = ["/", "/robots.txt", "/sitemap.xml"].includes(
     request.nextUrl.pathname,

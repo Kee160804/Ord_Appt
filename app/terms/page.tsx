@@ -4,9 +4,11 @@ import { LegalDocument } from "@/app/components/LegalDocument";
 import { LEGAL_CONTACT_EMAIL, LEGAL_EFFECTIVE_DATE } from "@/app/lib/legal";
 
 export const metadata: Metadata = {
-  title: "Terms of Service | YuhBusiness",
+  title: "Terms of Service",
   description:
     "Terms governing business accounts, storefront transactions, subscriptions, and use of YuhBusiness.",
+  alternates: { canonical: "/terms" },
+  robots: { index: true, follow: true },
 };
 
 export default function TermsPage() {

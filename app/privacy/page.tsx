@@ -4,9 +4,11 @@ import { LegalDocument } from "@/app/components/LegalDocument";
 import { PRIVACY_CONTACT_EMAIL, PRIVACY_EFFECTIVE_DATE } from "@/app/lib/legal";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy | YuhBusiness",
+  title: "Privacy Policy",
   description:
     "How YuhBusiness collects, uses, shares, retains, and protects personal data.",
+  alternates: { canonical: "/privacy" },
+  robots: { index: true, follow: true },
 };
 
 export default function PrivacyPage() {

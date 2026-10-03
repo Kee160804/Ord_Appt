@@ -224,6 +224,18 @@ const securityHeaders = [
 ];
 
 /**
+ * Keep account, authentication, administration, and form workflow pages out
+ * of search indexes. The response header also covers redirects and other
+ * responses that do not render route metadata.
+ */
+const noIndexHeaders = [
+  {
+    key: "X-Robots-Tag",
+    value: "noindex, nofollow, noarchive, noimageindex",
+  },
+];
+
+/**
  * --------------------------------------------------------------------------
  * Main Next.js Configuration
  * --------------------------------------------------------------------------
@@ -296,6 +308,19 @@ const nextConfig: NextConfig = {
         source: "/(.*)",
         headers: securityHeaders,
       },
+
+      ...[
+        "/admin/:path*",
+        "/dashboard/:path*",
+        "/login",
+        "/register",
+        "/forgot-password",
+        "/reset-password",
+        "/team/invite",
+        "/privacy/request",
+        "/auth/:path*",
+        "/api/:path*",
+      ].map((source) => ({ source, headers: noIndexHeaders })),
 
       /**
        * --------------------------------------------------------------

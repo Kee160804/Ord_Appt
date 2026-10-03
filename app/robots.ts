@@ -7,7 +7,10 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: "*",
       allow: "/",
-      disallow: ["/admin/", "/dashboard/", "/api/", "/login", "/register"],
+      // Indexing of front-end utility/private routes is controlled with
+      // noindex metadata and X-Robots-Tag headers. Keeping those routes
+      // crawlable lets Google and Bing observe the noindex directive.
+      disallow: ["/api/", "/auth/"],
     },
     sitemap: `${baseUrl}/sitemap.xml`,
     host: baseUrl,

@@ -20,7 +20,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   return [
     {
       url: baseUrl,
-      lastModified: new Date(),
+      lastModified: new Date("2026-09-23"),
       changeFrequency: "weekly",
       priority: 1,
     },
@@ -35,12 +35,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified: new Date("2026-09-14"),
       changeFrequency: "yearly",
       priority: 0.4,
-    },
-    {
-      url: `${baseUrl}/privacy/request`,
-      lastModified: new Date("2026-09-23"),
-      changeFrequency: "yearly",
-      priority: 0.3,
     },
     ...storefronts.map((storefront) => ({
       url: storefrontUrl(storefront.slug, storefront.customDomain),

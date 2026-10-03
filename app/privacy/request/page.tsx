@@ -5,10 +5,16 @@ import { PrivacyRequestForm } from "@/app/components/PrivacyRequestForm";
 import { PRIVACY_CONTACT_EMAIL, PRIVACY_EFFECTIVE_DATE } from "@/app/lib/legal";
 
 export const metadata: Metadata = {
-  title: "Privacy Request | YuhBusiness",
+  title: "Privacy Request",
   description:
     "Submit a personal-data access, correction, deletion, export, objection, restriction, or consent-withdrawal request to YuhBusiness.",
   alternates: { canonical: "/privacy/request" },
+  robots: {
+    index: false,
+    follow: false,
+    nocache: true,
+    googleBot: { index: false, follow: false, noimageindex: true },
+  },
 };
 
 export default function PrivacyRequestPage() {

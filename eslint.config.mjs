@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Tool-managed worktrees are separate checkouts, not part of this build.
+    ".kilo/**",
     // Supabase Edge Functions run on Deno and are checked/deployed separately.
     "supabase/functions/**",
     "supabase/send-appointment-email.ts",
