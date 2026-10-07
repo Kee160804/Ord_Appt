@@ -12,6 +12,7 @@ interface ModalProps {
   children: React.ReactNode;
   maxWidth?: string;
   footer?: React.ReactNode;
+  contentClassName?: string;
 }
 
 interface ScrollLockSnapshot {
@@ -91,6 +92,7 @@ export function Modal({
   children,
   maxWidth = "max-w-lg",
   footer,
+  contentClassName,
 }: ModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -233,7 +235,12 @@ export function Modal({
             </button>
           </div>
         )}
-        <div className="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain px-4 py-5 sm:px-6">
+        <div
+          className={cn(
+            "min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain px-4 py-5 sm:px-6",
+            contentClassName,
+          )}
+        >
           {children}
         </div>
         {footer && (

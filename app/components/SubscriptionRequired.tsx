@@ -15,10 +15,11 @@ import {
   PLAN_ORDER,
   calculateSubscriptionAmounts,
 } from "@/app/lib/plans";
-import { startSubscriptionCheckout } from "@/app/services/billingService";
 import type { PlanType } from "@/app/types";
 import type { Tenant, User } from "@/app/types";
 import { BusinessSwitcher } from "@/app/components/BusinessSwitcher";
+import { Modal } from "@/app/components/Modal";
+import { PaymentMethodSetup } from "@/app/components/PaymentMethodSetup";
 
 const plans = PLAN_ORDER.map((planId) => ({
   ...PLAN_DEFINITIONS[planId],
@@ -35,7 +36,7 @@ export function SubscriptionRequired({
   user: User;
   onLogout: () => Promise<void>;
 }) {
-  const [processingPlan, setProcessingPlan] = useState<PlanType | null>(null);
+  const [checkoutPlan, setCheckoutPlan] = useState<PlanType | null>(null);
   const [seatSelections, setSeatSelections] = useState<
     Record<PlanType, number>
   >(
@@ -52,32 +53,7 @@ export function SubscriptionRequired({
         }),
       ) as Record<PlanType, number>,
   );
-  const [error, setError] = useState("");
   const isOwner = user.role === "owner";
-
-  const checkout = async (plan: PlanType) => {
-    setProcessingPlan(plan);
-    setError("");
-    try {
-      const result = await startSubscriptionCheckout(
-        tenant.id,
-        plan,
-        seatSelections[plan],
-      );
-      if (result.status === "pending" && result.redirectUrl) {
-        window.location.assign(result.redirectUrl);
-        return;
-      }
-      window.location.reload();
-    } catch (checkoutError) {
-      setError(
-        checkoutError instanceof Error
-          ? checkoutError.message
-          : "Unable to start subscription checkout.",
-      );
-      setProcessingPlan(null);
-    }
-  };
 
   return (
     <div className="pwa-page-roomy min-h-dvh bg-[#070b14] px-4 py-8 text-white light:bg-[#f6f8fc] light:text-slate-900 sm:px-6">
@@ -157,7 +133,7 @@ export function SubscriptionRequired({
                   Additional staff seats ($2 BZD each)
                   <select
                     value={seatSelections[plan.id]}
-                    disabled={!isOwner || processingPlan !== null}
+                    disabled={!isOwner}
                     onChange={(event) =>
                       setSeatSelections((current) => ({
                         ...current,
@@ -182,33 +158,45 @@ export function SubscriptionRequired({
               )}
               <button
                 type="button"
-                disabled={!isOwner || processingPlan !== null}
-                onClick={() => void checkout(plan.id)}
+                disabled={!isOwner}
+                onClick={() => setCheckoutPlan(plan.id)}
                 className={`mt-auto inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-50 ${plan.popular ? "bg-violet-600 hover:bg-violet-500" : "bg-slate-700 hover:bg-slate-600"}`}
               >
-                {processingPlan === plan.id
-                  ? "Opening checkout..."
-                  : `Choose ${plan.name} · $${calculateSubscriptionAmounts(plan.id, seatSelections[plan.id]).recurringTotal} BZD/mo`}{" "}
+                {`Choose ${plan.name} · $${calculateSubscriptionAmounts(plan.id, seatSelections[plan.id]).recurringTotal} BZD/mo`}{" "}
                 <ArrowRight className="h-4 w-4" />
               </button>
             </article>
           ))}
         </div>
 
-        {error && (
-          <p className="mx-auto mt-6 max-w-2xl rounded-xl bg-rose-500/10 p-3 text-center text-sm text-rose-300 light:text-rose-700">
-            {error}
-          </p>
-        )}
-
         <div className="mx-auto mt-8 flex max-w-2xl items-start gap-3 rounded-2xl border border-slate-700 bg-slate-900/50 p-4 text-xs leading-5 text-slate-400 light:border-slate-200 light:bg-white light:text-slate-600">
           <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
           <p>
             {isOwner
-              ? "Secure checkout opens through the configured payment provider. Access is restored only after payment is confirmed."
+              ? "Choose a plan to review the online payment options. Subscription activation will begin once payment integration is available."
               : "Only the business owner can purchase or change a subscription. Ask the owner to sign in and complete checkout."}
           </p>
         </div>
+
+        {checkoutPlan && (
+          <Modal
+            open
+            onClose={() => setCheckoutPlan(null)}
+            title={`${PLAN_DEFINITIONS[checkoutPlan].name} subscription checkout`}
+            maxWidth="max-w-xl"
+          >
+            <PaymentMethodSetup
+              amount={
+                calculateSubscriptionAmounts(
+                  checkoutPlan,
+                  seatSelections[checkoutPlan],
+                ).recurringTotal
+              }
+              continueLabel="Continue"
+              description={`Pay for the ${PLAN_DEFINITIONS[checkoutPlan].name} subscription plan.`}
+            />
+          </Modal>
+        )}
       </div>
     </div>
   );

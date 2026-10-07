@@ -17,6 +17,7 @@ import {
   UserRound,
 } from "lucide-react";
 import { Button } from "@/app/components/Button";
+import { CustomerPaymentCheckout } from "@/app/components/CustomerPaymentCheckout";
 import { Modal } from "@/app/components/Modal";
 import { StorefrontOffers } from "@/app/components/StorefrontOffers";
 import { Input, Select } from "@/app/components/input";
@@ -173,6 +174,9 @@ export function OrderingMenu({
   const [searchQuery, setSearchQuery] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [checkoutStage, setCheckoutStage] = useState<"details" | "payment">(
+    "payment",
+  );
   const [currentProduct, setCurrentProduct] = useState<Product | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [selectedAddons, setSelectedAddons] = useState<AddonOption[]>([]);
@@ -1025,211 +1029,307 @@ export function OrderingMenu({
 
             <Modal
               open={checkoutOpen}
-              onClose={() => !isPlacingOrder && setCheckoutOpen(false)}
-              title="Complete your order"
-              maxWidth="max-w-3xl"
-              footer={
-                <div className="flex gap-3">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={isPlacingOrder}
-                    onClick={() => setCheckoutOpen(false)}
-                    className="flex-1"
-                  >
-                    Back
-                  </Button>
-                  <Button
-                    type="button"
-                    loading={isPlacingOrder}
-                    disabled={viewOnly || !orderingSettings.enabled}
-                    onClick={placeOrder}
-                    className="flex-1"
-                  >
-                    {isPlacingOrder ? "Placing..." : "Place Order"}
-                  </Button>
-                </div>
+              onClose={() => {
+                if (!isPlacingOrder) {
+                  setCheckoutStage("payment");
+                  setCheckoutOpen(false);
+                }
+              }}
+              title={checkoutStage === "details" ? "Checkout" : undefined}
+              maxWidth={checkoutStage === "payment" ? "max-w-6xl" : "max-w-5xl"}
+              contentClassName={
+                checkoutStage === "payment" ? "p-0 sm:p-0" : undefined
               }
-            >
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="mb-1 flex items-start gap-4 sm:col-span-2">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#142138] text-[#b8c5da] light:bg-slate-100 light:text-slate-600">
-                    <UserRound className="h-5 w-5" />
-                  </span>
-                  <div>
-                    <h3 className="text-base font-black text-white light:text-slate-950">
-                      Customer Information
-                    </h3>
-                    <p className="mt-0.5 text-xs text-[#90a2bd] light:text-slate-500">
-                      Tell us where to send your order.
-                    </p>
-                  </div>
-                </div>
-                <Input
-                  label="Full Name"
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                  placeholder="Enter your name"
-                />
-                <Input
-                  label="Email Address"
-                  type="email"
-                  value={customerEmail}
-                  onChange={(e) => setCustomerEmail(e.target.value)}
-                  placeholder="you@example.com"
-                  autoComplete="email"
-                />
-                <Input
-                  label="Phone Number"
-                  value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
-                  placeholder="Enter Phone Number"
-                />
-                <Select
-                  label="Order Type"
-                  options={orderingSettings.orderTypes.map((value) => ({
-                    value,
-                    label:
-                      value === "dine_in"
-                        ? "Dine In"
-                        : value === "pickup"
-                          ? "Pickup"
-                          : "Delivery",
-                  }))}
-                  value={orderType}
-                  onChange={(e) => setOrderType(e.target.value)}
-                />
-                {orderType === "dine_in" && (
-                  <Input
-                    label="Table Number"
-                    value={tableNumber}
-                    onChange={(event) => setTableNumber(event.target.value)}
-                    placeholder="e.g. 12"
-                  />
-                )}
-                {orderType === "pickup" && (
-                  <Input
-                    label={`Pickup Time (allow ${orderingSettings.preparationMinutes} min)`}
-                    type="datetime-local"
-                    value={requestedTime}
-                    onChange={(event) => setRequestedTime(event.target.value)}
-                  />
-                )}
-                {orderType === "delivery" && (
-                  <>
-                    <Input
-                      label="Delivery Address"
-                      value={deliveryAddress}
-                      onChange={(event) =>
-                        setDeliveryAddress(event.target.value)
-                      }
-                      placeholder="Street, building, and landmark"
-                    />
-                    {orderingSettings.deliveryAreas.length ? (
-                      <Select
-                        label="Delivery Area"
-                        value={deliveryArea}
-                        onChange={(event) =>
-                          setDeliveryArea(event.target.value)
-                        }
-                        options={[
-                          { value: "", label: "Choose an area" },
-                          ...orderingSettings.deliveryAreas.map((area) => ({
-                            value: area,
-                            label: area,
-                          })),
-                        ]}
-                      />
-                    ) : (
-                      <Input
-                        label="Delivery Area"
-                        value={deliveryArea}
-                        onChange={(event) =>
-                          setDeliveryArea(event.target.value)
-                        }
-                        placeholder="City, village, or neighbourhood"
-                      />
-                    )}
-                    <Input
-                      label="Delivery Instructions (optional)"
-                      value={deliveryInstructions}
-                      onChange={(event) =>
-                        setDeliveryInstructions(event.target.value)
-                      }
-                      placeholder="Gate, floor, or directions"
-                    />
-                  </>
-                )}
-                <Input
-                  label="Order Notes (optional)"
-                  value={orderNotes}
-                  onChange={(event) => setOrderNotes(event.target.value)}
-                  placeholder="Allergies or special requests"
-                />
-                <Select
-                  label="Payment"
-                  value={paymentMethod}
-                  onChange={(event) =>
-                    setPaymentMethod(
-                      event.target.value as "pay_later" | "mock_card",
-                    )
-                  }
-                  options={[
-                    {
-                      value: "pay_later",
-                      label: "Pay at business / on delivery",
-                    },
-                    {
-                      value: "mock_card",
-                      label: "Mock card payment (testing only)",
-                    },
-                  ]}
-                />
-                {paymentMethod === "mock_card" && (
-                  <p className="rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-[10px] text-amber-300 light:text-amber-700 sm:col-span-2">
-                    Test mode: no card details or real money are used. The
-                    ledger records a simulated approved payment.
-                  </p>
-                )}
-                <div className="sm:col-span-2">
-                  <label className="mb-1.5 block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                    Discount Code
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      value={promotionCode}
-                      maxLength={MAX_PROMOTION_CODE_LENGTH}
-                      onChange={(event) => {
-                        setPromotionCode(
-                          normalizePromotionCode(event.target.value),
-                        );
-                        setAppliedPromotion(null);
-                      }}
-                      placeholder="WELCOME10"
-                      className="min-w-0 flex-1 rounded-lg border border-slate-600 bg-slate-700/50 px-3 py-2.5 text-sm text-white outline-none focus:border-violet-500 light:border-[#dfe5ee] light:bg-white light:text-slate-900"
-                    />
+              footer={
+                checkoutStage === "details" ? (
+                  <div className="flex gap-3">
                     <Button
                       type="button"
-                      size="sm"
                       variant="outline"
-                      loading={isApplyingPromotion}
-                      onClick={() => void applyPromotion()}
+                      disabled={isPlacingOrder}
+                      onClick={() => setCheckoutOpen(false)}
+                      className="flex-1"
                     >
-                      Apply
+                      Back
                     </Button>
+                    {paymentMethod === "pay_later" && (
+                      <Button
+                        type="button"
+                        loading={isPlacingOrder}
+                        disabled={viewOnly || !orderingSettings.enabled}
+                        onClick={placeOrder}
+                        className="flex-1"
+                      >
+                        {isPlacingOrder ? "Placing..." : "Place Order"}
+                      </Button>
+                    )}
+                    {paymentMethod === "mock_card" && (
+                      <Button
+                        type="button"
+                        disabled={viewOnly || !orderingSettings.enabled}
+                        onClick={() => setCheckoutStage("payment")}
+                        className="flex-1"
+                      >
+                        Continue to Payment
+                      </Button>
+                    )}
                   </div>
-                  {appliedPromotion && (
-                    <p className="mt-1 text-[10px] text-emerald-500">
-                      {appliedPromotion.name} applied
-                    </p>
-                  )}
-                </div>
-                {orderError && (
-                  <p className="rounded-lg border border-red-400/20 bg-red-400/10 px-3 py-2 text-xs text-red-300 light:text-red-600 sm:col-span-2">
-                    {orderError}
-                  </p>
-                )}
-              </div>
+                ) : undefined
+              }
+            >
+              {checkoutStage === "payment" ? (
+                <CustomerPaymentCheckout
+                  items={cart.map((item) => ({
+                    id: cartLineKey(item),
+                    name: item.name,
+                    image: item.image || PLACEHOLDER_IMG,
+                    quantity: item.quantity,
+                    lineTotal:
+                      item.price * item.quantity +
+                      item.addons.reduce(
+                        (sum, addon) => sum + addon.price * item.quantity,
+                        0,
+                      ),
+                    detail: [
+                      item.variantLabel,
+                      item.addons.map((addon) => addon.name).join(", "),
+                    ]
+                      .filter(Boolean)
+                      .join(" · "),
+                  }))}
+                  subtotal={subtotal}
+                  tax={tax}
+                  deliveryFee={deliveryFee}
+                  discount={discount}
+                  promotionDiscount={promotionDiscount}
+                  promotionLabel={appliedPromotion?.code}
+                  total={grandTotal}
+                  promotionCode={promotionCode}
+                  promotionMaxLength={MAX_PROMOTION_CODE_LENGTH}
+                  applyingPromotion={isApplyingPromotion}
+                  promotionApplied={appliedPromotion?.name}
+                  error={orderError}
+                  onPromotionCodeChange={(value) => {
+                    setPromotionCode(normalizePromotionCode(value));
+                    setAppliedPromotion(null);
+                  }}
+                  onApplyPromotion={() => void applyPromotion()}
+                  onBack={() => {
+                    setCheckoutStage("payment");
+                    setCheckoutOpen(false);
+                  }}
+                  onClose={() => {
+                    setCheckoutStage("payment");
+                    setCheckoutOpen(false);
+                  }}
+                />
+              ) : (
+                <>
+                  <div
+                    className="mb-6 grid grid-cols-4 gap-0"
+                    aria-label="Checkout progress"
+                  >
+                    {["Cart", "Checkout", "Review", "Complete"].map(
+                      (step, index) => (
+                        <div key={step} className="relative text-center">
+                          {index > 0 && (
+                            <span
+                              className={`absolute right-1/2 top-4 h-0.5 w-full ${index <= 1 ? "bg-violet-500" : "bg-[#34445d] light:bg-slate-300"}`}
+                            />
+                          )}
+                          <span
+                            className={`relative z-10 mx-auto flex h-8 w-8 items-center justify-center rounded-full border text-xs font-black ${index <= 1 ? "border-violet-400 bg-violet-600 text-white" : "border-[#4a5d78] bg-[#101c2e] text-slate-400 light:bg-white"}`}
+                          >
+                            {index + 1}
+                          </span>
+                          <span
+                            className={`mt-2 block text-[10px] font-semibold ${index === 1 ? "text-white light:text-slate-950" : "text-slate-400 light:text-slate-600"}`}
+                          >
+                            {step}
+                          </span>
+                        </div>
+                      ),
+                    )}
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="mb-1 flex items-start gap-4 sm:col-span-2">
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#142138] text-[#b8c5da] light:bg-slate-100 light:text-slate-600">
+                        <UserRound className="h-5 w-5" />
+                      </span>
+                      <div>
+                        <h3 className="text-base font-black text-white light:text-slate-950">
+                          Customer Information
+                        </h3>
+                        <p className="mt-0.5 text-xs text-[#90a2bd] light:text-slate-500">
+                          Tell us where to send your order.
+                        </p>
+                      </div>
+                    </div>
+                    <Input
+                      label="Full Name"
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      placeholder="Enter your name"
+                    />
+                    <Input
+                      label="Email Address"
+                      type="email"
+                      value={customerEmail}
+                      onChange={(e) => setCustomerEmail(e.target.value)}
+                      placeholder="you@example.com"
+                      autoComplete="email"
+                    />
+                    <Input
+                      label="Phone Number"
+                      value={phoneNumber}
+                      onChange={(e) => setPhoneNumber(e.target.value)}
+                      placeholder="Enter Phone Number"
+                    />
+                    <Select
+                      label="Order Type"
+                      options={orderingSettings.orderTypes.map((value) => ({
+                        value,
+                        label:
+                          value === "dine_in"
+                            ? "Dine In"
+                            : value === "pickup"
+                              ? "Pickup"
+                              : "Delivery",
+                      }))}
+                      value={orderType}
+                      onChange={(e) => setOrderType(e.target.value)}
+                    />
+                    {orderType === "dine_in" && (
+                      <Input
+                        label="Table Number"
+                        value={tableNumber}
+                        onChange={(event) => setTableNumber(event.target.value)}
+                        placeholder="e.g. 12"
+                      />
+                    )}
+                    {orderType === "pickup" && (
+                      <Input
+                        label={`Pickup Time (allow ${orderingSettings.preparationMinutes} min)`}
+                        type="datetime-local"
+                        value={requestedTime}
+                        onChange={(event) =>
+                          setRequestedTime(event.target.value)
+                        }
+                      />
+                    )}
+                    {orderType === "delivery" && (
+                      <>
+                        <Input
+                          label="Delivery Address"
+                          value={deliveryAddress}
+                          onChange={(event) =>
+                            setDeliveryAddress(event.target.value)
+                          }
+                          placeholder="Street, building, and landmark"
+                        />
+                        {orderingSettings.deliveryAreas.length ? (
+                          <Select
+                            label="Delivery Area"
+                            value={deliveryArea}
+                            onChange={(event) =>
+                              setDeliveryArea(event.target.value)
+                            }
+                            options={[
+                              { value: "", label: "Choose an area" },
+                              ...orderingSettings.deliveryAreas.map((area) => ({
+                                value: area,
+                                label: area,
+                              })),
+                            ]}
+                          />
+                        ) : (
+                          <Input
+                            label="Delivery Area"
+                            value={deliveryArea}
+                            onChange={(event) =>
+                              setDeliveryArea(event.target.value)
+                            }
+                            placeholder="City, village, or neighbourhood"
+                          />
+                        )}
+                        <Input
+                          label="Delivery Instructions (optional)"
+                          value={deliveryInstructions}
+                          onChange={(event) =>
+                            setDeliveryInstructions(event.target.value)
+                          }
+                          placeholder="Gate, floor, or directions"
+                        />
+                      </>
+                    )}
+                    <Input
+                      label="Order Notes (optional)"
+                      value={orderNotes}
+                      onChange={(event) => setOrderNotes(event.target.value)}
+                      placeholder="Allergies or special requests"
+                    />
+                    <div className="sm:col-span-2">
+                      <p className="mb-2 text-xs font-semibold text-slate-300 light:text-slate-700">
+                        How would you like to pay?
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setPaymentMethod("pay_later")}
+                          className={`rounded-xl border px-3 py-3 text-xs font-bold transition ${paymentMethod === "pay_later" ? "border-violet-400 bg-violet-500/15 text-white light:text-violet-800" : "border-slate-600 text-slate-400 light:border-slate-300 light:text-slate-600"}`}
+                        >
+                          Pay at business / delivery
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPaymentMethod("mock_card")}
+                          className={`rounded-xl border px-3 py-3 text-xs font-bold transition ${paymentMethod === "mock_card" ? "border-violet-400 bg-violet-500/15 text-white light:text-violet-800" : "border-slate-600 text-slate-400 light:border-slate-300 light:text-slate-600"}`}
+                        >
+                          Pay online
+                        </button>
+                      </div>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <label className="mb-1.5 block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                        Discount Code
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          value={promotionCode}
+                          maxLength={MAX_PROMOTION_CODE_LENGTH}
+                          onChange={(event) => {
+                            setPromotionCode(
+                              normalizePromotionCode(event.target.value),
+                            );
+                            setAppliedPromotion(null);
+                          }}
+                          placeholder="WELCOME10"
+                          className="min-w-0 flex-1 rounded-lg border border-slate-600 bg-slate-700/50 px-3 py-2.5 text-sm text-white outline-none focus:border-violet-500 light:border-[#dfe5ee] light:bg-white light:text-slate-900"
+                        />
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          loading={isApplyingPromotion}
+                          onClick={() => void applyPromotion()}
+                        >
+                          Apply
+                        </Button>
+                      </div>
+                      {appliedPromotion && (
+                        <p className="mt-1 text-[10px] text-emerald-500">
+                          {appliedPromotion.name} applied
+                        </p>
+                      )}
+                    </div>
+                    {orderError && (
+                      <p className="rounded-lg border border-red-400/20 bg-red-400/10 px-3 py-2 text-xs text-red-300 light:text-red-600 sm:col-span-2">
+                        {orderError}
+                      </p>
+                    )}
+                  </div>
+                </>
+              )}
             </Modal>
 
             {orderConfirmation && (
@@ -1453,6 +1553,7 @@ export function OrderingMenu({
                 <Button
                   onClick={() => {
                     setOrderError("");
+                    setCheckoutStage("payment");
                     setCheckoutOpen(true);
                   }}
                   disabled={

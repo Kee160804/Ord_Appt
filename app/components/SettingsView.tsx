@@ -27,6 +27,7 @@ import {
 } from "../lib/plans";
 import { PlanFeatureRequired } from "./PlanFeatureRequired";
 import { BusinessLogo } from "./BusinessLogo";
+import { PaymentMethodSetup } from "./PaymentMethodSetup";
 import { TeamAccessView } from "./TeamAccessView";
 import {
   updateBusinessDetails,
@@ -42,7 +43,6 @@ import {
   cancelSubscriptionAtPeriodEnd,
   getSubscriptionSummary,
   listBillingLedger,
-  startSubscriptionCheckout,
   type BillingInvoice,
   type SubscriptionSummary,
   type BillingTransaction,
@@ -987,52 +987,6 @@ function PaymentsTab({
   useEffect(() => {
     void refresh();
   }, [refresh]);
-  const checkout = async () => {
-    setProcessing(true);
-    setError("");
-    setMessage("");
-    try {
-      const result = await startSubscriptionCheckout(
-        tenant.id,
-        selectedPlan,
-        paidStaffSeats,
-      );
-      if (result.status === "pending" && result.redirectUrl) {
-        window.location.assign(result.redirectUrl);
-        return;
-      }
-      const updated = result.subscription;
-      if (!updated) {
-        throw new Error("The payment provider returned no subscription.");
-      }
-      onTenantUpdated({
-        ...tenant,
-        plan: updated.plan ?? selectedPlan,
-        subscriptionStatus: "active",
-        currentPeriodStart: updated.currentPeriodStart,
-        currentPeriodEnd: updated.currentPeriodEnd,
-        cancelAtPeriodEnd: false,
-        subscriptionBaseAmount: updated.baseAmount,
-        subscriptionSeatAmount: updated.seatAmount,
-        subscriptionRecurringTotal: updated.recurringTotal,
-        subscriptionPaidStaffSeats: updated.paidStaffSeats,
-      });
-      setMessage(
-        result.isMock
-          ? "Development payment approved. No real money was processed."
-          : "Payment approved and subscription updated.",
-      );
-      await refresh();
-    } catch (checkoutError) {
-      setError(
-        checkoutError instanceof Error
-          ? checkoutError.message
-          : "Unable to complete checkout.",
-      );
-    } finally {
-      setProcessing(false);
-    }
-  };
   const cancel = async () => {
     if (
       !window.confirm(
@@ -1198,10 +1152,12 @@ function PaymentsTab({
           </div>
           {error && <p className="text-sm text-red-400">{error}</p>}
           {message && <p className="text-sm text-emerald-400">{message}</p>}
+          <PaymentMethodSetup
+            amount={selectedAmounts.recurringTotal}
+            continueLabel="Continue"
+            description={`Pay for the ${selectedDefinition.name} subscription plan.`}
+          />
           <div className="flex flex-wrap gap-3">
-            <Button type="button" loading={processing} onClick={checkout}>
-              Continue to secure checkout
-            </Button>
             {subscription?.status === "active" &&
               subscription.currentPeriodEnd &&
               !subscription.cancelAtPeriodEnd && (
