@@ -260,6 +260,10 @@ export function buildTransactionalEmail(
       detailRows([
         ["Order", orderNumber],
         ["Order type", stringValue(payload, "order_type").replaceAll("_", " ")],
+        [
+          "Payment",
+          stringValue(payload, "payment_status").replaceAll("_", " "),
+        ],
         ["Total", money(numberValue(payload, "total"))],
         ["Status", input.eventType.replace("ORDER_", "").replaceAll("_", " ")],
         ["Reason", stringValue(payload, "cancellation_reason")],

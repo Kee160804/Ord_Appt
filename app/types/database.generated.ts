@@ -1693,6 +1693,7 @@ export type Database = {
           discount_type: string;
           discount_value: number;
           ends_at: string | null;
+          flyer_url: string | null;
           id: string;
           is_active: boolean;
           name: string;
@@ -1712,6 +1713,7 @@ export type Database = {
           discount_type: string;
           discount_value: number;
           ends_at?: string | null;
+          flyer_url?: string | null;
           id?: string;
           is_active?: boolean;
           name: string;
@@ -1731,6 +1733,7 @@ export type Database = {
           discount_type?: string;
           discount_value?: number;
           ends_at?: string | null;
+          flyer_url?: string | null;
           id?: string;
           is_active?: boolean;
           name?: string;
@@ -2487,6 +2490,7 @@ export type Database = {
         Row: {
           accent_color: string | null;
           address: string | null;
+          about_text: string | null;
           banner_url: string | null;
           business_name: string;
           business_type: string;
@@ -2534,6 +2538,7 @@ export type Database = {
         Insert: {
           accent_color?: string | null;
           address?: string | null;
+          about_text?: string | null;
           banner_url?: string | null;
           business_name: string;
           business_type?: string;
@@ -2581,6 +2586,7 @@ export type Database = {
         Update: {
           accent_color?: string | null;
           address?: string | null;
+          about_text?: string | null;
           banner_url?: string | null;
           business_name?: string;
           business_type?: string;
@@ -2935,9 +2941,11 @@ export type Database = {
           applicable_product_ids: string[];
           applicable_service_ids: string[];
           code: string;
+          description: string;
           discount_type: string;
           discount_value: number;
           ends_at: string;
+          flyer_url: string;
           id: string;
           name: string;
           starts_at: string;

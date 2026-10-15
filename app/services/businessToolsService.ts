@@ -37,6 +37,8 @@ export interface Promotion {
   name: string;
   discountType: "PERCENTAGE" | "FIXED";
   discountValue: number;
+  description: string;
+  flyerUrl: string;
   startsAt: string;
   endsAt: string;
   usageLimit: number | null;
@@ -62,6 +64,59 @@ export interface AppointmentReminder {
 }
 
 type Row = Record<string, unknown>;
+
+const STOREFRONT_MEDIA_BUCKET = "storefront-media";
+const MAX_PROMOTION_FLYER_BYTES = 5 * 1024 * 1024;
+const PROMOTION_FLYER_EXTENSIONS: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+};
+
+export function validatePromotionFlyer(file: File) {
+  if (!PROMOTION_FLYER_EXTENSIONS[file.type]) {
+    throw new Error("Choose a JPG, PNG, or WebP promotion flyer.");
+  }
+  if (file.size > MAX_PROMOTION_FLYER_BYTES) {
+    throw new Error("Promotion flyers must be 5 MB or smaller.");
+  }
+}
+
+export async function uploadPromotionFlyer(tenantId: string, file: File) {
+  validatePromotionFlyer(file);
+  const extension = PROMOTION_FLYER_EXTENSIONS[file.type];
+  const objectPath = `${tenantId}/promotions/${crypto.randomUUID()}.${extension}`;
+  const supabase = client();
+  const { error } = await supabase.storage
+    .from(STOREFRONT_MEDIA_BUCKET)
+    .upload(objectPath, file, {
+      cacheControl: "3600",
+      contentType: file.type,
+      upsert: false,
+    });
+  if (error) throw error;
+  const { data } = supabase.storage
+    .from(STOREFRONT_MEDIA_BUCKET)
+    .getPublicUrl(objectPath);
+  if (!data.publicUrl) throw new Error("The flyer URL could not be created.");
+  return data.publicUrl;
+}
+
+export async function deletePromotionFlyer(tenantId: string, flyerUrl: string) {
+  try {
+    const url = new URL(flyerUrl);
+    const marker = `/storage/v1/object/public/${STOREFRONT_MEDIA_BUCKET}/`;
+    const markerIndex = url.pathname.indexOf(marker);
+    if (markerIndex < 0) return;
+    const objectPath = decodeURIComponent(
+      url.pathname.slice(markerIndex + marker.length),
+    );
+    if (!objectPath.startsWith(`${tenantId}/promotions/`)) return;
+    await client().storage.from(STOREFRONT_MEDIA_BUCKET).remove([objectPath]);
+  } catch {
+    // External and malformed historical URLs are not managed uploads.
+  }
+}
 
 function textValue(value: unknown) {
   return typeof value === "string" ? value : "";
@@ -251,6 +306,8 @@ export async function listPromotions(tenantId: string): Promise<Promotion[]> {
       name: textValue(row.name),
       discountType: row.discount_type === "FIXED" ? "FIXED" : "PERCENTAGE",
       discountValue: Number(row.discount_value ?? 0),
+      description: textValue(row.description),
+      flyerUrl: textValue(row.flyer_url),
       startsAt: textValue(row.starts_at),
       endsAt: textValue(row.ends_at),
       usageLimit: row.usage_limit == null ? null : Number(row.usage_limit),
@@ -298,6 +355,8 @@ export async function savePromotion(
     name: promotion.name.trim(),
     discount_type: promotion.discountType,
     discount_value: promotion.discountValue,
+    description: promotion.description.trim() || null,
+    flyer_url: promotion.flyerUrl.trim() || null,
     starts_at: promotion.startsAt || null,
     ends_at: promotion.endsAt || null,
     usage_limit: promotion.usageLimit,

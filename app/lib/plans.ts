@@ -16,6 +16,7 @@ export type PlanFeature =
   | "booking_deposits"
   | "storefront_branding"
   | "storefront_contact_form"
+  | "storefront_promotions"
   | "team_management";
 
 export interface PlanDefinition {
@@ -50,6 +51,7 @@ const MINIMUM_PLAN_BY_FEATURE: Record<PlanFeature, PlanType> = {
   booking_deposits: "pro",
   storefront_branding: "pro",
   storefront_contact_form: "pro",
+  storefront_promotions: "pro",
   team_management: "pro",
 };
 

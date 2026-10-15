@@ -10,6 +10,7 @@ import type {
 export interface BusinessDetailsInput {
   name: string;
   description: string;
+  aboutInfo: string;
   phone: string;
   email: string;
   address: string;
@@ -26,6 +27,22 @@ export interface StorefrontSettingsInput {
   accentColor: string;
   socialLinks: SocialLinks;
 }
+
+export interface OwnerEmailPreferences {
+  appointments: boolean;
+  orders: boolean;
+  retailOrders: boolean;
+  contactMessages: boolean;
+  otherAlerts: boolean;
+}
+
+export const DEFAULT_OWNER_EMAIL_PREFERENCES: OwnerEmailPreferences = {
+  appointments: true,
+  orders: true,
+  retailOrders: true,
+  contactMessages: true,
+  otherAlerts: true,
+};
 
 const DAYS = [
   "Sunday",
@@ -157,6 +174,7 @@ export async function updateBusinessDetails(
     .update({
       business_name: businessName,
       description: input.description.trim(),
+      about_text: input.aboutInfo.trim(),
       phone: input.phone.trim(),
       email: input.email.trim().toLowerCase(),
       address: input.address.trim(),
@@ -266,6 +284,48 @@ export async function updateBusinessHours(
 
   if (error) throw error;
   return hours;
+}
+
+export async function getOwnerEmailPreferences(
+  tenantId: string,
+): Promise<OwnerEmailPreferences> {
+  const { data, error } = await client()
+    .from("business_settings")
+    .select(
+      "owner_email_appointments,owner_email_orders,owner_email_retail_orders,owner_email_contact_messages,owner_email_other_alerts",
+    )
+    .eq("tenant_id", tenantId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return {
+    appointments: data?.owner_email_appointments !== false,
+    orders: data?.owner_email_orders !== false,
+    retailOrders: data?.owner_email_retail_orders !== false,
+    contactMessages: data?.owner_email_contact_messages !== false,
+    otherAlerts: data?.owner_email_other_alerts !== false,
+  };
+}
+
+export async function updateOwnerEmailPreferences(
+  tenantId: string,
+  preferences: OwnerEmailPreferences,
+) {
+  const { error } = await client().from("business_settings").upsert(
+    {
+      tenant_id: tenantId,
+      owner_email_appointments: preferences.appointments,
+      owner_email_orders: preferences.orders,
+      owner_email_retail_orders: preferences.retailOrders,
+      owner_email_contact_messages: preferences.contactMessages,
+      owner_email_other_alerts: preferences.otherAlerts,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "tenant_id" },
+  );
+
+  if (error) throw error;
+  return preferences;
 }
 
 export async function getOrderingSettings(

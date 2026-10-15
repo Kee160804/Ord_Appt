@@ -28,6 +28,7 @@ export const PLAN_CATALOG = Object.freeze({
     shortFeatures: Object.freeze([
       "Up to 150 monthly activities",
       "Analytics and advanced controls",
+      "Promotion codes, flyer uploads, and shareable promo pages",
       "Owner + 1 staff included; add up to 3 at $2 BZD each",
       "Maximum 5 accounts total, including owner",
     ]),
@@ -47,6 +48,7 @@ export const PLAN_CATALOG = Object.freeze({
       "Up to 10 accounts total, including owner",
       "Owner + 2 staff included; add up to 7 at $2 BZD each",
       "All advanced controls included",
+      "Promotion codes, flyer uploads, and shareable promo pages",
     ]),
   }),
 });
@@ -70,6 +72,7 @@ export const PREMIUM_FEATURES = Object.freeze([
   "booking_deposits",
   "storefront_branding",
   "storefront_contact_form",
+  "storefront_promotions",
   "team_management",
 ]);
 

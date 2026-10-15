@@ -815,6 +815,7 @@ export function AppointmentBooking({
                     <path d="m21 21-4.35-4.35" />
                   </svg>
                   <input
+                    id="storefront-search"
                     type="text"
                     placeholder="Search…"
                     value={searchQuery}

@@ -14,6 +14,7 @@ import {
   Move,
   RotateCcw,
   ZoomIn,
+  Bell,
 } from "lucide-react";
 import { Card, CardHeader, CardBody } from "../components/Card";
 import { Button } from "../components/Button";
@@ -38,6 +39,10 @@ import {
   validateStorefrontCoverImage,
   getOrderingSettings,
   updateOrderingSettings,
+  DEFAULT_OWNER_EMAIL_PREFERENCES,
+  getOwnerEmailPreferences,
+  updateOwnerEmailPreferences,
+  type OwnerEmailPreferences,
 } from "../services/settingsService";
 import {
   cancelSubscriptionAtPeriodEnd,
@@ -65,6 +70,7 @@ const TABS: { id: Tab; label: string; icon: typeof Building2 }[] = [
   { id: "payments", label: "Billing & Payments", icon: CreditCard },
   { id: "ordering", label: "Order Operations", icon: ShoppingBag },
   { id: "storefront", label: "Storefront", icon: Globe },
+  { id: "notifications", label: "Email Notifications", icon: Bell },
 ];
 
 interface Props {
@@ -177,6 +183,18 @@ export function SettingsView({ tenant, user, onTenantUpdated }: Props) {
                 description="Your storefront remains published on Beginner with its current design. Upgrade to change its URL, cover image, and brand colours."
               />
             ))}
+          {active === "notifications" &&
+            (user.role === "owner" ? (
+              <NotificationPreferencesTab tenant={tenant} />
+            ) : (
+              <Card>
+                <CardBody>
+                  <p className="text-sm text-slate-400 light:text-slate-600">
+                    Only the business owner can manage owner email preferences.
+                  </p>
+                </CardBody>
+              </Card>
+            ))}
         </div>
       </div>
     </div>
@@ -194,6 +212,7 @@ function BusinessTab({
   const [form, setForm] = useState({
     name: tenant.name,
     description: tenant.description,
+    aboutInfo: tenant.aboutInfo ?? "",
     phone: tenant.phone,
     email: tenant.email,
     address: tenant.address,
@@ -259,6 +278,20 @@ function BusinessTab({
               }))
             }
             rows={3}
+            className="col-span-2"
+          />
+          <Textarea
+            label="About your business"
+            value={form.aboutInfo}
+            onChange={(event) =>
+              setForm((current) => ({
+                ...current,
+                aboutInfo: event.target.value,
+              }))
+            }
+            rows={6}
+            maxLength={3000}
+            placeholder="Tell customers your story, what makes your business special, and what they can expect."
             className="col-span-2"
           />
           <Input
@@ -1212,6 +1245,133 @@ function PaymentsTab({
         </p>
       )}
     </div>
+  );
+}
+
+function NotificationPreferencesTab({ tenant }: { tenant: Tenant }) {
+  const [preferences, setPreferences] = useState<OwnerEmailPreferences>(
+    DEFAULT_OWNER_EMAIL_PREFERENCES,
+  );
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setError("");
+    getOwnerEmailPreferences(tenant.id)
+      .then((value) => {
+        if (active) setPreferences(value);
+      })
+      .catch((loadError) => {
+        if (active) {
+          setError(
+            loadError instanceof Error
+              ? loadError.message
+              : "Unable to load email preferences.",
+          );
+        }
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [tenant.id]);
+
+  const setPreference = (
+    key: keyof OwnerEmailPreferences,
+    checked: boolean,
+  ) => {
+    setPreferences((current) => ({ ...current, [key]: checked }));
+    setSuccess("");
+  };
+
+  const save = async () => {
+    setSaving(true);
+    setError("");
+    setSuccess("");
+    try {
+      const saved = await updateOwnerEmailPreferences(tenant.id, preferences);
+      setPreferences(saved);
+      setSuccess("Owner email preferences saved.");
+    } catch (saveError) {
+      setError(
+        saveError instanceof Error
+          ? saveError.message
+          : "Unable to save email preferences.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <div>
+          <h3 className="text-xs font-bold text-white light:text-slate-900">
+            Owner email notifications
+          </h3>
+          <p className="mt-1 text-[11px] text-slate-400 light:text-slate-600">
+            Choose which operational alerts are emailed to the business owner.
+            In-app notifications and customer confirmations remain available.
+          </p>
+        </div>
+      </CardHeader>
+      <CardBody className="space-y-3">
+        {loading ? (
+          <p className="text-sm text-slate-400">Loading email preferences...</p>
+        ) : (
+          <>
+            {tenant.businessType === "appointment" && (
+              <ToggleSetting
+                label="New appointments, cancellations, and reschedules"
+                checked={preferences.appointments}
+                onChange={(checked) => setPreference("appointments", checked)}
+              />
+            )}
+            {tenant.businessType === "ordering" && (
+              <ToggleSetting
+                label="New orders and order cancellations"
+                checked={preferences.orders}
+                onChange={(checked) => setPreference("orders", checked)}
+              />
+            )}
+            {tenant.businessType === "retail" && (
+              <ToggleSetting
+                label="New retail orders and retail cancellations"
+                checked={preferences.retailOrders}
+                onChange={(checked) => setPreference("retailOrders", checked)}
+              />
+            )}
+            <ToggleSetting
+              label="New storefront contact messages"
+              checked={preferences.contactMessages}
+              onChange={(checked) => setPreference("contactMessages", checked)}
+            />
+            <ToggleSetting
+              label="Other business and inventory alerts"
+              checked={preferences.otherAlerts}
+              onChange={(checked) => setPreference("otherAlerts", checked)}
+            />
+          </>
+        )}
+        {error && <p className="text-sm text-red-400">{error}</p>}
+        {success && <p className="text-sm text-emerald-400">{success}</p>}
+        <Button
+          type="button"
+          loading={saving}
+          disabled={loading}
+          onClick={save}
+        >
+          Save Email Preferences
+        </Button>
+      </CardBody>
+    </Card>
   );
 }
 

@@ -59,6 +59,8 @@ type PublicPromotionRow = {
   name: string;
   discount_type: string;
   discount_value: number | string;
+  description: string | null;
+  flyer_url: string | null;
   starts_at: string | null;
   ends_at: string | null;
   applicable_product_ids: string[] | null;
@@ -128,6 +130,7 @@ function mapTenant(row: TenantRow, hours: BusinessHourRow[]): Tenant {
     logoImage: row.logo_url ?? undefined,
     logoBg: row.logo_bg ?? row.primary_color ?? "#8b5cf6",
     description: row.description ?? `Welcome to ${businessName}.`,
+    aboutInfo: row.about_text ?? "",
     phone: row.phone ?? "",
     email: row.email ?? "",
     address: row.address ?? "",
@@ -486,6 +489,8 @@ export async function getPublicStorefront(
             ? ("FIXED" as const)
             : ("PERCENTAGE" as const),
         discountValue: nonNegativeNumber(row.discount_value, 0),
+        description: row.description ?? undefined,
+        flyerUrl: row.flyer_url ?? undefined,
         startsAt: row.starts_at ?? undefined,
         endsAt: row.ends_at ?? undefined,
         applicableProductIds: row.applicable_product_ids ?? [],

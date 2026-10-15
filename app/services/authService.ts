@@ -155,6 +155,7 @@ function mapTenant(row: TenantRow, hours: BusinessHourRow[]): Tenant {
     logoImage: row.logo_url ?? undefined,
     logoBg: row.logo_bg ?? row.primary_color ?? "#8b5cf6",
     description: row.description ?? `Welcome to ${businessName}.`,
+    aboutInfo: row.about_text ?? "",
     phone: row.phone ?? "",
     email: row.email ?? "",
     address: row.address ?? "",

@@ -13,6 +13,10 @@ import {
   ChevronRight,
   Store,
   ShoppingCart,
+  Search,
+  Info,
+  Phone,
+  BadgePercent,
 } from "lucide-react";
 import {
   getServicesByTenant,
@@ -21,11 +25,14 @@ import {
 } from "@/app/data/mock";
 import { getStoredProducts, getStoredServices } from "@/app/lib/storage";
 import { isSupabaseConfigured } from "@/app/lib/supabase/config";
+import { tenantHasFeature } from "@/app/lib/plans";
 import { AppointmentBooking } from "../components/AppointmentBooking";
 import { OrderingMenu } from "../components/OrderingMenu";
 import { BusinessLogo } from "../components/BusinessLogo";
 import { DemoDashboardPreview } from "../components/DemoDashboardPreview";
 import { StorefrontContact } from "../components/StorefrontContact";
+import { StorefrontPromotions } from "../components/StorefrontPromotions";
+import { StorefrontAbout } from "../components/StorefrontAbout";
 import { useTheme } from "@/app/contexts/theme";
 import type {
   BusinessReview,
@@ -246,12 +253,59 @@ export default function StorefrontClient({
   }, [tenant.id, isAppt, viewOnly]);
 
   // Storefront and guided-demo navigation are independent view states.
-  const [activeTab, setActiveTab] = useState<"home" | "contact">("home");
+  type StorefrontTab = "catalog" | "about" | "promotions" | "contact";
+  const [activeTab, setActiveTab] = useState<StorefrontTab>("catalog");
+  const [selectedPromotionId, setSelectedPromotionId] = useState<string>();
   const [activeDemoView, setActiveDemoView] = useState<
     "dashboard" | "storefront"
   >(viewOnly ? "dashboard" : "storefront");
 
   const { theme, toggleTheme } = useTheme();
+  const catalogLabel = isAppt
+    ? "Services"
+    : tenant.businessType === "retail"
+      ? "Shop"
+      : "Menu";
+  const canShowPromotions = tenantHasFeature(tenant, "storefront_promotions");
+
+  const switchTab = (tab: StorefrontTab, promotionId?: string) => {
+    setActiveTab(tab);
+    setSelectedPromotionId(promotionId);
+    const url = new URL(window.location.href);
+    if (tab === "catalog") url.searchParams.delete("tab");
+    else url.searchParams.set("tab", tab);
+    if (tab === "promotions" && promotionId) {
+      url.searchParams.set("promotion", promotionId);
+    } else {
+      url.searchParams.delete("promotion");
+    }
+    window.history.pushState({}, "", url);
+  };
+
+  useEffect(() => {
+    const syncTabFromUrl = () => {
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get("tab");
+      const nextTab: StorefrontTab =
+        tab === "about" || tab === "contact"
+          ? tab
+          : tab === "promotions" && canShowPromotions
+            ? "promotions"
+            : "catalog";
+      setActiveTab(nextTab);
+      setSelectedPromotionId(params.get("promotion") ?? undefined);
+    };
+    syncTabFromUrl();
+    window.addEventListener("popstate", syncTabFromUrl);
+    return () => window.removeEventListener("popstate", syncTabFromUrl);
+  }, [canShowPromotions]);
+
+  useEffect(() => {
+    if (activeTab !== "promotions" || !selectedPromotionId) return;
+    document
+      .getElementById(`promotion-${selectedPromotionId}`)
+      ?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [activeTab, selectedPromotionId]);
 
   // The cover image is always the first gallery item.
   const [galleryOpen, setGalleryOpen] = useState(false);
@@ -272,38 +326,196 @@ export default function StorefrontClient({
       <div className="min-h-dvh">
         <div className="min-w-0">
           {/* Header */}
-          <header className="pwa-header-inset sticky top-0 z-20 border-b border-[#1d2b42] bg-[#08111f]/95 backdrop-blur-xl light:border-slate-200 light:bg-white/95">
-            <div className="mx-auto flex min-h-18 max-w-365 items-center gap-3 px-4 py-2.5 sm:px-6">
-              {viewOnly && (
-                <Link
-                  href="/login"
-                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#29384f] text-slate-300 transition hover:border-violet-400 hover:text-violet-300 light:border-slate-200 light:text-slate-600"
-                  aria-label="Back to sign in"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                </Link>
-              )}
-
+          <header className="pwa-header-inset sticky top-0 z-20 px-2 pt-2 sm:px-4 sm:pt-3">
+            <div className="mx-auto max-w-365 rounded-2xl border border-[#25344c] bg-[#07111f]/95 px-3 py-3 shadow-[0_20px_50px_rgba(4,8,18,0.35)] backdrop-blur-xl light:border-slate-200 light:bg-white/95 sm:px-5">
               <div className="flex min-w-0 items-center gap-3">
-                <BusinessLogo
-                  tenant={tenant}
-                  className="h-11 w-11 rounded-xl text-lg font-black shadow-[0_8px_24px_rgba(124,58,237,0.3)]"
-                />
-                <div className="min-w-0">
-                  <h1 className="truncate text-base font-black text-white light:text-slate-950">
-                    {tenant.name}
-                  </h1>
-                  <p className="truncate text-[11px] text-[#91a1ba] light:text-slate-500">
-                    {tenant.businessType === "retail"
-                      ? "Style Beyond Limits"
-                      : tenant.city}
-                  </p>
+                {viewOnly && (
+                  <Link
+                    href="/login"
+                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#29384f] text-slate-300 transition hover:border-violet-400 hover:text-violet-300 light:border-slate-200 light:text-slate-600"
+                    aria-label="Back to sign in"
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                  </Link>
+                )}
+
+                <div className="flex min-w-0 shrink-0 items-center gap-3">
+                  <BusinessLogo
+                    tenant={tenant}
+                    className="h-11 w-11 rounded-xl text-lg font-black shadow-[0_8px_24px_rgba(124,58,237,0.3)]"
+                  />
+                  <div className="min-w-0">
+                    <h1 className="truncate text-base font-black text-white light:text-slate-950">
+                      {tenant.name}
+                    </h1>
+                    <p className="truncate text-[9px] font-bold uppercase tracking-[0.28em] text-[#91a1ba] light:text-slate-500">
+                      Storefront
+                    </p>
+                  </div>
+                </div>
+
+                {viewOnly && (
+                  <div
+                    className="ml-3 hidden items-center rounded-xl border border-[#29384f] bg-[#0b1525] p-1 sm:flex light:border-slate-200 light:bg-slate-100"
+                    role="tablist"
+                    aria-label="Demo view"
+                  >
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={activeDemoView === "dashboard"}
+                      onClick={() => setActiveDemoView("dashboard")}
+                      className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold transition ${activeDemoView === "dashboard" ? "bg-violet-600 text-white" : "text-slate-400 light:text-slate-600"}`}
+                    >
+                      <LayoutDashboard className="h-4 w-4" /> Dashboard
+                    </button>
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={activeDemoView === "storefront"}
+                      onClick={() => setActiveDemoView("storefront")}
+                      className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold transition ${activeDemoView === "storefront" ? "bg-violet-600 text-white" : "text-slate-400 light:text-slate-600"}`}
+                    >
+                      <Store className="h-4 w-4" /> Storefront
+                    </button>
+                  </div>
+                )}
+
+                {(!viewOnly || activeDemoView === "storefront") && (
+                  <nav
+                    className="ml-auto hidden min-w-0 items-center gap-1 lg:flex"
+                    aria-label="Storefront navigation"
+                  >
+                    {[
+                      {
+                        id: "catalog" as const,
+                        label: catalogLabel,
+                        icon: Store,
+                      },
+                      { id: "about" as const, label: "About", icon: Info },
+                      ...(canShowPromotions
+                        ? [
+                            {
+                              id: "promotions" as const,
+                              label: "Promotions",
+                              icon: BadgePercent,
+                            },
+                          ]
+                        : []),
+                      { id: "contact" as const, label: "Contact", icon: Phone },
+                    ].map((item) => {
+                      const Icon = item.icon;
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => switchTab(item.id)}
+                          className={`inline-flex min-h-12 items-center gap-2 rounded-2xl px-4 text-sm font-bold transition ${activeTab === item.id ? "bg-violet-500/20 text-violet-300 light:bg-violet-100 light:text-violet-700" : "text-[#b8c5d8] hover:bg-white/5 hover:text-white light:text-slate-600 light:hover:bg-slate-100 light:hover:text-slate-950"}`}
+                        >
+                          <Icon className="h-5 w-5" /> {item.label}
+                        </button>
+                      );
+                    })}
+                  </nav>
+                )}
+
+                <div className="ml-auto flex shrink-0 items-center gap-1.5 border-l border-[#29384f] pl-2 sm:gap-2 sm:pl-4 light:border-slate-200">
+                  {(!viewOnly || activeDemoView === "storefront") && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        switchTab("catalog");
+                        window.setTimeout(
+                          () =>
+                            document
+                              .getElementById("storefront-search")
+                              ?.focus(),
+                          50,
+                        );
+                      }}
+                      className="flex h-10 w-10 items-center justify-center rounded-xl text-[#b8c5d8] transition hover:bg-white/5 hover:text-white light:text-slate-600 light:hover:bg-slate-100"
+                      aria-label={`Search ${catalogLabel.toLowerCase()}`}
+                    >
+                      <Search className="h-5 w-5" />
+                    </button>
+                  )}
+                  {(!viewOnly || activeDemoView === "storefront") &&
+                    !isAppt && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          document
+                            .getElementById("order-summary")
+                            ?.scrollIntoView({ behavior: "smooth" })
+                        }
+                        className="relative flex h-10 w-10 items-center justify-center rounded-xl text-[#b8c5d8] transition hover:bg-white/5 hover:text-white light:text-slate-600 light:hover:bg-slate-100"
+                        aria-label={`View cart with ${itemCount} items`}
+                      >
+                        <ShoppingCart className="h-5 w-5" />
+                        {itemCount > 0 && (
+                          <span className="absolute right-0 top-0 flex h-5 min-w-5 translate-x-1/4 -translate-y-1/4 items-center justify-center rounded-full bg-violet-600 px-1 text-[10px] font-black text-white">
+                            {itemCount > 99 ? "99+" : itemCount}
+                          </span>
+                        )}
+                      </button>
+                    )}
+
+                  <button
+                    type="button"
+                    onClick={toggleTheme}
+                    className="flex h-10 w-10 items-center justify-center rounded-xl text-[#b8c5d8] transition hover:bg-white/5 hover:text-white light:text-slate-600 light:hover:bg-slate-100"
+                    aria-label="Toggle dark mode"
+                  >
+                    {theme === "light" ? (
+                      <Moon className="h-4.5 w-4.5" />
+                    ) : (
+                      <Sun className="h-4.5 w-4.5" />
+                    )}
+                  </button>
                 </div>
               </div>
 
+              {(!viewOnly || activeDemoView === "storefront") && (
+                <nav
+                  className="mt-3 flex gap-2 overflow-x-auto border-t border-[#1d2b42] pt-3 lg:hidden light:border-slate-200"
+                  aria-label="Storefront navigation"
+                >
+                  {[
+                    {
+                      id: "catalog" as const,
+                      label: catalogLabel,
+                      icon: Store,
+                    },
+                    { id: "about" as const, label: "About", icon: Info },
+                    ...(canShowPromotions
+                      ? [
+                          {
+                            id: "promotions" as const,
+                            label: "Promotions",
+                            icon: BadgePercent,
+                          },
+                        ]
+                      : []),
+                    { id: "contact" as const, label: "Contact", icon: Phone },
+                  ].map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => switchTab(item.id)}
+                        className={`inline-flex min-h-10 shrink-0 items-center gap-2 rounded-xl px-3 text-xs font-bold transition ${activeTab === item.id ? "bg-violet-500/20 text-violet-300 light:bg-violet-100 light:text-violet-700" : "text-[#b8c5d8] light:text-slate-600"}`}
+                      >
+                        <Icon className="h-4 w-4" /> {item.label}
+                      </button>
+                    );
+                  })}
+                </nav>
+              )}
+
               {viewOnly && (
                 <div
-                  className="ml-3 hidden items-center rounded-xl border border-[#29384f] bg-[#0b1525] p-1 sm:flex light:border-slate-200 light:bg-slate-100"
+                  className="pwa-demo-view-switcher mx-auto w-full max-w-365 grid-cols-2 gap-2 px-4 pb-3 sm:px-6"
                   role="tablist"
                   aria-label="Demo view"
                 >
@@ -312,7 +524,7 @@ export default function StorefrontClient({
                     role="tab"
                     aria-selected={activeDemoView === "dashboard"}
                     onClick={() => setActiveDemoView("dashboard")}
-                    className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold transition ${activeDemoView === "dashboard" ? "bg-violet-600 text-white" : "text-slate-400 light:text-slate-600"}`}
+                    className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-3 py-2 text-xs font-bold transition ${activeDemoView === "dashboard" ? "border-violet-500 bg-violet-600 text-white" : "border-[#29384f] bg-[#0b1525] text-slate-300 light:border-slate-200 light:bg-slate-100 light:text-slate-700"}`}
                   >
                     <LayoutDashboard className="h-4 w-4" /> Dashboard
                   </button>
@@ -321,114 +533,13 @@ export default function StorefrontClient({
                     role="tab"
                     aria-selected={activeDemoView === "storefront"}
                     onClick={() => setActiveDemoView("storefront")}
-                    className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold transition ${activeDemoView === "storefront" ? "bg-violet-600 text-white" : "text-slate-400 light:text-slate-600"}`}
+                    className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-3 py-2 text-xs font-bold transition ${activeDemoView === "storefront" ? "border-violet-500 bg-violet-600 text-white" : "border-[#29384f] bg-[#0b1525] text-slate-300 light:border-slate-200 light:bg-slate-100 light:text-slate-700"}`}
                   >
                     <Store className="h-4 w-4" /> Storefront
                   </button>
                 </div>
               )}
-
-              <div className="ml-auto flex items-center gap-1.5 sm:gap-3">
-                {(!viewOnly || activeDemoView === "storefront") && (
-                  <nav
-                    className="hidden items-center gap-7 md:flex"
-                    aria-label="Storefront navigation"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab("home")}
-                      className="py-6 text-sm text-[#aebad0] transition hover:text-white light:text-slate-600 light:hover:text-slate-950"
-                    >
-                      Home
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab("home")}
-                      className={`relative py-6 text-sm font-semibold transition ${activeTab === "home" ? "text-white light:text-slate-950" : "text-[#aebad0] light:text-slate-600"}`}
-                    >
-                      {isAppt
-                        ? "Services"
-                        : tenant.businessType === "retail"
-                          ? "Shop"
-                          : "Menu"}
-                      {activeTab === "home" && (
-                        <span className="absolute inset-x-0 bottom-2 h-0.5 rounded-full bg-violet-500" />
-                      )}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab("contact")}
-                      className={`relative py-6 text-sm transition ${activeTab === "contact" ? "font-semibold text-white light:text-slate-950" : "text-[#aebad0] light:text-slate-600"}`}
-                    >
-                      Contact
-                      {activeTab === "contact" && (
-                        <span className="absolute inset-x-0 bottom-2 h-0.5 rounded-full bg-violet-500" />
-                      )}
-                    </button>
-                  </nav>
-                )}
-
-                {!isAppt && (!viewOnly || activeDemoView === "storefront") && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      document
-                        .getElementById("order-summary")
-                        ?.scrollIntoView({ behavior: "smooth" })
-                    }
-                    className="relative flex h-10 w-10 items-center justify-center rounded-xl text-[#b8c5d8] transition hover:bg-white/5 hover:text-white light:text-slate-600 light:hover:bg-slate-100"
-                    aria-label={`View cart with ${itemCount} items`}
-                  >
-                    <ShoppingCart className="h-5 w-5" />
-                    {itemCount > 0 && (
-                      <span className="absolute right-0 top-0 flex h-5 min-w-5 translate-x-1/4 -translate-y-1/4 items-center justify-center rounded-full bg-violet-600 px-1 text-[10px] font-black text-white">
-                        {itemCount > 99 ? "99+" : itemCount}
-                      </span>
-                    )}
-                  </button>
-                )}
-
-                <button
-                  type="button"
-                  onClick={toggleTheme}
-                  className="flex h-10 w-10 items-center justify-center rounded-xl text-[#b8c5d8] transition hover:bg-white/5 hover:text-white light:text-slate-600 light:hover:bg-slate-100"
-                  aria-label="Toggle dark mode"
-                >
-                  {theme === "light" ? (
-                    <Moon className="h-4.5 w-4.5" />
-                  ) : (
-                    <Sun className="h-4.5 w-4.5" />
-                  )}
-                </button>
-              </div>
             </div>
-
-            {viewOnly && (
-              <div
-                className="pwa-demo-view-switcher mx-auto w-full max-w-365 grid-cols-2 gap-2 px-4 pb-3 sm:px-6"
-                role="tablist"
-                aria-label="Demo view"
-              >
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={activeDemoView === "dashboard"}
-                  onClick={() => setActiveDemoView("dashboard")}
-                  className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-3 py-2 text-xs font-bold transition ${activeDemoView === "dashboard" ? "border-violet-500 bg-violet-600 text-white" : "border-[#29384f] bg-[#0b1525] text-slate-300 light:border-slate-200 light:bg-slate-100 light:text-slate-700"}`}
-                >
-                  <LayoutDashboard className="h-4 w-4" /> Dashboard
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={activeDemoView === "storefront"}
-                  onClick={() => setActiveDemoView("storefront")}
-                  className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border px-3 py-2 text-xs font-bold transition ${activeDemoView === "storefront" ? "border-violet-500 bg-violet-600 text-white" : "border-[#29384f] bg-[#0b1525] text-slate-300 light:border-slate-200 light:bg-slate-100 light:text-slate-700"}`}
-                >
-                  <Store className="h-4 w-4" /> Storefront
-                </button>
-              </div>
-            )}
           </header>
 
           {viewOnly && (
@@ -445,7 +556,7 @@ export default function StorefrontClient({
           {/* Main content */}
           {(!viewOnly || activeDemoView === "storefront") && (
             <main className="mx-auto max-w-365 px-4 py-5 sm:px-6 sm:py-6">
-              {activeTab === "home" ? (
+              {activeTab === "catalog" ? (
                 isAppt ? (
                   <AppointmentBooking
                     tenant={tenant}
@@ -472,6 +583,14 @@ export default function StorefrontClient({
                     }}
                   />
                 )
+              ) : activeTab === "about" ? (
+                <StorefrontAbout tenant={tenant} />
+              ) : activeTab === "promotions" ? (
+                <StorefrontPromotions
+                  tenant={tenant}
+                  promotions={initialPromotions}
+                  selectedPromotionId={selectedPromotionId}
+                />
               ) : (
                 <StorefrontContact tenant={tenant} viewOnly={viewOnly} />
               )}

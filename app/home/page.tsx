@@ -114,6 +114,7 @@ export default function HomePage() {
         "Availability and appointment deposit settings",
         "Full storefront branding controls",
         "Storefront contact message form",
+        "Promotion codes, flyer uploads, and shareable promo pages",
       ],
     },
     {
@@ -134,6 +135,7 @@ export default function HomePage() {
         "Highest team capacity: up to 10 accounts total",
         "Complete customer management and history",
         "All analytics, catalog, booking, and branding controls",
+        "Promotion codes, flyer uploads, and shareable promo pages",
       ],
     },
   ];

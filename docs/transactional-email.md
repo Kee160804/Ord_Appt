@@ -12,6 +12,20 @@ YuhBusiness uses Resend as an additional delivery channel. Supabase remains the 
 
 The worker consumes the existing `order_email_deliveries`, `appointment_email_deliveries`, and `appointment_reminders` records. The new `transactional_email_deliveries` table covers only events that had no existing outbox.
 
+## Owner notification preferences
+
+Apply `supabase/migrations/202610150001_owner_email_preferences.sql` after the
+core transactional-email and recipient-notification migrations. It adds an
+owner-only **Email Notifications** settings panel for appointment, ordering,
+retail, storefront-message, and other business alerts.
+
+The migration also ensures that notification fan-out to staff produces only
+one owner email. Customer order receipts, appointment confirmations,
+reminders, and cancellations remain transactional and cannot be disabled by
+an owner's alert preferences. Retail subjects say either `marked paid` or
+`payment pending`; `marked paid` does not claim that the current mock-card
+provider settled real funds.
+
 ## Before purchasing a domain
 
 A domain is not required for local development or integration testing. Use

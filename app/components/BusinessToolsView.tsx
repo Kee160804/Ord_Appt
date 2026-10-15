@@ -10,14 +10,18 @@ import {
   Percent,
   Plus,
   QrCode,
+  Share2,
   Tags,
+  Upload,
   Users,
 } from "lucide-react";
 import { Button } from "@/app/components/Button";
 import { Card, CardBody, CardHeader } from "@/app/components/Card";
 import { Input, Select, Textarea } from "@/app/components/input";
 import { Modal } from "@/app/components/Modal";
+import { PlanFeatureRequired } from "@/app/components/PlanFeatureRequired";
 import { storefrontUrl as canonicalStorefrontUrl } from "@/app/lib/platform";
+import { tenantHasFeature } from "@/app/lib/plans";
 import {
   isValidPromotionCode,
   MAX_PROMOTION_CODE_LENGTH,
@@ -28,6 +32,7 @@ import { listServices } from "@/app/services/serviceService";
 import {
   assignServiceDepartment,
   createDepartment,
+  deletePromotionFlyer,
   getReminderSettings,
   listAppointmentReminders,
   listDepartments,
@@ -38,6 +43,8 @@ import {
   saveServiceProvider,
   setDepartmentActive,
   setPromotionActive,
+  uploadPromotionFlyer,
+  validatePromotionFlyer,
   type AppointmentReminder,
   type Promotion,
   type ProviderAvailability,
@@ -87,6 +94,8 @@ function emptyPromotion(): Omit<Promotion, "tenantId" | "usageCount"> {
     name: "",
     discountType: "PERCENTAGE",
     discountValue: 10,
+    description: "",
+    flyerUrl: "",
     startsAt: "",
     endsAt: "",
     usageLimit: null,
@@ -117,6 +126,9 @@ export function BusinessToolsView({ tenant }: { tenant: Tenant }) {
   const [promotionForm, setPromotionForm] = useState<ReturnType<
     typeof emptyPromotion
   > | null>(null);
+  const [promotionFlyerFile, setPromotionFlyerFile] = useState<File | null>(
+    null,
+  );
   const [departmentForm, setDepartmentForm] = useState({
     name: "",
     description: "",
@@ -131,6 +143,7 @@ export function BusinessToolsView({ tenant }: { tenant: Tenant }) {
     () => canonicalStorefrontUrl(tenant.slug, tenant.domain),
     [tenant.domain, tenant.slug],
   );
+  const hasPromotionFeature = tenantHasFeature(tenant, "storefront_promotions");
   const reload = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -237,12 +250,34 @@ export function BusinessToolsView({ tenant }: { tenant: Tenant }) {
     }
     setIsSaving(true);
     setError("");
+    const previousFlyerUrl = promotionForm.flyerUrl;
+    let uploadedFlyerUrl = "";
     try {
-      await savePromotion(tenant.id, promotionForm);
+      if (promotionFlyerFile) {
+        uploadedFlyerUrl = await uploadPromotionFlyer(
+          tenant.id,
+          promotionFlyerFile,
+        );
+      }
+      await savePromotion(tenant.id, {
+        ...promotionForm,
+        flyerUrl: uploadedFlyerUrl || previousFlyerUrl,
+      });
+      if (
+        uploadedFlyerUrl &&
+        previousFlyerUrl &&
+        previousFlyerUrl !== uploadedFlyerUrl
+      ) {
+        await deletePromotionFlyer(tenant.id, previousFlyerUrl);
+      }
       setPromotionForm(null);
+      setPromotionFlyerFile(null);
       await reload();
       done("Promotion saved.");
     } catch (saveError) {
+      if (uploadedFlyerUrl) {
+        await deletePromotionFlyer(tenant.id, uploadedFlyerUrl);
+      }
       setError(
         saveError instanceof Error
           ? saveError.message
@@ -251,6 +286,33 @@ export function BusinessToolsView({ tenant }: { tenant: Tenant }) {
     } finally {
       setIsSaving(false);
     }
+  };
+  const promotionUrl = (promotionId: string) => {
+    const url = new URL(storefrontUrl);
+    url.searchParams.set("tab", "promotions");
+    url.searchParams.set("promotion", promotionId);
+    return url.toString();
+  };
+  const sharePromotion = async (promotion: Promotion) => {
+    const url = promotionUrl(promotion.id);
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `${promotion.name} | ${tenant.name}`,
+          text: promotion.description || `See ${promotion.name}.`,
+          url,
+        });
+        return;
+      } catch (shareError) {
+        if (
+          shareError instanceof DOMException &&
+          shareError.name === "AbortError"
+        )
+          return;
+      }
+    }
+    await navigator.clipboard.writeText(url);
+    done("Promotion link copied.");
   };
   const tabs = [
     ...(isAppointment
@@ -498,7 +560,15 @@ export function BusinessToolsView({ tenant }: { tenant: Tenant }) {
             </div>
           )}
 
-          {tab === "promotions" && (
+          {tab === "promotions" && !hasPromotionFeature && (
+            <PlanFeatureRequired
+              feature="storefront_promotions"
+              title="Storefront promotions are a Pro feature"
+              description="Upgrade to Pro to create discount codes, upload promotion flyers, and share direct promotion links with customers."
+            />
+          )}
+
+          {tab === "promotions" && hasPromotionFeature && (
             <Card>
               <CardHeader>
                 <div>
@@ -511,7 +581,10 @@ export function BusinessToolsView({ tenant }: { tenant: Tenant }) {
                 </div>
                 <Button
                   size="sm"
-                  onClick={() => setPromotionForm(emptyPromotion())}
+                  onClick={() => {
+                    setPromotionFlyerFile(null);
+                    setPromotionForm(emptyPromotion());
+                  }}
                 >
                   <Plus className="h-3 w-3" /> Add promotion
                 </Button>
@@ -527,12 +600,29 @@ export function BusinessToolsView({ tenant }: { tenant: Tenant }) {
                     key={promotion.id}
                     className="rounded-xl border border-slate-700 p-4 light:border-slate-200"
                   >
+                    {promotion.flyerUrl && (
+                      <div className="relative mb-4 aspect-[16/9] overflow-hidden rounded-lg bg-slate-900 light:bg-slate-100">
+                        <Image
+                          src={promotion.flyerUrl}
+                          alt={`${promotion.name} flyer`}
+                          fill
+                          className="object-contain"
+                          sizes="(min-width: 768px) 45vw, 100vw"
+                          unoptimized
+                        />
+                      </div>
+                    )}
                     <div className="flex justify-between gap-3">
                       <div>
                         <p className="text-sm font-bold text-violet-400">
                           {promotion.code}
                         </p>
                         <p className="text-xs">{promotion.name}</p>
+                        {promotion.description && (
+                          <p className="mt-1 line-clamp-2 text-[10px] text-slate-400">
+                            {promotion.description}
+                          </p>
+                        )}
                       </div>
                       <span className="text-xs font-bold">
                         {promotion.discountType === "PERCENTAGE"
@@ -549,13 +639,16 @@ export function BusinessToolsView({ tenant }: { tenant: Tenant }) {
                     <div className="mt-3 flex gap-3">
                       <button
                         className="text-[10px] font-semibold text-violet-400"
-                        onClick={() =>
+                        onClick={() => {
+                          setPromotionFlyerFile(null);
                           setPromotionForm({
                             id: promotion.id,
                             code: promotion.code,
                             name: promotion.name,
                             discountType: promotion.discountType,
                             discountValue: promotion.discountValue,
+                            description: promotion.description,
+                            flyerUrl: promotion.flyerUrl,
                             startsAt: promotion.startsAt,
                             endsAt: promotion.endsAt,
                             usageLimit: promotion.usageLimit,
@@ -564,8 +657,8 @@ export function BusinessToolsView({ tenant }: { tenant: Tenant }) {
                             applicableServiceIds:
                               promotion.applicableServiceIds,
                             isActive: promotion.isActive,
-                          })
-                        }
+                          });
+                        }}
                       >
                         Edit
                       </button>
@@ -580,6 +673,12 @@ export function BusinessToolsView({ tenant }: { tenant: Tenant }) {
                         }
                       >
                         {promotion.isActive ? "Deactivate" : "Activate"}
+                      </button>
+                      <button
+                        className="inline-flex items-center gap-1 text-[10px] font-semibold text-violet-400"
+                        onClick={() => void sharePromotion(promotion)}
+                      >
+                        <Share2 className="h-3 w-3" /> Share
                       </button>
                     </div>
                   </div>
@@ -934,12 +1033,21 @@ export function BusinessToolsView({ tenant }: { tenant: Tenant }) {
 
       <Modal
         open={!!promotionForm}
-        onClose={() => setPromotionForm(null)}
+        onClose={() => {
+          setPromotionForm(null);
+          setPromotionFlyerFile(null);
+        }}
         title={promotionForm?.id ? "Edit Promotion" : "Add Promotion"}
         maxWidth="max-w-2xl"
         footer={
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setPromotionForm(null)}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setPromotionForm(null);
+                setPromotionFlyerFile(null);
+              }}
+            >
               Cancel
             </Button>
             <Button loading={isSaving} onClick={() => void saveDiscount()}>
@@ -972,6 +1080,20 @@ export function BusinessToolsView({ tenant }: { tenant: Tenant }) {
                     name: event.target.value,
                   })
                 }
+              />
+              <Textarea
+                label="Customer-facing description"
+                value={promotionForm.description}
+                maxLength={1000}
+                rows={4}
+                placeholder="Describe the offer and any important conditions."
+                onChange={(event) =>
+                  setPromotionForm({
+                    ...promotionForm,
+                    description: event.target.value,
+                  })
+                }
+                className="sm:col-span-2"
               />
               <Select
                 label="Discount type"
@@ -1043,6 +1165,58 @@ export function BusinessToolsView({ tenant }: { tenant: Tenant }) {
                   })
                 }
               />
+            </div>
+            <div className="rounded-xl border border-dashed border-slate-600 p-4 light:border-slate-300">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                {promotionForm.flyerUrl && (
+                  <div className="relative h-28 w-24 shrink-0 overflow-hidden rounded-lg bg-slate-900 light:bg-slate-100">
+                    <Image
+                      src={promotionForm.flyerUrl}
+                      alt="Promotion flyer preview"
+                      fill
+                      className="object-contain"
+                      unoptimized
+                    />
+                  </div>
+                )}
+                <div>
+                  <p className="text-xs font-bold">Promotion flyer</p>
+                  <p className="mt-1 text-[10px] text-slate-400">
+                    JPG, PNG, or WebP. Maximum 5 MB. The flyer appears on the
+                    public Promotions tab.
+                  </p>
+                  {promotionFlyerFile && (
+                    <p className="mt-2 text-[10px] font-semibold text-emerald-400">
+                      Ready to upload: {promotionFlyerFile.name}
+                    </p>
+                  )}
+                  <label className="mt-3 inline-flex cursor-pointer items-center gap-2 rounded-lg bg-violet-600 px-3 py-2 text-xs font-bold text-white hover:bg-violet-500">
+                    <Upload className="h-3.5 w-3.5" />
+                    {promotionForm.flyerUrl ? "Replace flyer" : "Upload flyer"}
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="sr-only"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0] ?? null;
+                        if (!file) return;
+                        try {
+                          validatePromotionFlyer(file);
+                          setPromotionFlyerFile(file);
+                          setError("");
+                        } catch (uploadError) {
+                          setPromotionFlyerFile(null);
+                          setError(
+                            uploadError instanceof Error
+                              ? uploadError.message
+                              : "Choose a valid promotion flyer.",
+                          );
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
+              </div>
             </div>
             <div>
               <p className="mb-2 text-xs font-semibold">

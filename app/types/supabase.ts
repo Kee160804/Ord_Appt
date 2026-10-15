@@ -37,6 +37,7 @@ export interface TenantRow {
   social_links?: Record<string, unknown> | null;
   business_type?: string | null;
   description?: string | null;
+  about_text?: string | null;
   phone?: string | null;
   email?: string | null;
   address?: string | null;

@@ -828,6 +828,7 @@ export function OrderingMenu({
             <div className="flex h-12 min-w-0 flex-1 items-center gap-3 rounded-xl border border-[#2b3b55] bg-[#111d30] px-4 text-[#8fa0bb] shadow-inner light:border-slate-200 light:bg-white light:text-slate-500">
               <Search className="h-4 w-4 shrink-0" />
               <input
+                id="storefront-search"
                 type="search"
                 placeholder={`Search ${isRetail ? "clothing, sneakers, and accessories" : itemLabel}...`}
                 value={searchQuery}

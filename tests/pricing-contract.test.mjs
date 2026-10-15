@@ -79,6 +79,7 @@ test("the 14-day trial has explicit activity/staff overrides and all premium fea
     "product_variants",
     "storefront_branding",
     "storefront_contact_form",
+    "storefront_promotions",
     "team_management",
   ]);
 

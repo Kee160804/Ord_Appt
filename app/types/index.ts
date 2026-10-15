@@ -51,6 +51,8 @@ export interface PublicPromotion {
   name: string;
   discountType: "PERCENTAGE" | "FIXED";
   discountValue: number;
+  description?: string;
+  flyerUrl?: string;
   startsAt?: string;
   endsAt?: string;
   applicableProductIds: string[];
@@ -85,6 +87,7 @@ export interface Tenant {
   logoImage?: string;
   logoBg: string;
   description: string;
+  aboutInfo?: string;
   phone: string;
   email: string;
   address: string;

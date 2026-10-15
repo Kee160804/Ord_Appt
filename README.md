@@ -10,6 +10,10 @@ Supabase, scheduler, and end-to-end testing guide.
 See [Legal and privacy readiness](docs/legal-readiness.md) for the implemented
 policy surfaces and the operational/legal work required before real payments.
 
+See [Product and payment overview](docs/product-and-payment-overview.md) for a
+complete description of the SaaS system, current features, payment status, and
+the planned customer-to-business and business-to-platform payment flows.
+
 ## Local setup
 
 1. Create `.env.local`.
