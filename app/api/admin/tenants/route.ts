@@ -25,7 +25,6 @@ interface CreateTenantRequest {
   slug?: string;
   plan?: "starter" | "pro" | "enterprise";
   subscriptionStatus?: "trial" | "active";
-  trialDays?: number;
   sendPasswordEmail?: boolean;
 }
 
@@ -54,10 +53,7 @@ export async function POST(request: Request) {
       body.plan === "pro" || body.plan === "enterprise" ? body.plan : "starter";
     const subscriptionStatus =
       body.subscriptionStatus === "active" ? "active" : "trial";
-    const trialDays =
-      Number.isInteger(body.trialDays) && Number(body.trialDays) > 0
-        ? Number(body.trialDays)
-        : TRIAL_ENTITLEMENTS.lengthDays;
+    const trialDays = TRIAL_ENTITLEMENTS.lengthDays;
     const sendPasswordEmail = body.sendPasswordEmail !== false;
 
     if (!businessName || businessName.length < 2) {

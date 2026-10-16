@@ -10,7 +10,6 @@ import {
   CreditCard,
   Eye,
   RefreshCw,
-  Save,
   Users,
 } from "lucide-react";
 import { Card, CardBody, CardHeader } from "@/app/components/Card";
@@ -35,12 +34,13 @@ export default function TenantDetailPage() {
   const rawId = Array.isArray(params?.Id) ? params.Id[0] : params?.Id;
   const tenantId = rawId ? decodeURIComponent(String(rawId)).trim() : "";
   const [data, setData] = useState<AdminTenantData | null>(null);
+  const [dataLoadedAt, setDataLoadedAt] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
-  const [selectedPlan, setSelectedPlan] = useState<Tenant["plan"]>("starter");
   const [isUpdatingSubscription, setIsUpdatingSubscription] = useState(false);
   const [subscriptionError, setSubscriptionError] = useState("");
   const [subscriptionMessage, setSubscriptionMessage] = useState("");
+  const [trialExtensionDays, setTrialExtensionDays] = useState(1);
   const [isUpdatingDomain, setIsUpdatingDomain] = useState(false);
   const [domainMessage, setDomainMessage] = useState("");
   const [domainError, setDomainError] = useState("");
@@ -58,7 +58,7 @@ export default function TenantDetailPage() {
         const result = await loadAdminTenantData(tenantId);
         if (!active) return;
         setData(result);
-        if (result) setSelectedPlan(result.tenant.plan);
+        if (result) setDataLoadedAt(new Date().toISOString());
         setError(
           result ? "" : "This tenant was not found or is not accessible.",
         );
@@ -102,7 +102,7 @@ export default function TenantDetailPage() {
   const updateSubscription = async (
     status: Tenant["subscriptionStatus"],
     trialDays?: number,
-    plan: Tenant["plan"] = data?.tenant.plan ?? selectedPlan,
+    plan: Tenant["plan"] = data?.tenant.plan ?? "starter",
     successMessage?: string,
   ) => {
     setIsUpdatingSubscription(true);
@@ -125,7 +125,7 @@ export default function TenantDetailPage() {
         );
       }
       setData(refreshed);
-      setSelectedPlan(refreshed.tenant.plan);
+      setDataLoadedAt(new Date().toISOString());
 
       try {
         const summary = await getAdminSeatSummary(tenantId);
@@ -144,7 +144,7 @@ export default function TenantDetailPage() {
           (status === "active"
             ? "Plan and testing access saved and verified in Supabase. The tester can now refresh their dashboard."
             : status === "trial"
-              ? "The trial was extended by 14 days and verified in Supabase."
+              ? `The trial was extended by ${trialDays} ${trialDays === 1 ? "day" : "days"} and verified in Supabase.`
               : "Tenant access is now marked past due and was verified in Supabase."),
       );
     } catch (updateError) {
@@ -167,7 +167,7 @@ export default function TenantDetailPage() {
       if (!refreshed)
         throw new Error("The business could not be reloaded from Supabase.");
       setData(refreshed);
-      setSelectedPlan(refreshed.tenant.plan);
+      setDataLoadedAt(new Date().toISOString());
       const summary = await getAdminSeatSummary(tenantId);
       setSeatSummary(summary);
       setPaidStaffSeats(summary.paidStaffSeats);
@@ -310,8 +310,19 @@ export default function TenantDetailPage() {
     );
   }
 
-  const { tenant, analytics } = data;
-  const hasUnsavedPlan = selectedPlan !== tenant.plan;
+  const { tenant, hasVerifiedPayment } = data;
+  const trialEnd = tenant.trialEndsAt
+    ? new Date(tenant.trialEndsAt)
+    : new Date(new Date(tenant.createdAt).getTime() + 14 * 86_400_000);
+  const trialIsLive =
+    !Number.isNaN(trialEnd.getTime()) &&
+    !Number.isNaN(Date.parse(dataLoadedAt)) &&
+    trialEnd.getTime() > Date.parse(dataLoadedAt);
+  const subscriptionLabel = hasVerifiedPayment
+    ? tenant.subscriptionStatus
+    : trialIsLive
+      ? "Free Trial"
+      : "Free Trial Expired";
   return (
     <div className="pwa-page-safe min-h-dvh space-y-6 bg-[#070b14] p-4 text-white light:bg-white light:text-gray-900 sm:p-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -367,18 +378,22 @@ export default function TenantDetailPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+        <StatCard label="Plan" value={tenant.plan.toUpperCase()} />
         <StatCard
-          label="Recognized Revenue"
-          value={formatCurrency(analytics.totalRevenue)}
+          label="Subscription Status"
+          value={subscriptionLabel.toUpperCase()}
         />
         <StatCard
-          label="Transactions"
-          value={analytics.totalActivity.toString()}
+          label="Monthly Subscription"
+          value={
+            hasVerifiedPayment
+              ? formatCurrency(tenant.subscriptionRecurringTotal ?? 0)
+              : formatCurrency(0)
+          }
         />
-        <StatCard label="Customers" value={analytics.newCustomers.toString()} />
         <StatCard
-          label="30-Day Revenue"
-          value={formatCurrency(tenant.monthlyRevenue ?? 0)}
+          label="Paid Staff Seats"
+          value={String(tenant.subscriptionPaidStaffSeats ?? 0)}
         />
       </div>
 
@@ -400,11 +415,7 @@ export default function TenantDetailPage() {
               }
             />
             <Info label="Plan" value={`${tenant.plan} plan`} capitalize />
-            <Info
-              label="Subscription"
-              value={tenant.subscriptionStatus}
-              capitalize
-            />
+            <Info label="Subscription" value={subscriptionLabel} capitalize />
             <Info
               label="Trial Ends"
               value={
@@ -622,10 +633,9 @@ export default function TenantDetailPage() {
         </CardHeader>
         <CardBody>
           <p className="max-w-2xl text-sm leading-6 text-slate-400 light:text-slate-600">
-            Assign a plan to a tester without payment. Saving grants active
-            access to exactly that plan&apos;s limits and features, then reloads
-            the record from Supabase to verify it persisted. The tester should
-            refresh their dashboard after you save.
+            Paid access is activated only after a real subscription payment is
+            verified. Until the Belize Bank payment flow is live, you can
+            inspect the saved plan or grant a controlled free-trial extension.
           </p>
           <div className="mt-4 flex flex-wrap gap-2 text-xs">
             <span className="rounded-full bg-slate-700/70 px-3 py-1.5 text-slate-300 light:bg-slate-100 light:text-slate-700">
@@ -636,42 +646,10 @@ export default function TenantDetailPage() {
             </span>
             <span className="rounded-full bg-slate-700/70 px-3 py-1.5 text-slate-300 light:bg-slate-100 light:text-slate-700">
               Access:{" "}
-              <strong className="capitalize">
-                {tenant.subscriptionStatus}
-              </strong>
+              <strong className="capitalize">{subscriptionLabel}</strong>
             </span>
-            {hasUnsavedPlan && (
-              <span className="rounded-full bg-amber-500/15 px-3 py-1.5 font-bold text-amber-300 light:text-amber-700">
-                Unsaved plan change
-              </span>
-            )}
           </div>
-          <div className="mt-5 flex flex-wrap items-end gap-3">
-            <label className="w-full sm:min-w-44 sm:w-auto">
-              <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-400">
-                Plan
-              </span>
-              <select
-                value={selectedPlan}
-                onChange={(event) =>
-                  setSelectedPlan(event.target.value as Tenant["plan"])
-                }
-                className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2.5 text-sm text-white outline-none focus:border-violet-500 light:border-slate-300 light:bg-white light:text-slate-900"
-              >
-                <option value="starter">Beginner — $9 BZD</option>
-                <option value="pro">Pro — $12 BZD</option>
-                <option value="enterprise">Enterprise — $15 BZD</option>
-              </select>
-            </label>
-            <button
-              disabled={isUpdatingSubscription}
-              onClick={() =>
-                void updateSubscription("active", undefined, selectedPlan)
-              }
-              className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-500 disabled:opacity-50"
-            >
-              <Save className="h-4 w-4" /> Save changes
-            </button>
+          <div className="mt-5 flex flex-wrap gap-3">
             <button
               disabled={isUpdatingSubscription}
               onClick={() => void reloadSavedSubscription()}
@@ -688,18 +666,44 @@ export default function TenantDetailPage() {
               Other access actions
             </p>
             <p className="mt-1 text-xs leading-5 text-slate-500">
-              A trial unlocks the full product for evaluation, so use active
-              testing access above when checking plan-specific restrictions.
+              An extension restores trial access for the exact number of days
+              you authorize. Without an extension or verified payment, access
+              remains expired.
             </p>
-            <div className="mt-3 flex flex-wrap gap-3">
+            <div className="mt-3 flex flex-wrap items-end gap-3">
+              <label>
+                <span className="mb-1.5 block text-xs font-semibold text-slate-400">
+                  Extra trial days (1–14)
+                </span>
+                <input
+                  type="number"
+                  min={1}
+                  max={14}
+                  step={1}
+                  value={trialExtensionDays}
+                  onChange={(event) =>
+                    setTrialExtensionDays(Number(event.target.value))
+                  }
+                  className="w-36 rounded-xl border border-slate-700 bg-slate-900 px-3 py-2.5 text-sm text-white outline-none focus:border-violet-500 light:border-slate-300 light:bg-white light:text-slate-900"
+                />
+              </label>
               <button
-                disabled={isUpdatingSubscription}
+                disabled={
+                  isUpdatingSubscription ||
+                  !Number.isInteger(trialExtensionDays) ||
+                  trialExtensionDays < 1 ||
+                  trialExtensionDays > 14
+                }
                 onClick={() =>
-                  void updateSubscription("trial", 14, tenant.plan)
+                  void updateSubscription(
+                    "trial",
+                    trialExtensionDays,
+                    tenant.plan,
+                  )
                 }
                 className="rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-violet-500 disabled:opacity-50"
               >
-                Extend trial 14 days
+                Extend free trial
               </button>
               <button
                 disabled={isUpdatingSubscription}
@@ -726,37 +730,6 @@ export default function TenantDetailPage() {
               <CheckCircle2 className="h-4 w-4" />
               {subscriptionMessage}
             </p>
-          )}
-        </CardBody>
-      </Card>
-
-      <Card className="border-slate-700 bg-slate-800/50 light:border-slate-200 light:bg-white">
-        <CardHeader>
-          <h3 className="font-semibold text-white light:text-gray-900">
-            Top Items
-          </h3>
-        </CardHeader>
-        <CardBody>
-          {analytics.topItems.length === 0 ? (
-            <p className="text-sm text-slate-400">
-              No completed business activity yet.
-            </p>
-          ) : (
-            <div className="space-y-3">
-              {analytics.topItems.map((item) => (
-                <div
-                  key={item.name}
-                  className="flex items-center justify-between gap-4"
-                >
-                  <span className="text-sm font-medium text-slate-300 light:text-gray-700">
-                    {item.name}
-                  </span>
-                  <span className="text-sm text-slate-400 light:text-gray-600">
-                    {item.count} × {formatCurrency(item.revenue)}
-                  </span>
-                </div>
-              ))}
-            </div>
           )}
         </CardBody>
       </Card>

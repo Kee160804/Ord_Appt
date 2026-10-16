@@ -12,7 +12,6 @@ import {
   Activity,
   AlertCircle,
   ArrowRight,
-  Bell,
   Building2,
   CalendarDays,
   Check,
@@ -37,16 +36,15 @@ import {
   Settings,
   Shield,
   ShieldCheck,
-  ShoppingCart,
   Sparkles,
   Sun,
   Trash2,
   UserCog,
-  Users,
   UsersRound,
   X,
 } from "lucide-react";
 import { AdminPrivacyRequests } from "@/app/components/AdminPrivacyRequests";
+import { PlatformNotificationCenter } from "@/app/components/PlatformNotificationCenter";
 import { useAuth } from "@/app/contexts/auth";
 import { PLATFORM } from "@/app/lib/platform";
 import { useTheme } from "@/app/contexts/theme";
@@ -106,10 +104,11 @@ const NAVIGATION: NavigationItem[] = [
 
 const EMPTY_PLATFORM_DATA: AdminPlatformData = {
   tenants: [],
-  analyticsByTenant: {},
-  totalRevenue: 0,
-  totalActivity: 0,
-  totalCustomers: 0,
+  paidTenantIds: [],
+  subscriptionRevenue: 0,
+  monthlyRecurringRevenue: 0,
+  activeSubscriptions: 0,
+  subscriptionPayments: 0,
   totalUsers: 0,
   agents: [],
   roles: [],
@@ -131,12 +130,15 @@ export default function AdminPage() {
     useState<AdminPlatformData>(EMPTY_PLATFORM_DATA);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [platformDataLoadedAt, setPlatformDataLoadedAt] = useState("");
 
   const refreshPlatformData = useCallback(async () => {
     setIsLoading(true);
     setError("");
     try {
-      setPlatformData(await loadAdminPlatformData());
+      const loadedData = await loadAdminPlatformData();
+      setPlatformData(loadedData);
+      setPlatformDataLoadedAt(new Date().toISOString());
     } catch (loadError) {
       setError(
         loadError instanceof Error
@@ -186,6 +188,7 @@ export default function AdminPage() {
           onRefresh={() => void refreshPlatformData()}
           onToggleTheme={toggleTheme}
           theme={theme}
+          userId={user?.id}
         />
         <main className="mx-auto max-w-400 px-4 pb-10 pt-5 sm:px-6 lg:px-8">
           {error && (
@@ -200,12 +203,15 @@ export default function AdminPage() {
               hasError={Boolean(error)}
               isLoading={isLoading}
               onSelect={selectView}
+              referenceTime={platformDataLoadedAt}
             />
           )}
           {activeView === "tenants" && (
             <TenantView
               tenants={platformData.tenants}
+              paidTenantIds={platformData.paidTenantIds}
               isLoading={isLoading}
+              referenceTime={platformDataLoadedAt}
               onRefresh={() => void refreshPlatformData()}
             />
           )}
@@ -340,6 +346,7 @@ function AdminHeader({
   onRefresh,
   onToggleTheme,
   theme,
+  userId,
 }: {
   activeItem: NavigationItem;
   isLoading: boolean;
@@ -347,6 +354,7 @@ function AdminHeader({
   onRefresh: () => void;
   onToggleTheme: () => void;
   theme: "dark" | "light";
+  userId?: string;
 }) {
   return (
     <header className="pwa-admin-header-safe sticky top-0 z-30 border-b border-slate-800/80 bg-[#070d19]/90 px-4 pb-4 backdrop-blur-xl light:border-slate-200 light:bg-[#f5f7fb]/90 sm:px-6 lg:px-8">
@@ -404,13 +412,7 @@ function AdminHeader({
             <RefreshCw className={cn("h-4 w-4", isLoading && "animate-spin")} />
             Refresh
           </button>
-          <button
-            aria-label="Notifications"
-            className="relative flex h-11 w-11 items-center justify-center rounded-xl border border-slate-800 bg-slate-900/50 text-slate-400 light:border-slate-200 light:bg-white light:text-slate-600"
-          >
-            <Bell className="h-4 w-4" />
-            <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-rose-500" />
-          </button>
+          <PlatformNotificationCenter userId={userId} />
         </div>
       </div>
     </header>
@@ -422,20 +424,29 @@ function OverviewView({
   hasError,
   isLoading,
   onSelect,
+  referenceTime,
 }: {
   data: AdminPlatformData;
   hasError: boolean;
   isLoading: boolean;
   onSelect: (view: AdminView) => void;
+  referenceTime: string;
 }) {
   const activeTenants = data.tenants.filter((tenant) => tenant.isActive).length;
-  const topTenants = [...data.tenants]
-    .sort(
-      (a, b) =>
-        (data.analyticsByTenant[b.id]?.totalRevenue ?? 0) -
-        (data.analyticsByTenant[a.id]?.totalRevenue ?? 0),
-    )
-    .slice(0, 5);
+  const paidTenantIds = new Set(data.paidTenantIds);
+  const subscriptionMix = (["starter", "pro", "enterprise"] as const).map(
+    (plan) => ({
+      plan,
+      count: data.tenants.filter(
+        (tenant) => tenant.plan === plan && paidTenantIds.has(tenant.id),
+      ).length,
+    }),
+  );
+  const freeTrialCount = data.tenants.filter(
+    (tenant) =>
+      !paidTenantIds.has(tenant.id) &&
+      isTrialStillActive(tenant, referenceTime),
+  ).length;
   const revenueSpark = data.revenueSeries
     .slice(-9)
     .map((point) => point.revenue);
@@ -453,8 +464,8 @@ function OverviewView({
             Here&apos;s what&apos;s happening across the platform.
           </h2>
           <p className="mt-2 max-w-2xl text-sm text-slate-400 light:text-slate-600">
-            Revenue, activity, tenant, user, and role information below is
-            loaded from your Supabase project.
+            Subscription income and account health below are loaded from your
+            Supabase project. Tenant sales and customer activity stay private.
           </p>
         </div>
         <div className="absolute -bottom-12 right-4 h-44 w-44 rounded-full bg-violet-500/20 blur-3xl" />
@@ -472,26 +483,26 @@ function OverviewView({
         <MetricCard
           accent="violet"
           icon={CircleDollarSign}
-          label="Total Revenue"
+          label="Subscription Revenue"
           loading={isLoading}
           sparkValues={revenueSpark}
-          value={formatCurrency(data.totalRevenue)}
+          value={formatCurrency(data.subscriptionRevenue)}
         />
         <MetricCard
           accent="blue"
-          icon={ShoppingCart}
-          label="Orders & Appointments"
+          icon={CreditCard}
+          label="Monthly Recurring Revenue"
           loading={isLoading}
           sparkValues={activitySpark}
-          value={data.totalActivity.toLocaleString()}
+          value={formatCurrency(data.monthlyRecurringRevenue)}
         />
         <MetricCard
           accent="emerald"
-          icon={Users}
-          label="Customers"
+          icon={CheckCheck}
+          label="Active Subscriptions"
           loading={isLoading}
           sparkValues={[1, 2, 1, 3, 3, 5, 4, 6]}
-          value={data.totalCustomers.toLocaleString()}
+          value={data.activeSubscriptions.toLocaleString()}
         />
         <MetricCard
           accent="amber"
@@ -507,16 +518,16 @@ function OverviewView({
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
             <div>
               <h3 className="font-bold text-white light:text-slate-950">
-                Platform Overview
+                Subscription Overview
               </h3>
               <div className="mt-2 flex gap-4 text-xs text-slate-500">
                 <span className="flex items-center gap-1.5">
                   <i className="h-2 w-5 rounded-full bg-violet-500" />
-                  Revenue
+                  Subscription income
                 </span>
                 <span className="flex items-center gap-1.5">
                   <i className="h-2 w-5 rounded-full bg-cyan-500" />
-                  Activity
+                  Payments
                 </span>
               </div>
             </div>
@@ -529,7 +540,7 @@ function OverviewView({
         <div className={cn(panelClass, "p-5 sm:p-6")}>
           <div className="mb-4 flex items-center justify-between">
             <h3 className="font-bold text-white light:text-slate-950">
-              Top Performing Tenants
+              Subscription Mix
             </h3>
             <button
               className="text-xs font-semibold text-violet-400 light:text-violet-700"
@@ -539,31 +550,47 @@ function OverviewView({
             </button>
           </div>
           {isLoading && <LoadingRows count={4} />}
-          {!isLoading && topTenants.length === 0 && (
-            <EmptyState message="No tenant performance data yet." />
+          {!isLoading && data.tenants.length === 0 && (
+            <EmptyState message="No subscriptions yet." />
           )}
           <div className="space-y-1">
-            {topTenants.map((tenant) => (
+            {subscriptionMix.map(({ plan, count }) => (
               <div
-                key={tenant.id}
+                key={plan}
                 className="flex items-center gap-3 rounded-xl px-2 py-3 hover:bg-slate-800/60 light:hover:bg-slate-50"
               >
-                <TenantMark tenant={tenant} />
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/15 text-sm font-bold uppercase text-violet-400">
+                  {plan.slice(0, 1)}
+                </div>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold text-slate-100 light:text-slate-900">
-                    {tenant.name}
+                    {PLAN_DEFINITIONS[plan].name}
                   </p>
                   <p className="text-[11px] text-slate-500">
-                    Recognized revenue
+                    {formatCurrency(PLAN_DEFINITIONS[plan].price)} per month
                   </p>
                 </div>
                 <p className="text-sm font-bold text-slate-100 light:text-slate-900">
-                  {formatCurrency(
-                    data.analyticsByTenant[tenant.id]?.totalRevenue ?? 0,
-                  )}
+                  {count} tenant{count === 1 ? "" : "s"}
                 </p>
               </div>
             ))}
+            <div className="flex items-center gap-3 rounded-xl px-2 py-3 hover:bg-slate-800/60 light:hover:bg-slate-50">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/15 text-sm font-bold text-amber-400">
+                F
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold text-slate-100 light:text-slate-900">
+                  Free Trial
+                </p>
+                <p className="text-[11px] text-slate-500">
+                  Standard or admin-extended trial
+                </p>
+              </div>
+              <p className="text-sm font-bold text-slate-100 light:text-slate-900">
+                {freeTrialCount} tenant{freeTrialCount === 1 ? "" : "s"}
+              </p>
+            </div>
           </div>
         </div>
       </section>
@@ -656,7 +683,7 @@ function PlatformChart({ points }: { points: AdminRevenuePoint[] }) {
   return (
     <div className="overflow-x-auto">
       <svg
-        aria-label="Revenue and activity over the last 30 days"
+        aria-label="Subscription revenue and payment activity over the last 30 days"
         className="h-62.5 min-w-155 w-full"
         preserveAspectRatio="none"
         viewBox="0 0 720 250"
@@ -740,12 +767,7 @@ function RecentActivity({
       )}
       <div className="space-y-1">
         {activities.slice(0, 4).map((item) => {
-          const Icon =
-            item.type === "tenant"
-              ? Building2
-              : item.type === "order"
-                ? ShoppingCart
-                : CalendarDays;
+          const Icon = item.type === "tenant" ? Building2 : CreditCard;
           return (
             <div
               key={item.id}
@@ -845,11 +867,15 @@ function SystemHealth({
 
 function TenantView({
   tenants,
+  paidTenantIds,
   isLoading,
+  referenceTime,
   onRefresh,
 }: {
   tenants: Tenant[];
+  paidTenantIds: string[];
   isLoading: boolean;
+  referenceTime: string;
   onRefresh: () => void;
 }) {
   const [query, setQuery] = useState("");
@@ -983,8 +1009,8 @@ function TenantView({
                 <th className="px-5 py-3 font-semibold">Tenant</th>
                 <th className="px-4 py-3 font-semibold">Business</th>
                 <th className="px-4 py-3 font-semibold">Plan</th>
-                <th className="px-4 py-3 font-semibold">Status</th>
-                <th className="px-4 py-3 font-semibold">Monthly Revenue</th>
+                <th className="px-4 py-3 font-semibold">Access Status</th>
+                <th className="px-4 py-3 font-semibold">Subscription Fee</th>
                 <th className="px-4 py-3 font-semibold">Created</th>
                 <th className="px-4 py-3 text-right font-semibold">Actions</th>
               </tr>
@@ -1017,10 +1043,18 @@ function TenantView({
                       <PlanBadge plan={tenant.plan} />
                     </td>
                     <td className="px-4 py-4">
-                      <StatusBadge active={tenant.isActive} />
+                      <SubscriptionAccessBadge
+                        tenant={tenant}
+                        hasVerifiedPayment={paidTenantIds.includes(tenant.id)}
+                        referenceTime={referenceTime}
+                      />
                     </td>
-                    <td className="px-4 py-4 font-semibold text-slate-200 light:text-slate-800">
-                      {formatCurrency(tenant.monthlyRevenue ?? 0)}
+                    <td className="px-4 py-4">
+                      <SubscriptionFee
+                        tenant={tenant}
+                        hasVerifiedPayment={paidTenantIds.includes(tenant.id)}
+                        referenceTime={referenceTime}
+                      />
                     </td>
                     <td className="px-4 py-4 text-slate-500">
                       {formatDate(tenant.createdAt)}
@@ -1145,9 +1179,7 @@ function AgentView({
         value.toLowerCase().includes(normalized),
       );
     const matchesRole = role === "all" || agent.role === role;
-    const matchesStatus =
-      status === "all" ||
-      (status === "active" ? agent.isActive : !agent.isActive);
+    const matchesStatus = status === "all" || agent.status === status;
     return matchesSearch && matchesRole && matchesStatus;
   });
 
@@ -1213,6 +1245,7 @@ function AgentView({
           >
             <option value="all">All Status</option>
             <option value="active">Active</option>
+            <option value="pending">Pending</option>
             <option value="inactive">Inactive</option>
           </select>
         </ManagementFilters>
@@ -1259,7 +1292,7 @@ function AgentView({
                       {agent.tenantName}
                     </td>
                     <td className="px-4 py-4">
-                      <StatusBadge active={agent.isActive} />
+                      <AgentStatusBadge status={agent.status} />
                     </td>
                     <td className="px-4 py-4 text-slate-500">
                       {formatDate(agent.createdAt)}
@@ -1471,22 +1504,22 @@ function AnalyticsView({
         <MetricCard
           accent="violet"
           icon={CircleDollarSign}
-          label="Recognized Revenue"
+          label="Subscription Revenue"
           loading={isLoading}
           sparkValues={data.revenueSeries
             .map((point) => point.revenue)
             .slice(-9)}
-          value={formatCurrency(data.totalRevenue)}
+          value={formatCurrency(data.subscriptionRevenue)}
         />
         <MetricCard
           accent="blue"
-          icon={Activity}
-          label="Total Activity"
+          icon={CreditCard}
+          label="Subscription Payments"
           loading={isLoading}
           sparkValues={data.revenueSeries
             .map((point) => point.activity)
             .slice(-9)}
-          value={data.totalActivity.toLocaleString()}
+          value={data.subscriptionPayments.toLocaleString()}
         />
         <MetricCard
           accent="emerald"
@@ -1499,7 +1532,7 @@ function AnalyticsView({
       </div>
       <div className={cn(panelClass, "p-5 sm:p-6")}>
         <h3 className="mb-5 font-bold text-white light:text-slate-950">
-          30-day Platform Analytics
+          30-day Subscription Analytics
         </h3>
         <PlatformChart points={data.revenueSeries} />
       </div>
@@ -1521,7 +1554,7 @@ function ActivityView({
           Activity Logs
         </h2>
         <p className="mt-1 text-xs text-slate-500">
-          Latest tenants, orders, and appointments across the platform
+          Latest business registrations and subscription payments
         </p>
       </div>
       {isLoading && <LoadingRows count={5} />}
@@ -1535,7 +1568,11 @@ function ActivityView({
             className="flex items-center gap-4 rounded-xl border border-slate-800 bg-slate-900/30 p-4 light:border-slate-200 light:bg-slate-50"
           >
             <div className="rounded-xl bg-violet-500/15 p-2.5 text-violet-400">
-              <Activity className="h-4 w-4" />
+              {item.type === "tenant" ? (
+                <Building2 className="h-4 w-4" />
+              ) : (
+                <CreditCard className="h-4 w-4" />
+              )}
             </div>
             <div className="min-w-0 flex-1">
               <p className="font-semibold text-slate-100 light:text-slate-900">
@@ -1606,10 +1643,10 @@ function AdminBillingView({ tenants }: { tenants: Tenant[] }) {
       </div>
       <section className={cn(panelClass, "overflow-hidden")}>
         <div className="border-b border-slate-800 p-5 light:border-slate-200">
-          <h2 className="font-bold">Payment & invoice ledger</h2>
+          <h2 className="font-bold">Subscription payment & invoice ledger</h2>
           <p className="mt-1 text-xs text-slate-500">
-            Mock transactions are explicitly identified and process no real
-            money.
+            Only YuhBusiness subscription charges are shown here. Tenant sales
+            and customer payments remain private to each business.
           </p>
         </div>
         {error && <p className="p-5 text-sm text-red-400">{error}</p>}
@@ -1871,7 +1908,108 @@ function PlanBadge({ plan }: { plan: Tenant["plan"] }) {
     </span>
   );
 }
-function StatusBadge({ active }: { active: boolean }) {
+function SubscriptionFee({
+  tenant,
+  hasVerifiedPayment,
+  referenceTime,
+}: {
+  tenant: Tenant;
+  hasVerifiedPayment: boolean;
+  referenceTime: string;
+}) {
+  const status = tenant.subscriptionStatus;
+
+  if (!hasVerifiedPayment || status === "trial" || status === "trialing") {
+    const trialEnd = getTenantTrialEnd(tenant);
+    const referenceTimestamp = Date.parse(referenceTime);
+    const expired =
+      trialEnd !== null &&
+      !Number.isNaN(referenceTimestamp) &&
+      trialEnd.getTime() <= referenceTimestamp;
+
+    return (
+      <div>
+        <span
+          className={cn(
+            "inline-flex rounded-full px-2.5 py-1 text-[10px] font-bold",
+            expired
+              ? "bg-rose-500/10 text-rose-400 light:text-rose-700"
+              : "bg-amber-500/10 text-amber-300 light:text-amber-700",
+          )}
+        >
+          {expired ? "Free Trial Expired" : "Free Trial"}
+        </span>
+        {trialEnd && (
+          <p className="mt-1 text-[10px] text-slate-500">
+            {expired ? "Ended" : "Ends"}{" "}
+            {formatDateTime(trialEnd.toISOString())}
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  if (status === "active" && hasVerifiedPayment) {
+    return (
+      <span className="font-semibold text-slate-200 light:text-slate-800">
+        {formatCurrency(tenant.subscriptionRecurringTotal ?? 0)} / month
+      </span>
+    );
+  }
+
+  const label =
+    status === "past_due"
+      ? "Payment Past Due"
+      : status === "cancelled" || status === "canceled"
+        ? "Subscription Cancelled"
+        : "Subscription Expired";
+  return (
+    <span className="inline-flex rounded-full bg-rose-500/10 px-2.5 py-1 text-[10px] font-bold text-rose-400 light:text-rose-700">
+      {label}
+    </span>
+  );
+}
+
+function getTenantTrialEnd(tenant: Tenant) {
+  const explicitEnd = tenant.trialEndsAt ? new Date(tenant.trialEndsAt) : null;
+  const createdAt = new Date(tenant.createdAt);
+  return explicitEnd && !Number.isNaN(explicitEnd.getTime())
+    ? explicitEnd
+    : !Number.isNaN(createdAt.getTime())
+      ? new Date(createdAt.getTime() + 14 * 86_400_000)
+      : null;
+}
+
+function isTrialStillActive(tenant: Tenant, referenceTime: string) {
+  const trialEnd = getTenantTrialEnd(tenant);
+  const referenceTimestamp = Date.parse(referenceTime);
+  return (
+    trialEnd !== null &&
+    !Number.isNaN(referenceTimestamp) &&
+    trialEnd.getTime() > referenceTimestamp
+  );
+}
+function SubscriptionAccessBadge({
+  tenant,
+  hasVerifiedPayment,
+  referenceTime,
+}: {
+  tenant: Tenant;
+  hasVerifiedPayment: boolean;
+  referenceTime: string;
+}) {
+  const trialActive = isTrialStillActive(tenant, referenceTime);
+  const paidActive =
+    hasVerifiedPayment && tenant.subscriptionStatus === "active";
+  const active = tenant.isActive && (trialActive || paidActive);
+  const label = !tenant.isActive
+    ? "Inactive"
+    : paidActive
+      ? "Paid Active"
+      : trialActive
+        ? "Free Trial"
+        : "Trial Expired";
+
   return (
     <span
       className={cn(
@@ -1887,7 +2025,33 @@ function StatusBadge({ active }: { active: boolean }) {
           active ? "bg-emerald-400" : "bg-rose-400",
         )}
       />
-      {active ? "Active" : "Inactive"}
+      {label}
+    </span>
+  );
+}
+function AgentStatusBadge({ status }: { status: AdminAgentRecord["status"] }) {
+  const pending = status === "pending";
+  const active = status === "active";
+
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold",
+        pending
+          ? "bg-amber-500/10 text-amber-400"
+          : active
+            ? "bg-emerald-500/10 text-emerald-400"
+            : "bg-rose-500/10 text-rose-400",
+      )}
+      title={pending ? "Waiting for email confirmation and setup" : undefined}
+    >
+      <i
+        className={cn(
+          "h-1.5 w-1.5 rounded-full",
+          pending ? "bg-amber-400" : active ? "bg-emerald-400" : "bg-rose-400",
+        )}
+      />
+      {pending ? "Pending" : active ? "Active" : "Inactive"}
     </span>
   );
 }
@@ -1985,6 +2149,20 @@ function formatDate(value: string) {
         month: "short",
         day: "numeric",
         year: "numeric",
+      }).format(date);
+}
+function formatDateTime(value: string) {
+  if (!value) return "—";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? "—"
+    : new Intl.DateTimeFormat(PLATFORM.locale, {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+        timeZone: PLATFORM.timezone,
       }).format(date);
 }
 function formatShortDate(value: string) {

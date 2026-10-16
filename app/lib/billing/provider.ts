@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { PlanType } from "@/app/types";
+import { registerBelizeBankSubscription } from "@/app/lib/billing/belize-bank";
 
 export class PaymentConfigurationError extends Error {}
 
@@ -21,6 +22,7 @@ export interface SubscriptionCheckoutRequest {
   recurringTotal: number;
   currency: "BZD";
   idempotencyKey: string;
+  requestId: string;
 }
 
 export interface SubscriptionCheckoutResult {
@@ -77,6 +79,33 @@ const mockProvider: PaymentProvider = {
   },
 };
 
+const belizeBankProvider: PaymentProvider = {
+  id: "BELIZE_BANK",
+  isMock: false,
+  supportsProration: false,
+  async createOrUpdateSubscription(request) {
+    const registration = await registerBelizeBankSubscription({
+      tenantId: request.tenantId,
+      requestId: request.requestId,
+      ownerEmail: request.ownerEmail,
+      businessName: request.businessName,
+      planName: request.plan,
+      amount: request.recurringTotal,
+    });
+    return {
+      provider: "BELIZE_BANK",
+      providerReference: registration.orderId,
+      status: "pending",
+      redirectUrl: registration.formUrl,
+      isMock: false,
+    };
+  },
+  async scheduleCancellation() {
+    // Belize Bank checkout is currently a one-time hosted monthly payment.
+    // No recurring instruction exists at the gateway to cancel.
+  },
+};
+
 export function getPaymentProvider(): PaymentProvider {
   const configured = process.env.BILLING_PROVIDER?.trim().toLowerCase();
   if (
@@ -94,6 +123,9 @@ export function getPaymentProvider(): PaymentProvider {
     throw new PaymentConfigurationError(
       "BILLING_PROVIDER=mock is not allowed in production.",
     );
+  }
+  if (configured === "belize_bank" || configured === "belize-bank") {
+    return belizeBankProvider;
   }
   throw new PaymentConfigurationError(
     `The ${configured} subscription payment adapter is not installed.`,

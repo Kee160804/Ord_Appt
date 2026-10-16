@@ -55,24 +55,52 @@ export async function PATCH(request: Request, context: RouteContext) {
       );
     }
     if (
-      status === "trial" &&
-      trialDays !== null &&
-      (!Number.isInteger(trialDays) || trialDays < 1 || trialDays > 365)
+      (status === "trial" || status === "trialing") &&
+      (trialDays === null ||
+        !Number.isInteger(trialDays) ||
+        trialDays < 1 ||
+        trialDays > 14)
     ) {
       return Response.json(
-        { error: "Trial days must be a whole number between 1 and 365." },
+        {
+          error:
+            "Trial extension must be a whole number between 1 and 14 days.",
+        },
         { status: 400 },
       );
     }
 
     const { data: existingTenant, error: existingTenantError } = await admin
       .from("tenants")
-      .select("id,subscription_paid_staff_seats")
+      .select("id,subscription_paid_staff_seats,trial_ends_at")
       .eq("id", tenantId)
       .maybeSingle();
     if (existingTenantError) throw existingTenantError;
     if (!existingTenant) {
       return Response.json({ error: "Business not found." }, { status: 404 });
+    }
+
+    if (status === "active") {
+      const { data: verifiedPayment, error: paymentError } = await admin
+        .from("payment_transactions")
+        .select("id")
+        .eq("tenant_id", tenantId)
+        .eq("kind", "SUBSCRIPTION")
+        .eq("provider", "BELIZE_BANK")
+        .in("status", ["SUCCEEDED", "PARTIALLY_REFUNDED"])
+        .not("paid_at", "is", null)
+        .limit(1)
+        .maybeSingle();
+      if (paymentError) throw paymentError;
+      if (!verifiedPayment) {
+        return Response.json(
+          {
+            error:
+              "Paid access requires a successfully verified Belize Bank subscription payment.",
+          },
+          { status: 409 },
+        );
+      }
     }
 
     const planDefinition =
@@ -99,9 +127,21 @@ export async function PATCH(request: Request, context: RouteContext) {
     };
     if (status === "trial" || status === "trialing") {
       const days = trialDays ?? TRIAL_ENTITLEMENTS.lengthDays;
+      const existingTrialEnd = existingTenant.trial_ends_at
+        ? new Date(existingTenant.trial_ends_at)
+        : null;
+      const extensionStartsAt =
+        existingTrialEnd &&
+        !Number.isNaN(existingTrialEnd.getTime()) &&
+        existingTrialEnd.getTime() > Date.now()
+          ? existingTrialEnd
+          : new Date();
       updates.trial_ends_at = new Date(
-        Date.now() + days * 86_400_000,
+        extensionStartsAt.getTime() + days * 86_400_000,
       ).toISOString();
+      updates.subscription_base_amount = 0;
+      updates.subscription_seat_amount = 0;
+      updates.subscription_recurring_total = 0;
       updates.current_period_start = null;
       updates.current_period_end = null;
       updates.cancel_at_period_end = false;

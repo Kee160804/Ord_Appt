@@ -6,6 +6,11 @@ import {
   getPaymentProvider,
   PaymentConfigurationError,
 } from "@/app/lib/billing/provider";
+import {
+  BelizeBankConfigurationError,
+  BelizeBankGatewayError,
+} from "@/app/lib/billing/belize-bank";
+import { findBelizeBankCheckoutByRequest } from "@/app/lib/billing/belize-bank-checkout";
 import { authorizeBillingOwner } from "@/app/lib/server/billing-authorization";
 import {
   isValidUuid,
@@ -95,29 +100,113 @@ export async function POST(request: Request) {
 
     const provider = getPaymentProvider();
     const idempotencyKey = `subscription-checkout/${tenantId}/${requestId}`;
-    const providerResult = await provider.createOrUpdateSubscription({
-      tenantId,
-      ownerId: authorization.user.id,
-      ownerEmail: authorization.user.email ?? "",
-      businessName: tenant.business_name,
-      currentPlan:
-        tenant.plan === "pro" || tenant.plan === "enterprise"
-          ? tenant.plan
-          : "starter",
-      currentPaidStaffSeats: Number(tenant.subscription_paid_staff_seats ?? 0),
-      currentPeriodEnd: tenant.current_period_end ?? undefined,
-      providerCustomerId: tenant.provider_customer_id ?? undefined,
-      providerSubscriptionId: tenant.provider_subscription_id ?? undefined,
-      plan: body.plan,
-      paidStaffSeats,
-      baseAmount: amounts.baseAmount,
-      seatAmount: amounts.seatAmount,
-      recurringTotal: amounts.recurringTotal,
-      currency: amounts.currency,
-      idempotencyKey,
-    });
+    let checkoutSessionId = "";
+    if (provider.id === "BELIZE_BANK") {
+      const existing = await findBelizeBankCheckoutByRequest(
+        tenantId,
+        requestId,
+      );
+      if (existing?.status === "SUCCEEDED") {
+        return Response.json({ status: "completed", isMock: false, amounts });
+      }
+      if (existing?.form_url && existing.status === "PENDING") {
+        return Response.json({
+          status: "pending",
+          redirectUrl: existing.form_url,
+          amounts,
+        });
+      }
+      if (existing) {
+        return Response.json(
+          {
+            error:
+              existing.status === "FAILED" || existing.status === "CANCELLED"
+                ? "That payment attempt ended. Please start a new checkout."
+                : "That payment is still being registered. Please try again shortly.",
+          },
+          { status: 409 },
+        );
+      }
+      const { data: created, error: createError } = await authorization.admin
+        .from("subscription_checkout_sessions")
+        .insert({
+          tenant_id: tenantId,
+          request_id: requestId,
+          merchant_order_number: requestId,
+          plan: body.plan,
+          paid_staff_seats: paidStaffSeats,
+          base_amount: amounts.baseAmount,
+          seat_amount: amounts.seatAmount,
+          total_amount: amounts.recurringTotal,
+          currency: amounts.currency,
+          status: "REGISTERING",
+        })
+        .select("id")
+        .single();
+      if (createError) throw createError;
+      checkoutSessionId = created.id;
+    }
+
+    let providerResult;
+    try {
+      providerResult = await provider.createOrUpdateSubscription({
+        tenantId,
+        ownerId: authorization.user.id,
+        ownerEmail: authorization.user.email ?? "",
+        businessName: tenant.business_name,
+        currentPlan:
+          tenant.plan === "pro" || tenant.plan === "enterprise"
+            ? tenant.plan
+            : "starter",
+        currentPaidStaffSeats: Number(
+          tenant.subscription_paid_staff_seats ?? 0,
+        ),
+        currentPeriodEnd: tenant.current_period_end ?? undefined,
+        providerCustomerId: tenant.provider_customer_id ?? undefined,
+        providerSubscriptionId: tenant.provider_subscription_id ?? undefined,
+        plan: body.plan,
+        paidStaffSeats,
+        baseAmount: amounts.baseAmount,
+        seatAmount: amounts.seatAmount,
+        recurringTotal: amounts.recurringTotal,
+        currency: amounts.currency,
+        idempotencyKey,
+        requestId,
+      });
+    } catch (providerError) {
+      if (checkoutSessionId) {
+        await authorization.admin
+          .from("subscription_checkout_sessions")
+          .update({
+            status: "FAILED",
+            last_error:
+              providerError instanceof Error
+                ? providerError.message.slice(0, 500)
+                : "Unable to register the payment.",
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", checkoutSessionId);
+      }
+      throw providerError;
+    }
 
     if (providerResult.status === "pending") {
+      if (provider.id === "BELIZE_BANK") {
+        if (!checkoutSessionId || !providerResult.redirectUrl) {
+          throw new Error("Belize Bank checkout was not persisted correctly.");
+        }
+        const { error: updateError } = await authorization.admin
+          .from("subscription_checkout_sessions")
+          .update({
+            gateway_order_id: providerResult.providerReference,
+            form_url: providerResult.redirectUrl,
+            status: "PENDING",
+            last_error: null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", checkoutSessionId);
+        if (updateError) throw updateError;
+      }
       return Response.json({
         status: "pending",
         redirectUrl: providerResult.redirectUrl,
@@ -151,8 +240,17 @@ export async function POST(request: Request) {
       subscription: data,
     });
   } catch (error) {
-    if (error instanceof PaymentConfigurationError) {
+    if (
+      error instanceof PaymentConfigurationError ||
+      error instanceof BelizeBankConfigurationError
+    ) {
       return Response.json({ error: error.message }, { status: 503 });
+    }
+    if (error instanceof BelizeBankGatewayError) {
+      return Response.json(
+        { error: error.message, code: error.code },
+        { status: 502 },
+      );
     }
     return safeServerError(
       "subscription-checkout",

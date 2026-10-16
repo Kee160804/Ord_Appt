@@ -1,5 +1,5 @@
 import { requireSupabaseBrowserClient as client } from "@/app/lib/supabase/client";
-import type { AnalyticsSummary, Tenant, TopItem } from "@/app/types/index";
+import type { Tenant } from "@/app/types/index";
 import type { TenantRow } from "@/app/types/supabase";
 import { parseSocialLinks } from "@/app/lib/social-links";
 
@@ -14,39 +14,17 @@ interface PageResult<T> {
   error: QueryError | null;
 }
 
-interface AdminOrderItemRow {
-  product_name: string;
-  quantity: number | string;
-  subtotal: number | string;
-}
-
-interface AdminOrderRow {
+interface AdminSubscriptionPaymentRow {
   id: string;
   tenant_id: string;
   status: string;
-  total: number | string;
+  kind: string;
+  amount: number | string;
+  refunded_amount: number | string;
+  currency: string;
+  provider: string;
+  paid_at: string | null;
   created_at: string;
-  order_items: AdminOrderItemRow[] | null;
-}
-
-interface AdminAppointmentServiceRow {
-  service_name: string;
-  price: number | string;
-}
-
-interface AdminAppointmentRow {
-  id: string;
-  tenant_id: string;
-  status: string;
-  total: number | string | null;
-  subtotal: number | string | null;
-  created_at: string;
-  appointment_services: AdminAppointmentServiceRow[] | null;
-}
-
-interface AdminCustomerRow {
-  id: string;
-  tenant_id: string;
 }
 
 interface AdminProfileRow {
@@ -82,6 +60,7 @@ export interface AdminAgentRecord {
   tenantId: string | null;
   tenantName: string;
   isActive: boolean;
+  status: "active" | "inactive" | "pending";
   createdAt: string;
 }
 
@@ -102,7 +81,7 @@ export interface AdminRevenuePoint {
 
 export interface AdminActivityRecord {
   id: string;
-  type: "tenant" | "order" | "appointment";
+  type: "tenant" | "subscription";
   title: string;
   description: string;
   createdAt: string;
@@ -111,15 +90,16 @@ export interface AdminActivityRecord {
 
 export interface AdminTenantData {
   tenant: Tenant;
-  analytics: AnalyticsSummary;
+  hasVerifiedPayment: boolean;
 }
 
 export interface AdminPlatformData {
   tenants: Tenant[];
-  analyticsByTenant: Record<string, AnalyticsSummary>;
-  totalRevenue: number;
-  totalActivity: number;
-  totalCustomers: number;
+  paidTenantIds: string[];
+  subscriptionRevenue: number;
+  monthlyRecurringRevenue: number;
+  activeSubscriptions: number;
+  subscriptionPayments: number;
   totalUsers: number;
   agents: AdminAgentRecord[];
   roles: AdminRoleSummary[];
@@ -203,34 +183,6 @@ function mapTenant(row: TenantRow): Tenant {
   };
 }
 
-function emptyAnalytics(): AnalyticsSummary {
-  return {
-    totalRevenue: 0,
-    totalActivity: 0,
-    newCustomers: 0,
-    avgOrderValue: 0,
-    revenueChange: 0,
-    activityChange: 0,
-    topItems: [],
-    revenueData: [],
-  };
-}
-
-function addTopItem(
-  itemsByTenant: Map<string, Map<string, TopItem>>,
-  tenantId: string,
-  name: string,
-  count: number,
-  revenue: number,
-) {
-  const tenantItems = itemsByTenant.get(tenantId) ?? new Map<string, TopItem>();
-  const item = tenantItems.get(name) ?? { name, count: 0, revenue: 0 };
-  item.count += count;
-  item.revenue += revenue;
-  tenantItems.set(name, item);
-  itemsByTenant.set(tenantId, tenantItems);
-}
-
 async function loadData(tenantId?: string): Promise<AdminPlatformData> {
   const supabase = client();
   const tenantFilter = <T extends { eq: (column: string, value: string) => T }>(
@@ -239,9 +191,7 @@ async function loadData(tenantId?: string): Promise<AdminPlatformData> {
 
   const [
     tenantRows,
-    orderRows,
-    appointmentRows,
-    customerRows,
+    subscriptionPaymentRows,
     profileRows,
     membershipRows,
     roleRows,
@@ -255,38 +205,20 @@ async function loadData(tenantId?: string): Promise<AdminPlatformData> {
       const { data, error } = await query.range(from, to);
       return { data: data as TenantRow[] | null, error };
     }),
-    collectPages<AdminOrderRow>(async (from, to) => {
+    collectPages<AdminSubscriptionPaymentRow>(async (from, to) => {
       let query = supabase
-        .from("orders")
+        .from("payment_transactions")
         .select(
-          "id, tenant_id, status, total, created_at, order_items(product_name, quantity, subtotal)",
+          "id,tenant_id,status,kind,amount,refunded_amount,currency,provider,paid_at,created_at",
         )
+        .eq("kind", "SUBSCRIPTION")
         .order("created_at", { ascending: false });
       query = tenantFilter(query);
       const { data, error } = await query.range(from, to);
-      return { data: data as unknown as AdminOrderRow[] | null, error };
-    }),
-    collectPages<AdminAppointmentRow>(async (from, to) => {
-      let query = supabase
-        .from("appointments")
-        .select(
-          "id, tenant_id, status, total, subtotal, created_at, appointment_services(service_name, price)",
-        )
-        .order("created_at", { ascending: false });
-      query = tenantFilter(query);
-      const { data, error } = await query.range(from, to);
-      return { data: data as unknown as AdminAppointmentRow[] | null, error };
-    }),
-    collectPages<AdminCustomerRow>(async (from, to) => {
-      let query = supabase
-        .from("customers")
-        .select("id, tenant_id")
-        .order("created_at", {
-          ascending: false,
-        });
-      query = tenantFilter(query);
-      const { data, error } = await query.range(from, to);
-      return { data: data as AdminCustomerRow[] | null, error };
+      return {
+        data: data as AdminSubscriptionPaymentRow[] | null,
+        error,
+      };
     }),
     collectPages<AdminProfileRow>(async (from, to) => {
       const query = supabase
@@ -314,102 +246,7 @@ async function loadData(tenantId?: string): Promise<AdminPlatformData> {
     }),
   ]);
 
-  const analyticsByTenant = new Map<string, AnalyticsSummary>();
-  const itemsByTenant = new Map<string, Map<string, TopItem>>();
-  const recognizedActivity = new Map<string, number>();
-  const monthlyRevenue = new Map<string, number>();
-  const monthCutoff = Date.now() - 30 * 86_400_000;
-
-  for (const tenant of tenantRows)
-    analyticsByTenant.set(tenant.id, emptyAnalytics());
-
-  for (const customer of customerRows) {
-    const analytics = analyticsByTenant.get(customer.tenant_id);
-    if (analytics) analytics.newCustomers += 1;
-  }
-
-  for (const order of orderRows) {
-    const analytics = analyticsByTenant.get(order.tenant_id);
-    if (!analytics) continue;
-    analytics.totalActivity += 1;
-    const status = order.status.toUpperCase();
-    const recognized = status === "DELIVERED" || status === "COMPLETED";
-    const orderTotal = Number(order.total) || 0;
-    if (recognized) {
-      analytics.totalRevenue += orderTotal;
-      recognizedActivity.set(
-        order.tenant_id,
-        (recognizedActivity.get(order.tenant_id) ?? 0) + 1,
-      );
-      if (new Date(order.created_at).getTime() >= monthCutoff) {
-        monthlyRevenue.set(
-          order.tenant_id,
-          (monthlyRevenue.get(order.tenant_id) ?? 0) + orderTotal,
-        );
-      }
-    }
-    if (status === "CANCELLED") continue;
-    for (const item of order.order_items ?? []) {
-      addTopItem(
-        itemsByTenant,
-        order.tenant_id,
-        item.product_name,
-        Number(item.quantity) || 0,
-        recognized ? Number(item.subtotal) || 0 : 0,
-      );
-    }
-  }
-
-  for (const appointment of appointmentRows) {
-    const analytics = analyticsByTenant.get(appointment.tenant_id);
-    if (!analytics) continue;
-    analytics.totalActivity += 1;
-    const status = appointment.status.toUpperCase();
-    const recognized = status === "COMPLETED";
-    const services = appointment.appointment_services ?? [];
-    const appointmentTotal =
-      Number(appointment.total ?? appointment.subtotal) ||
-      services.reduce((sum, service) => sum + (Number(service.price) || 0), 0);
-    if (recognized) {
-      analytics.totalRevenue += appointmentTotal;
-      recognizedActivity.set(
-        appointment.tenant_id,
-        (recognizedActivity.get(appointment.tenant_id) ?? 0) + 1,
-      );
-      if (new Date(appointment.created_at).getTime() >= monthCutoff) {
-        monthlyRevenue.set(
-          appointment.tenant_id,
-          (monthlyRevenue.get(appointment.tenant_id) ?? 0) + appointmentTotal,
-        );
-      }
-    }
-    if (status === "CANCELLED") continue;
-    for (const service of services) {
-      addTopItem(
-        itemsByTenant,
-        appointment.tenant_id,
-        service.service_name,
-        1,
-        recognized ? Number(service.price) || 0 : 0,
-      );
-    }
-  }
-
-  for (const [id, analytics] of analyticsByTenant) {
-    const recognizedCount = recognizedActivity.get(id) ?? 0;
-    analytics.avgOrderValue = recognizedCount
-      ? analytics.totalRevenue / recognizedCount
-      : 0;
-    analytics.topItems = [...(itemsByTenant.get(id)?.values() ?? [])]
-      .sort((a, b) => b.count - a.count || b.revenue - a.revenue)
-      .slice(0, 5);
-  }
-
-  const tenants = tenantRows.map((row) => ({
-    ...mapTenant(row),
-    monthlyRevenue: monthlyRevenue.get(row.id) ?? 0,
-  }));
-  const analyticsRecord = Object.fromEntries(analyticsByTenant);
+  const tenants = tenantRows.map(mapTenant);
   const tenantNameById = new Map(
     tenants.map((tenant) => [tenant.id, tenant.name]),
   );
@@ -428,6 +265,12 @@ async function loadData(tenantId?: string): Promise<AdminPlatformData> {
       const isSuperAdmin =
         profile.platform_role?.toUpperCase() === "SUPER_ADMIN";
       const role = membership ? roleById.get(membership.role_id) : undefined;
+      const isActive = profile.is_active && (membership?.is_active ?? true);
+      const status = !isActive
+        ? "inactive"
+        : !isSuperAdmin && !membership
+          ? "pending"
+          : "active";
       return {
         id: profile.id,
         name:
@@ -442,7 +285,8 @@ async function loadData(tenantId?: string): Promise<AdminPlatformData> {
           : isSuperAdmin
             ? "Platform"
             : "Unassigned",
-        isActive: profile.is_active && (membership?.is_active ?? true),
+        isActive,
+        status,
         createdAt: profile.created_at ?? "",
       };
     })
@@ -503,26 +347,39 @@ async function loadData(tenantId?: string): Promise<AdminPlatformData> {
     seriesByDate.set(key, { date: key, revenue: 0, activity: 0 });
   }
 
-  for (const order of orderRows) {
-    const point = seriesByDate.get(order.created_at.slice(0, 10));
+  const liveSubscriptionPayments = subscriptionPaymentRows.filter(
+    (payment) => payment.provider.toUpperCase() === "BELIZE_BANK",
+  );
+  const recognizedSubscriptionPayments = liveSubscriptionPayments.filter(
+    (payment) =>
+      ["SUCCEEDED", "PARTIALLY_REFUNDED", "REFUNDED"].includes(
+        payment.status.toUpperCase(),
+      ) && Boolean(payment.paid_at),
+  );
+  const paidTenantIds = new Set(
+    recognizedSubscriptionPayments
+      .filter((payment) =>
+        ["SUCCEEDED", "PARTIALLY_REFUNDED"].includes(
+          payment.status.toUpperCase(),
+        ),
+      )
+      .map((payment) => payment.tenant_id),
+  );
+
+  for (const payment of liveSubscriptionPayments) {
+    const occurredAt = payment.paid_at ?? payment.created_at;
+    const point = seriesByDate.get(occurredAt.slice(0, 10));
     if (!point) continue;
     point.activity += 1;
-    if (["DELIVERED", "COMPLETED"].includes(order.status.toUpperCase())) {
-      point.revenue += Number(order.total) || 0;
-    }
-  }
-  for (const appointment of appointmentRows) {
-    const point = seriesByDate.get(appointment.created_at.slice(0, 10));
-    if (!point) continue;
-    point.activity += 1;
-    if (appointment.status.toUpperCase() === "COMPLETED") {
-      const services = appointment.appointment_services ?? [];
-      point.revenue +=
-        Number(appointment.total ?? appointment.subtotal) ||
-        services.reduce(
-          (sum, service) => sum + (Number(service.price) || 0),
-          0,
-        );
+    if (
+      ["SUCCEEDED", "PARTIALLY_REFUNDED", "REFUNDED"].includes(
+        payment.status.toUpperCase(),
+      )
+    ) {
+      point.revenue += Math.max(
+        0,
+        (Number(payment.amount) || 0) - (Number(payment.refunded_amount) || 0),
+      );
     }
   }
 
@@ -535,36 +392,46 @@ async function loadData(tenantId?: string): Promise<AdminPlatformData> {
       createdAt: tenant.created_at ?? "",
       tenantName: tenant.business_name,
     })),
-    ...orderRows.map((order) => ({
-      id: `order-${order.id}`,
-      type: "order" as const,
-      title: "Order placed",
-      description: `Order ${order.id.slice(0, 8).toUpperCase()} was created`,
-      createdAt: order.created_at,
-      tenantName: tenantNameById.get(order.tenant_id) ?? "Unknown tenant",
-    })),
-    ...appointmentRows.map((appointment) => ({
-      id: `appointment-${appointment.id}`,
-      type: "appointment" as const,
-      title: "Appointment booked",
-      description: `Appointment ${appointment.id.slice(0, 8).toUpperCase()} was created`,
-      createdAt: appointment.created_at,
-      tenantName: tenantNameById.get(appointment.tenant_id) ?? "Unknown tenant",
+    ...liveSubscriptionPayments.map((payment) => ({
+      id: `subscription-${payment.id}`,
+      type: "subscription" as const,
+      title: `Subscription payment ${payment.status.toLowerCase()}`,
+      description: `${Number(payment.amount) || 0} ${payment.currency} via ${payment.provider}`,
+      createdAt: payment.paid_at ?? payment.created_at,
+      tenantName:
+        tenantNameById.get(payment.tenant_id) ?? "Unknown subscription",
     })),
   ]
     .filter((activity) => activity.createdAt)
     .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
     .slice(0, 6);
 
+  const paidTenants = tenants.filter(
+    (tenant) =>
+      tenant.subscriptionStatus === "active" &&
+      paidTenantIds.has(tenant.id) &&
+      (tenant.subscriptionRecurringTotal ?? 0) > 0,
+  );
+  const subscriptionRevenue = recognizedSubscriptionPayments.reduce(
+    (sum, payment) =>
+      sum +
+      Math.max(
+        0,
+        (Number(payment.amount) || 0) - (Number(payment.refunded_amount) || 0),
+      ),
+    0,
+  );
+
   return {
     tenants,
-    analyticsByTenant: analyticsRecord,
-    totalRevenue: Object.values(analyticsRecord).reduce(
-      (sum, analytics) => sum + analytics.totalRevenue,
+    paidTenantIds: [...paidTenantIds],
+    subscriptionRevenue,
+    monthlyRecurringRevenue: paidTenants.reduce(
+      (sum, tenant) => sum + (tenant.subscriptionRecurringTotal ?? 0),
       0,
     ),
-    totalActivity: orderRows.length + appointmentRows.length,
-    totalCustomers: customerRows.length,
+    activeSubscriptions: paidTenants.length,
+    subscriptionPayments: liveSubscriptionPayments.length,
     totalUsers: profileRows.length,
     agents,
     roles: [...roleGroups.values()].sort((a, b) => b.userCount - a.userCount),
@@ -585,7 +452,7 @@ export async function loadAdminTenantData(
   if (!tenant) return null;
   return {
     tenant,
-    analytics: data.analyticsByTenant[tenant.id] ?? emptyAnalytics(),
+    hasVerifiedPayment: data.paidTenantIds.includes(tenant.id),
   };
 }
 
@@ -699,6 +566,7 @@ export interface CreateAdminAgentResult {
     tenantId: string | null;
     tenantName: string;
     isActive: boolean;
+    status?: "active" | "inactive" | "pending";
   };
   emailSent?: boolean;
   createdNewUser?: boolean;

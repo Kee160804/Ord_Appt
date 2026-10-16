@@ -50,6 +50,9 @@ EMAIL_WEBHOOK_SECRET
 NEXT_PUBLIC_APP_URL
 # Set only after a real server-side billing adapter is installed.
 BILLING_PROVIDER
+BELIZE_BANK_PAYMENT_URL
+BELIZE_BANK_USERNAME
+BELIZE_BANK_PASSWORD
 ```
 
 Use the same URL and publishable key as `.env.local`. Never place a Supabase
@@ -96,10 +99,12 @@ unless `NEXT_PUBLIC_ENABLE_DEMO_MODE=true` is explicitly set.
 - Recipient-scoped Supabase Realtime in-app notifications with personal read state and tenant-isolated links.
 - Full public ordering checkout for dine-in, pickup, and delivery, including server-authoritative taxes, discounts, fees, minimums, and inventory.
 - Protected public order, booking, promotion, and contact APIs with distributed throttling and abuse controls.
-- Provider-neutral monthly subscription lifecycle, BZD invoice/payment ledger, automated $2 staff-seat totals, owner cancellation at period end, and an explicitly labelled development mock gateway.
+- Provider-neutral monthly subscription lifecycle, Belize Bank hosted card checkout, verified gateway status callbacks, BZD invoice/payment ledger, automated $2 staff-seat totals, owner cancellation at period end, and an explicitly labelled development mock gateway.
 - Reproducible baseline schema for new Supabase projects.
 
-Real-money payments remain disabled until a provider adapter, verified webhook,
-sandbox/production credentials, and `BILLING_PROVIDER` are configured. Development
-may use `BILLING_PROVIDER=mock`; production rejects mock billing and never silently
-activates a mock subscription.
+Belize Bank subscription payments remain disabled until the new checkout migration,
+sandbox/production credentials, public HTTPS callback URL, and
+`BILLING_PROVIDER=belize_bank` are configured. Development may use
+`BILLING_PROVIDER=mock`; production rejects mock billing and never silently activates
+a mock subscription. Customer order and appointment card routing remains disabled and
+is intentionally separate from platform subscription billing.

@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
   Check,
   CreditCard,
+  ExternalLink,
   LogOut,
   ShieldCheck,
   Sparkles,
@@ -19,7 +20,10 @@ import type { PlanType } from "@/app/types";
 import type { Tenant, User } from "@/app/types";
 import { BusinessSwitcher } from "@/app/components/BusinessSwitcher";
 import { Modal } from "@/app/components/Modal";
-import { PaymentMethodSetup } from "@/app/components/PaymentMethodSetup";
+import {
+  getBelizeBankCheckoutStatus,
+  startSubscriptionCheckout,
+} from "@/app/services/billingService";
 
 const plans = PLAN_ORDER.map((planId) => ({
   ...PLAN_DEFINITIONS[planId],
@@ -37,6 +41,10 @@ export function SubscriptionRequired({
   onLogout: () => Promise<void>;
 }) {
   const [checkoutPlan, setCheckoutPlan] = useState<PlanType | null>(null);
+  const [processing, setProcessing] = useState(false);
+  const [paymentMessage, setPaymentMessage] = useState("");
+  const [paymentError, setPaymentError] = useState("");
+  const checkoutRequestId = useRef<string | null>(null);
   const [seatSelections, setSeatSelections] = useState<
     Record<PlanType, number>
   >(
@@ -54,6 +62,97 @@ export function SubscriptionRequired({
       ) as Record<PlanType, number>,
   );
   const isOwner = user.role === "owner";
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const requestId = params.get("billingRequest")?.trim();
+    const returnedTenant = params.get("tenant")?.trim();
+    if (!requestId || (returnedTenant && returnedTenant !== tenant.id)) return;
+
+    setProcessing(true);
+    setPaymentError("");
+    setPaymentMessage("Verifying your Belize Bank payment...");
+    getBelizeBankCheckoutStatus(tenant.id, requestId)
+      .then((result) => {
+        if (result.state === "completed") {
+          setPaymentMessage("Payment confirmed. Restoring your dashboard...");
+          const nextUrl = new URL(
+            "/dashboard/settings",
+            window.location.origin,
+          );
+          nextUrl.searchParams.set("tab", "payments");
+          window.location.replace(nextUrl.toString());
+          return;
+        }
+        if (result.state === "pending") {
+          setPaymentMessage(
+            "Belize Bank is still processing this payment. Reload this page shortly to check again.",
+          );
+        } else if (result.state === "cancelled") {
+          setPaymentMessage("");
+          setPaymentError("The Belize Bank payment was cancelled.");
+        } else if (result.state === "refunded") {
+          setPaymentMessage("");
+          setPaymentError("This Belize Bank payment has been refunded.");
+        } else {
+          setPaymentMessage("");
+          setPaymentError("The Belize Bank payment was not approved.");
+        }
+      })
+      .catch((error) => {
+        setPaymentMessage("");
+        setPaymentError(
+          error instanceof Error
+            ? error.message
+            : "Unable to verify the Belize Bank payment.",
+        );
+      })
+      .finally(() => setProcessing(false));
+  }, [tenant.id]);
+
+  const paySubscription = async () => {
+    if (!checkoutPlan) return;
+    setProcessing(true);
+    setPaymentError("");
+    setPaymentMessage("");
+    checkoutRequestId.current ??= crypto.randomUUID();
+    try {
+      const result = await startSubscriptionCheckout(
+        tenant.id,
+        checkoutPlan,
+        seatSelections[checkoutPlan],
+        checkoutRequestId.current,
+      );
+      if (result.status === "pending" && result.redirectUrl) {
+        const redirect = new URL(result.redirectUrl);
+        if (redirect.protocol !== "https:") {
+          throw new Error("The bank returned an unsafe payment address.");
+        }
+        window.location.assign(redirect.toString());
+        return;
+      }
+      if (result.status === "completed") {
+        checkoutRequestId.current = null;
+        window.location.replace("/dashboard/settings?tab=payments");
+        return;
+      }
+      throw new Error("The subscription checkout did not start correctly.");
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        /ended|start a new checkout/i.test(error.message)
+      ) {
+        checkoutRequestId.current = null;
+      }
+      setPaymentError(
+        error instanceof Error
+          ? error.message
+          : "Unable to start the Belize Bank payment.",
+      );
+    } finally {
+      setProcessing(false);
+    }
+  };
 
   return (
     <div className="pwa-page-roomy min-h-dvh bg-[#070b14] px-4 py-8 text-white light:bg-[#f6f8fc] light:text-slate-900 sm:px-6">
@@ -173,7 +272,7 @@ export function SubscriptionRequired({
           <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
           <p>
             {isOwner
-              ? "Choose a plan to review the online payment options. Subscription activation will begin once payment integration is available."
+              ? "Choose a plan and pay securely on Belize Bank's hosted payment page. Your subscription activates only after the bank confirms the payment."
               : "Only the business owner can purchase or change a subscription. Ask the owner to sign in and complete checkout."}
           </p>
         </div>
@@ -185,16 +284,49 @@ export function SubscriptionRequired({
             title={`${PLAN_DEFINITIONS[checkoutPlan].name} subscription checkout`}
             maxWidth="max-w-xl"
           >
-            <PaymentMethodSetup
-              amount={
-                calculateSubscriptionAmounts(
-                  checkoutPlan,
-                  seatSelections[checkoutPlan],
-                ).recurringTotal
-              }
-              continueLabel="Continue"
-              description={`Pay for the ${PLAN_DEFINITIONS[checkoutPlan].name} subscription plan.`}
-            />
+            <div className="space-y-4">
+              <div className="flex gap-3 rounded-xl border border-emerald-500/25 bg-emerald-500/10 p-4 text-xs leading-5 text-slate-300 light:text-slate-700">
+                <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-400" />
+                <p>
+                  You will enter your card details only on Belize Bank&apos;s
+                  hosted payment page. YuhBusiness does not collect or store
+                  your card number or CVV.
+                </p>
+              </div>
+              <div className="flex items-center justify-between rounded-xl border border-violet-500/25 bg-violet-500/10 px-4 py-3">
+                <span className="text-xs font-semibold">Total due</span>
+                <span className="text-lg font-black text-violet-300 light:text-violet-700">
+                  $
+                  {
+                    calculateSubscriptionAmounts(
+                      checkoutPlan,
+                      seatSelections[checkoutPlan],
+                    ).recurringTotal
+                  }{" "}
+                  BZD
+                </span>
+              </div>
+              {paymentError && (
+                <p className="text-sm text-red-400">{paymentError}</p>
+              )}
+              {paymentMessage && (
+                <p className="text-sm text-emerald-400">{paymentMessage}</p>
+              )}
+              <button
+                type="button"
+                disabled={processing}
+                onClick={() => void paySubscription()}
+                className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-3 text-xs font-bold text-white hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <ExternalLink className="h-4 w-4" />
+                {processing
+                  ? "Connecting securely..."
+                  : "Continue to Belize Bank"}
+              </button>
+              <p className="text-center text-[10px] text-slate-400 light:text-slate-600">
+                This payment covers one monthly subscription period.
+              </p>
+            </div>
           </Modal>
         )}
       </div>

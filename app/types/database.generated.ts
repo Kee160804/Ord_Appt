@@ -1423,6 +1423,65 @@ export type Database = {
           },
         ];
       };
+      platform_notifications: {
+        Row: {
+          created_at: string;
+          event_key: string;
+          href: string;
+          id: string;
+          is_read: boolean;
+          message: string;
+          metadata: Json;
+          read_at: string | null;
+          recipient_id: string;
+          source_id: string | null;
+          source_table: string;
+          tenant_id: string | null;
+          title: string;
+          type: string;
+        };
+        Insert: {
+          created_at?: string;
+          event_key: string;
+          href?: string;
+          id?: string;
+          is_read?: boolean;
+          message: string;
+          metadata?: Json;
+          read_at?: string | null;
+          recipient_id: string;
+          source_id?: string | null;
+          source_table: string;
+          tenant_id?: string | null;
+          title: string;
+          type: string;
+        };
+        Update: {
+          created_at?: string;
+          event_key?: string;
+          href?: string;
+          id?: string;
+          is_read?: boolean;
+          message?: string;
+          metadata?: Json;
+          read_at?: string | null;
+          recipient_id?: string;
+          source_id?: string | null;
+          source_table?: string;
+          tenant_id?: string | null;
+          title?: string;
+          type?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "platform_notifications_tenant_id_fkey";
+            columns: ["tenant_id"];
+            isOneToOne: false;
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       privacy_requests: {
         Row: {
           acknowledgement_message_id: string | null;

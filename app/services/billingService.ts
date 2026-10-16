@@ -53,6 +53,7 @@ export async function listBillingLedger(tenantId?: string) {
     .select(
       "id,tenant_id,kind,amount,refunded_amount,currency,status,provider,provider_reference,created_at",
     )
+    .eq("kind", "SUBSCRIPTION")
     .order("created_at", { ascending: false })
     .limit(100);
   let invoiceQuery = client()
@@ -124,6 +125,28 @@ export async function startSubscriptionCheckout(
     throw new Error(
       result.error || "Unable to complete subscription checkout.",
     );
+  return result;
+}
+
+export async function getBelizeBankCheckoutStatus(
+  tenantId: string,
+  requestId: string,
+) {
+  const params = new URLSearchParams({ tenantId, requestId });
+  const response = await fetch(
+    `/api/billing/belize-bank/status?${params.toString()}`,
+    { cache: "no-store" },
+  );
+  const result = (await response.json()) as {
+    error?: string;
+    state?: "pending" | "completed" | "failed" | "cancelled" | "refunded";
+    gatewayStatus?: number | null;
+  };
+  if (!response.ok || !result.state) {
+    throw new Error(
+      result.error || "Unable to verify the subscription payment.",
+    );
+  }
   return result;
 }
 

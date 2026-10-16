@@ -15,6 +15,8 @@ import {
   RotateCcw,
   ZoomIn,
   Bell,
+  ExternalLink,
+  ShieldCheck,
 } from "lucide-react";
 import { Card, CardHeader, CardBody } from "../components/Card";
 import { Button } from "../components/Button";
@@ -28,7 +30,6 @@ import {
 } from "../lib/plans";
 import { PlanFeatureRequired } from "./PlanFeatureRequired";
 import { BusinessLogo } from "./BusinessLogo";
-import { PaymentMethodSetup } from "./PaymentMethodSetup";
 import { TeamAccessView } from "./TeamAccessView";
 import {
   updateBusinessDetails,
@@ -46,8 +47,10 @@ import {
 } from "../services/settingsService";
 import {
   cancelSubscriptionAtPeriodEnd,
+  getBelizeBankCheckoutStatus,
   getSubscriptionSummary,
   listBillingLedger,
+  startSubscriptionCheckout,
   type BillingInvoice,
   type SubscriptionSummary,
   type BillingTransaction,
@@ -81,6 +84,16 @@ interface Props {
 export function SettingsView({ tenant, user, onTenantUpdated }: Props) {
   const [active, setActive] = useState<Tab>("business");
   const [hours, setHours] = useState(tenant.businessHours);
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      if (
+        new URLSearchParams(window.location.search).get("tab") === "payments"
+      ) {
+        setActive("payments");
+      }
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
   return (
     <div className="min-h-full space-y-4 bg-[#08111f] light:bg-[#f8fafc] p-4 text-white light:text-[#14213a] md:p-5">
       <div className="sr-only">
@@ -994,6 +1007,7 @@ function PaymentsTab({
   const [processing, setProcessing] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const checkoutRequestId = useRef<string | null>(null);
   const refresh = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -1020,6 +1034,118 @@ function PaymentsTab({
   useEffect(() => {
     void refresh();
   }, [refresh]);
+  const applySubscriptionSummary = useCallback(
+    (summary: SubscriptionSummary) => {
+      setSubscription(summary);
+      setSelectedPlan(summary.plan);
+      setPaidStaffSeats(summary.paidStaffSeats);
+      onTenantUpdated({
+        ...tenant,
+        plan: summary.plan,
+        subscriptionStatus: summary.status as Tenant["subscriptionStatus"],
+        currentPeriodStart: summary.currentPeriodStart,
+        currentPeriodEnd: summary.currentPeriodEnd,
+        cancelAtPeriodEnd: summary.cancelAtPeriodEnd,
+        canceledAt: summary.canceledAt,
+        subscriptionBaseAmount: summary.baseAmount,
+        subscriptionSeatAmount: summary.seatAmount,
+        subscriptionRecurringTotal: summary.recurringTotal,
+        subscriptionPaidStaffSeats: summary.paidStaffSeats,
+      });
+    },
+    [onTenantUpdated, tenant],
+  );
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const requestId = params.get("billingRequest")?.trim();
+    const returnedTenant = params.get("tenant")?.trim();
+    if (!requestId || (returnedTenant && returnedTenant !== tenant.id)) return;
+
+    params.delete("billingRequest");
+    params.delete("tenant");
+    const nextUrl = `${window.location.pathname}${params.size ? `?${params.toString()}` : ""}${window.location.hash}`;
+    window.history.replaceState({}, "", nextUrl);
+    setProcessing(true);
+    setError("");
+    setMessage("Verifying your Belize Bank payment...");
+    getBelizeBankCheckoutStatus(tenant.id, requestId)
+      .then(async (result) => {
+        if (result.state === "completed") {
+          const summary = await getSubscriptionSummary(tenant.id);
+          applySubscriptionSummary(summary);
+          await refresh();
+          setMessage("Payment confirmed. Your subscription is active.");
+        } else if (result.state === "pending") {
+          setMessage(
+            "Belize Bank is still processing this payment. Refresh shortly to check again.",
+          );
+        } else if (result.state === "cancelled") {
+          setMessage("");
+          setError("The Belize Bank payment was cancelled.");
+        } else if (result.state === "refunded") {
+          setMessage("");
+          setError("This Belize Bank payment has been refunded.");
+        } else {
+          setMessage("");
+          setError("The Belize Bank payment was not approved.");
+        }
+      })
+      .catch((statusError) => {
+        setMessage("");
+        setError(
+          statusError instanceof Error
+            ? statusError.message
+            : "Unable to verify the Belize Bank payment.",
+        );
+      })
+      .finally(() => setProcessing(false));
+  }, [applySubscriptionSummary, refresh, tenant.id]);
+
+  const paySubscription = async () => {
+    setProcessing(true);
+    setError("");
+    setMessage("");
+    checkoutRequestId.current ??= crypto.randomUUID();
+    try {
+      const result = await startSubscriptionCheckout(
+        tenant.id,
+        selectedPlan,
+        paidStaffSeats,
+        checkoutRequestId.current,
+      );
+      if (result.status === "pending" && result.redirectUrl) {
+        const redirect = new URL(result.redirectUrl);
+        if (redirect.protocol !== "https:") {
+          throw new Error("The bank returned an unsafe payment address.");
+        }
+        window.location.assign(redirect.toString());
+        return;
+      }
+      if (result.status === "completed") {
+        checkoutRequestId.current = null;
+        const summary = await getSubscriptionSummary(tenant.id);
+        applySubscriptionSummary(summary);
+        await refresh();
+        setMessage("Payment confirmed. Your subscription is active.");
+        return;
+      }
+      throw new Error("The subscription checkout did not start correctly.");
+    } catch (checkoutError) {
+      if (
+        checkoutError instanceof Error &&
+        /ended|start a new checkout/i.test(checkoutError.message)
+      ) {
+        checkoutRequestId.current = null;
+      }
+      setError(
+        checkoutError instanceof Error
+          ? checkoutError.message
+          : "Unable to start the Belize Bank payment.",
+      );
+    } finally {
+      setProcessing(false);
+    }
+  };
   const cancel = async () => {
     if (
       !window.confirm(
@@ -1185,11 +1311,48 @@ function PaymentsTab({
           </div>
           {error && <p className="text-sm text-red-400">{error}</p>}
           {message && <p className="text-sm text-emerald-400">{message}</p>}
-          <PaymentMethodSetup
-            amount={selectedAmounts.recurringTotal}
-            continueLabel="Continue"
-            description={`Pay for the ${selectedDefinition.name} subscription plan.`}
-          />
+          <section className="overflow-hidden rounded-2xl border border-[#263651] bg-[#0b1728]/90 light:border-slate-200 light:bg-white">
+            <div className="flex items-center gap-3 border-b border-[#22324b] px-4 py-4 light:border-slate-200 sm:px-5">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-600 text-white">
+                <CreditCard className="h-5 w-5" />
+              </span>
+              <div>
+                <h3 className="text-sm font-black">Belize Bank card payment</h3>
+                <p className="mt-0.5 text-[11px] text-slate-400 light:text-slate-600">
+                  Pay your YuhBusiness monthly subscription securely.
+                </p>
+              </div>
+            </div>
+            <div className="space-y-4 p-4 sm:p-5">
+              <div className="flex gap-3 rounded-xl border border-emerald-500/25 bg-emerald-500/10 p-4 text-xs leading-5 text-slate-300 light:text-slate-700">
+                <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-400" />
+                <p>
+                  You will enter your card details only on Belize Bank&apos;s
+                  hosted payment page. YuhBusiness does not collect or store
+                  your card number or CVV.
+                </p>
+              </div>
+              <div className="flex items-center justify-between rounded-xl border border-violet-500/25 bg-violet-500/10 px-4 py-3">
+                <span className="text-xs font-semibold">Total due</span>
+                <span className="text-lg font-black text-violet-300 light:text-violet-700">
+                  {formatCurrency(selectedAmounts.recurringTotal)}
+                </span>
+              </div>
+              <Button
+                type="button"
+                loading={processing}
+                disabled={processing}
+                onClick={() => void paySubscription()}
+                className="min-h-12 w-full"
+              >
+                <ExternalLink className="h-4 w-4" /> Continue to Belize Bank
+              </Button>
+              <p className="text-center text-[10px] text-slate-400 light:text-slate-600">
+                Your subscription activates only after YuhBusiness verifies the
+                approved payment directly with Belize Bank.
+              </p>
+            </div>
+          </section>
           <div className="flex flex-wrap gap-3">
             {subscription?.status === "active" &&
               subscription.currentPeriodEnd &&
