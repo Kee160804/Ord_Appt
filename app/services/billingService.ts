@@ -26,6 +26,7 @@ export interface BillingTransaction {
   status: string;
   provider: string;
   reference: string;
+  invoiceId?: string;
   createdAt: string;
 }
 export interface BillingInvoice {
@@ -51,9 +52,12 @@ export async function listBillingLedger(tenantId?: string) {
   let transactionQuery = client()
     .from("payment_transactions")
     .select(
-      "id,tenant_id,kind,amount,refunded_amount,currency,status,provider,provider_reference,created_at",
+      "id,tenant_id,invoice_id,kind,amount,refunded_amount,currency,status,provider,provider_reference,created_at,paid_at",
     )
     .eq("kind", "SUBSCRIPTION")
+    .eq("provider", "BELIZE_BANK")
+    .in("status", ["SUCCEEDED", "PARTIALLY_REFUNDED", "REFUNDED"])
+    .not("paid_at", "is", null)
     .order("created_at", { ascending: false })
     .limit(100);
   let invoiceQuery = client()
@@ -73,31 +77,45 @@ export async function listBillingLedger(tenantId?: string) {
   ]);
   if (transactionsResult.error) throw transactionsResult.error;
   if (invoicesResult.error) throw invoicesResult.error;
+  const transactions = (transactionsResult.data ?? []).map((row) => ({
+    id: row.id,
+    tenantId: row.tenant_id,
+    kind: row.kind,
+    amount: Number(row.amount),
+    refundedAmount: Number(row.refunded_amount),
+    currency: row.currency,
+    status: row.status,
+    provider: row.provider,
+    reference: row.provider_reference,
+    invoiceId: row.invoice_id ?? undefined,
+    createdAt: row.created_at,
+  })) as BillingTransaction[];
+  const verifiedInvoiceIds = new Set(
+    transactions
+      .map((transaction) => transaction.invoiceId)
+      .filter((invoiceId): invoiceId is string => Boolean(invoiceId)),
+  );
   return {
-    transactions: (transactionsResult.data ?? []).map((row) => ({
-      id: row.id,
-      tenantId: row.tenant_id,
-      kind: row.kind,
-      amount: Number(row.amount),
-      refundedAmount: Number(row.refunded_amount),
-      currency: row.currency,
-      status: row.status,
-      provider: row.provider,
-      reference: row.provider_reference,
-      createdAt: row.created_at,
-    })) as BillingTransaction[],
-    invoices: (invoicesResult.data ?? []).map((row) => ({
-      id: row.id,
-      tenantId: row.tenant_id,
-      number: row.invoice_number,
-      plan: row.plan as PlanType,
-      amount: Number(row.amount),
-      currency: row.currency,
-      status: row.status,
-      periodStart: row.period_start,
-      periodEnd: row.period_end,
-      paidAt: row.paid_at ?? undefined,
-    })) as BillingInvoice[],
+    transactions,
+    invoices: (invoicesResult.data ?? [])
+      .filter(
+        (row) =>
+          row.status === "PAID" &&
+          Boolean(row.paid_at) &&
+          verifiedInvoiceIds.has(row.id),
+      )
+      .map((row) => ({
+        id: row.id,
+        tenantId: row.tenant_id,
+        number: row.invoice_number,
+        plan: row.plan as PlanType,
+        amount: Number(row.amount),
+        currency: row.currency,
+        status: row.status,
+        periodStart: row.period_start,
+        periodEnd: row.period_end,
+        paidAt: row.paid_at ?? undefined,
+      })) as BillingInvoice[],
   };
 }
 

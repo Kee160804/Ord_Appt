@@ -57,3 +57,48 @@ test("Pro and Enterprise pricing list promotion codes and flyers", async () => {
       ?.length >= 2,
   );
 });
+
+test("owners can customize the public contact page and preview their changes", async () => {
+  const [contact, designer, designParser, socialLinks] = await Promise.all([
+    read("app/components/StorefrontContact.tsx"),
+    read("app/components/StorefrontDesigner.tsx"),
+    read("app/lib/storefront-design.ts"),
+    read("app/lib/social-links.ts"),
+  ]);
+
+  assert.match(contact, /design\.contactHeading/);
+  assert.match(contact, /design\.contactDescription/);
+  assert.match(contact, /mapHref\(design\.contactMapUrl, location\)/);
+  assert.match(contact, /tenant\.coverImage/);
+  assert.match(designer, /Contact page content/);
+  assert.match(designer, /Contact information/);
+  assert.match(designer, /Maps share URL/);
+  assert.match(designer, /design\.contactMapUrl/);
+  assert.match(designer, /updateBusinessDetails/);
+  assert.match(designer, /ContactPagePreview/);
+  assert.match(designer, /label=\{platform\.label\}/);
+  assert.match(designer, /contactSection === "social"/);
+  assert.match(designer, /sm:grid-cols-2/);
+  assert.match(designer, /visibleSocials/);
+  assert.match(designParser, /contactResponseText/);
+  assert.match(designParser, /contactTrustText/);
+  assert.match(designParser, /contactMapUrl/);
+  assert.match(designParser, /STOREFRONT_SOCIAL_PLATFORMS/);
+  assert.match(contact, /Business Hours/);
+  assert.match(contact, /Find Us Online/);
+  assert.match(contact, /WhatsApp/);
+  assert.match(contact, /TikTok/);
+  assert.match(contact, /YouTube/);
+  assert.match(socialLinks, /"whatsapp"/);
+  assert.match(socialLinks, /"tiktok"/);
+  assert.match(socialLinks, /"youtube"/);
+});
+
+test("storefront desktop and mobile previews follow the active dashboard theme", async () => {
+  const designer = await read("app/components/StorefrontDesigner.tsx");
+
+  assert.match(designer, /const \{ theme \} = useTheme\(\)/);
+  assert.match(designer, /theme=\{theme\}/);
+  assert.match(designer, /theme === "light"/);
+  assert.match(designer, /mobile=\{previewMode === "mobile"\}/);
+});

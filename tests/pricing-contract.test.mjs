@@ -267,9 +267,56 @@ test("mock billing is development-only and stale marketing/payment placeholders 
     /Mock subscription payments are disabled in production/,
   );
   assert.match(provider, /BILLING_PROVIDER=mock is not allowed in production/);
+  assert.match(provider, /planName: PLAN_DEFINITIONS\[request\.plan\]\.name/);
   const publicSources = `${home}\n${subscriptionRequired}\n${env}`;
   assert.doesNotMatch(publicSources, /https:\/\/your-payment-link\//);
   assert.doesNotMatch(publicSources, /5(?:×|Ã—)|\$0\.53\/day/i);
   assert.doesNotMatch(publicSources, /Unlimited products or services/i);
-  assert.match(home, /3× the monthly activity/);
+  assert.match(
+    home,
+    /const proActivityMultiplier =[\s\S]+monthlyActivityLimit/,
+  );
+  assert.match(home, /\{proActivityMultiplier\}× the monthly activity/);
+});
+
+test("pricing surfaces source changeable values from the canonical catalog", async () => {
+  const [
+    home,
+    settings,
+    subscriptionRequired,
+    teamAccess,
+    registration,
+    businessSwitcher,
+    admin,
+  ] = await Promise.all([
+    readFile("app/home/page.tsx", "utf8"),
+    readFile("app/components/SettingsView.tsx", "utf8"),
+    readFile("app/components/SubscriptionRequired.tsx", "utf8"),
+    readFile("app/components/TeamAccessView.tsx", "utf8"),
+    readFile("app/register/page.tsx", "utf8"),
+    readFile("app/components/BusinessSwitcher.tsx", "utf8"),
+    readFile("app/admin/page.tsx", "utf8"),
+  ]);
+
+  assert.match(home, /PLAN_DEFINITIONS\.pro\.additionalStaffSeatPrice/);
+  assert.match(home, /TRIAL_ENTITLEMENTS\.lengthDays/);
+  assert.match(settings, /selectedDefinition\.additionalStaffSeatPrice/);
+  assert.match(subscriptionRequired, /plan\.additionalStaffSeatPrice/);
+  assert.match(subscriptionRequired, /TRIAL_ENTITLEMENTS\.lengthDays/);
+  assert.match(teamAccess, /summary\.additionalSeatPrice/);
+  assert.match(registration, /TRIAL_ENTITLEMENTS\.lengthDays/);
+  assert.match(businessSwitcher, /TRIAL_ENTITLEMENTS\.lengthDays/);
+  assert.match(admin, /TRIAL_ENTITLEMENTS\.lengthDays/);
+
+  const combined = [
+    home,
+    settings,
+    subscriptionRequired,
+    teamAccess,
+    registration,
+    businessSwitcher,
+    admin,
+  ].join("\n");
+  assert.doesNotMatch(combined, /\$2 BZD each/);
+  assert.doesNotMatch(combined, /\b14-day (?:free )?trial/i);
 });

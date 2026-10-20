@@ -495,9 +495,10 @@ export function TeamAccessView({ tenant }: { tenant: Tenant }) {
           </CardHeader>
           <CardBody>
             <p className="text-xs leading-5 text-slate-400 light:text-slate-600">
-              Each additional staff seat is $2 BZD per month for this business.
-              The owner can change paid seats through Billing & Payments; the
-              subscription total updates only after checkout is confirmed.
+              Each additional staff seat is ${summary.additionalSeatPrice} BZD
+              per month for this business. The owner can change paid seats
+              through Billing & Payments; the subscription total updates only
+              after checkout is confirmed.
             </p>
             {summary.pendingSeatRequest ? (
               <div className="mt-4 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-100 light:text-amber-800">

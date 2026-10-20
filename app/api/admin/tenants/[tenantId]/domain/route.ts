@@ -14,13 +14,36 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     const authorization = await authorizeActiveSuperAdmin(
-      "Only a platform super admin can verify custom domains.",
+      "Only a platform super admin can manage storefront URL access.",
     );
     if (!authorization.authorized) return authorization.response;
 
     const { admin } = authorization;
 
-    const body = (await request.json()) as { verified?: unknown };
+    const body = (await request.json()) as {
+      verified?: unknown;
+      allowStorefrontUrlEdit?: unknown;
+    };
+    if (typeof body.allowStorefrontUrlEdit === "boolean") {
+      const { data: tenant, error: updateError } = await admin
+        .from("tenants")
+        .update({ allow_storefront_url_edit: body.allowStorefrontUrlEdit })
+        .eq("id", tenantId)
+        .select(
+          "custom_domain,custom_domain_verified_at,allow_storefront_url_edit",
+        )
+        .maybeSingle();
+      if (updateError) throw updateError;
+      if (!tenant) {
+        return Response.json({ error: "Business not found." }, { status: 404 });
+      }
+      return Response.json({
+        domain: tenant.custom_domain,
+        verified: Boolean(tenant.custom_domain_verified_at),
+        allowStorefrontUrlEdit: tenant.allow_storefront_url_edit,
+      });
+    }
+
     if (typeof body.verified !== "boolean") {
       return Response.json(
         { error: "A verification state is required." },

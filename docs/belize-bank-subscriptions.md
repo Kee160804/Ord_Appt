@@ -4,6 +4,11 @@ This integration is intentionally limited to monthly YuhBusiness subscription
 payments made by business owners. It does not process or route storefront
 customer payments for orders, appointments, or retail purchases.
 
+> **Prelaunch:** Owner-facing checkout is currently a non-mutating preview. The
+> server returns `503` for checkout requests unless
+> `SUBSCRIPTION_CHECKOUT_ENABLED=true` is explicitly configured. No subscription
+> should be activated before a verified Belize Bank payment exists.
+
 ## Payment flow
 
 1. The authenticated business owner selects a YuhBusiness plan and staff seats.
@@ -38,6 +43,7 @@ registrations remain separate from the paid subscription ledger.
 Configure these server-side variables in the deployment environment:
 
 ```text
+SUBSCRIPTION_CHECKOUT_ENABLED=true
 BILLING_PROVIDER=belize_bank
 BELIZE_BANK_PAYMENT_URL=https://sandbox.belizebank.com/payment/rest
 BELIZE_BANK_USERNAME=<sandbox username from Belize Bank>
@@ -64,6 +70,7 @@ origin during the test.
 After Belize Bank certifies the sandbox integration, set:
 
 ```text
+SUBSCRIPTION_CHECKOUT_ENABLED=true
 BILLING_PROVIDER=belize_bank
 BELIZE_BANK_PAYMENT_URL=https://gateway.belizebank.com/payment/rest
 BELIZE_BANK_USERNAME=<production username from Belize Bank>

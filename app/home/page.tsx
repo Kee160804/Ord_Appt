@@ -16,9 +16,21 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { PublicHeader } from "@/app/components/PublicHeader";
-import { PLAN_DEFINITIONS, approximateDailyPrice } from "@/app/lib/plans";
+import {
+  PLAN_DEFINITIONS,
+  TRIAL_ENTITLEMENTS,
+  approximateDailyPrice,
+} from "@/app/lib/plans";
 
 export default function HomePage() {
+  const proPriceDifference =
+    PLAN_DEFINITIONS.pro.price - PLAN_DEFINITIONS.starter.price;
+  const enterprisePriceDifference =
+    PLAN_DEFINITIONS.enterprise.price - PLAN_DEFINITIONS.pro.price;
+  const proActivityMultiplier =
+    PLAN_DEFINITIONS.pro.monthlyActivityLimit! /
+    PLAN_DEFINITIONS.starter.monthlyActivityLimit!;
+
   const teamAccess = (plan: keyof typeof PLAN_DEFINITIONS) => {
     const definition = PLAN_DEFINITIONS[plan];
     const totalIncludedAccounts = definition.includedStaffSeats + 1;
@@ -101,7 +113,7 @@ export default function HomePage() {
       description:
         "Unlock the controls and insights that help you grow faster.",
       dailyPrice: `About $${approximateDailyPrice(PLAN_DEFINITIONS.pro.price).toFixed(2)} a day`,
-      priceAnchor: "Only $3 more than Beginner",
+      priceAnchor: `Only $${proPriceDifference} more than Beginner`,
       color: "border-violet-500 light:border-violet-300",
       badge: "Best Value · Most Popular",
       cta: "Choose Pro",
@@ -124,7 +136,7 @@ export default function HomePage() {
       audience: "For established, high-volume businesses",
       description: "Remove the limits and get extra help as demand increases.",
       dailyPrice: `About $${approximateDailyPrice(PLAN_DEFINITIONS.enterprise.price).toFixed(2)} a day`,
-      priceAnchor: "Just $4 more than Pro",
+      priceAnchor: `Just $${enterprisePriceDifference} more than Pro`,
       color: "border-indigo-500/70 light:border-indigo-300",
       badge: "Maximum Scale",
       cta: "Go Enterprise",
@@ -214,7 +226,7 @@ export default function HomePage() {
             <Check className="h-3.5 w-3.5 stroke-[3]" />
           </span>
           <strong className="font-black uppercase tracking-wide text-violet-300 light:text-violet-700">
-            14 days free fi true
+            {TRIAL_ENTITLEMENTS.lengthDays} days free fi true
           </strong>
           <span className="hidden h-4 w-px bg-violet-400/35 sm:block" />
           <span className="font-bold text-white light:text-slate-800">
@@ -435,7 +447,7 @@ export default function HomePage() {
                 <Check className="h-4 w-4 stroke-[3]" />
               </span>
               <span className="text-sm font-black uppercase tracking-wide text-violet-300 light:text-violet-700">
-                Yuh 14-day free trial
+                Yuh {TRIAL_ENTITLEMENTS.lengthDays}-day free trial
               </span>
               <span className="hidden h-5 w-px bg-violet-400/35 sm:block" />
               <span className="text-sm font-bold text-white light:text-slate-800">
@@ -562,17 +574,21 @@ export default function HomePage() {
                 Why Pro da di smartest place fi start
               </p>
               <p className="mt-1 text-sm leading-6 text-slate-400 light:text-gray-600">
-                For only $3 more than Beginner, you get 3× the monthly activity,
-                live analytics, and advanced ordering or booking controls—while
-                still paying about $0.40 per day.
+                For only ${proPriceDifference} more than Beginner, you get{" "}
+                {proActivityMultiplier}× the monthly activity, live analytics,
+                and advanced ordering or booking controls—while still paying
+                about $
+                {approximateDailyPrice(PLAN_DEFINITIONS.pro.price).toFixed(2)}{" "}
+                per day.
               </p>
             </div>
           </div>
 
           <p className="mt-7 text-center text-xs text-slate-500 light:text-gray-500">
             All prices are monthly in BZD and apply per business. Paid staff
-            seats are $2 BZD each per month. Account limits include the owner.
-            Each business starts its own 14-day trial.
+            seats are ${PLAN_DEFINITIONS.pro.additionalStaffSeatPrice} BZD each
+            per month. Account limits include the owner. Each business starts
+            its own {TRIAL_ENTITLEMENTS.lengthDays}-day trial.
           </p>
         </div>
       </section>
@@ -615,7 +631,11 @@ export default function HomePage() {
             Mek yuh free account <ArrowRight className="w-5 h-5" />
           </Link>
           <div className="flex items-center justify-center gap-6 mt-8 text-sm text-slate-500 light:text-gray-600">
-            {["No card needed", "14 days free", "Cancel anytime"].map((t) => (
+            {[
+              "No card needed",
+              `${TRIAL_ENTITLEMENTS.lengthDays} days free`,
+              "Cancel anytime",
+            ].map((t) => (
               <span key={t} className="flex items-center gap-1.5">
                 <Check className="w-3.5 h-3.5 text-emerald-500 light:text-emerald-600" />{" "}
                 {t}

@@ -26,6 +26,7 @@ import {
 import { getStoredProducts, getStoredServices } from "@/app/lib/storage";
 import { isSupabaseConfigured } from "@/app/lib/supabase/config";
 import { tenantHasFeature } from "@/app/lib/plans";
+import { parseStorefrontDesign } from "@/app/lib/storefront-design";
 import { AppointmentBooking } from "../components/AppointmentBooking";
 import { OrderingMenu } from "../components/OrderingMenu";
 import { BusinessLogo } from "../components/BusinessLogo";
@@ -267,6 +268,12 @@ export default function StorefrontClient({
       ? "Shop"
       : "Menu";
   const canShowPromotions = tenantHasFeature(tenant, "storefront_promotions");
+  const storefrontDesign = parseStorefrontDesign(
+    tenant.storefrontDesign,
+    tenant.businessType,
+  );
+  const showPromotions =
+    canShowPromotions && storefrontDesign.sections.promotions;
 
   const switchTab = (tab: StorefrontTab, promotionId?: string) => {
     setActiveTab(tab);
@@ -289,7 +296,7 @@ export default function StorefrontClient({
       const nextTab: StorefrontTab =
         tab === "about" || tab === "contact"
           ? tab
-          : tab === "promotions" && canShowPromotions
+          : tab === "promotions" && showPromotions
             ? "promotions"
             : "catalog";
       setActiveTab(nextTab);
@@ -298,7 +305,7 @@ export default function StorefrontClient({
     syncTabFromUrl();
     window.addEventListener("popstate", syncTabFromUrl);
     return () => window.removeEventListener("popstate", syncTabFromUrl);
-  }, [canShowPromotions]);
+  }, [showPromotions]);
 
   useEffect(() => {
     if (activeTab !== "promotions" || !selectedPromotionId) return;
@@ -392,8 +399,10 @@ export default function StorefrontClient({
                         label: catalogLabel,
                         icon: Store,
                       },
-                      { id: "about" as const, label: "About", icon: Info },
-                      ...(canShowPromotions
+                      ...(storefrontDesign.sections.about
+                        ? [{ id: "about" as const, label: "About", icon: Info }]
+                        : []),
+                      ...(showPromotions
                         ? [
                             {
                               id: "promotions" as const,
@@ -402,7 +411,9 @@ export default function StorefrontClient({
                             },
                           ]
                         : []),
-                      { id: "contact" as const, label: "Contact", icon: Phone },
+                      ...(storefrontDesign.sections.contact
+                        ? [{ id: "contact" as const, label: "Contact", icon: Phone }]
+                        : []),
                     ].map((item) => {
                       const Icon = item.icon;
                       return (
@@ -486,8 +497,10 @@ export default function StorefrontClient({
                       label: catalogLabel,
                       icon: Store,
                     },
-                    { id: "about" as const, label: "About", icon: Info },
-                    ...(canShowPromotions
+                    ...(storefrontDesign.sections.about
+                      ? [{ id: "about" as const, label: "About", icon: Info }]
+                      : []),
+                    ...(showPromotions
                       ? [
                           {
                             id: "promotions" as const,
@@ -496,7 +509,9 @@ export default function StorefrontClient({
                           },
                         ]
                       : []),
-                    { id: "contact" as const, label: "Contact", icon: Phone },
+                    ...(storefrontDesign.sections.contact
+                      ? [{ id: "contact" as const, label: "Contact", icon: Phone }]
+                      : []),
                   ].map((item) => {
                     const Icon = item.icon;
                     return (

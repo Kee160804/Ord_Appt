@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { PlanType } from "@/app/types";
+import { PLAN_DEFINITIONS } from "@/app/lib/plans";
 import { registerBelizeBankSubscription } from "@/app/lib/billing/belize-bank";
 
 export class PaymentConfigurationError extends Error {}
@@ -89,7 +90,7 @@ const belizeBankProvider: PaymentProvider = {
       requestId: request.requestId,
       ownerEmail: request.ownerEmail,
       businessName: request.businessName,
-      planName: request.plan,
+      planName: PLAN_DEFINITIONS[request.plan].name,
       amount: request.recurringTotal,
     });
     return {
@@ -110,7 +111,8 @@ export function getPaymentProvider(): PaymentProvider {
   const configured = process.env.BILLING_PROVIDER?.trim().toLowerCase();
   if (
     process.env.NODE_ENV !== "production" &&
-    (!configured || configured === "mock")
+    configured === "mock" &&
+    process.env.ENABLE_MOCK_BILLING === "true"
   ) {
     return mockProvider;
   }
@@ -121,7 +123,9 @@ export function getPaymentProvider(): PaymentProvider {
   }
   if (configured === "mock") {
     throw new PaymentConfigurationError(
-      "BILLING_PROVIDER=mock is not allowed in production.",
+      process.env.NODE_ENV === "production"
+        ? "BILLING_PROVIDER=mock is not allowed in production."
+        : "Mock subscription activation is disabled. Set ENABLE_MOCK_BILLING=true only for isolated billing tests.",
     );
   }
   if (configured === "belize_bank" || configured === "belize-bank") {

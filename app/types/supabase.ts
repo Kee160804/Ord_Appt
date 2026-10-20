@@ -34,7 +34,9 @@ export interface TenantRow {
   subdomain: string;
   custom_domain?: string | null;
   custom_domain_verified_at?: string | null;
+  allow_storefront_url_edit?: boolean | null;
   social_links?: Record<string, unknown> | null;
+  storefront_design?: Record<string, unknown> | null;
   business_type?: string | null;
   description?: string | null;
   about_text?: string | null;

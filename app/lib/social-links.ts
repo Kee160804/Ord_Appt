@@ -1,6 +1,14 @@
 import type { SocialLinks } from "@/app/types";
 
-const SOCIAL_KEYS = ["instagram", "facebook", "twitter", "website"] as const;
+const SOCIAL_KEYS = [
+  "instagram",
+  "facebook",
+  "twitter",
+  "tiktok",
+  "whatsapp",
+  "youtube",
+  "website",
+] as const;
 
 export function parseSocialLinks(value: unknown): SocialLinks {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};

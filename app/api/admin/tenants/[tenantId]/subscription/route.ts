@@ -59,12 +59,11 @@ export async function PATCH(request: Request, context: RouteContext) {
       (trialDays === null ||
         !Number.isInteger(trialDays) ||
         trialDays < 1 ||
-        trialDays > 14)
+        trialDays > TRIAL_ENTITLEMENTS.lengthDays)
     ) {
       return Response.json(
         {
-          error:
-            "Trial extension must be a whole number between 1 and 14 days.",
+          error: `Trial extension must be a whole number between 1 and ${TRIAL_ENTITLEMENTS.lengthDays} days.`,
         },
         { status: 400 },
       );

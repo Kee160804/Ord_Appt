@@ -37,6 +37,7 @@ export interface Promotion {
   name: string;
   discountType: "PERCENTAGE" | "FIXED";
   discountValue: number;
+  discountScope: "TOTAL" | "ITEMS";
   description: string;
   flyerUrl: string;
   startsAt: string;
@@ -306,6 +307,7 @@ export async function listPromotions(tenantId: string): Promise<Promotion[]> {
       name: textValue(row.name),
       discountType: row.discount_type === "FIXED" ? "FIXED" : "PERCENTAGE",
       discountValue: Number(row.discount_value ?? 0),
+      discountScope: row.discount_scope === "ITEMS" ? "ITEMS" : "TOTAL",
       description: textValue(row.description),
       flyerUrl: textValue(row.flyer_url),
       startsAt: textValue(row.starts_at),
@@ -349,19 +351,29 @@ export async function savePromotion(
   ) {
     throw new Error("The promotion end date must be after its start date.");
   }
+  if (
+    promotion.discountScope === "ITEMS" &&
+    promotion.applicableProductIds.length === 0 &&
+    promotion.applicableServiceIds.length === 0
+  ) {
+    throw new Error("Select at least one item or service for this promotion.");
+  }
   const values = {
     tenant_id: tenantId,
     code,
     name: promotion.name.trim(),
     discount_type: promotion.discountType,
     discount_value: promotion.discountValue,
+    discount_scope: promotion.discountScope,
     description: promotion.description.trim() || null,
     flyer_url: promotion.flyerUrl.trim() || null,
     starts_at: promotion.startsAt || null,
     ends_at: promotion.endsAt || null,
     usage_limit: promotion.usageLimit,
-    applicable_product_ids: promotion.applicableProductIds,
-    applicable_service_ids: promotion.applicableServiceIds,
+    applicable_product_ids:
+      promotion.discountScope === "ITEMS" ? promotion.applicableProductIds : [],
+    applicable_service_ids:
+      promotion.discountScope === "ITEMS" ? promotion.applicableServiceIds : [],
     is_active: promotion.isActive,
     updated_at: new Date().toISOString(),
   };
@@ -413,6 +425,8 @@ export async function validatePromotion(
         : ("PERCENTAGE" as const),
     discountValue: Number(row.discountValue ?? 0),
     discountAmount: Number(row.discountAmount ?? 0),
+    discountScope:
+      row.discountScope === "ITEMS" ? ("ITEMS" as const) : ("TOTAL" as const),
     applicableProductIds: stringArray(row.applicableProductIds),
   };
 }

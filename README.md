@@ -48,6 +48,8 @@ SUPABASE_SECRET_KEY
 CRON_SECRET
 EMAIL_WEBHOOK_SECRET
 NEXT_PUBLIC_APP_URL
+# Keep false until the real gateway is certified and ready for customers.
+SUBSCRIPTION_CHECKOUT_ENABLED=false
 # Set only after a real server-side billing adapter is installed.
 BILLING_PROVIDER
 BELIZE_BANK_PAYMENT_URL
@@ -99,12 +101,14 @@ unless `NEXT_PUBLIC_ENABLE_DEMO_MODE=true` is explicitly set.
 - Recipient-scoped Supabase Realtime in-app notifications with personal read state and tenant-isolated links.
 - Full public ordering checkout for dine-in, pickup, and delivery, including server-authoritative taxes, discounts, fees, minimums, and inventory.
 - Protected public order, booking, promotion, and contact APIs with distributed throttling and abuse controls.
-- Provider-neutral monthly subscription lifecycle, Belize Bank hosted card checkout, verified gateway status callbacks, BZD invoice/payment ledger, automated $2 staff-seat totals, owner cancellation at period end, and an explicitly labelled development mock gateway.
+- Provider-neutral monthly subscription lifecycle, a non-mutating prelaunch checkout preview, verified gateway status callbacks, BZD invoice/payment ledger, automated $2 staff-seat totals, and owner cancellation at period end.
 - Reproducible baseline schema for new Supabase projects.
 
-Belize Bank subscription payments remain disabled until the new checkout migration,
-sandbox/production credentials, public HTTPS callback URL, and
-`BILLING_PROVIDER=belize_bank` are configured. Development may use
-`BILLING_PROVIDER=mock`; production rejects mock billing and never silently activates
-a mock subscription. Customer order and appointment card routing remains disabled and
-is intentionally separate from platform subscription billing.
+Belize Bank subscription payments remain disabled until certification, the
+checkout migration, credentials, public HTTPS callback URL,
+`BILLING_PROVIDER=belize_bank`, and `SUBSCRIPTION_CHECKOUT_ENABLED=true` are all
+configured. The owner-facing checkout is currently a preview and cannot change
+subscription data. Mock subscription activation requires the separate
+`ENABLE_MOCK_BILLING=true` development flag and remains blocked in production.
+Customer order and appointment card routing remains disabled and is intentionally
+separate from platform subscription billing.

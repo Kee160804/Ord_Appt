@@ -13,6 +13,7 @@ interface ModalProps {
   maxWidth?: string;
   footer?: React.ReactNode;
   contentClassName?: string;
+  scrollable?: boolean;
 }
 
 interface ScrollLockSnapshot {
@@ -93,6 +94,7 @@ export function Modal({
   maxWidth = "max-w-lg",
   footer,
   contentClassName,
+  scrollable = true,
 }: ModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -237,7 +239,10 @@ export function Modal({
         )}
         <div
           className={cn(
-            "min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain px-4 py-5 sm:px-6",
+            "min-h-0 flex-1 overscroll-contain px-4 py-5 sm:px-6",
+            scrollable
+              ? "touch-pan-y overflow-y-auto"
+              : "touch-none overflow-hidden",
             contentClassName,
           )}
         >

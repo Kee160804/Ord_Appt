@@ -2,6 +2,7 @@ import "server-only";
 
 import { getSupabasePublicClient } from "@/app/lib/supabase/server";
 import { parseSocialLinks } from "@/app/lib/social-links";
+import { parseStorefrontDesign } from "@/app/lib/storefront-design";
 import type {
   BusinessReview,
   Category,
@@ -59,6 +60,7 @@ type PublicPromotionRow = {
   name: string;
   discount_type: string;
   discount_value: number | string;
+  discount_scope: string;
   description: string | null;
   flyer_url: string | null;
   starts_at: string | null;
@@ -111,6 +113,12 @@ function normalizedSlug(value: string): string {
 
 function mapTenant(row: TenantRow, hours: BusinessHourRow[]): Tenant {
   const businessName = row.business_name;
+  const businessType =
+    row.business_type?.toLowerCase() === "ordering"
+      ? "ordering"
+      : row.business_type?.toLowerCase() === "retail"
+        ? "retail"
+        : "appointment";
   return {
     id: row.id,
     name: businessName,
@@ -120,12 +128,8 @@ function mapTenant(row: TenantRow, hours: BusinessHourRow[]): Tenant {
       : undefined,
     customDomain: row.custom_domain ?? undefined,
     customDomainVerified: Boolean(row.custom_domain_verified_at),
-    businessType:
-      row.business_type?.toLowerCase() === "ordering"
-        ? "ordering"
-        : row.business_type?.toLowerCase() === "retail"
-          ? "retail"
-          : "appointment",
+    storefrontUrlEditAllowed: row.allow_storefront_url_edit === true,
+    businessType,
     logo: row.logo ?? businessName.charAt(0).toUpperCase(),
     logoImage: row.logo_url ?? undefined,
     logoBg: row.logo_bg ?? row.primary_color ?? "#8b5cf6",
@@ -152,6 +156,10 @@ function mapTenant(row: TenantRow, hours: BusinessHourRow[]): Tenant {
     socialLinks: parseSocialLinks(row.social_links),
     primaryColor: row.primary_color ?? "#8b5cf6",
     accentColor: row.accent_color ?? "#a78bfa",
+    storefrontDesign: parseStorefrontDesign(
+      row.storefront_design,
+      businessType,
+    ),
     createdAt: row.created_at ?? new Date().toISOString(),
     isActive: row.is_active && row.status.toUpperCase() === "ACTIVE",
     plan:
@@ -489,6 +497,7 @@ export async function getPublicStorefront(
             ? ("FIXED" as const)
             : ("PERCENTAGE" as const),
         discountValue: nonNegativeNumber(row.discount_value, 0),
+        discountScope: row.discount_scope === "ITEMS" ? "ITEMS" : "TOTAL",
         description: row.description ?? undefined,
         flyerUrl: row.flyer_url ?? undefined,
         startsAt: row.starts_at ?? undefined,

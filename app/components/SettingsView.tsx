@@ -15,7 +15,7 @@ import {
   RotateCcw,
   ZoomIn,
   Bell,
-  ExternalLink,
+  LockKeyhole,
   ShieldCheck,
 } from "lucide-react";
 import { Card, CardHeader, CardBody } from "../components/Card";
@@ -31,6 +31,8 @@ import {
 import { PlanFeatureRequired } from "./PlanFeatureRequired";
 import { BusinessLogo } from "./BusinessLogo";
 import { TeamAccessView } from "./TeamAccessView";
+import { StorefrontDesigner } from "./StorefrontDesigner";
+import { SubscriptionCheckoutPreview } from "./SubscriptionCheckoutPreview";
 import {
   updateBusinessDetails,
   updateBusinessHours,
@@ -47,10 +49,8 @@ import {
 } from "../services/settingsService";
 import {
   cancelSubscriptionAtPeriodEnd,
-  getBelizeBankCheckoutStatus,
   getSubscriptionSummary,
   listBillingLedger,
-  startSubscriptionCheckout,
   type BillingInvoice,
   type SubscriptionSummary,
   type BillingTransaction,
@@ -479,6 +479,18 @@ function StorefrontTab({
   tenant: Tenant;
   onTenantUpdated: (tenant: Tenant) => void;
 }) {
+  return (
+    <StorefrontDesigner tenant={tenant} onTenantUpdated={onTenantUpdated} />
+  );
+}
+
+export function LegacyStorefrontTab({
+  tenant,
+  onTenantUpdated,
+}: {
+  tenant: Tenant;
+  onTenantUpdated: (tenant: Tenant) => void;
+}) {
   const [slug, setSlug] = useState(tenant.slug);
   const [coverImage, setCoverImage] = useState(tenant.coverImage);
   const [coverImagePositionX, setCoverImagePositionX] = useState(
@@ -565,6 +577,8 @@ function StorefrontTab({
       }
       const saved = await updateStorefrontSettings(tenant.id, {
         slug,
+        storefrontUrlEditAllowed: tenant.storefrontUrlEditAllowed === true,
+        existingCustomDomain: tenant.customDomain,
         coverImage: uploadedCoverImage || coverImage,
         coverImagePositionX,
         coverImagePositionY,
@@ -572,6 +586,7 @@ function StorefrontTab({
         primaryColor,
         accentColor,
         socialLinks,
+        storefrontDesign: tenant.storefrontDesign!,
       });
       setSlug(saved.slug);
       setCoverImage(saved.coverImage);
@@ -630,8 +645,9 @@ function StorefrontTab({
               id="storefront-slug"
               title="Storefront Slug"
               value={slug}
+              disabled={!tenant.storefrontUrlEditAllowed}
               onChange={(event) => setSlug(event.target.value)}
-              className="min-w-0 flex-1 px-3 py-2.5 bg-slate-700 light:bg-white border border-slate-600 light:border-gray-300 rounded-r-xl text-sm text-white light:text-gray-900 focus:outline-none focus:ring-2 focus:ring-violet-500/30 sm:px-4"
+              className="min-w-0 flex-1 rounded-r-xl border border-slate-600 bg-slate-700 px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-2 focus:ring-violet-500/30 disabled:cursor-not-allowed disabled:opacity-60 light:border-gray-300 light:bg-white light:text-gray-900 sm:px-4"
             />
           </div>
         </div>
@@ -952,6 +968,7 @@ function StorefrontTab({
               id="business-domain"
               aria-label="Custom domain prefix"
               value={slug}
+              disabled={!tenant.storefrontUrlEditAllowed}
               onChange={(event) => {
                 setSlug(event.target.value);
                 setSuccess("");
@@ -1007,7 +1024,7 @@ function PaymentsTab({
   const [processing, setProcessing] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const checkoutRequestId = useRef<string | null>(null);
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
   const refresh = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -1021,6 +1038,27 @@ function PaymentsTab({
       setSubscription(currentSubscription);
       setSelectedPlan(currentSubscription.plan);
       setPaidStaffSeats(currentSubscription.paidStaffSeats);
+      if (
+        tenant.plan !== currentSubscription.plan ||
+        tenant.subscriptionStatus !== currentSubscription.status ||
+        tenant.subscriptionRecurringTotal !== currentSubscription.recurringTotal
+      ) {
+        onTenantUpdated({
+          ...tenant,
+          plan: currentSubscription.plan,
+          subscriptionStatus:
+            currentSubscription.status as Tenant["subscriptionStatus"],
+          trialEndsAt: currentSubscription.trialEndsAt,
+          currentPeriodStart: currentSubscription.currentPeriodStart,
+          currentPeriodEnd: currentSubscription.currentPeriodEnd,
+          cancelAtPeriodEnd: currentSubscription.cancelAtPeriodEnd,
+          canceledAt: currentSubscription.canceledAt,
+          subscriptionBaseAmount: currentSubscription.baseAmount,
+          subscriptionSeatAmount: currentSubscription.seatAmount,
+          subscriptionRecurringTotal: currentSubscription.recurringTotal,
+          subscriptionPaidStaffSeats: currentSubscription.paidStaffSeats,
+        });
+      }
     } catch (loadError) {
       setError(
         loadError instanceof Error
@@ -1030,122 +1068,10 @@ function PaymentsTab({
     } finally {
       setLoading(false);
     }
-  }, [tenant.id]);
+  }, [onTenantUpdated, tenant]);
   useEffect(() => {
     void refresh();
   }, [refresh]);
-  const applySubscriptionSummary = useCallback(
-    (summary: SubscriptionSummary) => {
-      setSubscription(summary);
-      setSelectedPlan(summary.plan);
-      setPaidStaffSeats(summary.paidStaffSeats);
-      onTenantUpdated({
-        ...tenant,
-        plan: summary.plan,
-        subscriptionStatus: summary.status as Tenant["subscriptionStatus"],
-        currentPeriodStart: summary.currentPeriodStart,
-        currentPeriodEnd: summary.currentPeriodEnd,
-        cancelAtPeriodEnd: summary.cancelAtPeriodEnd,
-        canceledAt: summary.canceledAt,
-        subscriptionBaseAmount: summary.baseAmount,
-        subscriptionSeatAmount: summary.seatAmount,
-        subscriptionRecurringTotal: summary.recurringTotal,
-        subscriptionPaidStaffSeats: summary.paidStaffSeats,
-      });
-    },
-    [onTenantUpdated, tenant],
-  );
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const requestId = params.get("billingRequest")?.trim();
-    const returnedTenant = params.get("tenant")?.trim();
-    if (!requestId || (returnedTenant && returnedTenant !== tenant.id)) return;
-
-    params.delete("billingRequest");
-    params.delete("tenant");
-    const nextUrl = `${window.location.pathname}${params.size ? `?${params.toString()}` : ""}${window.location.hash}`;
-    window.history.replaceState({}, "", nextUrl);
-    setProcessing(true);
-    setError("");
-    setMessage("Verifying your Belize Bank payment...");
-    getBelizeBankCheckoutStatus(tenant.id, requestId)
-      .then(async (result) => {
-        if (result.state === "completed") {
-          const summary = await getSubscriptionSummary(tenant.id);
-          applySubscriptionSummary(summary);
-          await refresh();
-          setMessage("Payment confirmed. Your subscription is active.");
-        } else if (result.state === "pending") {
-          setMessage(
-            "Belize Bank is still processing this payment. Refresh shortly to check again.",
-          );
-        } else if (result.state === "cancelled") {
-          setMessage("");
-          setError("The Belize Bank payment was cancelled.");
-        } else if (result.state === "refunded") {
-          setMessage("");
-          setError("This Belize Bank payment has been refunded.");
-        } else {
-          setMessage("");
-          setError("The Belize Bank payment was not approved.");
-        }
-      })
-      .catch((statusError) => {
-        setMessage("");
-        setError(
-          statusError instanceof Error
-            ? statusError.message
-            : "Unable to verify the Belize Bank payment.",
-        );
-      })
-      .finally(() => setProcessing(false));
-  }, [applySubscriptionSummary, refresh, tenant.id]);
-
-  const paySubscription = async () => {
-    setProcessing(true);
-    setError("");
-    setMessage("");
-    checkoutRequestId.current ??= crypto.randomUUID();
-    try {
-      const result = await startSubscriptionCheckout(
-        tenant.id,
-        selectedPlan,
-        paidStaffSeats,
-        checkoutRequestId.current,
-      );
-      if (result.status === "pending" && result.redirectUrl) {
-        const redirect = new URL(result.redirectUrl);
-        if (redirect.protocol !== "https:") {
-          throw new Error("The bank returned an unsafe payment address.");
-        }
-        window.location.assign(redirect.toString());
-        return;
-      }
-      if (result.status === "completed") {
-        checkoutRequestId.current = null;
-        const summary = await getSubscriptionSummary(tenant.id);
-        applySubscriptionSummary(summary);
-        await refresh();
-        setMessage("Payment confirmed. Your subscription is active.");
-        return;
-      }
-      throw new Error("The subscription checkout did not start correctly.");
-    } catch (checkoutError) {
-      if (
-        checkoutError instanceof Error &&
-        /ended|start a new checkout/i.test(checkoutError.message)
-      ) {
-        checkoutRequestId.current = null;
-      }
-      setError(
-        checkoutError instanceof Error
-          ? checkoutError.message
-          : "Unable to start the Belize Bank payment.",
-      );
-    } finally {
-      setProcessing(false);
-    }
-  };
   const cancel = async () => {
     if (
       !window.confirm(
@@ -1276,7 +1202,9 @@ function PaymentsTab({
           {maximumPaidSeats > 0 && (
             <label className="block max-w-sm">
               <span className="mb-1.5 block text-xs font-bold">
-                Additional staff seats ($2 BZD each / month)
+                Additional staff seats (
+                {formatCurrency(selectedDefinition.additionalStaffSeatPrice)}
+                each / month)
               </span>
               <select
                 value={paidStaffSeats}
@@ -1317,9 +1245,9 @@ function PaymentsTab({
                 <CreditCard className="h-5 w-5" />
               </span>
               <div>
-                <h3 className="text-sm font-black">Belize Bank card payment</h3>
+                <h3 className="text-sm font-black">Subscription checkout</h3>
                 <p className="mt-0.5 text-[11px] text-slate-400 light:text-slate-600">
-                  Pay your YuhBusiness monthly subscription securely.
+                  Preview your order and available payment methods.
                 </p>
               </div>
             </div>
@@ -1327,9 +1255,9 @@ function PaymentsTab({
               <div className="flex gap-3 rounded-xl border border-emerald-500/25 bg-emerald-500/10 p-4 text-xs leading-5 text-slate-300 light:text-slate-700">
                 <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-400" />
                 <p>
-                  You will enter your card details only on Belize Bank&apos;s
-                  hosted payment page. YuhBusiness does not collect or store
-                  your card number or CVV.
+                  Checkout is in preview while payment processing is being
+                  prepared. Opening it will not charge you or change your free
+                  trial.
                 </p>
               </div>
               <div className="flex items-center justify-between rounded-xl border border-violet-500/25 bg-violet-500/10 px-4 py-3">
@@ -1340,19 +1268,23 @@ function PaymentsTab({
               </div>
               <Button
                 type="button"
-                loading={processing}
-                disabled={processing}
-                onClick={() => void paySubscription()}
+                onClick={() => setCheckoutOpen(true)}
                 className="min-h-12 w-full"
               >
-                <ExternalLink className="h-4 w-4" /> Continue to Belize Bank
+                <LockKeyhole className="h-4 w-4" /> Checkout
               </Button>
               <p className="text-center text-[10px] text-slate-400 light:text-slate-600">
-                Your subscription activates only after YuhBusiness verifies the
-                approved payment directly with Belize Bank.
+                Payments are coming soon and are not available yet.
               </p>
             </div>
           </section>
+          <SubscriptionCheckoutPreview
+            open={checkoutOpen}
+            tenantId={tenant.id}
+            plan={selectedPlan}
+            paidStaffSeats={paidStaffSeats}
+            onClose={() => setCheckoutOpen(false)}
+          />
           <div className="flex flex-wrap gap-3">
             {subscription?.status === "active" &&
               subscription.currentPeriodEnd &&

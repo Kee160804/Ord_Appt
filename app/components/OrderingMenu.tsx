@@ -20,6 +20,7 @@ import { Button } from "@/app/components/Button";
 import { CustomerPaymentCheckout } from "@/app/components/CustomerPaymentCheckout";
 import { Modal } from "@/app/components/Modal";
 import { StorefrontOffers } from "@/app/components/StorefrontOffers";
+import { StorefrontHero } from "@/app/components/StorefrontHero";
 import { Input, Select } from "@/app/components/input";
 import {
   MAX_PROMOTION_CODE_LENGTH,
@@ -27,6 +28,7 @@ import {
 } from "@/app/lib/promotions";
 import { formatCurrency } from "@/app/lib/utils";
 import { isSupabaseConfigured } from "@/app/lib/supabase/config";
+import { parseStorefrontDesign } from "@/app/lib/storefront-design";
 import { createPublicOrder } from "@/app/services/orderService";
 import { validatePromotion } from "@/app/services/businessToolsService";
 import { Product, PublicPromotion, Tenant } from "@/app/types/index";
@@ -170,6 +172,10 @@ export function OrderingMenu({
   const catalogLabel = isRetail ? "Products & Retail" : "Food & Drinks";
   const itemLabel = isRetail ? "products" : "foods";
   const addLabel = isRetail ? "Add to bag" : "Add to cart";
+  const storefrontDesign = parseStorefrontDesign(
+    tenant.storefrontDesign,
+    tenant.businessType,
+  );
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
@@ -206,6 +212,7 @@ export function OrderingMenu({
     code: string;
     name: string;
     discountAmount: number;
+    discountScope: "TOTAL" | "ITEMS";
   } | null>(null);
   const [isApplyingPromotion, setIsApplyingPromotion] = useState(false);
   const orderSummaryRef = useRef<HTMLDivElement>(null);
@@ -339,20 +346,23 @@ export function OrderingMenu({
         subtotal,
         cart.map((item) => item.id),
       );
-      const eligibleAmount = validated.applicableProductIds.length
-        ? cart
-            .filter((item) => validated.applicableProductIds.includes(item.id))
-            .reduce(
-              (sum, item) =>
-                sum +
-                item.price * item.quantity +
-                item.addons.reduce(
-                  (addonSum, addon) => addonSum + addon.price * item.quantity,
-                  0,
-                ),
-              0,
-            )
-        : subtotal;
+      const eligibleAmount =
+        validated.discountScope === "ITEMS"
+          ? cart
+              .filter((item) =>
+                validated.applicableProductIds.includes(item.id),
+              )
+              .reduce(
+                (sum, item) =>
+                  sum +
+                  item.price * item.quantity +
+                  item.addons.reduce(
+                    (addonSum, addon) => addonSum + addon.price * item.quantity,
+                    0,
+                  ),
+                0,
+              )
+          : subtotal;
       const discountAmount = Math.min(
         eligibleAmount,
         validated.discountType === "PERCENTAGE"
@@ -363,6 +373,7 @@ export function OrderingMenu({
         code: validated.code,
         name: validated.name,
         discountAmount,
+        discountScope: validated.discountScope,
       });
     } catch (promotionError) {
       setAppliedPromotion(null);
@@ -732,6 +743,17 @@ export function OrderingMenu({
       <div className="grid min-w-0 grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_400px] xl:items-start">
         {/* LEFT: Menu */}
         <div className="min-w-0">
+          <div className="mb-6">
+            <StorefrontHero
+              tenant={tenant}
+              onAction={() =>
+                document
+                  .getElementById("storefront-search")
+                  ?.scrollIntoView({ behavior: "smooth", block: "center" })
+              }
+            />
+          </div>
+          {false && (
           <span
             onClick={onOpenGallery}
             onKeyDown={(event) => {
@@ -804,7 +826,8 @@ export function OrderingMenu({
               </span>
             </span>
           </span>
-          <StorefrontOffers
+          )}
+          {storefrontDesign.sections.promotions && <StorefrontOffers
             promotions={promotions}
             automaticDiscount={
               orderingSettings.discountEnabled &&
@@ -820,8 +843,8 @@ export function OrderingMenu({
               setAppliedPromotion(null);
               setOrderError("");
             }}
-          />
-          <div className="mb-4 flex items-center gap-3">
+          />}
+          {storefrontDesign.sections.search && <div className="mb-4 flex items-center gap-3">
             <h2 className="sr-only">
               {catalogLabel} for {tenant.name}
             </h2>
@@ -843,9 +866,9 @@ export function OrderingMenu({
             >
               <SlidersHorizontal className="h-4 w-4" />
             </span>
-          </div>
+          </div>}
 
-          <div className="no-scrollbar mb-6 flex gap-2 overflow-x-auto pb-1">
+          {storefrontDesign.sections.categories && <div className="no-scrollbar mb-6 flex gap-2 overflow-x-auto pb-1">
             <CategoryPill
               label="All"
               active={selectedCategory === null}
@@ -859,7 +882,7 @@ export function OrderingMenu({
                 onClick={() => setSelectedCategory(cat.id)}
               />
             ))}
-          </div>
+          </div>}
 
           <div className="space-y-8">
             {filteredProducts.length === 0 && (

@@ -5,7 +5,9 @@ import type {
   BusinessHours,
   OrderingSettings,
   SocialLinks,
+  StorefrontDesign,
 } from "@/app/types/index";
+import { parseStorefrontDesign } from "@/app/lib/storefront-design";
 
 export interface BusinessDetailsInput {
   name: string;
@@ -19,6 +21,8 @@ export interface BusinessDetailsInput {
 
 export interface StorefrontSettingsInput {
   slug: string;
+  storefrontUrlEditAllowed: boolean;
+  existingCustomDomain?: string;
   coverImage: string;
   coverImagePositionX: number;
   coverImagePositionY: number;
@@ -26,6 +30,7 @@ export interface StorefrontSettingsInput {
   primaryColor: string;
   accentColor: string;
   socialLinks: SocialLinks;
+  storefrontDesign: StorefrontDesign;
 }
 
 export interface OwnerEmailPreferences {
@@ -199,8 +204,14 @@ export async function updateStorefrontSettings(
       "Your YuhBusiness domain prefix must be 63 characters or fewer.",
     );
   }
-  const customDomain = `${slug}.yuhbusiness.com`;
+  const customDomain = input.storefrontUrlEditAllowed
+    ? `${slug}.yuhbusiness.com`
+    : input.existingCustomDomain;
   const socialLinks = cleanSocialLinks(input.socialLinks);
+  const storefrontDesign = parseStorefrontDesign(
+    input.storefrontDesign,
+    "retail",
+  );
   const coverImagePositionX = Math.round(input.coverImagePositionX);
   const coverImagePositionY = Math.round(input.coverImagePositionY);
   const coverImageZoom = Math.round(input.coverImageZoom);
@@ -228,20 +239,27 @@ export async function updateStorefrontSettings(
     }
   }
 
+  const storefrontUpdate = {
+    cover_image: coverImage || null,
+    cover_image_position_x: coverImagePositionX,
+    cover_image_position_y: coverImagePositionY,
+    cover_image_zoom: coverImageZoom,
+    primary_color: input.primaryColor,
+    accent_color: input.accentColor,
+    social_links: socialLinks,
+    storefront_design: storefrontDesign,
+    ...(input.storefrontUrlEditAllowed
+      ? {
+          slug,
+          subdomain: slug,
+          custom_domain: customDomain || null,
+        }
+      : {}),
+  };
+
   const { error } = await client()
     .from("tenants")
-    .update({
-      slug,
-      subdomain: slug,
-      cover_image: coverImage || null,
-      cover_image_position_x: coverImagePositionX,
-      cover_image_position_y: coverImagePositionY,
-      cover_image_zoom: coverImageZoom,
-      primary_color: input.primaryColor,
-      accent_color: input.accentColor,
-      social_links: socialLinks,
-      custom_domain: customDomain || null,
-    })
+    .update(storefrontUpdate)
     .eq("id", tenantId)
     .select("id")
     .single();
@@ -256,6 +274,7 @@ export async function updateStorefrontSettings(
     coverImagePositionY,
     coverImageZoom,
     socialLinks,
+    storefrontDesign,
     customDomain,
     customDomainVerified: true,
   };

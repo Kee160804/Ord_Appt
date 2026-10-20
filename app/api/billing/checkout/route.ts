@@ -33,6 +33,15 @@ export async function POST(request: Request) {
   if (!requestHasAllowedOrigin(request)) {
     return Response.json({ error: "Invalid request origin." }, { status: 403 });
   }
+  if (process.env.SUBSCRIPTION_CHECKOUT_ENABLED !== "true") {
+    return Response.json(
+      {
+        error:
+          "Subscription checkout is coming soon and is not available yet. No payment was taken.",
+      },
+      { status: 503 },
+    );
+  }
   try {
     const body = await readJsonBody<CheckoutBody>(request, 4_096);
     const tenantId = body.tenantId?.trim() ?? "";

@@ -2,6 +2,7 @@ import {
   getPaymentProvider,
   PaymentConfigurationError,
 } from "@/app/lib/billing/provider";
+import { TRIAL_ENTITLEMENTS } from "@/app/lib/plans";
 import { authorizeBillingOwner } from "@/app/lib/server/billing-authorization";
 import {
   isValidUuid,
@@ -22,30 +23,96 @@ export async function GET(request: Request) {
     }
     const authorization = await authorizeBillingOwner(tenantId);
     if (!authorization.authorized) return authorization.response;
+    const tenantColumns =
+      "id,plan,subscription_status,trial_ends_at,created_at,current_period_start,current_period_end,cancel_at_period_end,canceled_at,provider_customer_id,provider_subscription_id,subscription_base_amount,subscription_seat_amount,subscription_recurring_total,subscription_paid_staff_seats";
     const { data, error } = await authorization.admin
       .from("tenants")
-      .select(
-        "id,plan,subscription_status,trial_ends_at,current_period_start,current_period_end,cancel_at_period_end,canceled_at,provider_customer_id,provider_subscription_id,subscription_base_amount,subscription_seat_amount,subscription_recurring_total,subscription_paid_staff_seats",
-      )
+      .select(tenantColumns)
       .eq("id", tenantId)
       .maybeSingle();
     if (error) throw error;
     if (!data)
       return Response.json({ error: "Business not found." }, { status: 404 });
+
+    let subscription = data;
+    const paidLookingStatus = ["active", "cancelled", "canceled"].includes(
+      String(data.subscription_status).toLowerCase(),
+    );
+    if (paidLookingStatus) {
+      const { data: verifiedPayment, error: paymentError } =
+        await authorization.admin
+          .from("payment_transactions")
+          .select("id")
+          .eq("tenant_id", tenantId)
+          .eq("kind", "SUBSCRIPTION")
+          .eq("provider", "BELIZE_BANK")
+          .in("status", ["SUCCEEDED", "PARTIALLY_REFUNDED"])
+          .not("paid_at", "is", null)
+          .limit(1)
+          .maybeSingle();
+      if (paymentError) throw paymentError;
+
+      if (!verifiedPayment) {
+        const createdAt = new Date(data.created_at);
+        const trialEndsAt =
+          data.trial_ends_at ??
+          new Date(
+            (Number.isNaN(createdAt.getTime())
+              ? Date.now()
+              : createdAt.getTime()) +
+              TRIAL_ENTITLEMENTS.lengthDays * 86_400_000,
+          ).toISOString();
+        const { data: repaired, error: repairError } = await authorization.admin
+          .from("tenants")
+          .update({
+            subscription_status: "trial",
+            trial_ends_at: trialEndsAt,
+            current_period_start: null,
+            current_period_end: null,
+            cancel_at_period_end: false,
+            canceled_at: null,
+            provider_customer_id: null,
+            provider_subscription_id: null,
+            subscription_base_amount: 0,
+            subscription_seat_amount: 0,
+            subscription_recurring_total: 0,
+            subscription_paid_staff_seats: 0,
+            subscription_updated_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", tenantId)
+          .select(tenantColumns)
+          .single();
+        if (repairError) throw repairError;
+        subscription = repaired;
+
+        await authorization.admin
+          .from("tenant_seat_entitlements")
+          .update({ paid_staff_seats: 0, updated_at: new Date().toISOString() })
+          .eq("tenant_id", tenantId);
+        await authorization.admin
+          .from("business_notifications")
+          .delete()
+          .eq("tenant_id", tenantId)
+          .eq("type", "SUBSCRIPTION")
+          .eq("title", "Subscription active");
+      }
+    }
+
     return Response.json({
       subscription: {
-        tenantId: data.id,
-        plan: data.plan,
-        status: data.subscription_status,
-        trialEndsAt: data.trial_ends_at,
-        currentPeriodStart: data.current_period_start,
-        currentPeriodEnd: data.current_period_end,
-        cancelAtPeriodEnd: data.cancel_at_period_end,
-        canceledAt: data.canceled_at,
-        baseAmount: Number(data.subscription_base_amount ?? 0),
-        seatAmount: Number(data.subscription_seat_amount ?? 0),
-        recurringTotal: Number(data.subscription_recurring_total ?? 0),
-        paidStaffSeats: Number(data.subscription_paid_staff_seats ?? 0),
+        tenantId: subscription.id,
+        plan: subscription.plan,
+        status: subscription.subscription_status,
+        trialEndsAt: subscription.trial_ends_at,
+        currentPeriodStart: subscription.current_period_start,
+        currentPeriodEnd: subscription.current_period_end,
+        cancelAtPeriodEnd: subscription.cancel_at_period_end,
+        canceledAt: subscription.canceled_at,
+        baseAmount: Number(subscription.subscription_base_amount ?? 0),
+        seatAmount: Number(subscription.subscription_seat_amount ?? 0),
+        recurringTotal: Number(subscription.subscription_recurring_total ?? 0),
+        paidStaffSeats: Number(subscription.subscription_paid_staff_seats ?? 0),
       },
     });
   } catch (error) {

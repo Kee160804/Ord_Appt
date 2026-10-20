@@ -6,6 +6,8 @@ const migrationPath =
   "supabase/migrations/202609220002_promotion_storefront_fixes.sql";
 const discountOptInMigrationPath =
   "supabase/migrations/202609230002_discounts_are_owner_opt_in.sql";
+const discountScopeMigrationPath =
+  "supabase/migrations/202610160004_promotion_discount_scope.sql";
 
 test("retail checkout applies promotions and owner automatic discounts atomically", async () => {
   const [sql, route] = await Promise.all([
@@ -91,4 +93,27 @@ test("storefront discounts remain hidden until the business owner enables one", 
   assert.match(storefrontService, /discount_enabled === true/);
   assert.match(ordering, /discountEnabled: false/);
   assert.match(settings, /discountEnabled: false/);
+});
+
+test("owners choose total or item-scoped promotions and checkout previews them immediately", async () => {
+  const [sql, ownerView, ownerService, ordering, checkout] = await Promise.all([
+    readFile(discountScopeMigrationPath, "utf8"),
+    readFile("app/components/BusinessToolsView.tsx", "utf8"),
+    readFile("app/services/businessToolsService.ts", "utf8"),
+    readFile("app/components/OrderingMenu.tsx", "utf8"),
+    readFile("app/components/CustomerPaymentCheckout.tsx", "utf8"),
+  ]);
+
+  assert.match(sql, /ADD COLUMN IF NOT EXISTS discount_scope TEXT/);
+  assert.match(sql, /discount_scope IN \('TOTAL', 'ITEMS'\)/);
+  assert.match(sql, /v_scope = 'TOTAL'/);
+  assert.match(sql, /item\.product_id = ANY\(v_applicable\)/);
+  assert.match(sql, /'discountScope', v_promo\.discount_scope/);
+  assert.match(ownerView, /label="Apply discount to"/);
+  assert.match(ownerView, /Entire purchase total/);
+  assert.match(ownerView, /Selected item\(s\)/);
+  assert.match(ownerService, /discount_scope: promotion\.discountScope/);
+  assert.match(ordering, /validated\.discountScope === "ITEMS"/);
+  assert.match(checkout, /You save/);
+  assert.match(checkout, /promotionDiscount/);
 });

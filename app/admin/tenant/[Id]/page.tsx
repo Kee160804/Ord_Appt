@@ -14,10 +14,12 @@ import {
 } from "lucide-react";
 import { Card, CardBody, CardHeader } from "@/app/components/Card";
 import { Button } from "@/app/components/Button";
+import { PLAN_DEFINITIONS, TRIAL_ENTITLEMENTS } from "@/app/lib/plans";
 import { formatCurrency } from "@/app/lib/utils";
 import {
   loadAdminTenantData,
   updateAdminDomainVerification,
+  updateAdminStorefrontUrlAccess,
   updateAdminTenantSubscription,
   type AdminTenantData,
 } from "@/app/services/adminService";
@@ -44,6 +46,8 @@ export default function TenantDetailPage() {
   const [isUpdatingDomain, setIsUpdatingDomain] = useState(false);
   const [domainMessage, setDomainMessage] = useState("");
   const [domainError, setDomainError] = useState("");
+  const [urlAccessMessage, setUrlAccessMessage] = useState("");
+  const [urlAccessError, setUrlAccessError] = useState("");
   const [seatSummary, setSeatSummary] = useState<AdminSeatSummary | null>(null);
   const [paidStaffSeats, setPaidStaffSeats] = useState(0);
   const [seatReviewNote, setSeatReviewNote] = useState("");
@@ -218,6 +222,31 @@ export default function TenantDetailPage() {
     }
   };
 
+  const setStorefrontUrlAccess = async (allowed: boolean) => {
+    setIsUpdatingDomain(true);
+    setUrlAccessError("");
+    setUrlAccessMessage("");
+    try {
+      await updateAdminStorefrontUrlAccess(tenantId, allowed);
+      const refreshed = await loadAdminTenantData(tenantId);
+      if (!refreshed) throw new Error("The business could not be reloaded.");
+      setData(refreshed);
+      setUrlAccessMessage(
+        allowed
+          ? "The business owner can now change the storefront URL."
+          : "Storefront URL editing is locked for the business owner.",
+      );
+    } catch (accessError) {
+      setUrlAccessError(
+        accessError instanceof Error
+          ? accessError.message
+          : "Unable to update storefront URL access.",
+      );
+    } finally {
+      setIsUpdatingDomain(false);
+    }
+  };
+
   const savePaidStaffSeats = async (
     requestId?: string,
     requestedSeats?: number,
@@ -311,9 +340,13 @@ export default function TenantDetailPage() {
   }
 
   const { tenant, hasVerifiedPayment } = data;
+  const planDefinition = PLAN_DEFINITIONS[tenant.plan];
   const trialEnd = tenant.trialEndsAt
     ? new Date(tenant.trialEndsAt)
-    : new Date(new Date(tenant.createdAt).getTime() + 14 * 86_400_000);
+    : new Date(
+        new Date(tenant.createdAt).getTime() +
+          TRIAL_ENTITLEMENTS.lengthDays * 86_400_000,
+      );
   const trialIsLive =
     !Number.isNaN(trialEnd.getTime()) &&
     !Number.isNaN(Date.parse(dataLoadedAt)) &&
@@ -378,7 +411,7 @@ export default function TenantDetailPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-        <StatCard label="Plan" value={tenant.plan.toUpperCase()} />
+        <StatCard label="Plan" value={planDefinition.name} />
         <StatCard
           label="Subscription Status"
           value={subscriptionLabel.toUpperCase()}
@@ -414,7 +447,7 @@ export default function TenantDetailPage() {
                 "Not provided"
               }
             />
-            <Info label="Plan" value={`${tenant.plan} plan`} capitalize />
+            <Info label="Plan" value={`${planDefinition.name} plan`} />
             <Info label="Subscription" value={subscriptionLabel} capitalize />
             <Info
               label="Trial Ends"
@@ -433,6 +466,47 @@ export default function TenantDetailPage() {
               }
             />
           </div>
+        </CardBody>
+      </Card>
+
+      <Card className="border-slate-700 bg-slate-800/50 light:border-slate-200 light:bg-white">
+        <CardHeader>
+          <h3 className="font-semibold text-white light:text-gray-900">
+            Storefront URL Access
+          </h3>
+        </CardHeader>
+        <CardBody>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold text-slate-200 light:text-slate-800">
+                Business owner URL editing is{" "}
+                {tenant.storefrontUrlEditAllowed ? "enabled" : "locked"}.
+              </p>
+              <p className="mt-1 max-w-2xl text-sm text-slate-400 light:text-slate-600">
+                The signup URL stays reserved unless you grant access. Revoke
+                access after the requested change is complete.
+              </p>
+            </div>
+            <Button
+              type="button"
+              disabled={isUpdatingDomain}
+              onClick={() =>
+                void setStorefrontUrlAccess(!tenant.storefrontUrlEditAllowed)
+              }
+            >
+              {isUpdatingDomain
+                ? "Saving..."
+                : tenant.storefrontUrlEditAllowed
+                  ? "Lock URL editing"
+                  : "Allow URL editing"}
+            </Button>
+          </div>
+          {urlAccessError && (
+            <p className="mt-3 text-sm text-red-400">{urlAccessError}</p>
+          )}
+          {urlAccessMessage && (
+            <p className="mt-3 text-sm text-emerald-400">{urlAccessMessage}</p>
+          )}
         </CardBody>
       </Card>
 
@@ -640,9 +714,7 @@ export default function TenantDetailPage() {
           <div className="mt-4 flex flex-wrap gap-2 text-xs">
             <span className="rounded-full bg-slate-700/70 px-3 py-1.5 text-slate-300 light:bg-slate-100 light:text-slate-700">
               Saved plan:{" "}
-              <strong className="capitalize">
-                {tenant.plan === "starter" ? "Beginner" : tenant.plan}
-              </strong>
+              <strong className="capitalize">{planDefinition.name}</strong>
             </span>
             <span className="rounded-full bg-slate-700/70 px-3 py-1.5 text-slate-300 light:bg-slate-100 light:text-slate-700">
               Access:{" "}
@@ -673,12 +745,12 @@ export default function TenantDetailPage() {
             <div className="mt-3 flex flex-wrap items-end gap-3">
               <label>
                 <span className="mb-1.5 block text-xs font-semibold text-slate-400">
-                  Extra trial days (1–14)
+                  Extra trial days (1–{TRIAL_ENTITLEMENTS.lengthDays})
                 </span>
                 <input
                   type="number"
                   min={1}
-                  max={14}
+                  max={TRIAL_ENTITLEMENTS.lengthDays}
                   step={1}
                   value={trialExtensionDays}
                   onChange={(event) =>
@@ -692,7 +764,7 @@ export default function TenantDetailPage() {
                   isUpdatingSubscription ||
                   !Number.isInteger(trialExtensionDays) ||
                   trialExtensionDays < 1 ||
-                  trialExtensionDays > 14
+                  trialExtensionDays > TRIAL_ENTITLEMENTS.lengthDays
                 }
                 onClick={() =>
                   void updateSubscription(

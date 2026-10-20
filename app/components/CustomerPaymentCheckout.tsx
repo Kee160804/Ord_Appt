@@ -323,7 +323,8 @@ export function CustomerPaymentCheckout({
               </div>
               {promotionApplied && (
                 <p className="mt-1.5 text-[10px] text-emerald-400">
-                  {promotionApplied} applied
+                  {promotionApplied} applied · You save{" "}
+                  {formatCurrency(promotionDiscount)}
                 </p>
               )}
               {error && (

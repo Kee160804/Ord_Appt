@@ -17,7 +17,7 @@ test("admin tenant list distinguishes live and expired free trials", async () =>
   assert.match(service, /paidTenantIds/);
 });
 
-test("trial extensions are restricted to 1 through 14 additional days", async () => {
+test("trial extensions use the canonical trial length as their maximum", async () => {
   const [route, tenantPage, migration] = await Promise.all([
     readFile("app/api/admin/tenants/[tenantId]/subscription/route.ts", "utf8"),
     readFile("app/admin/tenant/[Id]/page.tsx", "utf8"),
@@ -27,11 +27,14 @@ test("trial extensions are restricted to 1 through 14 additional days", async ()
     ),
   ]);
 
-  assert.match(route, /trialDays > 14/);
+  assert.match(route, /trialDays > TRIAL_ENTITLEMENTS\.lengthDays/);
   assert.match(route, /existingTrialEnd\.getTime\(\) > Date\.now\(\)/);
   assert.match(route, /extensionStartsAt\.getTime\(\) \+ days/);
-  assert.match(tenantPage, /Extra trial days \(1–14\)/);
-  assert.match(tenantPage, /max=\{14\}/);
+  assert.match(
+    tenantPage,
+    /Extra trial days \(1–\{TRIAL_ENTITLEMENTS\.lengthDays\}\)/,
+  );
+  assert.match(tenantPage, /max=\{TRIAL_ENTITLEMENTS\.lengthDays\}/);
   assert.match(migration, /p_trial_days > 14/);
   assert.match(
     migration,

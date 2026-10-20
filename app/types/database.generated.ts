@@ -1749,6 +1749,7 @@ export type Database = {
           created_at: string;
           created_by: string | null;
           description: string | null;
+          discount_scope: string;
           discount_type: string;
           discount_value: number;
           ends_at: string | null;
@@ -1769,6 +1770,7 @@ export type Database = {
           created_at?: string;
           created_by?: string | null;
           description?: string | null;
+          discount_scope?: string;
           discount_type: string;
           discount_value: number;
           ends_at?: string | null;
@@ -1789,6 +1791,7 @@ export type Database = {
           created_at?: string;
           created_by?: string | null;
           description?: string | null;
+          discount_scope?: string;
           discount_type?: string;
           discount_value?: number;
           ends_at?: string | null;
@@ -2566,6 +2569,7 @@ export type Database = {
           current_period_start: string | null;
           custom_domain: string | null;
           custom_domain_verified_at: string | null;
+          allow_storefront_url_edit: boolean;
           description: string | null;
           email: string | null;
           id: string;
@@ -2581,6 +2585,7 @@ export type Database = {
           provider_subscription_id: string | null;
           slug: string;
           social_links: Json;
+          storefront_design: Json;
           status: string;
           stripe_connected: boolean | null;
           subdomain: string;
@@ -2614,6 +2619,7 @@ export type Database = {
           current_period_start?: string | null;
           custom_domain?: string | null;
           custom_domain_verified_at?: string | null;
+          allow_storefront_url_edit?: boolean;
           description?: string | null;
           email?: string | null;
           id?: string;
@@ -2629,6 +2635,7 @@ export type Database = {
           provider_subscription_id?: string | null;
           slug: string;
           social_links?: Json;
+          storefront_design?: Json;
           status?: string;
           stripe_connected?: boolean | null;
           subdomain: string;
@@ -2662,6 +2669,7 @@ export type Database = {
           current_period_start?: string | null;
           custom_domain?: string | null;
           custom_domain_verified_at?: string | null;
+          allow_storefront_url_edit?: boolean;
           description?: string | null;
           email?: string | null;
           id?: string;
@@ -2677,6 +2685,7 @@ export type Database = {
           provider_subscription_id?: string | null;
           slug?: string;
           social_links?: Json;
+          storefront_design?: Json;
           status?: string;
           stripe_connected?: boolean | null;
           subdomain?: string;
@@ -3001,6 +3010,7 @@ export type Database = {
           applicable_service_ids: string[];
           code: string;
           description: string;
+          discount_scope: string;
           discount_type: string;
           discount_value: number;
           ends_at: string;

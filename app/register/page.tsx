@@ -28,6 +28,7 @@ import {
 
 import { useAuth } from "@/app/contexts/auth";
 import { PublicHeader } from "@/app/components/PublicHeader";
+import { TRIAL_ENTITLEMENTS } from "@/app/lib/plans";
 import { cn, slugify } from "@/app/lib/utils";
 import { resendSignupConfirmation } from "@/app/services/authService";
 import type { BusinessType } from "@/app/types";
@@ -627,10 +628,10 @@ function BusinessTypeStep({
                   "border-emerald-700/70 hover:bg-emerald-500/10",
                 active &&
                   (option.theme === "violet"
-                      ? "bg-violet-500/15 ring-1 ring-violet-400 light:bg-violet-50"
-                      : option.theme === "orange"
-                        ? "bg-orange-500/15 ring-1 ring-orange-400 light:bg-orange-50"
-                        : "bg-emerald-500/15 ring-1 ring-emerald-400 light:bg-emerald-50"),
+                    ? "bg-violet-500/15 ring-1 ring-violet-400 light:bg-violet-50"
+                    : option.theme === "orange"
+                      ? "bg-orange-500/15 ring-1 ring-orange-400 light:bg-orange-50"
+                      : "bg-emerald-500/15 ring-1 ring-emerald-400 light:bg-emerald-50"),
               )}
             >
               <span className="flex items-center gap-4">
@@ -832,8 +833,8 @@ function BusinessDetailsStep({
           </p>
           <p className="mt-1 text-xs leading-4 text-violet-200/80 light:text-slate-600">
             Your {businessDescription} storefront will be live after signup.
-            You&apos;ll get 14 days to explore all features. No credit card is
-            required today.
+            You&apos;ll get {TRIAL_ENTITLEMENTS.lengthDays} days to explore all
+            features. No credit card is required today.
           </p>
         </div>
       </div>
@@ -891,8 +892,12 @@ function PanelHeading({
         <Icon className="h-7 w-7" />
       </div>
       <div className="pt-1">
-        <h2 className="text-lg font-black text-white light:text-slate-950">{title}</h2>
-        <p className="mt-1 text-sm leading-5 text-[#91a5c8] light:text-slate-600">{description}</p>
+        <h2 className="text-lg font-black text-white light:text-slate-950">
+          {title}
+        </h2>
+        <p className="mt-1 text-sm leading-5 text-[#91a5c8] light:text-slate-600">
+          {description}
+        </p>
       </div>
     </div>
   );

@@ -2,6 +2,7 @@ import { requireSupabaseBrowserClient as client } from "@/app/lib/supabase/clien
 import type { Tenant } from "@/app/types/index";
 import type { TenantRow } from "@/app/types/supabase";
 import { parseSocialLinks } from "@/app/lib/social-links";
+import { parseStorefrontDesign } from "@/app/lib/storefront-design";
 
 const PAGE_SIZE = 1000;
 
@@ -124,6 +125,12 @@ function mapTenant(row: TenantRow): Tenant {
   const businessName = row.business_name;
   const plan = row.plan?.toLowerCase();
   const subscription = row.subscription_status?.toLowerCase();
+  const businessType =
+    row.business_type?.toLowerCase() === "ordering"
+      ? "ordering"
+      : row.business_type?.toLowerCase() === "retail"
+        ? "retail"
+        : "appointment";
 
   return {
     id: row.id,
@@ -134,12 +141,8 @@ function mapTenant(row: TenantRow): Tenant {
       : undefined,
     customDomain: row.custom_domain ?? undefined,
     customDomainVerified: Boolean(row.custom_domain_verified_at),
-    businessType:
-      row.business_type?.toLowerCase() === "ordering"
-        ? "ordering"
-        : row.business_type?.toLowerCase() === "retail"
-          ? "retail"
-          : "appointment",
+    storefrontUrlEditAllowed: row.allow_storefront_url_edit === true,
+    businessType,
     logo: row.logo ?? (businessName.charAt(0).toUpperCase() || "B"),
     logoImage: row.logo_url ?? undefined,
     logoBg: row.logo_bg ?? row.primary_color ?? "#8b5cf6",
@@ -156,6 +159,10 @@ function mapTenant(row: TenantRow): Tenant {
     socialLinks: parseSocialLinks(row.social_links),
     primaryColor: row.primary_color ?? "#8b5cf6",
     accentColor: row.accent_color ?? "#a78bfa",
+    storefrontDesign: parseStorefrontDesign(
+      row.storefront_design,
+      businessType,
+    ),
     createdAt: row.created_at ?? "",
     isActive: row.is_active && row.status.toUpperCase() === "ACTIVE",
     plan: plan === "pro" || plan === "enterprise" ? plan : "starter",
@@ -501,6 +508,28 @@ export async function updateAdminDomainVerification(
     throw new Error(payload.error || "Unable to update domain verification.");
   }
   return { domain: payload.domain ?? "", verified: payload.verified };
+}
+
+export async function updateAdminStorefrontUrlAccess(
+  tenantId: string,
+  allowed: boolean,
+) {
+  const response = await fetch(
+    `/api/admin/tenants/${encodeURIComponent(tenantId)}/domain`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ allowStorefrontUrlEdit: allowed }),
+    },
+  );
+  const payload = (await response.json()) as {
+    allowStorefrontUrlEdit?: boolean;
+    error?: string;
+  };
+  if (!response.ok || typeof payload.allowStorefrontUrlEdit !== "boolean") {
+    throw new Error(payload.error || "Unable to update storefront URL access.");
+  }
+  return payload.allowStorefrontUrlEdit;
 }
 
 export interface CreateAdminTenantInput {

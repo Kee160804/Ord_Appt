@@ -49,7 +49,7 @@ import { useAuth } from "@/app/contexts/auth";
 import { PLATFORM } from "@/app/lib/platform";
 import { useTheme } from "@/app/contexts/theme";
 import { cn, formatCurrency } from "@/app/lib/utils";
-import { PLAN_DEFINITIONS } from "@/app/lib/plans";
+import { PLAN_DEFINITIONS, TRIAL_ENTITLEMENTS } from "@/app/lib/plans";
 import {
   createAdminAgent,
   createAdminTenant,
@@ -1119,7 +1119,7 @@ function TenantView({
           badge="Business Onboarded"
           name={successData.tenant.name}
           email={successData.user.email}
-          roleOrType={`${successData.tenant.businessType.toUpperCase()} BUSINESS · ${successData.tenant.plan.toUpperCase()}`}
+          roleOrType={`${successData.tenant.businessType.toUpperCase()} BUSINESS · ${PLAN_DEFINITIONS[successData.tenant.plan].name.toUpperCase()}`}
           slug={successData.tenant.slug}
           emailSent={successData.emailSent}
         />
@@ -2547,9 +2547,11 @@ function AddTenantModal({
                 }
                 className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-900/80 px-3 py-2 text-xs text-slate-100 outline-none focus:border-violet-500 light:border-slate-300 light:bg-slate-50 light:text-slate-900"
               >
-                <option value="starter">Starter / Beginner</option>
-                <option value="pro">Pro</option>
-                <option value="enterprise">Enterprise</option>
+                <option value="starter">{PLAN_DEFINITIONS.starter.name}</option>
+                <option value="pro">{PLAN_DEFINITIONS.pro.name}</option>
+                <option value="enterprise">
+                  {PLAN_DEFINITIONS.enterprise.name}
+                </option>
               </select>
             </div>
             <div>
@@ -2563,7 +2565,9 @@ function AddTenantModal({
                 }
                 className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-900/80 px-3 py-2 text-xs text-slate-100 outline-none focus:border-violet-500 light:border-slate-300 light:bg-slate-50 light:text-slate-900"
               >
-                <option value="trial">14-Day Free Trial</option>
+                <option value="trial">
+                  {TRIAL_ENTITLEMENTS.lengthDays}-Day Free Trial
+                </option>
                 <option value="active">Active (Paid / Approved)</option>
               </select>
             </div>

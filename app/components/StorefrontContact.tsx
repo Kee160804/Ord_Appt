@@ -13,16 +13,21 @@ import {
   Mail,
   MapPin,
   MessageSquareText,
+  MessageCircle,
+  Music2,
   Phone,
   Send,
+  Share2,
   ShieldCheck,
   Store,
   Twitter,
   UserRound,
+  Youtube,
 } from "lucide-react";
 import { tenantHasFeature } from "@/app/lib/plans";
+import { parseStorefrontDesign } from "@/app/lib/storefront-design";
 import { submitStorefrontContactMessage } from "@/app/services/contactService";
-import type { BusinessHours, Tenant } from "@/app/types";
+import type { BusinessHours, SocialPlatform, Tenant } from "@/app/types";
 
 interface StorefrontContactProps {
   tenant: Tenant;
@@ -53,30 +58,45 @@ function formatTime(value: string) {
 }
 
 function compactHours(hours: BusinessHours[]) {
-  const openDays = hours.filter((day) => !day.closed && day.open && day.close);
   const groups = new Map<string, BusinessHours[]>();
+  const dayOrder = [
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+    "Sunday",
+  ];
 
-  openDays.forEach((day) => {
-    const key = `${day.open}-${day.close}`;
-    groups.set(key, [...(groups.get(key) ?? []), day]);
-  });
+  [...hours]
+    .sort((a, b) => dayOrder.indexOf(a.day) - dayOrder.indexOf(b.day))
+    .forEach((day) => {
+      const key = day.closed ? "closed" : `${day.open}-${day.close}`;
+      groups.set(key, [...(groups.get(key) ?? []), day]);
+    });
 
   return Array.from(groups.values()).map((days) => {
     const first = days[0].day.slice(0, 3);
     const last = days[days.length - 1].day.slice(0, 3);
     const dayLabel = days.length === 1 ? first : `${first} - ${last}`;
-    return `${dayLabel}: ${formatTime(days[0].open)} - ${formatTime(days[0].close)}`;
+    const schedule = days[0].closed
+      ? "Closed"
+      : `${formatTime(days[0].open)} - ${formatTime(days[0].close)}`;
+    return `${dayLabel}: ${schedule}`;
   });
 }
 
-function socialHref(
-  platform: "facebook" | "instagram" | "twitter",
-  value: string,
-) {
+function socialHref(platform: SocialPlatform, value: string) {
   if (/^https?:\/\//i.test(value)) return value;
   const handle = value.replace(/^@/, "");
-  const host = platform === "twitter" ? "x.com" : `${platform}.com`;
-  return `https://${host}/${handle}`;
+  if (platform === "whatsapp") {
+    return `https://wa.me/${value.replace(/\D/g, "")}`;
+  }
+  if (platform === "twitter") return `https://x.com/${handle}`;
+  if (platform === "youtube") return `https://youtube.com/@${handle}`;
+  if (platform === "tiktok") return `https://tiktok.com/@${handle}`;
+  return `https://${platform}.com/${handle}`;
 }
 
 function websiteHref(value: string) {
@@ -85,6 +105,21 @@ function websiteHref(value: string) {
 
 function displayWebsite(value: string) {
   return value.replace(/^https?:\/\//i, "").replace(/\/$/, "");
+}
+
+function mapHref(sharedUrl: string, location: string) {
+  const fallback = location
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`
+    : "";
+  if (!sharedUrl.trim()) return fallback;
+  try {
+    const url = new URL(sharedUrl.trim());
+    return url.protocol === "https:" || url.protocol === "http:"
+      ? url.toString()
+      : fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 export function StorefrontContact({
@@ -96,15 +131,17 @@ export function StorefrontContact({
   const [status, setStatus] = useState("");
   const [isSending, setIsSending] = useState(false);
   const canSendMessage = tenantHasFeature(tenant, "storefront_contact_form");
+  const design = parseStorefrontDesign(
+    tenant.storefrontDesign,
+    tenant.businessType,
+  );
   const hours = useMemo(
     () => compactHours(tenant.businessHours),
     [tenant.businessHours],
   );
   const location = [tenant.address, tenant.city].filter(Boolean).join(", ");
   const website = tenant.socialLinks.website || tenant.domain || "";
-  const locationHref = location
-    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`
-    : "";
+  const locationHref = mapHref(design.contactMapUrl, location);
 
   const submitMessage = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -191,26 +228,55 @@ export function StorefrontContact({
       : null,
   ].filter((row): row is NonNullable<typeof row> => Boolean(row));
 
+  const selectedSocials = new Set(design.visibleSocials);
   const socials = [
-    tenant.socialLinks.facebook
-      ? {
-          label: "Facebook",
-          href: socialHref("facebook", tenant.socialLinks.facebook),
-          icon: Facebook,
-        }
-      : null,
-    tenant.socialLinks.instagram
+    tenant.socialLinks.instagram && selectedSocials.has("instagram")
       ? {
           label: "Instagram",
           href: socialHref("instagram", tenant.socialLinks.instagram),
           icon: Instagram,
+          className:
+            "bg-linear-to-br from-amber-400 via-pink-500 to-violet-600 text-white",
         }
       : null,
-    tenant.socialLinks.twitter
+    tenant.socialLinks.facebook && selectedSocials.has("facebook")
+      ? {
+          label: "Facebook",
+          href: socialHref("facebook", tenant.socialLinks.facebook),
+          icon: Facebook,
+          className: "bg-blue-600 text-white",
+        }
+      : null,
+    tenant.socialLinks.tiktok && selectedSocials.has("tiktok")
+      ? {
+          label: "TikTok",
+          href: socialHref("tiktok", tenant.socialLinks.tiktok),
+          icon: Music2,
+          className: "bg-slate-950 text-white",
+        }
+      : null,
+    tenant.socialLinks.whatsapp && selectedSocials.has("whatsapp")
+      ? {
+          label: "WhatsApp",
+          href: socialHref("whatsapp", tenant.socialLinks.whatsapp),
+          icon: MessageCircle,
+          className: "bg-emerald-500 text-white",
+        }
+      : null,
+    tenant.socialLinks.youtube && selectedSocials.has("youtube")
+      ? {
+          label: "YouTube",
+          href: socialHref("youtube", tenant.socialLinks.youtube),
+          icon: Youtube,
+          className: "bg-red-600 text-white",
+        }
+      : null,
+    tenant.socialLinks.twitter && selectedSocials.has("twitter")
       ? {
           label: "X / Twitter",
           href: socialHref("twitter", tenant.socialLinks.twitter),
           icon: Twitter,
+          className: "bg-black text-white",
         }
       : null,
   ].filter((social): social is NonNullable<typeof social> => Boolean(social));
@@ -224,63 +290,90 @@ export function StorefrontContact({
         <div className="relative grid items-center gap-10 lg:grid-cols-[1.08fr_0.92fr]">
           <div>
             <p className="mb-4 text-xs font-black uppercase tracking-[0.2em] text-violet-300">
-              Contact {tenant.name}
+              {design.contactEyebrow}
             </p>
             <h2
               id="contact-heading"
               className="max-w-xl text-4xl font-black leading-tight tracking-tight sm:text-5xl"
             >
-              We&apos;d love to hear from{" "}
+              {design.contactHeading}{" "}
               <span
                 style={{ color: tenant.accentColor || tenant.primaryColor }}
               >
-                you
+                {design.contactAccent}
               </span>{" "}
               <span aria-hidden="true">👋</span>
             </h2>
             <p className="mt-5 max-w-xl text-sm leading-7 text-slate-300 sm:text-base">
-              Have a question, feedback, or need support? Reach out to us —
-              we&apos;re here to help.
+              {design.contactDescription}
             </p>
 
             <div className="mt-9 grid gap-5 sm:grid-cols-3">
               <ContactHighlight
                 icon={Clock3}
                 title="Quick Response"
-                description="We reply within 24 hours"
+                description={design.contactResponseText}
                 color={tenant.primaryColor}
               />
               <ContactHighlight
                 icon={Headphones}
                 title="Customer Support"
-                description={hours[0] || "Contact us during business hours"}
+                description={
+                  design.contactSupportText ||
+                  hours[0] ||
+                  "Contact us during business hours"
+                }
                 color={tenant.primaryColor}
               />
               <ContactHighlight
                 icon={ShieldCheck}
                 title="Trusted Service"
-                description="Local support from a team that cares"
+                description={design.contactTrustText}
                 color={tenant.primaryColor}
               />
             </div>
           </div>
 
           <div
-            className="relative mx-auto flex min-h-64 w-full max-w-md items-center justify-center"
+            className="relative mx-auto flex min-h-64 w-full max-w-md items-center justify-center overflow-hidden rounded-3xl bg-slate-900"
+            style={
+              tenant.coverImage
+                ? {
+                    backgroundImage: `linear-gradient(0deg, rgba(15, 23, 42, 0.35), rgba(15, 23, 42, 0.05)), url(${tenant.coverImage})`,
+                    backgroundPosition: `${tenant.coverImagePositionX ?? 50}% ${tenant.coverImagePositionY ?? 50}%`,
+                    backgroundSize: `${tenant.coverImageZoom ?? 100}%`,
+                    backgroundRepeat: "no-repeat",
+                  }
+                : undefined
+            }
             aria-hidden="true"
           >
-            <div className="absolute h-56 w-56 rounded-full border border-violet-400/15" />
-            <div className="absolute h-40 w-40 rounded-full bg-violet-500/20 blur-2xl" />
-            <div className="relative mt-10 h-40 w-56 rounded-b-3xl bg-linear-to-br from-violet-500 to-violet-700 shadow-[0_30px_80px_rgba(124,58,237,0.4)]">
-              <div className="absolute -top-16 left-1/2 h-36 w-40 -translate-x-1/2 rounded-2xl border border-white/30 bg-linear-to-b from-white to-slate-200 p-5 shadow-2xl">
-                <div className="h-2 w-16 rounded-full bg-violet-400" />
-                <div className="mt-5 h-2 w-full rounded-full bg-slate-300" />
-                <div className="mt-3 h-2 w-4/5 rounded-full bg-slate-300" />
-                <div className="mt-3 h-2 w-2/3 rounded-full bg-slate-300" />
+            {!tenant.coverImage && (
+              <>
+                <div className="absolute h-56 w-56 rounded-full border border-violet-400/15" />
+                <div className="absolute h-40 w-40 rounded-full bg-violet-500/20 blur-2xl" />
+                <div className="relative mt-10 h-40 w-56 rounded-b-3xl bg-linear-to-br from-violet-500 to-violet-700 shadow-[0_30px_80px_rgba(124,58,237,0.4)]">
+                  <div className="absolute -top-16 left-1/2 h-36 w-40 -translate-x-1/2 rounded-2xl border border-white/30 bg-linear-to-b from-white to-slate-200 p-5 shadow-2xl">
+                    <div className="h-2 w-16 rounded-full bg-violet-400" />
+                    <div className="mt-5 h-2 w-full rounded-full bg-slate-300" />
+                    <div className="mt-3 h-2 w-4/5 rounded-full bg-slate-300" />
+                    <div className="mt-3 h-2 w-2/3 rounded-full bg-slate-300" />
+                  </div>
+                  <div className="absolute inset-x-0 bottom-0 h-28 rounded-b-3xl bg-linear-to-br from-violet-600 to-violet-700 [clip-path:polygon(0_0,50%_58%,100%_0,100%_100%,0_100%)]" />
+                </div>
+                <Send className="absolute right-4 top-5 h-16 w-16 rotate-[-12deg] text-violet-400 drop-shadow-[0_12px_24px_rgba(139,92,246,0.45)]" />
+              </>
+            )}
+            {tenant.coverImage && (
+              <div className="absolute inset-x-4 bottom-4 rounded-xl border border-white/15 bg-slate-950/75 px-4 py-3 text-left text-white shadow-xl backdrop-blur-md">
+                <strong className="flex items-center gap-2 text-sm">
+                  <Store className="h-4 w-4 text-violet-300" /> {tenant.name}
+                </strong>
+                <span className="mt-0.5 block truncate text-xs text-slate-300">
+                  {location || "We look forward to hearing from you"}
+                </span>
               </div>
-              <div className="absolute inset-x-0 bottom-0 h-28 rounded-b-3xl bg-linear-to-br from-violet-600 to-violet-700 [clip-path:polygon(0_0,50%_58%,100%_0,100%_100%,0_100%)]" />
-            </div>
-            <Send className="absolute right-4 top-5 h-16 w-16 rotate-[-12deg] text-violet-400 drop-shadow-[0_12px_24px_rgba(139,92,246,0.45)]" />
+            )}
           </div>
         </div>
       </div>
@@ -398,9 +491,7 @@ export function StorefrontContact({
             </p>
           </div>
 
-          <div
-            className={`grid gap-3 ${canSendMessage ? "" : "md:grid-cols-2"}`}
-          >
+          <div className="grid gap-3 sm:grid-cols-2">
             {infoRows.map((row) => {
               const Icon = row.icon;
               const external = row.href.startsWith("http");
@@ -460,66 +551,90 @@ export function StorefrontContact({
         </div>
       </div>
 
-      <div className="grid gap-5 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 md:grid-cols-[1fr_auto_1fr] md:items-center sm:p-7">
-        <div>
-          <h3 className="font-black text-slate-950 dark:text-white">
-            Other ways to connect
-          </h3>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Follow us on social media or visit us in person.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3 md:border-x md:border-slate-200 md:px-8 dark:md:border-slate-700">
-          {socials.map((social) => {
-            const Icon = social.icon;
-            return (
-              <a
-                key={social.label}
-                href={social.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label={social.label}
-                className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-600 transition hover:bg-violet-600 hover:text-white dark:bg-slate-800 dark:text-slate-300"
-              >
-                <Icon className="h-4 w-4" />
-              </a>
-            );
-          })}
-          {socials.length === 0 && (
-            <span className="text-xs text-slate-400">
-              No social profiles published yet
-            </span>
-          )}
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-2 sm:items-center">
-          {location && (
-            <a
-              href={locationHref}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-3 group"
+      <div className="grid gap-5 lg:grid-cols-2">
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <div className="flex items-start gap-3">
+            <span
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white shadow-lg"
+              style={{ backgroundColor: tenant.primaryColor }}
             >
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/15 text-violet-600 dark:text-violet-300">
-                <Store className="h-4 w-4" />
+              <Clock3 className="h-5 w-5" />
+            </span>
+            <div>
+              <h3 className="font-black text-slate-950 dark:text-white">
+                Business Hours
+              </h3>
+              <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                We&apos;re here to assist you during the following hours.
+              </p>
+            </div>
+          </div>
+          <div className="mt-4 divide-y divide-slate-200 text-xs dark:divide-slate-700">
+            {(hours.length ? hours : ["Hours available on request"]).map(
+              (line) => {
+                const separator = line.indexOf(":");
+                const day = separator >= 0 ? line.slice(0, separator) : line;
+                const schedule =
+                  separator >= 0 ? line.slice(separator + 1).trim() : "";
+                return (
+                  <div
+                    key={line}
+                    className="flex items-center justify-between gap-4 py-2 first:pt-0 last:pb-0"
+                  >
+                    <span className="font-medium text-slate-700 dark:text-slate-200">
+                      {day}
+                    </span>
+                    {schedule && (
+                      <span className="text-right text-slate-600 dark:text-slate-300">
+                        {schedule}
+                      </span>
+                    )}
+                  </div>
+                );
+              },
+            )}
+          </div>
+        </div>
+
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <div className="flex items-start gap-3">
+            <span
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white shadow-lg"
+              style={{ backgroundColor: tenant.primaryColor }}
+            >
+              <Share2 className="h-5 w-5" />
+            </span>
+            <div>
+              <h3 className="font-black text-slate-950 dark:text-white">
+                Find Us Online
+              </h3>
+              <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                Follow us on social media for updates, new arrivals, and more.
+              </p>
+            </div>
+          </div>
+          <div className="mt-5 flex flex-wrap items-center justify-center gap-3 sm:justify-start sm:pl-13">
+            {socials.map((social) => {
+              const Icon = social.icon;
+              return (
+                <a
+                  key={social.label}
+                  href={social.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={social.label}
+                  title={social.label}
+                  className={`flex h-11 w-11 items-center justify-center rounded-xl shadow-md transition hover:-translate-y-0.5 hover:shadow-lg ${social.className}`}
+                >
+                  <Icon className="h-5 w-5" />
+                </a>
+              );
+            })}
+            {socials.length === 0 && (
+              <span className="text-xs text-slate-400">
+                No social profiles selected yet
               </span>
-              <span>
-                <strong className="block text-sm text-slate-900 group-hover:text-violet-600 dark:text-white">
-                  Visit our store
-                </strong>
-                <span className="text-xs text-slate-500 dark:text-slate-400">
-                  Come by and say hello!
-                </span>
-              </span>
-            </a>
-          )}
-          <div className="space-y-1 text-xs text-slate-600 dark:text-slate-300">
-            {(hours.length ? hours : ["Hours available on request"])
-              .slice(0, 3)
-              .map((line) => (
-                <p key={line}>{line}</p>
-              ))}
+            )}
           </div>
         </div>
       </div>

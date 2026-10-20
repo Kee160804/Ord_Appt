@@ -31,8 +31,14 @@ export interface SocialLinks {
   instagram?: string;
   facebook?: string;
   twitter?: string;
+  tiktok?: string;
+  whatsapp?: string;
+  youtube?: string;
   website?: string;
 }
+
+export type SocialPlatform =
+  "instagram" | "facebook" | "tiktok" | "whatsapp" | "youtube" | "twitter";
 
 export interface BusinessReview {
   id: string;
@@ -51,6 +57,7 @@ export interface PublicPromotion {
   name: string;
   discountType: "PERCENTAGE" | "FIXED";
   discountValue: number;
+  discountScope: "TOTAL" | "ITEMS";
   description?: string;
   flyerUrl?: string;
   startsAt?: string;
@@ -82,6 +89,7 @@ export interface Tenant {
   domain?: string;
   customDomain?: string;
   customDomainVerified?: boolean;
+  storefrontUrlEditAllowed?: boolean;
   businessType: BusinessType;
   logo: string;
   logoImage?: string;
@@ -100,6 +108,7 @@ export interface Tenant {
   socialLinks: SocialLinks;
   primaryColor: string;
   accentColor: string;
+  storefrontDesign?: StorefrontDesign;
   createdAt: string;
   isActive: boolean;
   plan: PlanType;
@@ -118,6 +127,35 @@ export interface Tenant {
   subscriptionPaidStaffSeats?: number;
   monthlyRevenue?: number;
   orderingSettings?: OrderingSettings;
+}
+
+export interface StorefrontDesign {
+  heroHeading: string;
+  heroAccent: string;
+  heroSubheading: string;
+  heroCtaLabel: string;
+  contactEyebrow: string;
+  contactHeading: string;
+  contactAccent: string;
+  contactDescription: string;
+  contactResponseText: string;
+  contactSupportText: string;
+  contactTrustText: string;
+  contactMapUrl: string;
+  visibleSocials: SocialPlatform[];
+  heroAlignment: "left" | "center" | "right";
+  heroStyle: "full" | "balanced" | "close-up";
+  backgroundStyle: "light" | "dark" | "gradient";
+  sections: {
+    hero: boolean;
+    search: boolean;
+    categories: boolean;
+    promotions: boolean;
+    featured: boolean;
+    reviews: boolean;
+    about: boolean;
+    contact: boolean;
+  };
 }
 export interface User {
   id: string;

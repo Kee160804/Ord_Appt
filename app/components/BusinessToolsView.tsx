@@ -94,6 +94,7 @@ function emptyPromotion(): Omit<Promotion, "tenantId" | "usageCount"> {
     name: "",
     discountType: "PERCENTAGE",
     discountValue: 10,
+    discountScope: "TOTAL",
     description: "",
     flyerUrl: "",
     startsAt: "",
@@ -247,6 +248,15 @@ export function BusinessToolsView({ tenant }: { tenant: Tenant }) {
       new Date(promotionForm.endsAt) <= new Date(promotionForm.startsAt)
     ) {
       return setError("The promotion end date must be after its start date.");
+    }
+    if (
+      promotionForm.discountScope === "ITEMS" &&
+      promotionForm.applicableProductIds.length === 0 &&
+      promotionForm.applicableServiceIds.length === 0
+    ) {
+      return setError(
+        "Select at least one item or service for this promotion.",
+      );
     }
     setIsSaving(true);
     setError("");
@@ -631,6 +641,12 @@ export function BusinessToolsView({ tenant }: { tenant: Tenant }) {
                       </span>
                     </div>
                     <p className="mt-3 text-[10px] text-slate-400">
+                      Applies to:{" "}
+                      {promotion.discountScope === "TOTAL"
+                        ? "entire purchase total"
+                        : "selected items or services"}
+                    </p>
+                    <p className="mt-1 text-[10px] text-slate-400">
                       Used {promotion.usageCount}
                       {promotion.usageLimit
                         ? ` of ${promotion.usageLimit}`
@@ -647,6 +663,7 @@ export function BusinessToolsView({ tenant }: { tenant: Tenant }) {
                             name: promotion.name,
                             discountType: promotion.discountType,
                             discountValue: promotion.discountValue,
+                            discountScope: promotion.discountScope,
                             description: promotion.description,
                             flyerUrl: promotion.flyerUrl,
                             startsAt: promotion.startsAt,
@@ -1125,6 +1142,33 @@ export function BusinessToolsView({ tenant }: { tenant: Tenant }) {
                   })
                 }
               />
+              <Select
+                label="Apply discount to"
+                value={promotionForm.discountScope}
+                onChange={(event) =>
+                  setPromotionForm({
+                    ...promotionForm,
+                    discountScope: event.target.value as "TOTAL" | "ITEMS",
+                    applicableProductIds:
+                      event.target.value === "TOTAL"
+                        ? []
+                        : promotionForm.applicableProductIds,
+                    applicableServiceIds:
+                      event.target.value === "TOTAL"
+                        ? []
+                        : promotionForm.applicableServiceIds,
+                  })
+                }
+                options={[
+                  { value: "TOTAL", label: "Entire purchase total" },
+                  {
+                    value: "ITEMS",
+                    label: isAppointment
+                      ? "Selected service(s)"
+                      : "Selected item(s)",
+                  },
+                ]}
+              />
               <Input
                 label="Starts (optional)"
                 type="datetime-local"
@@ -1218,42 +1262,44 @@ export function BusinessToolsView({ tenant }: { tenant: Tenant }) {
                 </div>
               </div>
             </div>
-            <div>
-              <p className="mb-2 text-xs font-semibold">
-                Applies to (none selected = entire storefront)
-              </p>
-              <div className="max-h-48 space-y-2 overflow-y-auto">
-                {(isAppointment ? services : products).map((item) => {
-                  const key = isAppointment
-                    ? "applicableServiceIds"
-                    : "applicableProductIds";
-                  const selected = promotionForm[key].includes(item.id);
-                  return (
-                    <label
-                      key={item.id}
-                      className="flex items-center gap-2 text-xs"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selected}
-                        onChange={(event) =>
-                          setPromotionForm({
-                            ...promotionForm,
-                            [key]: event.target.checked
-                              ? [...promotionForm[key], item.id]
-                              : promotionForm[key].filter(
-                                  (id) => id !== item.id,
-                                ),
-                          })
-                        }
-                        className="accent-violet-600"
-                      />
-                      {item.name}
-                    </label>
-                  );
-                })}
+            {promotionForm.discountScope === "ITEMS" && (
+              <div>
+                <p className="mb-2 text-xs font-semibold">
+                  Choose eligible {isAppointment ? "services" : "items"}
+                </p>
+                <div className="max-h-48 space-y-2 overflow-y-auto">
+                  {(isAppointment ? services : products).map((item) => {
+                    const key = isAppointment
+                      ? "applicableServiceIds"
+                      : "applicableProductIds";
+                    const selected = promotionForm[key].includes(item.id);
+                    return (
+                      <label
+                        key={item.id}
+                        className="flex items-center gap-2 text-xs"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          onChange={(event) =>
+                            setPromotionForm({
+                              ...promotionForm,
+                              [key]: event.target.checked
+                                ? [...promotionForm[key], item.id]
+                                : promotionForm[key].filter(
+                                    (id) => id !== item.id,
+                                  ),
+                            })
+                          }
+                          className="accent-violet-600"
+                        />
+                        {item.name}
+                      </label>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
+            )}
             <label className="flex items-center gap-2 text-xs">
               <input
                 type="checkbox"

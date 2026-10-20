@@ -12,7 +12,8 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/app/contexts/auth";
 import { slugify } from "@/app/lib/utils";
-import { PLAN_DEFINITIONS } from "@/app/lib/plans";
+import { PLAN_DEFINITIONS, TRIAL_ENTITLEMENTS } from "@/app/lib/plans";
+import { getTenantEntitlement } from "@/app/lib/subscription";
 import type { BusinessType, Tenant } from "@/app/types";
 import { Modal } from "@/app/components/Modal";
 import { cn } from "@/app/lib/utils";
@@ -134,7 +135,8 @@ export function BusinessSwitcher({
           <form onSubmit={submitBusiness} className="space-y-5">
             <div className="rounded-2xl border border-violet-500/25 bg-violet-500/10 p-4 text-xs leading-5 text-violet-100 light:text-violet-900">
               This creates a separate business under the same login. It starts
-              on a 14-day trial and keeps its own data, plan, and subscription.
+              on a {TRIAL_ENTITLEMENTS.lengthDays}-day trial and keeps its own
+              data, plan, and subscription.
             </div>
 
             <label className="block text-xs font-semibold text-slate-200 light:text-slate-700">
@@ -262,6 +264,15 @@ export function BusinessSwitcher({
               {businesses.map((business) => {
                 const active = business.id === tenant.id;
                 const plan = PLAN_DEFINITIONS[business.plan];
+                const entitlement = getTenantEntitlement(business);
+                const subscriptionLabel =
+                  entitlement.state === "trial"
+                    ? `Free Trial · ${entitlement.daysRemaining} day${entitlement.daysRemaining === 1 ? "" : "s"} left`
+                    : entitlement.state === "active"
+                      ? `${plan.name} · ${plan.price} BZD/month`
+                      : entitlement.state === "past_due"
+                        ? "Payment past due"
+                        : "Free Trial expired";
                 return (
                   <button
                     key={business.id}
@@ -284,7 +295,7 @@ export function BusinessSwitcher({
                         {business.name}
                       </span>
                       <span className="mt-0.5 block text-[10px] text-slate-400 light:text-slate-500">
-                        {plan.name} · ${plan.price} BZD/month ·{" "}
+                        {subscriptionLabel} ·{" "}
                         {business.businessType === "appointment"
                           ? "Appointments"
                           : "Ordering"}

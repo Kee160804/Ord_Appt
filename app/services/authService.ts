@@ -13,6 +13,7 @@ import type {
   TenantRow,
 } from "@/app/types/supabase";
 import { parseSocialLinks } from "@/app/lib/social-links";
+import { parseStorefrontDesign } from "@/app/lib/storefront-design";
 import { slugify } from "@/app/lib/utils";
 
 interface AuthenticatedAppSession {
@@ -132,6 +133,7 @@ function normalizeBusinessType(value: string | null | undefined): BusinessType {
 
 function mapTenant(row: TenantRow, hours: BusinessHourRow[]): Tenant {
   const businessName = row.business_name;
+  const businessType = normalizeBusinessType(row.business_type);
   const businessHours = [...hours]
     .sort((a, b) => a.day_of_week - b.day_of_week)
     .map((hour) => ({
@@ -150,7 +152,8 @@ function mapTenant(row: TenantRow, hours: BusinessHourRow[]): Tenant {
       : undefined,
     customDomain: row.custom_domain ?? undefined,
     customDomainVerified: Boolean(row.custom_domain_verified_at),
-    businessType: normalizeBusinessType(row.business_type),
+    storefrontUrlEditAllowed: row.allow_storefront_url_edit === true,
+    businessType,
     logo: row.logo ?? businessName.charAt(0).toUpperCase(),
     logoImage: row.logo_url ?? undefined,
     logoBg: row.logo_bg ?? row.primary_color ?? "#8b5cf6",
@@ -170,6 +173,10 @@ function mapTenant(row: TenantRow, hours: BusinessHourRow[]): Tenant {
     socialLinks: parseSocialLinks(row.social_links),
     primaryColor: row.primary_color ?? "#8b5cf6",
     accentColor: row.accent_color ?? "#a78bfa",
+    storefrontDesign: parseStorefrontDesign(
+      row.storefront_design,
+      businessType,
+    ),
     createdAt: row.created_at ?? new Date().toISOString(),
     isActive: row.is_active && row.status.toUpperCase() === "ACTIVE",
     plan:

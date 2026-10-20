@@ -16,10 +16,12 @@ import { formatCurrency, formatDate } from "@/app/lib/utils";
 import { createPublicAppointment } from "@/app/services/bookingService";
 import { listPublicAppointmentAvailability } from "@/app/services/appointmentService";
 import { isSupabaseConfigured } from "@/app/lib/supabase/config";
+import { parseStorefrontDesign } from "@/app/lib/storefront-design";
 import { Button } from "@/app/components/Button";
 import { Input } from "@/app/components/input";
 import { Modal } from "@/app/components/Modal";
 import { StorefrontOffers } from "@/app/components/StorefrontOffers";
+import { StorefrontHero } from "@/app/components/StorefrontHero";
 import {
   MAX_PROMOTION_CODE_LENGTH,
   normalizePromotionCode,
@@ -121,6 +123,10 @@ export function AppointmentBooking({
   promotions = [],
   viewOnly = false,
 }: AppointmentBookingProps) {
+  const storefrontDesign = parseStorefrontDesign(
+    tenant.storefrontDesign,
+    tenant.businessType,
+  );
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
@@ -496,14 +502,14 @@ export function AppointmentBooking({
           )}
         </div>
       )}
-      <StorefrontOffers
+      {storefrontDesign.sections.promotions && <StorefrontOffers
         promotions={promotions}
         onSelectCode={(code) => {
           setPromotionCode(code);
           setAppliedPromotion(null);
           setBookingError("");
         }}
-      />
+      />}
       <div className="grid min-w-0 grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_340px] xl:items-start">
         {/* Left sidebar: Calendar, Time slots, Notes */}
         <aside
@@ -737,6 +743,17 @@ export function AppointmentBooking({
 
         {/* Center: Service list */}
         <div className="order-1 min-w-0 space-y-5">
+          <StorefrontHero
+            tenant={tenant}
+            onAction={() => {
+              const firstService = extendedServices[0];
+              if (firstService) setSelectedServiceId(firstService.id);
+              document
+                .getElementById("appointment-booking-panel")
+                ?.scrollIntoView({ behavior: "smooth", block: "start" });
+            }}
+          />
+          {false && (
           <section className="relative min-h-64 overflow-hidden rounded-2xl border border-[#26364f] bg-[#0d1829] light:border-slate-200 light:bg-white">
             <Image
               src={tenant.coverImage || PLACEHOLDER_IMG}
@@ -796,6 +813,7 @@ export function AppointmentBooking({
               </button>
             </div>
           </section>
+          )}
 
           <div className="rounded-2xl border border-[#26364f] bg-[#091322] p-4 light:border-slate-200 light:bg-slate-50 sm:p-5">
             <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
