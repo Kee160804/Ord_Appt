@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Plus,
   Edit2,
@@ -13,6 +13,8 @@ import {
   FolderTree,
   ChevronLeft,
   ChevronRight,
+  Upload,
+  X,
 } from "lucide-react";
 import { Card } from "../components/Card";
 import { Button } from "../components/Button";
@@ -35,6 +37,9 @@ import {
   updateCategory,
   updateProduct,
   saveProductVariants,
+  deleteProductImage,
+  uploadProductImage,
+  validateProductImage,
 } from "../services/productService";
 import type {
   Category,
@@ -67,6 +72,16 @@ const PRODUCT_COLOR_SUGGESTIONS = [
 ];
 const ONE_SIZE_OPTION = "One size";
 const COLORS_ATTRIBUTE = "colors";
+
+function fileAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ""));
+    reader.onerror = () =>
+      reject(new Error("Unable to read the product image."));
+    reader.readAsDataURL(file);
+  });
+}
 
 function variantAttribute(
   attributes: Record<string, string>,
@@ -119,9 +134,7 @@ function variantColors(variant: ProductVariant) {
     }
   }
 
-  return uniqueOptionValues([
-    variantAttribute(variant.attributes, "color"),
-  ]);
+  return uniqueOptionValues([variantAttribute(variant.attributes, "color")]);
 }
 
 function attributesForSize(size: string, colors: string[]) {
@@ -211,6 +224,53 @@ export function ProductsView({ tenant }: Props) {
   const [variantSizes, setVariantSizes] = useState<string[]>([]);
   const [sizeDraft, setSizeDraft] = useState("");
   const [colorDrafts, setColorDrafts] = useState<Record<string, string>>({});
+  const [productImageFile, setProductImageFile] = useState<File | null>(null);
+  const [productImagePreview, setProductImagePreview] = useState("");
+  const productImagePreviewRef = useRef("");
+
+  useEffect(
+    () => () => {
+      if (productImagePreviewRef.current) {
+        URL.revokeObjectURL(productImagePreviewRef.current);
+      }
+    },
+    [],
+  );
+
+  const clearProductImageFile = () => {
+    if (productImagePreviewRef.current) {
+      URL.revokeObjectURL(productImagePreviewRef.current);
+      productImagePreviewRef.current = "";
+    }
+    setProductImageFile(null);
+    setProductImagePreview("");
+  };
+
+  const selectProductImage = (file?: File) => {
+    if (!file) return;
+    try {
+      validateProductImage(file);
+      if (productImagePreviewRef.current) {
+        URL.revokeObjectURL(productImagePreviewRef.current);
+      }
+      const previewUrl = URL.createObjectURL(file);
+      productImagePreviewRef.current = previewUrl;
+      setProductImageFile(file);
+      setProductImagePreview(previewUrl);
+      setError("");
+    } catch (imageError) {
+      setError(
+        imageError instanceof Error
+          ? imageError.message
+          : "Unable to use that product image.",
+      );
+    }
+  };
+
+  const closeProductEditor = () => {
+    clearProductImageFile();
+    setShowAdd(false);
+  };
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -413,6 +473,7 @@ export function ProductsView({ tenant }: Props) {
   };
 
   const openAdd = () => {
+    clearProductImageFile();
     setEditingProduct(null);
     setNewProduct({
       name: "",
@@ -434,6 +495,7 @@ export function ProductsView({ tenant }: Props) {
   };
 
   const openEdit = (product: Product) => {
+    clearProductImageFile();
     setEditingProduct(product);
     setNewProduct({
       name: product.name,
@@ -472,11 +534,7 @@ export function ProductsView({ tenant }: Props) {
     setVariants((current) => [
       ...current,
       ...newSizes.map((size) =>
-        createRetailVariant(
-          size,
-          newProduct.name,
-          editingProduct?.id ?? "",
-        ),
+        createRetailVariant(size, newProduct.name, editingProduct?.id ?? ""),
       ),
     ]);
     setColorDrafts((current) =>
@@ -643,14 +701,24 @@ export function ProductsView({ tenant }: Props) {
     const category = categories.find(
       (candidate) => candidate.id === newProduct.categoryId,
     );
+    let uploadedProductImage = "";
+    let productWasSaved = false;
 
     try {
       let product: Product;
+      const productImage = productImageFile
+        ? isSupabaseConfigured()
+          ? (uploadedProductImage = await uploadProductImage(
+              tenant.id,
+              productImageFile,
+            ))
+          : await fileAsDataUrl(productImageFile)
+        : newProduct.image;
       const input = {
         name: newProduct.name,
         description: newProduct.description,
         price,
-        image: newProduct.image,
+        image: productImage,
         categoryId: newProduct.categoryId,
         inventory,
         trackInventory: newProduct.trackInventory,
@@ -685,7 +753,7 @@ export function ProductsView({ tenant }: Props) {
           name: newProduct.name,
           description: newProduct.description,
           price,
-          image: newProduct.image,
+          image: productImage,
           categoryId: newProduct.categoryId,
           categoryName: category?.name ?? "Uncategorized",
           isActive: editingProduct?.isActive ?? true,
@@ -710,6 +778,7 @@ export function ProductsView({ tenant }: Props) {
           : [...products, product];
         setStoredProducts(tenant.id, nextProducts);
       }
+      productWasSaved = true;
 
       if (
         tenant.businessType === "retail" &&
@@ -746,6 +815,13 @@ export function ProductsView({ tenant }: Props) {
             : [...current, product],
         );
       }
+      if (
+        uploadedProductImage &&
+        editingProduct?.image &&
+        editingProduct.image !== uploadedProductImage
+      ) {
+        await deleteProductImage(tenant.id, editingProduct.image);
+      }
       setNewProduct({
         name: "",
         price: "",
@@ -761,9 +837,13 @@ export function ProductsView({ tenant }: Props) {
       setVariantSizes([]);
       setSizeDraft("");
       setColorDrafts({});
+      clearProductImageFile();
       setEditingProduct(null);
       setShowAdd(false);
     } catch (createError) {
+      if (uploadedProductImage && !productWasSaved) {
+        await deleteProductImage(tenant.id, uploadedProductImage);
+      }
       const message =
         createError instanceof Error
           ? createError.message
@@ -1089,14 +1169,14 @@ export function ProductsView({ tenant }: Props) {
       {/* Add modal */}
       <Modal
         open={showAdd}
-        onClose={() => setShowAdd(false)}
+        onClose={closeProductEditor}
         title={editingProduct ? "Edit Product" : "Add New Product"}
         maxWidth="max-w-2xl"
         footer={
           <div className="flex gap-3">
             <Button
               variant="outline"
-              onClick={() => setShowAdd(false)}
+              onClick={closeProductEditor}
               className="flex-1 border-slate-600 light:border-gray-300 text-white light:text-gray-800 hover:bg-slate-700 light:hover:bg-gray-100"
             >
               Cancel
@@ -1242,15 +1322,66 @@ export function ProductsView({ tenant }: Props) {
               . Basic product details remain available on Beginner.
             </div>
           )}
-          <div>
-            <Input
-              label="Image URL"
-              placeholder="https://..."
-              value={newProduct.image}
-              onChange={(e) =>
-                setNewProduct({ ...newProduct, image: e.target.value })
-              }
-            />
+          <div className="space-y-2">
+            <div className="grid items-end gap-2 sm:grid-cols-[1fr_auto]">
+              <Input
+                label="Image URL"
+                placeholder="https://..."
+                value={newProduct.image}
+                onChange={(event) => {
+                  if (productImageFile) clearProductImageFile();
+                  setNewProduct({
+                    ...newProduct,
+                    image: event.target.value,
+                  });
+                }}
+              />
+              <label
+                htmlFor="product-image-upload"
+                className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-violet-500/50 bg-violet-500/10 px-4 text-xs font-bold text-violet-200 transition hover:bg-violet-500/20 light:text-violet-700"
+              >
+                <Upload className="h-4 w-4" /> Upload from photos
+                <input
+                  id="product-image-upload"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="sr-only"
+                  onChange={(event) => {
+                    selectProductImage(event.target.files?.[0]);
+                    event.target.value = "";
+                  }}
+                />
+              </label>
+            </div>
+            {productImageFile && (
+              <div className="flex items-center gap-3 rounded-lg border border-violet-500/25 bg-violet-500/10 p-2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={productImagePreview}
+                  alt="Selected product preview"
+                  className="h-12 w-12 rounded-md object-cover"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs font-semibold">
+                    {productImageFile.name}
+                  </p>
+                  <p className="text-[10px] text-slate-400 light:text-slate-600">
+                    This photo will be used instead of the Image URL.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={clearProductImageFile}
+                  aria-label="Remove selected product image"
+                  className="rounded-md p-1.5 text-slate-400 transition hover:bg-slate-700 hover:text-white light:hover:bg-slate-200 light:hover:text-slate-900"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            )}
+            <p className="text-[10px] text-slate-400 light:text-slate-600">
+              Paste an image URL or upload a JPG, PNG, or WebP photo up to 5 MB.
+            </p>
           </div>
           {canUseAdvancedCatalog && tenant.businessType !== "retail" && (
             <div className="space-y-2">

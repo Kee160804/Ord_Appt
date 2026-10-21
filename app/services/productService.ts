@@ -58,6 +58,70 @@ export interface ListProductsOptions {
 const DEFAULT_PRODUCT_PAGE_SIZE = 25;
 const MAX_PRODUCT_PAGE_SIZE = 100;
 const MAX_PRODUCT_SEARCH_LENGTH = 120;
+const STOREFRONT_MEDIA_BUCKET = "storefront-media";
+const MAX_PRODUCT_IMAGE_BYTES = 5 * 1024 * 1024;
+const PRODUCT_IMAGE_EXTENSIONS: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+};
+
+export function validateProductImage(file: File) {
+  if (!PRODUCT_IMAGE_EXTENSIONS[file.type]) {
+    throw new Error("Choose a JPG, PNG, or WebP product image.");
+  }
+  if (file.size > MAX_PRODUCT_IMAGE_BYTES) {
+    throw new Error("Product images must be 5 MB or smaller.");
+  }
+}
+
+export async function uploadProductImage(tenantId: string, file: File) {
+  validateProductImage(file);
+  const extension = PRODUCT_IMAGE_EXTENSIONS[file.type];
+  const objectPath = `${tenantId}/products/${crypto.randomUUID()}.${extension}`;
+  const supabase = client();
+  const { error } = await supabase.storage
+    .from(STOREFRONT_MEDIA_BUCKET)
+    .upload(objectPath, file, {
+      cacheControl: "3600",
+      contentType: file.type,
+      upsert: false,
+    });
+
+  if (error) {
+    if (error.message.toLowerCase().includes("row-level security")) {
+      throw new Error(
+        "Product photo uploads are not installed yet. Apply the product image upload migration in Supabase.",
+      );
+    }
+    throw new Error(error.message || "Unable to upload the product image.");
+  }
+
+  const { data } = supabase.storage
+    .from(STOREFRONT_MEDIA_BUCKET)
+    .getPublicUrl(objectPath);
+  if (!data.publicUrl) {
+    await supabase.storage.from(STOREFRONT_MEDIA_BUCKET).remove([objectPath]);
+    throw new Error("The uploaded product image URL could not be created.");
+  }
+  return data.publicUrl;
+}
+
+export async function deleteProductImage(tenantId: string, imageUrl: string) {
+  try {
+    const url = new URL(imageUrl);
+    const marker = `/storage/v1/object/public/${STOREFRONT_MEDIA_BUCKET}/`;
+    const markerIndex = url.pathname.indexOf(marker);
+    if (markerIndex < 0) return;
+    const objectPath = decodeURIComponent(
+      url.pathname.slice(markerIndex + marker.length),
+    );
+    if (!objectPath.startsWith(`${tenantId}/products/`)) return;
+    await client().storage.from(STOREFRONT_MEDIA_BUCKET).remove([objectPath]);
+  } catch {
+    // External URLs and malformed historical values are not managed uploads.
+  }
+}
 
 function mapCategory(row: CategoryRow): Category {
   return {
