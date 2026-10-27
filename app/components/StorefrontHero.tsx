@@ -27,11 +27,12 @@ export function StorefrontHero({
       : design.heroAlignment === "right"
         ? "items-end text-right"
         : "items-start text-left";
-  const imageFit = design.heroStyle === "full" ? "object-cover" : "object-contain";
+  const imageFit =
+    design.heroStyle === "full" ? "object-cover" : "object-contain";
   const zoom =
     design.heroStyle === "close-up"
       ? Math.max(150, tenant.coverImageZoom ?? 100)
-      : tenant.coverImageZoom ?? 100;
+      : (tenant.coverImageZoom ?? 100);
 
   return (
     <section

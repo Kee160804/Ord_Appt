@@ -8,7 +8,7 @@ test("storefront navigation separates the catalog, about, promotions, and contac
   const source = await read("app/components/store.tsx");
   assert.match(
     source,
-    /type StorefrontTab = "catalog" \| "about" \| "promotions" \| "contact"/,
+    /type StorefrontTab =[\s\S]*"catalog" \| "about" \| "promotions" \| "contact" \| "track-order"/,
   );
   assert.doesNotMatch(source, />\s*Home\s*</);
   assert.match(source, /<StorefrontAbout tenant=\{tenant\}/);

@@ -151,7 +151,7 @@ async function validateJob(job: ClaimedEmailJob) {
   if (job.queue_name === "order") {
     const { data, error } = await supabase
       .from("orders")
-      .select("id, customer_email")
+      .select("id, customer_email, payment_status")
       .eq("id", job.source_id)
       .eq("tenant_id", job.tenant_id)
       .maybeSingle();
@@ -163,6 +163,12 @@ async function validateJob(job: ClaimedEmailJob) {
       throw new Error(
         "The order recipient no longer matches the queued email.",
       );
+    }
+    if (
+      job.event_type === "PAYMENT_CONFIRMED" &&
+      data.payment_status?.toUpperCase() !== "PAID"
+    ) {
+      throw new Error("The order is no longer paid.");
     }
     replyTo = tenant.email;
   } else if (

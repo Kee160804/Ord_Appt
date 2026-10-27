@@ -26,12 +26,9 @@ test("retail checkout applies promotions and owner automatic discounts atomicall
   assert.match(sql, /public\.apply_public_order_promotion/);
   assert.match(sql, /GRANT EXECUTE[\s\S]+TO service_role/);
 
-  assert.match(route, /create_public_retail_order_v2/);
-  assert.match(route, /p_promotion_code: payload\.p_promotion_code/);
-  assert.match(
-    route,
-    /error\?\.code === "PGRST202" && isRetail && promotionCode/,
-  );
+  assert.match(route, /create_customer_business_order/);
+  assert.match(route, /p_promotion_code: promotionCode/);
+  assert.match(route, /p_checkout: payload/);
 });
 
 test("active owner promotions are discoverable and rendered on both storefront types", async () => {

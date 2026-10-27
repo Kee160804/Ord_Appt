@@ -41,7 +41,7 @@ test("cover framing persists and renders on public storefronts", async () => {
   assert.match(settings, /Perfect fit/);
   assert.match(settings, /Left \/ right/);
   assert.match(settings, /Up \/ down/);
-  assert.match(service, /customDomain = `\$\{slug\}\.yuhbusiness\.com`/);
+  assert.match(service, /\? `\$\{slug\}\.yuhbusiness\.com`/);
   assert.match(booking, /coverImagePositionX/);
   assert.match(ordering, /coverImageZoom/);
 });

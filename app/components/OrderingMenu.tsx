@@ -14,10 +14,20 @@ import {
   ShoppingCart,
   SlidersHorizontal,
   Trash2,
-  UserRound,
 } from "lucide-react";
 import { Button } from "@/app/components/Button";
-import { CustomerPaymentCheckout } from "@/app/components/CustomerPaymentCheckout";
+import {
+  CustomerPaymentCheckout,
+  type CheckoutConfirmation,
+} from "@/app/components/CustomerPaymentCheckout";
+import {
+  checkoutOrderTypes,
+  checkoutPaymentOptions,
+  moneyRound,
+  type CheckoutOrderType,
+  type CustomerCheckoutMethod,
+} from "@/app/lib/customer-checkout";
+import type { PublicBusinessPaymentConfiguration } from "@/app/lib/business-payments";
 import { Modal } from "@/app/components/Modal";
 import { StorefrontOffers } from "@/app/components/StorefrontOffers";
 import { StorefrontHero } from "@/app/components/StorefrontHero";
@@ -91,6 +101,7 @@ interface OrderingMenuProps {
   onOrderPlaced?: (items: { productId: string; quantity: number }[]) => void;
   viewOnly?: boolean;
   onOpenGallery?: () => void;
+  onTrackOrder: (reference: string) => void;
 }
 
 const PLACEHOLDER_IMG = "/fallback-product.png";
@@ -167,6 +178,7 @@ export function OrderingMenu({
   onOrderPlaced,
   viewOnly = false,
   onOpenGallery,
+  onTrackOrder,
 }: OrderingMenuProps) {
   const isRetail = tenant.businessType === "retail";
   const catalogLabel = isRetail ? "Products & Retail" : "Food & Drinks";
@@ -180,8 +192,8 @@ export function OrderingMenu({
   const [searchQuery, setSearchQuery] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
-  const [checkoutStage, setCheckoutStage] = useState<"details" | "payment">(
-    "payment",
+  const [checkoutStage, setCheckoutStage] = useState<"details" | "complete">(
+    "details",
   );
   const [currentProduct, setCurrentProduct] = useState<Product | null>(null);
   const [quantity, setQuantity] = useState(1);
@@ -193,19 +205,66 @@ export function OrderingMenu({
   const [customerName, setCustomerName] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
-  const [orderType, setOrderType] = useState("dine_in");
+  const [orderType, setOrderType] = useState<CheckoutOrderType>(
+    isRetail ? "pickup" : "dine_in",
+  );
   const [requestedTime, setRequestedTime] = useState("");
   const [deliveryAddress, setDeliveryAddress] = useState("");
   const [deliveryArea, setDeliveryArea] = useState("");
   const [deliveryInstructions, setDeliveryInstructions] = useState("");
   const [tableNumber, setTableNumber] = useState("");
   const [orderNotes, setOrderNotes] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState<"pay_later" | "mock_card">(
-    "pay_later",
-  );
+  const [paymentMethod, setPaymentMethod] =
+    useState<CustomerCheckoutMethod>("pay_later");
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
   const [orderError, setOrderError] = useState("");
   const [orderConfirmation, setOrderConfirmation] = useState("");
+  const [confirmation, setConfirmation] = useState<CheckoutConfirmation | null>(
+    null,
+  );
+  const [paymentConfiguration, setPaymentConfiguration] =
+    useState<PublicBusinessPaymentConfiguration | null>(null);
+  const [configurationLoading, setConfigurationLoading] = useState(true);
+  const [configurationError, setConfigurationError] = useState("");
+  const [configurationAttempt, setConfigurationAttempt] = useState(0);
+  const placingOrderRef = useRef(false);
+  const checkoutRequest = useRef<{ fingerprint: string; key: string } | null>(
+    null,
+  );
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setConfigurationLoading(true);
+    setConfigurationError("");
+    fetch(
+      `/api/public/payment-options?tenantId=${encodeURIComponent(tenant.id)}&module=${isRetail ? "retail" : "ordering"}`,
+      { signal: controller.signal, cache: "no-store" },
+    )
+      .then(async (response) => {
+        if (!response.ok)
+          throw new Error(
+            "Business payment options are unavailable. Please try again.",
+          );
+        return response.json() as Promise<PublicBusinessPaymentConfiguration>;
+      })
+      .then((configuration) => {
+        if (!controller.signal.aborted) setPaymentConfiguration(configuration);
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted) {
+          setPaymentConfiguration(null);
+          setConfigurationError(
+            error instanceof Error
+              ? error.message
+              : "Unable to load payment options.",
+          );
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setConfigurationLoading(false);
+      });
+    return () => controller.abort();
+  }, [tenant.id, isRetail, configurationAttempt]);
   const [checkoutActionsVisible, setCheckoutActionsVisible] = useState(false);
   const [promotionCode, setPromotionCode] = useState("");
   const [appliedPromotion, setAppliedPromotion] = useState<{
@@ -304,11 +363,30 @@ export function OrderingMenu({
       i.addons.reduce((a, ad) => a + ad.price * i.quantity, 0)
     );
   }, 0);
-  const tax = subtotal * (orderingSettings.taxRate / 100);
+  const availableOrderTypes = checkoutOrderTypes(
+    orderingSettings.orderTypes,
+    paymentConfiguration,
+    isRetail,
+  );
+  const paymentOptions = useMemo(
+    () =>
+      paymentConfiguration
+        ? checkoutPaymentOptions(paymentConfiguration, orderType)
+        : [],
+    [paymentConfiguration, orderType],
+  );
+  useEffect(() => {
+    if (
+      paymentOptions.length &&
+      !paymentOptions.some((option) => option.method === paymentMethod)
+    )
+      setPaymentMethod(paymentOptions[0].method);
+  }, [paymentOptions, paymentMethod]);
+  const tax = moneyRound(subtotal * (orderingSettings.taxRate / 100));
   const discount =
     orderingSettings.discountEnabled &&
     subtotal >= orderingSettings.discountThreshold
-      ? subtotal * (orderingSettings.discountRate / 100)
+      ? moneyRound(subtotal * (orderingSettings.discountRate / 100))
       : 0;
   const deliveryFee =
     orderType === "delivery" ? orderingSettings.deliveryFee : 0;
@@ -316,24 +394,25 @@ export function OrderingMenu({
     appliedPromotion?.discountAmount ?? 0,
     subtotal + tax - discount + deliveryFee,
   );
-  const grandTotal =
-    subtotal + tax - discount + deliveryFee - promotionDiscount;
+  const grandTotal = moneyRound(
+    Math.max(0, subtotal + tax - discount + deliveryFee - promotionDiscount),
+  );
   const itemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   // A promotion must be revalidated whenever the cart value changes.
   useEffect(() => {
     setAppliedPromotion(null);
-  }, [subtotal]);
+  }, [subtotal, orderType]);
   // Keep the selected order type valid when a business changes its settings.
   useEffect(() => {
     if (
-      !orderingSettings.orderTypes.includes(
+      !availableOrderTypes.includes(
         orderType as "dine_in" | "pickup" | "delivery",
       )
     ) {
-      setOrderType(orderingSettings.orderTypes[0] ?? "pickup");
+      setOrderType(availableOrderTypes[0] ?? "pickup");
     }
-  }, [orderType, orderingSettings.orderTypes]);
+  }, [orderType, availableOrderTypes]);
 
   const applyPromotion = async () => {
     if (!promotionCode.trim() || cart.length === 0) return;
@@ -618,54 +697,86 @@ export function OrderingMenu({
 
   // Validate the complete checkout locally before calling the public order API.
   // Server-side validation remains authoritative inside createPublicOrder.
-  const placeOrder = async () => {
+  const validateCheckout = () => {
+    if (configurationLoading || configurationError || !paymentConfiguration) {
+      setOrderError("Load the business's payment options before continuing.");
+      return false;
+    }
+    if (
+      !availableOrderTypes.includes(
+        orderType as "dine_in" | "pickup" | "delivery",
+      ) ||
+      !paymentOptions.some((option) => option.method === paymentMethod)
+    ) {
+      setOrderError("Choose an available fulfillment and payment method.");
+      return false;
+    }
     if (viewOnly) {
       setOrderError("This is a view-only demo. No order was submitted.");
-      return;
+      return false;
     }
     if (cart.length === 0) {
       setOrderError("Your cart is empty.");
-      return;
+      return false;
     }
-    if (!customerName.trim() || !customerEmail.trim() || !phoneNumber.trim()) {
+    if (
+      customerName.trim().length < 2 ||
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail.trim()) ||
+      phoneNumber.trim().length < 7
+    ) {
       setOrderError("Name, email address, and phone number are required.");
-      return;
+      return false;
     }
     if (!orderingSettings.enabled || orderingSettings.paused) {
       setOrderError("Online ordering is temporarily unavailable.");
-      return;
+      return false;
     }
     if (subtotal < orderingSettings.minimumOrder) {
       setOrderError(
         `The minimum order is ${formatCurrency(orderingSettings.minimumOrder)}.`,
       );
-      return;
+      return false;
     }
     if (orderType === "dine_in" && !tableNumber.trim()) {
       setOrderError("Enter your table number for dine-in service.");
-      return;
+      return false;
     }
-    if (orderType === "pickup" && !requestedTime) {
-      setOrderError("Choose a pickup time.");
-      return;
+    if (
+      orderType === "pickup" &&
+      (!requestedTime ||
+        !Number.isFinite(Date.parse(requestedTime)) ||
+        Date.parse(requestedTime) <
+          Date.now() + orderingSettings.preparationMinutes * 60_000)
+    ) {
+      setOrderError(
+        `Choose a pickup time at least ${orderingSettings.preparationMinutes} minutes from now.`,
+      );
+      return false;
     }
     if (
       orderType === "delivery" &&
       (!deliveryAddress.trim() || !deliveryArea.trim())
     ) {
       setOrderError("Delivery address and area are required.");
-      return;
+      return false;
     }
     if (!isSupabaseConfigured()) {
       setOrderError("Online ordering is not configured.");
-      return;
+      return false;
     }
 
+    setOrderError("");
+    return true;
+  };
+
+  const placeOrder = async () => {
+    if (placingOrderRef.current || !validateCheckout()) return;
+    placingOrderRef.current = true;
     setIsPlacingOrder(true);
     setOrderError("");
     setOrderConfirmation("");
     try {
-      const result = await createPublicOrder({
+      const input = {
         tenantId: tenant.id,
         customerName,
         customerEmail,
@@ -687,14 +798,26 @@ export function OrderingMenu({
         tableNumber,
         notes: orderNotes,
         paymentMethod,
+      };
+      const fingerprint = JSON.stringify(input);
+      if (checkoutRequest.current?.fingerprint !== fingerprint) {
+        checkoutRequest.current = { fingerprint, key: crypto.randomUUID() };
+      }
+      const result = await createPublicOrder({
+        ...input,
+        idempotencyKey: checkoutRequest.current.key,
       });
-      const paymentMessage =
-        result.paymentStatus === "paid"
-          ? ` Mock payment ${result.paymentReference ?? ""} was approved.`
-          : " Payment is due at the business or on delivery.";
+      setConfirmation({
+        orderNumber: result.orderNumber,
+        total: result.total,
+        customerEmail: customerEmail.trim(),
+        emailQueued: result.emailQueued === true,
+        createdAt: result.createdAt,
+      });
       setOrderConfirmation(
-        `Order ${result.orderNumber} was placed successfully.${paymentMessage}`,
+        `Order ${result.orderNumber} was placed. Use Track Order to verify your email and arrange payment with ${tenant.name}.`,
       );
+      checkoutRequest.current = null;
       /**
        * A product may appear in several configured cart lines. Aggregate the
        * quantities before updating the storefront inventory preview so no
@@ -716,7 +839,7 @@ export function OrderingMenu({
       setCustomerName("");
       setCustomerEmail("");
       setPhoneNumber("");
-      setOrderType(orderingSettings.orderTypes[0] ?? "pickup");
+      setOrderType(availableOrderTypes[0] ?? "pickup");
       setRequestedTime("");
       setDeliveryAddress("");
       setDeliveryArea("");
@@ -726,7 +849,7 @@ export function OrderingMenu({
       setPaymentMethod("pay_later");
       setPromotionCode("");
       setAppliedPromotion(null);
-      setCheckoutOpen(false);
+      setCheckoutStage("complete");
     } catch (placeError) {
       setOrderError(
         placeError instanceof Error
@@ -734,6 +857,7 @@ export function OrderingMenu({
           : "Unable to place order.",
       );
     } finally {
+      placingOrderRef.current = false;
       setIsPlacingOrder(false);
     }
   };
@@ -754,135 +878,141 @@ export function OrderingMenu({
             />
           </div>
           {false && (
-          <span
-            onClick={onOpenGallery}
-            onKeyDown={(event) => {
-              if (
-                (event.key === "Enter" || event.key === " ") &&
-                onOpenGallery
-              ) {
-                event.preventDefault();
-                onOpenGallery();
-              }
-            }}
-            role="button"
-            tabIndex={0}
-            className="group relative mb-6 block h-52 w-full overflow-hidden rounded-[1.35rem] border border-violet-500/55 bg-[#0a1322] p-1.5 text-left shadow-[0_22px_70px_rgba(0,0,0,0.38),0_0_32px_rgba(124,58,237,0.08)] transition-colors sm:h-56 light:border-white light:bg-white light:shadow-[0_18px_55px_rgba(15,23,42,0.16)]"
-            aria-label={`View ${tenant.name} gallery`}
-          >
-            <span className="absolute inset-1.5 overflow-hidden rounded-[1rem] bg-[#111827] light:bg-[#f8fafc]">
-              <Image
-                src={tenant.coverImage || PLACEHOLDER_IMG}
-                alt=""
-                fill
-                sizes="(max-width: 1280px) 100vw, 900px"
-                className="pointer-events-none object-cover opacity-80 blur-sm"
-                style={{
-                  objectPosition: `${tenant.coverImagePositionX ?? 50}% ${tenant.coverImagePositionY ?? 50}%`,
-                  transform: `scale(${Math.max(100, tenant.coverImageZoom ?? 100) / 100})`,
-                }}
-                aria-hidden="true"
-                unoptimized
-              />
-              <Image
-                src={tenant.coverImage || PLACEHOLDER_IMG}
-                alt={tenant.name}
-                fill
-                sizes="(max-width: 1280px) 100vw, 900px"
-                className="object-contain object-right transition duration-500"
-                style={{
-                  objectPosition: `${tenant.coverImagePositionX ?? 50}% ${tenant.coverImagePositionY ?? 50}%`,
-                  WebkitMaskImage:
-                    "linear-gradient(to right, transparent 0%, transparent 54%, rgba(0,0,0,0.18) 63%, rgba(0,0,0,0.62) 74%, black 88%)",
-                  maskImage:
-                    "linear-gradient(to right, transparent 0%, transparent 54%, rgba(0,0,0,0.18) 63%, rgba(0,0,0,0.62) 74%, black 88%)",
-                }}
-                priority
-                unoptimized
-                onError={(event) => {
-                  (event.target as HTMLImageElement).src = PLACEHOLDER_IMG;
-                }}
-              />
-              <span className="absolute inset-y-0 left-0 w-[48%] bg-[#091322]/96 [clip-path:polygon(0_0,100%_0,78%_100%,0_100%)] light:bg-transparent" />
-              <span className="absolute inset-0 bg-[linear-gradient(90deg,#091322_0%,rgba(9,19,34,0.92)_34%,rgba(9,19,34,0.48)_50%,rgba(9,19,34,0.14)_64%,transparent_76%)] light:bg-[linear-gradient(90deg,#ffffff_0%,rgba(255,255,255,0.94)_32%,rgba(255,255,255,0.50)_50%,rgba(255,255,255,0.12)_66%,transparent_78%)]" />
-              <span className="absolute inset-0 bg-black/5 light:bg-white/5" />
-            </span>
-            <span className="absolute inset-y-1.5 left-1.5 flex max-w-[82%] flex-col justify-center px-5 sm:max-w-[42%] sm:px-9">
-              <span className="text-3xl font-black leading-[1.08] tracking-[-0.035em] text-white [text-shadow:0_2px_12px_rgba(0,0,0,0.72)] sm:text-4xl light:text-[#171b24] light:[text-shadow:none]">
-                {isRetail ? "Fresh Styles" : "Good Food"}
-                <br />
-                {isRetail ? (
-                  <>
-                    For <span className="text-violet-500">Every You</span>
-                  </>
-                ) : (
-                  <>
-                    <span className="text-violet-500">Together</span>
-                  </>
-                )}
-              </span>
-              <span className="mt-3 max-w-sm text-xs leading-5 text-slate-300 [text-shadow:0_1px_8px_rgba(0,0,0,0.75)] sm:text-sm light:text-slate-600 light:[text-shadow:none]">
-                {tenant.description}
-              </span>
-            </span>
-          </span>
-          )}
-          {storefrontDesign.sections.promotions && <StorefrontOffers
-            promotions={promotions}
-            automaticDiscount={
-              orderingSettings.discountEnabled &&
-              orderingSettings.discountRate > 0
-                ? {
-                    rate: orderingSettings.discountRate,
-                    threshold: orderingSettings.discountThreshold,
-                  }
-                : undefined
-            }
-            onSelectCode={(code) => {
-              setPromotionCode(code);
-              setAppliedPromotion(null);
-              setOrderError("");
-            }}
-          />}
-          {storefrontDesign.sections.search && <div className="mb-4 flex items-center gap-3">
-            <h2 className="sr-only">
-              {catalogLabel} for {tenant.name}
-            </h2>
-            <div className="flex h-12 min-w-0 flex-1 items-center gap-3 rounded-xl border border-[#2b3b55] bg-[#111d30] px-4 text-[#8fa0bb] shadow-inner light:border-slate-200 light:bg-white light:text-slate-500">
-              <Search className="h-4 w-4 shrink-0" />
-              <input
-                id="storefront-search"
-                type="search"
-                placeholder={`Search ${isRetail ? "clothing, sneakers, and accessories" : itemLabel}...`}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-[#7d8ca5] light:text-slate-950 light:placeholder:text-slate-400"
-                aria-label={`Search ${itemLabel}`}
-              />
-            </div>
             <span
-              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-[#2b3b55] bg-[#111d30] text-[#aebbd0] transition hover:border-violet-500 hover:text-white light:border-slate-200 light:bg-white light:text-slate-600"
-              aria-hidden="true"
+              onClick={onOpenGallery}
+              onKeyDown={(event) => {
+                if (
+                  (event.key === "Enter" || event.key === " ") &&
+                  onOpenGallery
+                ) {
+                  event.preventDefault();
+                  onOpenGallery();
+                }
+              }}
+              role="button"
+              tabIndex={0}
+              className="group relative mb-6 block h-52 w-full overflow-hidden rounded-[1.35rem] border border-violet-500/55 bg-[#0a1322] p-1.5 text-left shadow-[0_22px_70px_rgba(0,0,0,0.38),0_0_32px_rgba(124,58,237,0.08)] transition-colors sm:h-56 light:border-white light:bg-white light:shadow-[0_18px_55px_rgba(15,23,42,0.16)]"
+              aria-label={`View ${tenant.name} gallery`}
             >
-              <SlidersHorizontal className="h-4 w-4" />
+              <span className="absolute inset-1.5 overflow-hidden rounded-[1rem] bg-[#111827] light:bg-[#f8fafc]">
+                <Image
+                  src={tenant.coverImage || PLACEHOLDER_IMG}
+                  alt=""
+                  fill
+                  sizes="(max-width: 1280px) 100vw, 900px"
+                  className="pointer-events-none object-cover opacity-80 blur-sm"
+                  style={{
+                    objectPosition: `${tenant.coverImagePositionX ?? 50}% ${tenant.coverImagePositionY ?? 50}%`,
+                    transform: `scale(${Math.max(100, tenant.coverImageZoom ?? 100) / 100})`,
+                  }}
+                  aria-hidden="true"
+                  unoptimized
+                />
+                <Image
+                  src={tenant.coverImage || PLACEHOLDER_IMG}
+                  alt={tenant.name}
+                  fill
+                  sizes="(max-width: 1280px) 100vw, 900px"
+                  className="object-contain object-right transition duration-500"
+                  style={{
+                    objectPosition: `${tenant.coverImagePositionX ?? 50}% ${tenant.coverImagePositionY ?? 50}%`,
+                    WebkitMaskImage:
+                      "linear-gradient(to right, transparent 0%, transparent 54%, rgba(0,0,0,0.18) 63%, rgba(0,0,0,0.62) 74%, black 88%)",
+                    maskImage:
+                      "linear-gradient(to right, transparent 0%, transparent 54%, rgba(0,0,0,0.18) 63%, rgba(0,0,0,0.62) 74%, black 88%)",
+                  }}
+                  priority
+                  unoptimized
+                  onError={(event) => {
+                    (event.target as HTMLImageElement).src = PLACEHOLDER_IMG;
+                  }}
+                />
+                <span className="absolute inset-y-0 left-0 w-[48%] bg-[#091322]/96 [clip-path:polygon(0_0,100%_0,78%_100%,0_100%)] light:bg-transparent" />
+                <span className="absolute inset-0 bg-[linear-gradient(90deg,#091322_0%,rgba(9,19,34,0.92)_34%,rgba(9,19,34,0.48)_50%,rgba(9,19,34,0.14)_64%,transparent_76%)] light:bg-[linear-gradient(90deg,#ffffff_0%,rgba(255,255,255,0.94)_32%,rgba(255,255,255,0.50)_50%,rgba(255,255,255,0.12)_66%,transparent_78%)]" />
+                <span className="absolute inset-0 bg-black/5 light:bg-white/5" />
+              </span>
+              <span className="absolute inset-y-1.5 left-1.5 flex max-w-[82%] flex-col justify-center px-5 sm:max-w-[42%] sm:px-9">
+                <span className="text-3xl font-black leading-[1.08] tracking-[-0.035em] text-white [text-shadow:0_2px_12px_rgba(0,0,0,0.72)] sm:text-4xl light:text-[#171b24] light:[text-shadow:none]">
+                  {isRetail ? "Fresh Styles" : "Good Food"}
+                  <br />
+                  {isRetail ? (
+                    <>
+                      For <span className="text-violet-500">Every You</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-violet-500">Together</span>
+                    </>
+                  )}
+                </span>
+                <span className="mt-3 max-w-sm text-xs leading-5 text-slate-300 [text-shadow:0_1px_8px_rgba(0,0,0,0.75)] sm:text-sm light:text-slate-600 light:[text-shadow:none]">
+                  {tenant.description}
+                </span>
+              </span>
             </span>
-          </div>}
-
-          {storefrontDesign.sections.categories && <div className="no-scrollbar mb-6 flex gap-2 overflow-x-auto pb-1">
-            <CategoryPill
-              label="All"
-              active={selectedCategory === null}
-              onClick={() => setSelectedCategory(null)}
+          )}
+          {storefrontDesign.sections.promotions && (
+            <StorefrontOffers
+              promotions={promotions}
+              automaticDiscount={
+                orderingSettings.discountEnabled &&
+                orderingSettings.discountRate > 0
+                  ? {
+                      rate: orderingSettings.discountRate,
+                      threshold: orderingSettings.discountThreshold,
+                    }
+                  : undefined
+              }
+              onSelectCode={(code) => {
+                setPromotionCode(code);
+                setAppliedPromotion(null);
+                setOrderError("");
+              }}
             />
-            {categories.map((cat) => (
+          )}
+          {storefrontDesign.sections.search && (
+            <div className="mb-4 flex items-center gap-3">
+              <h2 className="sr-only">
+                {catalogLabel} for {tenant.name}
+              </h2>
+              <div className="flex h-12 min-w-0 flex-1 items-center gap-3 rounded-xl border border-[#2b3b55] bg-[#111d30] px-4 text-[#8fa0bb] shadow-inner light:border-slate-200 light:bg-white light:text-slate-500">
+                <Search className="h-4 w-4 shrink-0" />
+                <input
+                  id="storefront-search"
+                  type="search"
+                  placeholder={`Search ${isRetail ? "clothing, sneakers, and accessories" : itemLabel}...`}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-[#7d8ca5] light:text-slate-950 light:placeholder:text-slate-400"
+                  aria-label={`Search ${itemLabel}`}
+                />
+              </div>
+              <span
+                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-[#2b3b55] bg-[#111d30] text-[#aebbd0] transition hover:border-violet-500 hover:text-white light:border-slate-200 light:bg-white light:text-slate-600"
+                aria-hidden="true"
+              >
+                <SlidersHorizontal className="h-4 w-4" />
+              </span>
+            </div>
+          )}
+
+          {storefrontDesign.sections.categories && (
+            <div className="no-scrollbar mb-6 flex gap-2 overflow-x-auto pb-1">
               <CategoryPill
-                key={cat.id}
-                label={cat.name}
-                active={selectedCategory === cat.id}
-                onClick={() => setSelectedCategory(cat.id)}
+                label="All"
+                active={selectedCategory === null}
+                onClick={() => setSelectedCategory(null)}
               />
-            ))}
-          </div>}
+              {categories.map((cat) => (
+                <CategoryPill
+                  key={cat.id}
+                  label={cat.name}
+                  active={selectedCategory === cat.id}
+                  onClick={() => setSelectedCategory(cat.id)}
+                />
+              ))}
+            </div>
+          )}
 
           <div className="space-y-8">
             {filteredProducts.length === 0 && (
@@ -1054,178 +1184,46 @@ export function OrderingMenu({
             <Modal
               open={checkoutOpen}
               onClose={() => {
-                if (!isPlacingOrder) {
-                  setCheckoutStage("payment");
-                  setCheckoutOpen(false);
-                }
+                if (!placingOrderRef.current) setCheckoutOpen(false);
               }}
-              title={checkoutStage === "details" ? "Checkout" : undefined}
-              maxWidth={checkoutStage === "payment" ? "max-w-6xl" : "max-w-5xl"}
-              contentClassName={
-                checkoutStage === "payment" ? "p-0 sm:p-0" : undefined
-              }
-              footer={
-                checkoutStage === "details" ? (
-                  <div className="flex gap-3">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={isPlacingOrder}
-                      onClick={() => setCheckoutOpen(false)}
-                      className="flex-1"
-                    >
-                      Back
-                    </Button>
-                    {paymentMethod === "pay_later" && (
-                      <Button
-                        type="button"
-                        loading={isPlacingOrder}
-                        disabled={viewOnly || !orderingSettings.enabled}
-                        onClick={placeOrder}
-                        className="flex-1"
-                      >
-                        {isPlacingOrder ? "Placing..." : "Place Order"}
-                      </Button>
-                    )}
-                    {paymentMethod === "mock_card" && (
-                      <Button
-                        type="button"
-                        disabled={viewOnly || !orderingSettings.enabled}
-                        onClick={() => setCheckoutStage("payment")}
-                        className="flex-1"
-                      >
-                        Continue to Payment
-                      </Button>
-                    )}
-                  </div>
-                ) : undefined
-              }
+              maxWidth="max-w-6xl"
+              contentClassName="p-0 sm:p-0"
             >
-              {checkoutStage === "payment" ? (
-                <CustomerPaymentCheckout
-                  items={cart.map((item) => ({
-                    id: cartLineKey(item),
-                    name: item.name,
-                    image: item.image || PLACEHOLDER_IMG,
-                    quantity: item.quantity,
-                    lineTotal:
-                      item.price * item.quantity +
-                      item.addons.reduce(
-                        (sum, addon) => sum + addon.price * item.quantity,
-                        0,
-                      ),
-                    detail: [
-                      item.variantLabel,
-                      item.addons.map((addon) => addon.name).join(", "),
-                    ]
-                      .filter(Boolean)
-                      .join(" · "),
-                  }))}
-                  subtotal={subtotal}
-                  tax={tax}
-                  deliveryFee={deliveryFee}
-                  discount={discount}
-                  promotionDiscount={promotionDiscount}
-                  promotionLabel={appliedPromotion?.code}
-                  total={grandTotal}
-                  promotionCode={promotionCode}
-                  promotionMaxLength={MAX_PROMOTION_CODE_LENGTH}
-                  applyingPromotion={isApplyingPromotion}
-                  promotionApplied={appliedPromotion?.name}
-                  error={orderError}
-                  onPromotionCodeChange={(value) => {
-                    setPromotionCode(normalizePromotionCode(value));
-                    setAppliedPromotion(null);
-                  }}
-                  onApplyPromotion={() => void applyPromotion()}
-                  onBack={() => {
-                    setCheckoutStage("payment");
-                    setCheckoutOpen(false);
-                  }}
-                  onClose={() => {
-                    setCheckoutStage("payment");
-                    setCheckoutOpen(false);
-                  }}
-                />
-              ) : (
-                <>
-                  <div
-                    className="mb-6 grid grid-cols-4 gap-0"
-                    aria-label="Checkout progress"
-                  >
-                    {["Cart", "Checkout", "Review", "Complete"].map(
-                      (step, index) => (
-                        <div key={step} className="relative text-center">
-                          {index > 0 && (
-                            <span
-                              className={`absolute right-1/2 top-4 h-0.5 w-full ${index <= 1 ? "bg-violet-500" : "bg-[#34445d] light:bg-slate-300"}`}
-                            />
-                          )}
-                          <span
-                            className={`relative z-10 mx-auto flex h-8 w-8 items-center justify-center rounded-full border text-xs font-black ${index <= 1 ? "border-violet-400 bg-violet-600 text-white" : "border-[#4a5d78] bg-[#101c2e] text-slate-400 light:bg-white"}`}
-                          >
-                            {index + 1}
-                          </span>
-                          <span
-                            className={`mt-2 block text-[10px] font-semibold ${index === 1 ? "text-white light:text-slate-950" : "text-slate-400 light:text-slate-600"}`}
-                          >
-                            {step}
-                          </span>
-                        </div>
-                      ),
-                    )}
-                  </div>
+              <CustomerPaymentCheckout
+                businessName={tenant.name}
+                stage={checkoutStage}
+                confirmation={confirmation}
+                availableOrderTypes={availableOrderTypes}
+                orderType={orderType}
+                onOrderTypeChange={setOrderType}
+                paymentOptions={paymentOptions}
+                paymentMethod={paymentMethod}
+                onPaymentMethodChange={setPaymentMethod}
+                configurationLoading={configurationLoading}
+                configurationError={configurationError}
+                onReloadConfiguration={() =>
+                  setConfigurationAttempt((value) => value + 1)
+                }
+                placingOrder={isPlacingOrder}
+                unavailable={
+                  viewOnly ||
+                  !orderingSettings.enabled ||
+                  orderingSettings.paused ||
+                  !availableOrderTypes.length ||
+                  cart.length === 0
+                }
+                onPlaceOrder={() => void placeOrder()}
+                onTrackOrder={(reference) => {
+                  setCheckoutOpen(false);
+                  onTrackOrder(reference);
+                }}
+                fulfillmentFields={
                   <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="mb-1 flex items-start gap-4 sm:col-span-2">
-                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#142138] text-[#b8c5da] light:bg-slate-100 light:text-slate-600">
-                        <UserRound className="h-5 w-5" />
-                      </span>
-                      <div>
-                        <h3 className="text-base font-black text-white light:text-slate-950">
-                          Customer Information
-                        </h3>
-                        <p className="mt-0.5 text-xs text-[#90a2bd] light:text-slate-500">
-                          Tell us where to send your order.
-                        </p>
-                      </div>
-                    </div>
-                    <Input
-                      label="Full Name"
-                      value={customerName}
-                      onChange={(e) => setCustomerName(e.target.value)}
-                      placeholder="Enter your name"
-                    />
-                    <Input
-                      label="Email Address"
-                      type="email"
-                      value={customerEmail}
-                      onChange={(e) => setCustomerEmail(e.target.value)}
-                      placeholder="you@example.com"
-                      autoComplete="email"
-                    />
-                    <Input
-                      label="Phone Number"
-                      value={phoneNumber}
-                      onChange={(e) => setPhoneNumber(e.target.value)}
-                      placeholder="Enter Phone Number"
-                    />
-                    <Select
-                      label="Order Type"
-                      options={orderingSettings.orderTypes.map((value) => ({
-                        value,
-                        label:
-                          value === "dine_in"
-                            ? "Dine In"
-                            : value === "pickup"
-                              ? "Pickup"
-                              : "Delivery",
-                      }))}
-                      value={orderType}
-                      onChange={(e) => setOrderType(e.target.value)}
-                    />
                     {orderType === "dine_in" && (
                       <Input
                         label="Table Number"
+                        required
+                        maxLength={20}
                         value={tableNumber}
                         onChange={(event) => setTableNumber(event.target.value)}
                         placeholder="e.g. 12"
@@ -1235,6 +1233,7 @@ export function OrderingMenu({
                       <Input
                         label={`Pickup Time (allow ${orderingSettings.preparationMinutes} min)`}
                         type="datetime-local"
+                        required
                         value={requestedTime}
                         onChange={(event) =>
                           setRequestedTime(event.target.value)
@@ -1245,6 +1244,8 @@ export function OrderingMenu({
                       <>
                         <Input
                           label="Delivery Address"
+                          required
+                          maxLength={500}
                           value={deliveryAddress}
                           onChange={(event) =>
                             setDeliveryAddress(event.target.value)
@@ -1254,6 +1255,7 @@ export function OrderingMenu({
                         {orderingSettings.deliveryAreas.length ? (
                           <Select
                             label="Delivery Area"
+                            required
                             value={deliveryArea}
                             onChange={(event) =>
                               setDeliveryArea(event.target.value)
@@ -1269,6 +1271,7 @@ export function OrderingMenu({
                         ) : (
                           <Input
                             label="Delivery Area"
+                            required
                             value={deliveryArea}
                             onChange={(event) =>
                               setDeliveryArea(event.target.value)
@@ -1292,68 +1295,83 @@ export function OrderingMenu({
                       onChange={(event) => setOrderNotes(event.target.value)}
                       placeholder="Allergies or special requests"
                     />
-                    <div className="sm:col-span-2">
-                      <p className="mb-2 text-xs font-semibold text-slate-300 light:text-slate-700">
-                        How would you like to pay?
-                      </p>
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setPaymentMethod("pay_later")}
-                          className={`rounded-xl border px-3 py-3 text-xs font-bold transition ${paymentMethod === "pay_later" ? "border-violet-400 bg-violet-500/15 text-white light:text-violet-800" : "border-slate-600 text-slate-400 light:border-slate-300 light:text-slate-600"}`}
-                        >
-                          Pay at business / delivery
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setPaymentMethod("mock_card")}
-                          className={`rounded-xl border px-3 py-3 text-xs font-bold transition ${paymentMethod === "mock_card" ? "border-violet-400 bg-violet-500/15 text-white light:text-violet-800" : "border-slate-600 text-slate-400 light:border-slate-300 light:text-slate-600"}`}
-                        >
-                          Pay online
-                        </button>
-                      </div>
-                    </div>
-                    <div className="sm:col-span-2">
-                      <label className="mb-1.5 block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                        Discount Code
-                      </label>
-                      <div className="flex gap-2">
-                        <input
-                          value={promotionCode}
-                          maxLength={MAX_PROMOTION_CODE_LENGTH}
-                          onChange={(event) => {
-                            setPromotionCode(
-                              normalizePromotionCode(event.target.value),
-                            );
-                            setAppliedPromotion(null);
-                          }}
-                          placeholder="WELCOME10"
-                          className="min-w-0 flex-1 rounded-lg border border-slate-600 bg-slate-700/50 px-3 py-2.5 text-sm text-white outline-none focus:border-violet-500 light:border-[#dfe5ee] light:bg-white light:text-slate-900"
-                        />
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          loading={isApplyingPromotion}
-                          onClick={() => void applyPromotion()}
-                        >
-                          Apply
-                        </Button>
-                      </div>
-                      {appliedPromotion && (
-                        <p className="mt-1 text-[10px] text-emerald-500">
-                          {appliedPromotion.name} applied
-                        </p>
-                      )}
-                    </div>
-                    {orderError && (
-                      <p className="rounded-lg border border-red-400/20 bg-red-400/10 px-3 py-2 text-xs text-red-300 light:text-red-600 sm:col-span-2">
-                        {orderError}
-                      </p>
-                    )}
                   </div>
-                </>
-              )}
+                }
+                items={cart.map((item) => ({
+                  id: cartLineKey(item),
+                  name: item.name,
+                  image: item.image || PLACEHOLDER_IMG,
+                  quantity: item.quantity,
+                  lineTotal:
+                    item.price * item.quantity +
+                    item.addons.reduce(
+                      (sum, addon) => sum + addon.price * item.quantity,
+                      0,
+                    ),
+                  detail: [
+                    item.variantLabel,
+                    item.addons.map((addon) => addon.name).join(", "),
+                  ]
+                    .filter(Boolean)
+                    .join(" · "),
+                }))}
+                subtotal={subtotal}
+                tax={tax}
+                deliveryFee={deliveryFee}
+                discount={discount}
+                promotionDiscount={promotionDiscount}
+                promotionLabel={appliedPromotion?.code}
+                total={grandTotal}
+                promotionCode={promotionCode}
+                promotionMaxLength={MAX_PROMOTION_CODE_LENGTH}
+                applyingPromotion={isApplyingPromotion}
+                promotionApplied={appliedPromotion?.name}
+                error={orderError}
+                onPromotionCodeChange={(value) => {
+                  setPromotionCode(normalizePromotionCode(value));
+                  setAppliedPromotion(null);
+                }}
+                onApplyPromotion={() => void applyPromotion()}
+
+                onBack={() => setCheckoutOpen(false)}
+                onClose={() => {
+                  if (!placingOrderRef.current) setCheckoutOpen(false);
+                }}
+              >
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Input
+                    label="Full Name"
+                    required
+                    minLength={2}
+                    maxLength={120}
+                    autoComplete="name"
+                    value={customerName}
+                    onChange={(e) => setCustomerName(e.target.value)}
+                    placeholder="Enter your name"
+                  />
+                  <Input
+                    label="Email Address"
+                    required
+                    maxLength={254}
+                    type="email"
+                    value={customerEmail}
+                    onChange={(e) => setCustomerEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    autoComplete="email"
+                  />
+                  <Input
+                    label="Phone Number"
+                    required
+                    type="tel"
+                    minLength={7}
+                    maxLength={32}
+                    autoComplete="tel"
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value)}
+                    placeholder="Enter Phone Number"
+                  />
+                </div>
+              </CustomerPaymentCheckout>
             </Modal>
 
             {orderConfirmation && (
@@ -1516,7 +1534,7 @@ export function OrderingMenu({
                     Order type
                   </p>
                   <div className="grid grid-cols-3 gap-1.5">
-                    {orderingSettings.orderTypes.map((value) => (
+                    {availableOrderTypes.map((value) => (
                       <button
                         key={value}
                         type="button"
@@ -1577,7 +1595,7 @@ export function OrderingMenu({
                 <Button
                   onClick={() => {
                     setOrderError("");
-                    setCheckoutStage("payment");
+                    setCheckoutStage("details");
                     setCheckoutOpen(true);
                   }}
                   disabled={

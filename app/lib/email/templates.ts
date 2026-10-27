@@ -5,6 +5,8 @@ export type TransactionalEmailEvent =
   | "BUSINESS_CREATED"
   | "TEAM_INVITATION"
   | "ORDER_RECEIVED"
+  | "ORDER_TRACKING_CODE"
+  | "PAYMENT_CONFIRMED"
   | "ORDER_ACCEPTED"
   | "ORDER_PREPARING"
   | "ORDER_READY"
@@ -197,6 +199,23 @@ function orderItems(payload: Record<string, unknown>) {
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:18px 0;border-bottom:1px solid #e2e8f0">${rows}</table>`;
 }
 
+function orderItemCounts(payload: Record<string, unknown>) {
+  const items = Array.isArray(payload.items) ? payload.items : [];
+  return {
+    products: items.length,
+    items: items.reduce((total, candidate) => {
+      if (!candidate || typeof candidate !== "object") return total;
+      return (
+        total +
+        Math.max(
+          0,
+          numberValue(candidate as Record<string, unknown>, "quantity"),
+        )
+      );
+    }, 0),
+  };
+}
+
 const ORDER_HEADLINES: Partial<Record<TransactionalEmailEvent, string>> = {
   ORDER_RECEIVED: "We received your order",
   ORDER_ACCEPTED: "Your order was accepted",
@@ -247,6 +266,90 @@ export function buildTransactionalEmail(
       paragraph(
         `${stringValue(payload, "inviter_name", "The business owner")} invited you as ${stringValue(payload, "role", "staff")}. Sign in with this email address to accept the invitation.`,
       ) + action("Accept invitation", stringValue(payload, "invitation_url"));
+  } else if (input.eventType === "ORDER_TRACKING_CODE") {
+    subject = `Your order verification code · ${business}`;
+    title = "Verify your order";
+    preview = "Use this code to securely view your order.";
+    content =
+      paragraph(
+        `Hi ${name}, enter this code on ${business}'s Track Order page.`,
+      ) +
+      detailRows([
+        ["Verification code", stringValue(payload, "verification_code")],
+        ["Order reference", stringValue(payload, "order_number")],
+      ]) +
+      paragraph(
+        "This code expires in 10 minutes. Do not share it. If you did not request it, you can ignore this email.",
+      );
+  } else if (input.eventType === "ORDER_RECEIVED") {
+    const orderNumber = stringValue(payload, "order_number", "your order");
+    const storefrontSlug = stringValue(payload, "storefront_slug");
+    const counts = orderItemCounts(payload);
+    const trackingPath = storefrontSlug
+      ? `/store-front/${encodeURIComponent(storefrontSlug)}?tab=track-order&order=${encodeURIComponent(orderNumber)}`
+      : "";
+    subject = input.subject?.trim() || `Order received · ${orderNumber}`;
+    title = "Order received";
+    preview = `We received ${orderNumber} and will review it shortly.`;
+    content =
+      paragraph(
+        `Hello ${name}, thank you for your order. We received it and will review the details shortly.`,
+      ) +
+      detailRows([
+        ["Order reference", orderNumber],
+        ["Order date", dateTime(stringValue(payload, "created_at"))],
+        ["Total amount", money(numberValue(payload, "total"))],
+        [
+          "Items",
+          counts.products
+            ? `${counts.products} product${counts.products === 1 ? "" : "s"} · ${counts.items} item${counts.items === 1 ? "" : "s"}`
+            : "",
+        ],
+        [
+          "Delivery method",
+          stringValue(payload, "order_type").replaceAll("_", " "),
+        ],
+        ["Delivery address", stringValue(payload, "delivery_address")],
+      ]) +
+      orderItems(payload) +
+      (trackingPath
+        ? action("Track your order", appActionUrl(appUrl, trackingPath))
+        : "") +
+      paragraph(
+        "Use Track Order to verify your email, view payment instructions, upload your receipt, and follow delivery or pickup progress.",
+      );
+  } else if (input.eventType === "PAYMENT_CONFIRMED") {
+    const orderNumber = stringValue(payload, "order_number", "your order");
+    const storefrontSlug = stringValue(payload, "storefront_slug");
+    const trackingPath = storefrontSlug
+      ? `/store-front/${encodeURIComponent(storefrontSlug)}?tab=track-order&order=${encodeURIComponent(orderNumber)}`
+      : "";
+    subject = input.subject?.trim() || `Payment confirmed · ${orderNumber}`;
+    title = "Payment confirmed";
+    preview = `Payment for ${orderNumber} was verified successfully.`;
+    content =
+      paragraph(
+        `Hello ${name}, great news! Your payment has been verified successfully.`,
+      ) +
+      detailRows([
+        ["Order reference", orderNumber],
+        ["Payment status", "Paid"],
+        [
+          "Fulfillment method",
+          stringValue(payload, "order_type").replaceAll("_", " "),
+        ],
+        ["Delivery address", stringValue(payload, "delivery_address")],
+        [
+          "Estimated delivery",
+          dateTime(stringValue(payload, "requested_time")),
+        ],
+      ]) +
+      paragraph(
+        "Your order is now being prepared. Check Track Order for the latest delivery or pickup progress.",
+      ) +
+      (trackingPath
+        ? action("Track your order", appActionUrl(appUrl, trackingPath))
+        : "");
   } else if (ORDER_HEADLINES[input.eventType]) {
     const orderNumber = stringValue(payload, "order_number", "your order");
     subject =
@@ -268,6 +371,14 @@ export function buildTransactionalEmail(
         ["Status", input.eventType.replace("ORDER_", "").replaceAll("_", " ")],
         ["Reason", stringValue(payload, "cancellation_reason")],
       ]);
+    const storefrontSlug = stringValue(payload, "storefront_slug");
+    if (storefrontSlug) {
+      const trackingPath = `/store-front/${encodeURIComponent(storefrontSlug)}?tab=track-order&order=${encodeURIComponent(orderNumber)}`;
+      content +=
+        paragraph(
+          "Keep your order reference. Verify your checkout email in Track Order to view your items, payment instructions, and delivery or pickup progress.",
+        ) + action("Track order & payment", appActionUrl(appUrl, trackingPath));
+    }
   } else if (input.eventType === "APPOINTMENT_CONFIRMED") {
     subject =
       input.subject?.trim() || `Your appointment with ${business} is confirmed`;
@@ -432,6 +543,45 @@ export function buildTransactionalEmail(
     title,
     preview,
     business,
+    ...(input.eventType === "ORDER_RECEIVED"
+      ? [
+          `Order reference: ${stringValue(payload, "order_number")}`,
+          `Total: ${money(numberValue(payload, "total"))}`,
+          ...(stringValue(payload, "storefront_slug")
+            ? [
+                appActionUrl(
+                  appUrl,
+                  `/store-front/${encodeURIComponent(stringValue(payload, "storefront_slug"))}?tab=track-order&order=${encodeURIComponent(stringValue(payload, "order_number"))}`,
+                ),
+              ]
+            : []),
+        ]
+      : []),
+    ...(input.eventType === "PAYMENT_CONFIRMED"
+      ? [
+          `Order reference: ${stringValue(payload, "order_number")}`,
+          "Payment status: Paid",
+          `Fulfillment method: ${stringValue(payload, "order_type").replaceAll("_", " ")}`,
+          stringValue(payload, "delivery_address")
+            ? `Delivery address: ${stringValue(payload, "delivery_address")}`
+            : "",
+          ...(stringValue(payload, "storefront_slug")
+            ? [
+                appActionUrl(
+                  appUrl,
+                  `/store-front/${encodeURIComponent(stringValue(payload, "storefront_slug"))}?tab=track-order&order=${encodeURIComponent(stringValue(payload, "order_number"))}`,
+                ),
+              ]
+            : []),
+        ]
+      : []),
+    ...(input.eventType === "ORDER_TRACKING_CODE"
+      ? [
+          `Verification code: ${stringValue(payload, "verification_code")}`,
+          `Order reference: ${stringValue(payload, "order_number")}`,
+          "Expires in 10 minutes. Do not share this code.",
+        ]
+      : []),
     stringValue(payload, "message"),
     appUrl,
   ]

@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint --max-warnings=0",
     "typecheck": "tsc --noEmit",
-    "test": "node --test tests",
+    "test": "node scripts/run-tests.mjs",
     "format": "prettier --write \"app/**/*.{ts,tsx,css}\" \"components/**/*.{ts,tsx}\" \"scripts/**/*.mjs\" \"supabase/functions/**/*.{ts,json}\" \"tests/**/*.mjs\" \"docs/**/*.md\" \"README.md\" \"supabase/README.md\" \".vscode/*.json\" \"package.json\" \"next.config.ts\" \"proxy.ts\" \"eslint.config.mjs\" \"postcss.config.mjs\" \"tsconfig.json\"",
     "format:check": "prettier --check \"app/**/*.{ts,tsx,css}\" \"components/**/*.{ts,tsx}\" \"scripts/**/*.mjs\" \"supabase/functions/**/*.{ts,json}\" \"tests/**/*.mjs\" \"docs/**/*.md\" \"README.md\" \"supabase/README.md\" \".vscode/*.json\" \"package.json\" \"next.config.ts\" \"proxy.ts\" \"eslint.config.mjs\" \"postcss.config.mjs\" \"tsconfig.json\"",
     "test:ci": "npm run lint && npm run typecheck && npm test && npm run build",

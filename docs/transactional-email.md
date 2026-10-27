@@ -5,7 +5,9 @@ YuhBusiness uses Resend as an additional delivery channel. Supabase remains the 
 ## Architecture
 
 1. Orders, appointments, account/business creation, contact messages, billing changes, and important alerts write durable delivery rows in Supabase.
-2. The database transaction never calls Resend. A queue insert is best-effort, so an email outage cannot roll back a valid order, appointment, contact message, or subscription update.
+2. Database transactions never call Resend. They write durable queue rows;
+   temporary Resend outages are handled later by the worker and cannot interrupt
+   checkout or payment verification.
 3. `GET /api/email/process` claims jobs atomically with `FOR UPDATE SKIP LOCKED`, reloads the tenant and source record, verifies the recipient and `tenant_id`, and sends through the server-only Resend SDK.
 4. Successful provider IDs and failures are recorded. Jobs retry at most three times. Stale processing leases recover after 15 minutes.
 5. Resend idempotency keys provide a second layer of duplicate protection.
@@ -82,7 +84,7 @@ where routine_schema = 'public'
 5. Add a TXT record at `_dmarc` with `v=DMARC1; p=none;` if no DMARC record
    already exists. Tighten the policy after delivery has been monitored.
 6. Wait for Resend to show the domain as **Verified** before switching the
-   sender. Until then, `YuhBusiness <YuhBusiness <noreply@yuhbusiness.com>>` can be used only
+   sender. Until then, `YuhBusiness <noreply@yuhbusiness.com>` can be used only
    for messages to the email address that owns the Resend account.
 
 ## 3. Configure local variables

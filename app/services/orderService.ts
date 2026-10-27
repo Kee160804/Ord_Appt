@@ -1,4 +1,5 @@
 import { requireSupabaseBrowserClient as client } from "@/app/lib/supabase/client";
+import type { CustomerCheckoutMethod } from "@/app/lib/customer-checkout";
 
 import type {
   Order,
@@ -54,7 +55,8 @@ export interface PublicOrderInput {
 
   notes?: string;
 
-  paymentMethod?: "pay_later" | "mock_card";
+  paymentMethod?: CustomerCheckoutMethod;
+  idempotencyKey?: string;
 }
 
 /**
@@ -68,6 +70,8 @@ export interface PublicOrderResult {
   paymentStatus: PaymentStatus;
 
   paymentReference?: string;
+  emailQueued?: boolean;
+  createdAt: string;
 }
 
 /**
@@ -393,6 +397,8 @@ export async function createPublicOrder(
     paymentStatus?: string;
 
     paymentReference?: string | null;
+    emailQueued?: boolean;
+    createdAt?: string;
 
     error?: string;
   };
@@ -417,6 +423,8 @@ export async function createPublicOrder(
     paymentStatus: normalizePaymentStatus(result.paymentStatus || "UNPAID"),
 
     paymentReference: result.paymentReference || undefined,
+    emailQueued: result.emailQueued === true,
+    createdAt: result.createdAt || new Date().toISOString(),
   };
 }
 

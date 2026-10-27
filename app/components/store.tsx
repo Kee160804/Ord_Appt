@@ -17,6 +17,7 @@ import {
   Info,
   Phone,
   BadgePercent,
+  PackageSearch,
 } from "lucide-react";
 import {
   getServicesByTenant,
@@ -34,6 +35,7 @@ import { DemoDashboardPreview } from "../components/DemoDashboardPreview";
 import { StorefrontContact } from "../components/StorefrontContact";
 import { StorefrontPromotions } from "../components/StorefrontPromotions";
 import { StorefrontAbout } from "../components/StorefrontAbout";
+import { StorefrontOrderTracking } from "../components/StorefrontOrderTracking";
 import { useTheme } from "@/app/contexts/theme";
 import type {
   BusinessReview,
@@ -254,8 +256,10 @@ export default function StorefrontClient({
   }, [tenant.id, isAppt, viewOnly]);
 
   // Storefront and guided-demo navigation are independent view states.
-  type StorefrontTab = "catalog" | "about" | "promotions" | "contact";
+  type StorefrontTab =
+    "catalog" | "about" | "promotions" | "contact" | "track-order";
   const [activeTab, setActiveTab] = useState<StorefrontTab>("catalog");
+  const [trackingOrderReference, setTrackingOrderReference] = useState("");
   const [selectedPromotionId, setSelectedPromotionId] = useState<string>();
   const [activeDemoView, setActiveDemoView] = useState<
     "dashboard" | "storefront"
@@ -275,12 +279,23 @@ export default function StorefrontClient({
   const showPromotions =
     canShowPromotions && storefrontDesign.sections.promotions;
 
-  const switchTab = (tab: StorefrontTab, promotionId?: string) => {
+  const switchTab = (
+    tab: StorefrontTab,
+    promotionId?: string,
+    orderReference?: string,
+  ) => {
     setActiveTab(tab);
     setSelectedPromotionId(promotionId);
     const url = new URL(window.location.href);
     if (tab === "catalog") url.searchParams.delete("tab");
     else url.searchParams.set("tab", tab);
+    if (tab === "track-order" && orderReference) {
+      url.searchParams.set("order", orderReference);
+      setTrackingOrderReference(orderReference);
+    } else {
+      url.searchParams.delete("order");
+      setTrackingOrderReference("");
+    }
     if (tab === "promotions" && promotionId) {
       url.searchParams.set("promotion", promotionId);
     } else {
@@ -294,12 +309,15 @@ export default function StorefrontClient({
       const params = new URLSearchParams(window.location.search);
       const tab = params.get("tab");
       const nextTab: StorefrontTab =
-        tab === "about" || tab === "contact"
+        tab === "about" || tab === "contact" || tab === "track-order"
           ? tab
           : tab === "promotions" && showPromotions
             ? "promotions"
             : "catalog";
       setActiveTab(nextTab);
+      setTrackingOrderReference(
+        nextTab === "track-order" ? (params.get("order") ?? "") : "",
+      );
       setSelectedPromotionId(params.get("promotion") ?? undefined);
     };
     syncTabFromUrl();
@@ -412,8 +430,19 @@ export default function StorefrontClient({
                           ]
                         : []),
                       ...(storefrontDesign.sections.contact
-                        ? [{ id: "contact" as const, label: "Contact", icon: Phone }]
+                        ? [
+                            {
+                              id: "contact" as const,
+                              label: "Contact",
+                              icon: Phone,
+                            },
+                          ]
                         : []),
+                      {
+                        id: "track-order" as const,
+                        label: "Track Order",
+                        icon: PackageSearch,
+                      },
                     ].map((item) => {
                       const Icon = item.icon;
                       return (
@@ -510,8 +539,19 @@ export default function StorefrontClient({
                         ]
                       : []),
                     ...(storefrontDesign.sections.contact
-                      ? [{ id: "contact" as const, label: "Contact", icon: Phone }]
+                      ? [
+                          {
+                            id: "contact" as const,
+                            label: "Contact",
+                            icon: Phone,
+                          },
+                        ]
                       : []),
+                    {
+                      id: "track-order" as const,
+                      label: "Track Order",
+                      icon: PackageSearch,
+                    },
                   ].map((item) => {
                     const Icon = item.icon;
                     return (
@@ -591,6 +631,9 @@ export default function StorefrontClient({
                     cart={cart}
                     updateCart={setCart}
                     onOrderPlaced={handleOrderPlaced}
+                    onTrackOrder={(reference) =>
+                      switchTab("track-order", undefined, reference)
+                    }
                     viewOnly={viewOnly}
                     onOpenGallery={() => {
                       setCurrentImageIndex(0);
@@ -605,6 +648,13 @@ export default function StorefrontClient({
                   tenant={tenant}
                   promotions={initialPromotions}
                   selectedPromotionId={selectedPromotionId}
+                />
+              ) : activeTab === "track-order" ? (
+                <StorefrontOrderTracking
+                  key={trackingOrderReference}
+                  tenantId={tenant.id}
+                  viewOnly={viewOnly}
+                  initialOrderNumber={trackingOrderReference}
                 />
               ) : (
                 <StorefrontContact tenant={tenant} viewOnly={viewOnly} />

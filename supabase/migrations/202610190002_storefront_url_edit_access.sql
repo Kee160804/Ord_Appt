@@ -1,6 +1,8 @@
 -- Storefront addresses are reserved during onboarding. Business owners can
 -- change them only after a platform administrator explicitly grants access.
 
+BEGIN;
+
 ALTER TABLE public.tenants
   ADD COLUMN IF NOT EXISTS allow_storefront_url_edit BOOLEAN NOT NULL DEFAULT FALSE;
 
@@ -46,3 +48,5 @@ CREATE TRIGGER trg_guard_tenant_storefront_url_fields
 BEFORE UPDATE ON public.tenants
 FOR EACH ROW
 EXECUTE FUNCTION public.guard_tenant_storefront_url_fields();
+
+COMMIT;

@@ -1,4 +1,6 @@
 import { getSupabaseAdminClient } from "@/app/lib/supabase/admin";
+import { randomUUID } from "node:crypto";
+import { isBusinessPaymentMethod } from "@/app/lib/business-payments";
 
 import {
   enforcePublicRateLimit,
@@ -70,7 +72,8 @@ interface OrderRequest {
    * Real payment-provider methods will be introduced later.
    * For now, only the existing development/payment modes are accepted.
    */
-  paymentMethod?: "pay_later" | "mock_card";
+  paymentMethod?: string;
+  idempotencyKey?: string;
 
   /**
    * Honeypot field.
@@ -274,7 +277,7 @@ export async function POST(request: Request): Promise<Response> {
       );
     }
 
-    if (customerPhone.length > MAX_PHONE_LENGTH) {
+    if (customerPhone.length < 7 || customerPhone.length > MAX_PHONE_LENGTH) {
       return json(
         {
           error: "Enter a valid phone number.",
@@ -328,6 +331,12 @@ export async function POST(request: Request): Promise<Response> {
     const notes = body.notes?.trim() || null;
 
     const promotionCode = body.promotionCode?.trim().toUpperCase() || null;
+    if (
+      body.requestedTime &&
+      !Number.isFinite(Date.parse(body.requestedTime))
+    ) {
+      return json({ error: "Choose a valid pickup time." }, 400);
+    }
 
     if (deliveryAddress && deliveryAddress.length > MAX_ADDRESS_LENGTH) {
       return json(
@@ -426,8 +435,20 @@ export async function POST(request: Request): Promise<Response> {
        9. NORMALIZE PAYMENT MODE
        ====================================================================== */
 
-    const paymentMethod =
-      body.paymentMethod === "mock_card" ? "mock_card" : "pay_later";
+    const paymentMethod = body.paymentMethod ?? "pay_later";
+    if (
+      (paymentMethod !== "pay_later" &&
+        !isBusinessPaymentMethod(paymentMethod)) ||
+      paymentMethod === "payment_at_appointment"
+    ) {
+      return json({ error: "Choose a valid business payment method." }, 400);
+    }
+    const idempotencyKey = body.idempotencyKey ?? randomUUID();
+    if (!isValidUuid(idempotencyKey))
+      return json(
+        { error: "Invalid checkout request. Please refresh and try again." },
+        400,
+      );
 
     /* ======================================================================
        10. BUILD DATABASE RPC PAYLOAD
@@ -520,75 +541,23 @@ export async function POST(request: Request): Promise<Response> {
     /* ======================================================================
        13. CREATE ORDER
 
-       Retail stores use their inventory-aware retail RPC.
-
-       Ordering businesses use create_public_order_v3.
+       The customer checkout transaction validates business payment methods,
+       delegates catalog pricing, and saves the tracking-ready confirmation.
        ====================================================================== */
 
-    const isRetail = tenant.business_type === "retail";
-    let { data, error } = isRetail
-      ? await supabase.rpc("create_public_retail_order_v2", {
-          p_tenant_id: payload.p_tenant_id,
-
-          p_customer_name: payload.p_customer_name,
-
-          p_customer_email: payload.p_customer_email,
-
-          p_customer_phone: payload.p_customer_phone,
-
-          p_items: payload.p_items,
-
-          p_notes: payload.p_notes,
-
-          p_promotion_code: payload.p_promotion_code,
-
-          p_payment_method: payload.p_payment_method,
-        })
-      : await supabase.rpc("create_public_order_v3", payload);
-
-    /* ======================================================================
-       14. ROLLING-DEPLOYMENT COMPATIBILITY
-
-       PGRST202 means the newer RPC was not found in PostgREST's schema.
-
-       Keep the older compatibility RPC available while databases are being
-       migrated. It supports fewer fields than the v3 endpoint.
-       ====================================================================== */
-
-    if (error?.code === "PGRST202" && isRetail && promotionCode) {
+    const { data, error } = await supabase.rpc(
+      "create_customer_business_order",
+      {
+        p_tenant_id: tenantId,
+        p_checkout_id: idempotencyKey,
+        p_checkout: payload,
+      },
+    );
+    if (error?.code === "PGRST202") {
       return json(
-        {
-          error:
-            "Promotion checkout is being updated. Please try again shortly.",
-        },
+        { error: "Checkout is being updated. Please try again shortly." },
         503,
       );
-    }
-
-    if (error?.code === "PGRST202") {
-      const fallback = isRetail
-        ? await supabase.rpc("create_public_retail_order", {
-            p_tenant_id: payload.p_tenant_id,
-            p_customer_name: payload.p_customer_name,
-            p_customer_email: payload.p_customer_email,
-            p_customer_phone: payload.p_customer_phone,
-            p_items: payload.p_items,
-            p_notes: payload.p_notes,
-            p_payment_method: payload.p_payment_method,
-          })
-        : await supabase.rpc("create_public_order_with_email", {
-            p_tenant_id: payload.p_tenant_id,
-            p_customer_name: payload.p_customer_name,
-            p_customer_email: payload.p_customer_email,
-            p_customer_phone: payload.p_customer_phone,
-            p_order_type: payload.p_order_type,
-            p_items: payload.p_items,
-            p_notes: payload.p_notes,
-            p_promotion_code: payload.p_promotion_code,
-          });
-
-      data = fallback.data;
-      error = fallback.error;
     }
 
     /* ======================================================================
@@ -638,7 +607,9 @@ export async function POST(request: Request): Promise<Response> {
 
       paymentStatus: result.payment_status || "UNPAID",
 
-      paymentReference: result.payment_reference || null,
+      paymentReference: null,
+      emailQueued: result.email_queued === true,
+      createdAt: new Date().toISOString(),
     });
   } catch (error) {
     /* ======================================================================

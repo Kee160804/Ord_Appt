@@ -502,14 +502,16 @@ export function AppointmentBooking({
           )}
         </div>
       )}
-      {storefrontDesign.sections.promotions && <StorefrontOffers
-        promotions={promotions}
-        onSelectCode={(code) => {
-          setPromotionCode(code);
-          setAppliedPromotion(null);
-          setBookingError("");
-        }}
-      />}
+      {storefrontDesign.sections.promotions && (
+        <StorefrontOffers
+          promotions={promotions}
+          onSelectCode={(code) => {
+            setPromotionCode(code);
+            setAppliedPromotion(null);
+            setBookingError("");
+          }}
+        />
+      )}
       <div className="grid min-w-0 grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_340px] xl:items-start">
         {/* Left sidebar: Calendar, Time slots, Notes */}
         <aside
@@ -754,65 +756,65 @@ export function AppointmentBooking({
             }}
           />
           {false && (
-          <section className="relative min-h-64 overflow-hidden rounded-2xl border border-[#26364f] bg-[#0d1829] light:border-slate-200 light:bg-white">
-            <Image
-              src={tenant.coverImage || PLACEHOLDER_IMG}
-              alt=""
-              fill
-              sizes="(max-width: 1280px) 100vw, 75vw"
-              className="pointer-events-none object-cover opacity-55 blur-xl scale-110"
-              aria-hidden="true"
-              unoptimized
-            />
-            <Image
-              src={tenant.coverImage || PLACEHOLDER_IMG}
-              alt={tenant.name}
-              fill
-              priority
-              sizes="(max-width: 1280px) 100vw, 75vw"
-              className="object-contain"
-              style={{
-                objectPosition: `${tenant.coverImagePositionX ?? 50}% ${tenant.coverImagePositionY ?? 50}%`,
-                transform: `scale(${(tenant.coverImageZoom ?? 100) / 100})`,
-              }}
-              unoptimized
-              onError={(event) => {
-                (event.target as HTMLImageElement).src = PLACEHOLDER_IMG;
-              }}
-            />
-            <div className="absolute inset-0 bg-linear-to-r from-[#080d18]/45 via-[#080d18]/15 to-transparent" />
-            <div className="relative flex min-h-64 max-w-xl flex-col justify-center p-6 sm:p-9">
-              <p className="mb-3 text-[10px] font-black uppercase tracking-[0.22em] text-violet-300">
-                Premium care, made simple
-              </p>
-              <h2 className="text-3xl font-black leading-none text-white [text-shadow:0_2px_14px_rgba(0,0,0,0.7)] sm:text-5xl">
-                Look Good
-                <br />
-                Feel <span className="text-violet-400">Amazing</span>
-              </h2>
-              <p className="mt-4 max-w-md text-sm leading-6 text-white/90 [text-shadow:0_1px_8px_rgba(0,0,0,0.72)]">
-                {tenant.description ||
-                  "Premium services tailored to you. Book your appointment in minutes."}
-              </p>
-              <button
-                type="button"
-                onClick={() => {
-                  const firstService = extendedServices[0];
-                  if (firstService) {
-                    setSelectedServiceId(firstService.id);
-                    setSelectedProviderId("");
-                    setSelectedTime(null);
-                  }
-                  document
-                    .getElementById("appointment-booking-panel")
-                    ?.scrollIntoView({ behavior: "smooth", block: "start" });
+            <section className="relative min-h-64 overflow-hidden rounded-2xl border border-[#26364f] bg-[#0d1829] light:border-slate-200 light:bg-white">
+              <Image
+                src={tenant.coverImage || PLACEHOLDER_IMG}
+                alt=""
+                fill
+                sizes="(max-width: 1280px) 100vw, 75vw"
+                className="pointer-events-none object-cover opacity-55 blur-xl scale-110"
+                aria-hidden="true"
+                unoptimized
+              />
+              <Image
+                src={tenant.coverImage || PLACEHOLDER_IMG}
+                alt={tenant.name}
+                fill
+                priority
+                sizes="(max-width: 1280px) 100vw, 75vw"
+                className="object-contain"
+                style={{
+                  objectPosition: `${tenant.coverImagePositionX ?? 50}% ${tenant.coverImagePositionY ?? 50}%`,
+                  transform: `scale(${(tenant.coverImageZoom ?? 100) / 100})`,
                 }}
-                className="mt-5 w-fit rounded-xl bg-linear-to-r from-violet-700 to-fuchsia-600 px-5 py-3 text-xs font-black text-white shadow-lg shadow-violet-900/30 transition hover:brightness-110"
-              >
-                Book Now
-              </button>
-            </div>
-          </section>
+                unoptimized
+                onError={(event) => {
+                  (event.target as HTMLImageElement).src = PLACEHOLDER_IMG;
+                }}
+              />
+              <div className="absolute inset-0 bg-linear-to-r from-[#080d18]/45 via-[#080d18]/15 to-transparent" />
+              <div className="relative flex min-h-64 max-w-xl flex-col justify-center p-6 sm:p-9">
+                <p className="mb-3 text-[10px] font-black uppercase tracking-[0.22em] text-violet-300">
+                  Premium care, made simple
+                </p>
+                <h2 className="text-3xl font-black leading-none text-white [text-shadow:0_2px_14px_rgba(0,0,0,0.7)] sm:text-5xl">
+                  Look Good
+                  <br />
+                  Feel <span className="text-violet-400">Amazing</span>
+                </h2>
+                <p className="mt-4 max-w-md text-sm leading-6 text-white/90 [text-shadow:0_1px_8px_rgba(0,0,0,0.72)]">
+                  {tenant.description ||
+                    "Premium services tailored to you. Book your appointment in minutes."}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const firstService = extendedServices[0];
+                    if (firstService) {
+                      setSelectedServiceId(firstService.id);
+                      setSelectedProviderId("");
+                      setSelectedTime(null);
+                    }
+                    document
+                      .getElementById("appointment-booking-panel")
+                      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+                  }}
+                  className="mt-5 w-fit rounded-xl bg-linear-to-r from-violet-700 to-fuchsia-600 px-5 py-3 text-xs font-black text-white shadow-lg shadow-violet-900/30 transition hover:brightness-110"
+                >
+                  Book Now
+                </button>
+              </div>
+            </section>
           )}
 
           <div className="rounded-2xl border border-[#26364f] bg-[#091322] p-4 light:border-slate-200 light:bg-slate-50 sm:p-5">

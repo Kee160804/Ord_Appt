@@ -8,11 +8,23 @@ test("platform notifications are recipient scoped and separate from tenant alert
     "utf8",
   );
 
-  assert.match(migration, /CREATE TABLE IF NOT EXISTS public\.platform_notifications/);
-  assert.match(migration, /recipient_id = auth\.uid\(\) AND public\.is_super_admin\(\)/);
-  assert.match(migration, /CREATE OR REPLACE FUNCTION public\.notify_platform_admins/);
+  assert.match(
+    migration,
+    /CREATE TABLE IF NOT EXISTS public\.platform_notifications/,
+  );
+  assert.match(
+    migration,
+    /recipient_id = auth\.uid\(\) AND public\.is_super_admin\(\)/,
+  );
+  assert.match(
+    migration,
+    /CREATE OR REPLACE FUNCTION public\.notify_platform_admins/,
+  );
   assert.doesNotMatch(migration, /INSERT INTO public\.business_notifications/);
-  assert.match(migration, /ALTER PUBLICATION supabase_realtime ADD TABLE public\.platform_notifications/);
+  assert.match(
+    migration,
+    /ALTER PUBLICATION supabase_realtime ADD TABLE public\.platform_notifications/,
+  );
 });
 
 test("platform monitoring covers signup, tenants, teams, commerce, payments, and privacy", async () => {
