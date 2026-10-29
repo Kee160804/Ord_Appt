@@ -211,7 +211,7 @@ The subscription system currently includes:
 
 ## Current payment functionality
 
-Real-money payments are not enabled. The application currently provides the payment screens, business rules, database records, and safe testing paths needed to integrate an authorized provider without pretending that real funds have moved.
+Customer-to-business payments remain business-managed. Business-owner subscription payments use Belize Bank's hosted gateway when the deployment explicitly enables and configures the provider.
 
 ### Customer payments that work today
 
@@ -220,18 +220,19 @@ Real-money payments are not enabled. The application currently provides the paym
 - The server records these transactions as unpaid and the business can manage fulfilment through its dashboard.
 - Development mock-card modes can create simulated paid records for order and appointment workflow testing where exposed by the current flow.
 - Mock payments carry an explicit simulated-payment notice and do not collect payment credentials or move money.
-- The customer online-payment checkout design supports DigiWallet and card presentation, order summaries, promotions, and totals, but its final online-payment action currently shows a coming-soon notice rather than charging the customer.
+- Customer checkout records the business-selected payment method and uses Track Order for verified instructions and receipt upload. It does not route customer funds through YuhBusiness's Belize Bank merchant account.
 
 ### Business subscription payments that work today
 
 - The Billing and Payments area calculates the selected plan and paid-seat total.
 - It displays subscription status, period dates, cancellation state, invoices, and payment-ledger records.
 - Owners can schedule subscription cancellation at the end of the current paid period.
-- The server has a provider-neutral subscription checkout API and a development mock provider.
+- The server has a provider-neutral subscription checkout API and a Belize Bank hosted-payment adapter.
 - Mock subscription processing is rejected automatically in production.
-- The visible DigiWallet and card payment form is currently a preview. Its Continue button does not charge the business owner until a real provider adapter is installed and connected.
+- The checkout modal shows the server-calculated amount and redirects the owner to Belize Bank. Card data is entered only on the bank's hosted page.
+- Subscription access changes only after an authenticated status query confirms status `2` and the exact expected amount.
 
-## Upcoming real payment feature
+## Payment relationship boundaries
 
 The real payment implementation will preserve two separate payment relationships.
 
@@ -247,11 +248,11 @@ The customer checkout on a business's storefront will charge the customer for th
 
 YuhBusiness will provide the storefront and transaction workflow, but customer-sale funds must not be confused with the business owner's YuhBusiness subscription. The intended flow is:
 
-1. The customer chooses DigiWallet or card at storefront checkout.
-2. The authorized payment provider securely collects the customer's payment credentials.
-3. YuhBusiness sends the provider the server-verified amount and the correct business payment-account reference.
-4. The provider authorizes the payment and settles it to the business owner according to its terms.
-5. A verified webhook updates the YuhBusiness order or appointment, payment status, reference, fee, refund, or dispute record.
+1. The customer chooses one of the payment methods configured by that business.
+2. After email verification in Track Order, the customer sees the business's instructions and pays the business directly.
+3. The customer uploads a receipt where the selected method requires one.
+4. The business reviews the receipt and confirms or rejects the payment.
+5. YuhBusiness records the business's decision without routing those customer funds through the platform subscription merchant account.
 
 ### Business owner pays YuhBusiness
 
@@ -269,12 +270,11 @@ The intended flow is:
 
 The following items are not yet live and are required before real money can be accepted:
 
-- Select an appropriately authorized provider that supports the intended Belize payment methods and settlement model.
-- Install separate provider adapters for customer transactions and SaaS subscription billing where required.
+- Complete Belize Bank sandbox certification before enabling the production gateway.
+- Install a separate provider adapter for customer transactions only if YuhBusiness later routes customer-to-business funds.
 - Associate each business with the provider-side account or settlement reference used for its customer payments.
-- Replace preview card inputs with provider-hosted or tokenized payment fields so raw credentials never pass through YuhBusiness servers.
-- Add sandbox and production credentials through server-only environment variables.
-- Implement signed and replay-safe webhooks for authorization, capture, failure, settlement, refund, chargeback, dispute, renewal, and cancellation events.
+- Keep sandbox and production credentials separated in server-only environment variables.
+- Obtain written bank guidance before adding unattended recurring charges, saved-card billing, chargebacks, or dispute automation.
 - Preserve server-authoritative amounts, tenant checks, idempotency, audit records, and safe retry behavior.
 - Add business-facing refund and dispute procedures supported by the chosen provider.
 - Publish provider name, fees, settlement times, supported methods, refund rules, dispute rules, and provider privacy terms.
@@ -302,8 +302,8 @@ Some implemented features require external services or production configuration 
 
 ## Current limitations
 
-- Online DigiWallet and card screens are previews and do not process real money.
-- Payment-provider account onboarding and real settlement are not implemented.
+- Customer-to-business online card routing is not implemented; those payments remain direct arrangements with the business.
+- Belize Bank subscription checkout is limited to hosted one-time monthly payments and must complete sandbox certification before production.
 - Refunds, chargebacks, disputes, and settlement reconciliation are not connected to a live provider.
 - Appointment reminder rows can be scheduled and tracked, but delivery requires a configured email or messaging provider.
 - Some standalone administration role screens remain read-only or use temporary display data while persistent role management is completed.

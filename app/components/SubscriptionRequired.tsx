@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ArrowRight,
   Check,
@@ -20,6 +21,7 @@ import type { PlanType } from "@/app/types";
 import type { Tenant, User } from "@/app/types";
 import { BusinessSwitcher } from "@/app/components/BusinessSwitcher";
 import { SubscriptionCheckoutPreview } from "@/app/components/SubscriptionCheckoutPreview";
+import { getBelizeBankCheckoutStatus } from "@/app/services/billingService";
 
 const plans = PLAN_ORDER.map((planId) => ({
   ...PLAN_DEFINITIONS[planId],
@@ -36,7 +38,18 @@ export function SubscriptionRequired({
   user: User;
   onLogout: () => Promise<void>;
 }) {
+  const router = useRouter();
   const [checkoutPlan, setCheckoutPlan] = useState<PlanType | null>(null);
+  const [paymentMessage, setPaymentMessage] = useState(() => {
+    if (typeof window === "undefined") return "";
+    const url = new URL(window.location.href);
+    return url.searchParams.get("billingRequest") &&
+      url.searchParams.get("tenant") === tenant.id
+      ? "Verifying your Belize Bank payment..."
+      : "";
+  });
+  const [paymentError, setPaymentError] = useState("");
+  const handledBillingReturn = useRef("");
   const [seatSelections, setSeatSelections] = useState<
     Record<PlanType, number>
   >(
@@ -54,6 +67,50 @@ export function SubscriptionRequired({
       ) as Record<PlanType, number>,
   );
   const isOwner = user.role === "owner";
+
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const requestId = url.searchParams.get("billingRequest")?.trim() ?? "";
+    const returnTenantId = url.searchParams.get("tenant")?.trim() ?? "";
+    if (
+      !requestId ||
+      returnTenantId !== tenant.id ||
+      handledBillingReturn.current === requestId
+    ) {
+      return;
+    }
+
+    handledBillingReturn.current = requestId;
+    void getBelizeBankCheckoutStatus(tenant.id, requestId)
+      .then((result) => {
+        if (result.state === "completed") {
+          router.replace("/dashboard/settings?tab=payments");
+          return;
+        }
+        if (result.state === "pending") {
+          setPaymentMessage(
+            "Belize Bank is still processing this payment. Refresh this page shortly to check again.",
+          );
+          return;
+        }
+        setPaymentMessage("");
+        setPaymentError(
+          result.state === "cancelled"
+            ? "The Belize Bank payment was cancelled."
+            : result.state === "refunded"
+              ? "The Belize Bank payment was refunded."
+              : "The Belize Bank payment was not approved.",
+        );
+      })
+      .catch((statusError) => {
+        setPaymentMessage("");
+        setPaymentError(
+          statusError instanceof Error
+            ? statusError.message
+            : "Unable to verify the Belize Bank payment.",
+        );
+      });
+  }, [router, tenant.id]);
 
   return (
     <div className="pwa-page-roomy min-h-dvh bg-[#070b14] px-4 py-8 text-white light:bg-[#f6f8fc] light:text-slate-900 sm:px-6">
@@ -96,6 +153,16 @@ export function SubscriptionRequired({
           <p className="mt-3 text-xs text-slate-500">
             Signed in as {user.email}
           </p>
+          {paymentMessage && (
+            <p className="mx-auto mt-4 max-w-xl rounded-xl border border-violet-500/30 bg-violet-500/10 px-4 py-3 text-xs font-semibold text-violet-200">
+              {paymentMessage}
+            </p>
+          )}
+          {paymentError && (
+            <p className="mx-auto mt-4 max-w-xl rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-xs font-semibold text-red-200">
+              {paymentError}
+            </p>
+          )}
         </section>
 
         <div className="grid gap-5 md:grid-cols-3">
@@ -174,7 +241,7 @@ export function SubscriptionRequired({
           <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
           <p>
             {isOwner
-              ? "Choose a plan to preview checkout. Payments are coming soon, and opening checkout will not charge you or change your subscription."
+              ? "Choose a plan, then continue to Belize Bank's hosted page to complete the secure card payment."
               : "Only the business owner can purchase or change a subscription. Ask the owner to sign in and complete checkout."}
           </p>
         </div>

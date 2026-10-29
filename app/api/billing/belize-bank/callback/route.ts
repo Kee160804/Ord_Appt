@@ -11,6 +11,13 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const CALLBACK_OPERATIONS = new Set([
+  "approved",
+  "deposited",
+  "reversed",
+  "refunded",
+]);
+
 function text(body: string, status = 200) {
   return new Response(body, {
     status,
@@ -40,8 +47,8 @@ export async function POST(request: Request) {
       (!gatewayOrderId && !merchantOrderNumber) ||
       gatewayOrderId.length > 200 ||
       merchantOrderNumber.length > 200 ||
-      operation.length > 64 ||
-      callbackStatus.length > 16
+      !CALLBACK_OPERATIONS.has(operation) ||
+      !["0", "1"].includes(callbackStatus)
     ) {
       return text("Invalid callback.", 400);
     }

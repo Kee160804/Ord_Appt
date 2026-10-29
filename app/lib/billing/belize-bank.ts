@@ -5,6 +5,10 @@ import { publicAppOrigin } from "@/app/lib/platform";
 const SANDBOX_PAYMENT_URL = "https://sandbox.belizebank.com/payment/rest";
 const PRODUCTION_PAYMENT_URL = "https://gateway.belizebank.com/payment/rest";
 const REQUEST_TIMEOUT_MS = 20_000;
+const DEFAULT_HOSTED_PAYMENT_DOMAINS = [
+  "belizebank.com",
+  "radarpayment.online",
+] as const;
 
 type GatewayJson = Record<string, unknown>;
 
@@ -169,6 +173,29 @@ function safeHostedUrl(value: unknown) {
       "Belize Bank returned an unsafe hosted payment URL.",
     );
   }
+  const configuredDomains =
+    process.env.BELIZE_BANK_HOSTED_PAYMENT_DOMAINS?.split(",")
+      .map((domain) =>
+        domain
+          .trim()
+          .toLowerCase()
+          .replace(/^\.+|\.+$/g, ""),
+      )
+      .filter(Boolean) ?? [];
+  const allowedDomains = [
+    ...DEFAULT_HOSTED_PAYMENT_DOMAINS,
+    ...configuredDomains,
+  ];
+  const hostname = url.hostname.toLowerCase();
+  if (
+    !allowedDomains.some(
+      (domain) => hostname === domain || hostname.endsWith(`.${domain}`),
+    )
+  ) {
+    throw new BelizeBankGatewayError(
+      "Belize Bank returned an unrecognized hosted payment domain.",
+    );
+  }
   return url.toString();
 }
 
@@ -216,13 +243,19 @@ export async function registerBelizeBankSubscription(input: {
 export async function getBelizeBankOrderStatus(
   orderId: string,
 ): Promise<BelizeBankOrderStatus> {
+  const normalizedOrderId = orderId.trim();
+  if (!normalizedOrderId || normalizedOrderId.length > 200) {
+    throw new BelizeBankGatewayError(
+      "The Belize Bank order reference is invalid.",
+    );
+  }
   const auth = credentials();
   const response = await postGateway(
     "/getOrderStatusExtended.do",
     new URLSearchParams({
       userName: auth.userName,
       password: auth.password,
-      orderId,
+      orderId: normalizedOrderId,
     }),
   );
   gatewayError(response);
@@ -239,7 +272,7 @@ export async function getBelizeBankOrderStatus(
       ? (response.cardAuthInfo as GatewayJson)
       : {};
   return {
-    orderId,
+    orderId: normalizedOrderId,
     orderStatus,
     amountMinor: numericValue(response.amount),
     bindingId:

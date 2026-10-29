@@ -307,7 +307,17 @@ export async function loadAuthenticatedAppSession(
   try {
     let authUser = suppliedAuthUser;
     if (!authUser) {
-      const { data, error } = await supabase.auth.getUser();
+      // Avoid a remote Auth request on public pages when the browser has no
+      // session at all. Existing sessions are still verified with getUser()
+      // before any profile or tenant data is trusted.
+      const { data: sessionData, error: sessionError } =
+        await supabase.auth.getSession();
+      if (sessionError) return { error: sessionError.message };
+      if (!sessionData.session) return { error: "Not authenticated." };
+
+      const { data, error } = await supabase.auth.getUser(
+        sessionData.session.access_token,
+      );
       if (error || !data.user)
         return { error: error?.message ?? "Not authenticated." };
       authUser = data.user;

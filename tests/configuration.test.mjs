@@ -49,3 +49,17 @@ test("production authentication emails cannot emit localhost callbacks", async (
   assert.doesNotMatch(adminAgents, /let appOrigin = "http:\/\/localhost/);
   assert.doesNotMatch(adminTenants, /"http:\/\/localhost:3000"/);
 });
+
+test("public pages do not remotely verify a user when no session exists", async () => {
+  const authService = await readFile("app/services/authService.ts", "utf8");
+  const sessionCheck = authService.indexOf("supabase.auth.getSession()");
+  const userCheck = authService.indexOf("supabase.auth.getUser(");
+
+  assert.ok(sessionCheck >= 0);
+  assert.ok(userCheck > sessionCheck);
+  assert.match(
+    authService,
+    /if \(!sessionData\.session\) return \{ error: "Not authenticated\." \}/,
+  );
+  assert.match(authService, /sessionData\.session\.access_token/);
+});

@@ -49,6 +49,7 @@ import {
 } from "../services/settingsService";
 import {
   cancelSubscriptionAtPeriodEnd,
+  getBelizeBankCheckoutStatus,
   getSubscriptionSummary,
   listBillingLedger,
   type BillingInvoice,
@@ -1025,6 +1026,7 @@ function PaymentsTab({
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const handledBillingReturn = useRef("");
   const refresh = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -1072,6 +1074,68 @@ function PaymentsTab({
   useEffect(() => {
     void refresh();
   }, [refresh]);
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const requestId = url.searchParams.get("billingRequest")?.trim() ?? "";
+    const returnTenantId = url.searchParams.get("tenant")?.trim() ?? "";
+    if (
+      !requestId ||
+      returnTenantId !== tenant.id ||
+      handledBillingReturn.current === requestId
+    ) {
+      return;
+    }
+
+    handledBillingReturn.current = requestId;
+    const clearReturnParameters = () => {
+      url.searchParams.delete("billingRequest");
+      url.searchParams.delete("tenant");
+      window.history.replaceState(
+        {},
+        "",
+        `${url.pathname}${url.search}${url.hash}`,
+      );
+    };
+    setProcessing(true);
+    setError("");
+    setMessage("Verifying your Belize Bank payment...");
+
+    void getBelizeBankCheckoutStatus(tenant.id, requestId)
+      .then(async (result) => {
+        if (result.state === "completed") {
+          clearReturnParameters();
+          await refresh();
+          setMessage(
+            "Payment verified. Your subscription is now active for the new billing period.",
+          );
+          return;
+        }
+        if (result.state === "pending") {
+          setMessage(
+            "Belize Bank is still processing this payment. Refresh this page shortly to check again.",
+          );
+          return;
+        }
+        clearReturnParameters();
+        setMessage("");
+        setError(
+          result.state === "cancelled"
+            ? "The Belize Bank payment was cancelled."
+            : result.state === "refunded"
+              ? "The Belize Bank payment was refunded."
+              : "The Belize Bank payment was not approved.",
+        );
+      })
+      .catch((statusError) => {
+        setMessage("");
+        setError(
+          statusError instanceof Error
+            ? statusError.message
+            : "Unable to verify the Belize Bank payment.",
+        );
+      })
+      .finally(() => setProcessing(false));
+  }, [refresh, tenant.id]);
   const cancel = async () => {
     if (
       !window.confirm(
@@ -1247,7 +1311,7 @@ function PaymentsTab({
               <div>
                 <h3 className="text-sm font-black">Subscription checkout</h3>
                 <p className="mt-0.5 text-[11px] text-slate-400 light:text-slate-600">
-                  Preview your order and available payment methods.
+                  Pay securely on Belize Bank&apos;s hosted payment page.
                 </p>
               </div>
             </div>
@@ -1255,9 +1319,9 @@ function PaymentsTab({
               <div className="flex gap-3 rounded-xl border border-emerald-500/25 bg-emerald-500/10 p-4 text-xs leading-5 text-slate-300 light:text-slate-700">
                 <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-400" />
                 <p>
-                  Checkout is in preview while payment processing is being
-                  prepared. Opening it will not charge you or change your free
-                  trial.
+                  Belize Bank collects and processes your card information.
+                  YuhBusiness activates the subscription only after the bank
+                  independently confirms the exact payment amount.
                 </p>
               </div>
               <div className="flex items-center justify-between rounded-xl border border-violet-500/25 bg-violet-500/10 px-4 py-3">
@@ -1274,7 +1338,7 @@ function PaymentsTab({
                 <LockKeyhole className="h-4 w-4" /> Checkout
               </Button>
               <p className="text-center text-[10px] text-slate-400 light:text-slate-600">
-                Payments are coming soon and are not available yet.
+                You will be redirected to Belize Bank to complete payment.
               </p>
             </div>
           </section>

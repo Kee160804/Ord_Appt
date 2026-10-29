@@ -4,10 +4,10 @@ This integration is intentionally limited to monthly YuhBusiness subscription
 payments made by business owners. It does not process or route storefront
 customer payments for orders, appointments, or retail purchases.
 
-> **Prelaunch:** Owner-facing checkout is currently a non-mutating preview. The
-> server returns `503` for checkout requests unless
-> `SUBSCRIPTION_CHECKOUT_ENABLED=true` is explicitly configured. No subscription
-> should be activated before a verified Belize Bank payment exists.
+> **Controlled rollout:** The server returns `503` unless
+> `SUBSCRIPTION_CHECKOUT_ENABLED=true` is explicitly configured. Start in the
+> Belize Bank sandbox and enable production only after certification. No
+> subscription is activated before a verified Belize Bank payment exists.
 
 ## Payment flow
 
@@ -25,6 +25,12 @@ customer payments for orders, appointments, or retail purchases.
    queries `/getOrderStatusExtended.do` with the platform credentials.
 8. Only status `2` with the exact expected minor-unit amount activates the
    subscription and creates the paid invoice and payment-ledger record.
+
+The owner-facing modal keeps the DigiWallet and Credit/Debit selector.
+DigiWallet is visibly disabled as a coming-soon feature. When Credit/Debit is
+selected, Continue immediately registers the server-calculated payment and
+redirects to Belize Bank's hosted page. YuhBusiness never accepts a card number,
+expiry date, or CVV.
 
 The return URL performs the same authenticated status verification. Returning
 from the hosted page is never accepted as proof of payment.
@@ -50,6 +56,10 @@ BELIZE_BANK_USERNAME=<sandbox username from Belize Bank>
 BELIZE_BANK_PASSWORD=<sandbox password from Belize Bank>
 NEXT_PUBLIC_APP_URL=https://your-public-https-domain.example
 ```
+
+Temporary credentials may require a password change before the API accepts
+requests. Complete that bank-required change through the merchant portal, then
+store the updated API password only in server-side environment variables.
 
 Do not prefix credentials with `NEXT_PUBLIC_`, commit them, place them in client
 code, or print them in application logs. Belize Bank supplies sandbox usernames

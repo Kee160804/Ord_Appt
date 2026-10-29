@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 
 const read = (path) => readFile(path, "utf8");
 
-test("subscription checkout UI is a non-mutating coming-soon preview", async () => {
+test("subscription checkout redirects to the bank-hosted payment page", async () => {
   const [settings, required, preview] = await Promise.all([
     read("app/components/SettingsView.tsx"),
     read("app/components/SubscriptionRequired.tsx"),
@@ -13,34 +13,28 @@ test("subscription checkout UI is a non-mutating coming-soon preview", async () 
 
   assert.match(settings, /SubscriptionCheckoutPreview/);
   assert.match(required, /SubscriptionCheckoutPreview/);
-  assert.doesNotMatch(settings, /startSubscriptionCheckout/);
-  assert.doesNotMatch(required, /startSubscriptionCheckout/);
-  assert.doesNotMatch(preview, /fetch\(/);
-  assert.match(preview, /Checkout ID: #/);
+  assert.match(preview, /startSubscriptionCheckout/);
+  assert.match(preview, /crypto\.randomUUID\(\)/);
+  assert.match(preview, /window\.location\.assign\(result\.redirectUrl\)/);
+  assert.match(
+    preview,
+    /router\.push\("\/dashboard\/settings\?tab=payments"\)/,
+  );
   assert.match(preview, /DigiWallet/);
+  assert.match(preview, /Feature Coming Soon/);
   assert.match(preview, /Credit \/ Debit Card/);
-  assert.match(preview, /Card Number/);
-  assert.match(preview, /Name on Card/);
-  assert.match(preview, /label="CVV"/);
-  assert.match(preview, /American Express/);
-  assert.match(preview, /Mastercard/);
-  assert.match(preview, /Discover/);
-  assert.match(preview, /PaymentBrandLogo/);
-  assert.match(preview, /CARD_BRAND_LABELS\[cardBrand\(cardNumber\)\]/);
-  assert.match(preview, /from-violet-700/);
-  assert.match(preview, /aspect-\[1\.586\/1\]/);
-  assert.match(preview, /title="Checkout"/);
+  assert.match(preview, /Continue to Belize Bank/);
+  assert.match(preview, /onClick=\{\(\) => void continueToBank\(\)\}/);
+  assert.doesNotMatch(preview, /CardPaymentStep/);
+  assert.doesNotMatch(preview, /Secure Card/);
+  assert.doesNotMatch(preview, /<input/);
+  assert.doesNotMatch(preview, /autoComplete="cc-/);
+  assert.match(preview, /title="Secure subscription checkout"/);
   assert.match(preview, /maxWidth="max-w-2xl"/);
-  assert.doesNotMatch(preview, /const steps =/);
-  assert.match(preview, /<CardPreview[\s\S]+Payment Method/);
   assert.match(preview, /LockKeyhole[\s\S]+Continue/);
-  assert.match(preview, /DigiWallet payments are coming soon/);
-  assert.match(preview, /value\.toUpperCase\(\)/);
-  assert.match(preview, /onSecurityCodeFocus\(true\)/);
-  assert.match(preview, /rotateY\(180deg\)/);
   assert.match(settings, /LockKeyhole[\s\S]+Checkout/);
-  assert.match(preview, /coming soon and is not available yet/);
-  assert.match(preview, /subscription was not changed/);
+  assert.match(settings, /getBelizeBankCheckoutStatus/);
+  assert.match(required, /getBelizeBankCheckoutStatus/);
 });
 
 test("server checkout fails closed until the real gateway is enabled", async () => {
