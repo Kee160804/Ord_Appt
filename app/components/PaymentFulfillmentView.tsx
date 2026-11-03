@@ -11,6 +11,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { Button } from "@/app/components/Button";
+import { StatusBadge } from "@/app/components/Badge";
 import {
   DEFAULT_FULFILLMENT_CONFIGURATION,
   PAYMENT_METHOD_LABELS,
@@ -708,9 +709,10 @@ export function PaymentFulfillmentView({ tenant }: { tenant: Tenant }) {
                     {submission.customer_name} · {submission.customer_email}
                   </p>
                 </div>
-                <span className="h-fit rounded-full bg-violet-500/15 px-3 py-1 text-xs font-bold text-violet-300 light:text-violet-700">
-                  {submission.status.replaceAll("_", " ")}
-                </span>
+                <StatusBadge
+                  status={submission.status.toLowerCase()}
+                  className="h-fit"
+                />
               </div>
               <div className="mt-4 grid gap-2 text-sm sm:grid-cols-3">
                 <p>
@@ -729,7 +731,15 @@ export function PaymentFulfillmentView({ tenant }: { tenant: Tenant }) {
                   <b>{submission.transaction_reference || "Not provided"}</b>
                 </p>
                 <p>
-                  Payment: <b>{submission.target?.payment_status}</b>
+                  Payment:{" "}
+                  {submission.target?.payment_status ? (
+                    <StatusBadge
+                      status={submission.target.payment_status.toLowerCase()}
+                      className="ml-1 align-middle"
+                    />
+                  ) : (
+                    <b>Not available</b>
+                  )}
                 </p>
                 <p>
                   Fulfillment:{" "}

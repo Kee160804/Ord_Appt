@@ -38,14 +38,10 @@ test("appointment payments support deposit review, in-person confirmation, and l
   assert.match(checkout, /Pay deposit in person/);
   assert.match(checkout, /Choose payment amount/);
   assert.match(checkout, /Pay in full/);
-  assert.match(dashboard, /Confirm full payment received/);
-  assert.match(dashboard, /Confirm remaining payment received/);
   assert.match(dashboard, /Customer Payment Choice/);
-  assert.match(dashboard, /Accept full-payment receipt/);
-  assert.match(dashboard, /View receipt/);
-  assert.match(dashboard, /Accept deposit receipt/);
   assert.match(dashboard, /Remaining Balance/);
-  assert.match(dashboard, /After approval, the remaining balance will be/);
+  assert.doesNotMatch(dashboard, /View receipt/);
+  assert.doesNotMatch(dashboard, /Accept deposit receipt/);
   assert.match(migration, /record_appointment_in_person_payment/);
   assert.match(
     migration,
@@ -91,6 +87,7 @@ test("appointment emails are limited to received, verification, confirmation, an
     emailWorker,
     emailPolicy,
     dashboard,
+    paymentFulfillment,
   ] = await Promise.all([
     read("app/api/public/bookings/route.ts"),
     read("app/api/appointments/status/route.ts"),
@@ -99,6 +96,7 @@ test("appointment emails are limited to received, verification, confirmation, an
     read("app/lib/email/worker.ts"),
     read("supabase/migrations/202611030001_customer_email_policy.sql"),
     read("app/components/AppointmentsView.tsx"),
+    read("app/components/PaymentFulfillmentView.tsx"),
   ]);
 
   assert.match(bookingRoute, /processEmailQueueBestEffort/);
@@ -123,5 +121,5 @@ test("appointment emails are limited to received, verification, confirmation, an
   assert.match(emailWorker, /APPOINTMENT_PAYMENT_CONFIRMED/);
   assert.match(emailWorker, /appointment email is no longer eligible/);
   assert.match(dashboard, /Confirm & email customer/);
-  assert.match(dashboard, /No customer email was sent/);
+  assert.match(paymentFulfillment, /No customer email was sent/);
 });

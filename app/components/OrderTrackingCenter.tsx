@@ -22,6 +22,7 @@ import {
   type TrackedOrder,
 } from "@/app/lib/order-tracking";
 import { formatCurrency } from "@/app/lib/utils";
+import { ReceiptFilePreview } from "@/app/components/ReceiptFilePreview";
 
 const panel =
   "rounded-xl border border-purple-500/20 bg-[#0c1020] p-3 light:border-slate-200 light:bg-white";
@@ -773,24 +774,27 @@ function TrackingReceiptUpload({
           onChange={(event) => selectFile(event.target.files?.[0])}
         />
         {file && (
-          <div className="mt-2 flex items-center gap-2 rounded-lg bg-purple-500/10 p-2">
-            <FileText className="h-5 w-5 shrink-0 text-purple-300" />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-semibold">{file.name}</p>
-              <p className="text-xs text-slate-400">
-                {Math.ceil(file.size / 1024)} KB
-              </p>
+          <div className="mt-2 rounded-lg bg-purple-500/10 p-2">
+            <div className="flex items-center gap-2">
+              <FileText className="h-5 w-5 shrink-0 text-purple-300" />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs font-semibold">{file.name}</p>
+                <p className="text-xs text-slate-400">
+                  {Math.ceil(file.size / 1024)} KB
+                </p>
+              </div>
+              <button
+                type="button"
+                aria-label="Remove selected receipt"
+                onClick={() => {
+                  setFile(null);
+                  if (fileInput.current) fileInput.current.value = "";
+                }}
+              >
+                <X className="h-4 w-4" />
+              </button>
             </div>
-            <button
-              type="button"
-              aria-label="Remove selected receipt"
-              onClick={() => {
-                setFile(null);
-                if (fileInput.current) fileInput.current.value = "";
-              }}
-            >
-              <X className="h-4 w-4" />
-            </button>
+            <ReceiptFilePreview file={file} className="mt-2 w-full" />
           </div>
         )}
         <button

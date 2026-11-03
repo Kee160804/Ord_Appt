@@ -71,7 +71,15 @@ export function getStatusColor(status: string): string {
       "bg-amber-500/20 light:bg-amber-50 text-amber-300 light:text-amber-700 border-amber-500/30 light:border-amber-300",
     awaiting_verification:
       "bg-violet-500/20 light:bg-violet-50 text-violet-300 light:text-violet-700 border-violet-500/30 light:border-violet-300",
+    verified:
+      "bg-emerald-500/20 light:bg-emerald-50 text-emerald-300 light:text-emerald-700 border-emerald-500/30 light:border-emerald-300",
+    rejected:
+      "bg-red-500/20 light:bg-red-50 text-red-400 light:text-red-700 border-red-500/30 light:border-red-300",
+    resubmission_requested:
+      "bg-amber-500/20 light:bg-amber-50 text-amber-300 light:text-amber-700 border-amber-500/30 light:border-amber-300",
     partial:
+      "bg-blue-500/20 light:bg-blue-50 text-blue-300 light:text-blue-700 border-blue-500/30 light:border-blue-300",
+    partially_paid:
       "bg-blue-500/20 light:bg-blue-50 text-blue-300 light:text-blue-700 border-blue-500/30 light:border-blue-300",
     refunded:
       "bg-slate-500/20 light:bg-slate-100 text-slate-400 light:text-slate-600 border-slate-500/30 light:border-slate-300",

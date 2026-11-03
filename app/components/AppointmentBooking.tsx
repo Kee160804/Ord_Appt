@@ -27,6 +27,7 @@ import { Input } from "@/app/components/input";
 import { Modal } from "@/app/components/Modal";
 import { StorefrontOffers } from "@/app/components/StorefrontOffers";
 import { StorefrontHero } from "@/app/components/StorefrontHero";
+import { ReceiptFilePreview } from "@/app/components/ReceiptFilePreview";
 import {
   MAX_PROMOTION_CODE_LENGTH,
   normalizePromotionCode,
@@ -1931,9 +1932,12 @@ export function AppointmentBooking({
                 />
               </label>
               {depositReceipt && (
-                <p className="mt-3 max-w-full truncate text-xs text-emerald-300">
-                  {depositReceipt.name}
-                </p>
+                <div className="mt-3 flex max-w-full flex-col items-center gap-2">
+                  <p className="max-w-full truncate text-xs text-emerald-300">
+                    {depositReceipt.name}
+                  </p>
+                  <ReceiptFilePreview file={depositReceipt} />
+                </div>
               )}
             </section>
             {depositUploadError && (

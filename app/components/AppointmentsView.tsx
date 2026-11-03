@@ -12,7 +12,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Download,
-  FileText,
   Search,
 } from "lucide-react";
 import { Card } from "./Card";
@@ -47,19 +46,6 @@ interface Props {
   tenant: Tenant;
 }
 
-interface AppointmentPaymentSubmission {
-  id: string;
-  appointment_id: string;
-  expected_amount: number | string;
-  submitted_amount: number | string;
-  payment_date: string;
-  transaction_reference: string | null;
-  status: string;
-  rejection_reason: string | null;
-  created_at: string;
-  receiptUrl: string | null;
-}
-
 function isFullyPaid(appointment: Appointment) {
   const total = Number(appointment.servicePrice ?? 0);
   const paid = Number(appointment.amountPaid ?? 0);
@@ -78,10 +64,6 @@ export function AppointmentsView({ tenant }: Props) {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [providers, setProviders] = useState<ServiceProvider[]>([]);
-  const [paymentSubmission, setPaymentSubmission] =
-    useState<AppointmentPaymentSubmission | null>(null);
-  const [submissionLoading, setSubmissionLoading] = useState(false);
-
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
@@ -209,50 +191,6 @@ export function AppointmentsView({ tenant }: Props) {
       setIsLoading(false);
     }
   }, [filter, page, search, tenant.id, usesSupabase]);
-
-  const loadAppointmentSubmission = useCallback(
-    async (appointmentId: string) => {
-      if (!usesSupabase) {
-        setPaymentSubmission(null);
-        return;
-      }
-      setSubmissionLoading(true);
-      try {
-        const response = await fetch(
-          `/api/payments/submissions?tenantId=${encodeURIComponent(tenant.id)}&appointmentId=${encodeURIComponent(appointmentId)}&status=ALL`,
-        );
-        const result = (await response.json()) as {
-          submissions?: AppointmentPaymentSubmission[];
-          error?: string;
-        };
-        if (!response.ok) {
-          throw new Error(
-            result.error || "Unable to load the deposit receipt.",
-          );
-        }
-        setPaymentSubmission(result.submissions?.[0] ?? null);
-      } catch (cause) {
-        setPaymentSubmission(null);
-        setError(
-          cause instanceof Error
-            ? cause.message
-            : "Unable to load the deposit receipt.",
-        );
-      } finally {
-        setSubmissionLoading(false);
-      }
-    },
-    [tenant.id, usesSupabase],
-  );
-
-  const selectedAppointmentId = selected?.id;
-  useEffect(() => {
-    if (!selectedAppointmentId) {
-      setPaymentSubmission(null);
-      return;
-    }
-    void loadAppointmentSubmission(selectedAppointmentId);
-  }, [loadAppointmentSubmission, selectedAppointmentId]);
 
   /**
    * Load the current appointment page and keep it synchronized when the
@@ -433,98 +371,6 @@ export function AppointmentsView({ tenant }: Props) {
     } catch (cause) {
       setError(
         cause instanceof Error ? cause.message : "Unable to assign provider.",
-      );
-    } finally {
-      setUpdatingId(null);
-    }
-  };
-
-  const confirmInPersonPayment = async () => {
-    if (!selected || updatingId) return;
-    setUpdatingId(selected.id);
-    setError("");
-    setNotice("");
-    try {
-      const response = await fetch("/api/payments/appointments/manual", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          tenantId: tenant.id,
-          appointmentId: selected.id,
-        }),
-      });
-      const result = await response.json();
-      if (!response.ok)
-        throw new Error(result.error || "Unable to confirm the payment.");
-      await loadAppointments();
-      setNotice(
-        "Payment recorded in the tracker. No customer email was sent. Confirm the appointment separately after the full balance is paid.",
-      );
-    } catch (cause) {
-      setError(
-        cause instanceof Error
-          ? cause.message
-          : "Unable to confirm the payment.",
-      );
-    } finally {
-      setUpdatingId(null);
-    }
-  };
-
-  const reviewDeposit = async (
-    action: "verify" | "reject" | "request_resubmission",
-  ) => {
-    if (!selected || !paymentSubmission || updatingId) return;
-    const comment =
-      action === "verify"
-        ? "Receipt accepted and funds confirmed in the business account."
-        : window.prompt(
-            action === "reject"
-              ? "Why was this deposit receipt rejected?"
-              : "What should the customer correct?",
-          );
-    if (action !== "verify" && !comment) return;
-    if (
-      action === "verify" &&
-      !window.confirm(
-        "Accept this receipt only after the funds appear in the business account. This updates tracking but does not email the customer. Continue?",
-      )
-    ) {
-      return;
-    }
-
-    setUpdatingId(selected.id);
-    setError("");
-    setNotice("");
-    try {
-      const response = await fetch("/api/payments/submissions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          tenantId: tenant.id,
-          submissionId: paymentSubmission.id,
-          action,
-          comment,
-        }),
-      });
-      const result = (await response.json()) as { error?: string };
-      if (!response.ok) {
-        throw new Error(result.error || "Unable to review this deposit.");
-      }
-      await Promise.all([
-        loadAppointments(),
-        loadAppointmentSubmission(selected.id),
-      ]);
-      setNotice(
-        action === "verify"
-          ? "Receipt accepted and payment tracking updated. No customer email was sent."
-          : "Receipt review updated in customer tracking. No customer email was sent.",
-      );
-    } catch (cause) {
-      setError(
-        cause instanceof Error
-          ? cause.message
-          : "Unable to review this deposit.",
       );
     } finally {
       setUpdatingId(null);
@@ -921,12 +767,6 @@ export function AppointmentsView({ tenant }: Props) {
               )}
 
             <div className="bg-slate-800 light:bg-gray-50 rounded-xl p-4 space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-slate-400 light:text-gray-600">
-                  Payment Status
-                </span>
-                <StatusBadge status={selected.paymentStatus} />
-              </div>
               <div className="flex justify-between gap-4">
                 <span className="text-slate-400 light:text-gray-600">
                   Customer Payment Choice
@@ -971,127 +811,10 @@ export function AppointmentsView({ tenant }: Props) {
                   </div>
                 </>
               )}
-              {submissionLoading && (
-                <p className="pt-2 text-xs text-slate-400">
-                  Loading deposit receipt...
-                </p>
-              )}
-              {paymentSubmission && (
-                <div className="mt-3 rounded-xl border border-violet-400/30 bg-violet-500/10 p-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <p className="text-xs font-bold text-white light:text-slate-900">
-                        {selected.paymentSelection === "full"
-                          ? "Full payment receipt"
-                          : "Deposit receipt"}
-                      </p>
-                      <p className="mt-1 text-[11px] text-slate-300 light:text-slate-600">
-                        Submitted{" "}
-                        {formatCurrency(
-                          Number(paymentSubmission.submitted_amount),
-                        )}
-                        {paymentSubmission.transaction_reference
-                          ? ` · Ref: ${paymentSubmission.transaction_reference}`
-                          : ""}
-                      </p>
-                    </div>
-                    <StatusBadge
-                      status={paymentSubmission.status.toLowerCase()}
-                    />
-                  </div>
-
-                  {paymentSubmission.status === "AWAITING_VERIFICATION" && (
-                    <p className="mt-2 text-[11px] text-amber-300 light:text-amber-700">
-                      After approval, the remaining balance will be{" "}
-                      {formatCurrency(
-                        Math.max(
-                          0,
-                          selected.servicePrice -
-                            Number(paymentSubmission.submitted_amount),
-                        ),
-                      )}
-                      .
-                    </p>
-                  )}
-                  {paymentSubmission.rejection_reason && (
-                    <p className="mt-2 text-[11px] text-red-300 light:text-red-700">
-                      {paymentSubmission.rejection_reason}
-                    </p>
-                  )}
-
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {paymentSubmission.receiptUrl && (
-                      <a
-                        href={paymentSubmission.receiptUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-2 rounded-lg border border-slate-500 px-3 py-2 text-xs font-bold hover:border-violet-400"
-                      >
-                        <FileText className="h-4 w-4" />
-                        View receipt
-                      </a>
-                    )}
-                    {paymentSubmission.status === "AWAITING_VERIFICATION" &&
-                      ["owner", "admin", "manager"].includes(
-                        user?.role ?? "",
-                      ) && (
-                        <>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="success"
-                            disabled={updatingId === selected.id}
-                            onClick={() => void reviewDeposit("verify")}
-                          >
-                            <CheckCircle className="h-4 w-4" />
-                            {selected.paymentSelection === "full"
-                              ? "Accept full-payment receipt"
-                              : "Accept deposit receipt"}
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            disabled={updatingId === selected.id}
-                            onClick={() =>
-                              void reviewDeposit("request_resubmission")
-                            }
-                          >
-                            Request new receipt
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="danger"
-                            disabled={updatingId === selected.id}
-                            onClick={() => void reviewDeposit("reject")}
-                          >
-                            Reject
-                          </Button>
-                        </>
-                      )}
-                  </div>
-                </div>
-              )}
-              {selected.paymentStatus !== "paid" && user?.role === "owner" && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="mt-3 w-full justify-center"
-                  disabled={updatingId === selected.id}
-                  onClick={() => void confirmInPersonPayment()}
-                >
-                  <CheckCircle className="h-4 w-4" />
-                  {Number(selected.amountPaid ?? 0) > 0
-                    ? "Confirm remaining payment received"
-                    : "Confirm full payment received"}
-                </Button>
-              )}
               {selected.status === "pending" && !isFullyPaid(selected) && (
                 <p className="pt-2 text-xs text-amber-400 light:text-amber-700">
-                  Receipt approval updates tracking only. Record the full
-                  balance before using “Confirm & email customer.”
+                  Manage payment in Customer Payment &amp; Fulfillment. Record
+                  the full balance before using “Confirm & email customer.”
                 </p>
               )}
               {selected.status === "pending" &&
