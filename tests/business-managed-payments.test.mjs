@@ -8,6 +8,8 @@ const reservationMigration =
   "supabase/migrations/202610230001_retail_purchase_reservations.sql";
 const atomicReviewMigration =
   "supabase/migrations/202610270002_atomic_customer_payment_review.sql";
+const appointmentPaymentMigration =
+  "supabase/migrations/202610300002_appointment_customer_payments.sql";
 
 test("customer payments remain separate from platform subscription billing", async () => {
   const sql = await readFile(paymentMigration, "utf8");
@@ -30,6 +32,30 @@ test("checkout uses only business-configured customer payment methods", async ()
   assert.doesNotMatch(ordering, /mock_card|Credit \/ Debit Card/);
   assert.match(checkout, /Payment is made directly to/);
   assert.match(checkout, /Go to Track Order/);
+});
+
+test("appointment, ordering, and retail share the customer-to-business payment flow", async () => {
+  const [appointment, ordering, bookingRoute, tracking, receiptRoute, sql] =
+    await Promise.all([
+      readFile("app/components/AppointmentBooking.tsx", "utf8"),
+      readFile("app/components/OrderingMenu.tsx", "utf8"),
+      readFile("app/api/public/bookings/route.ts", "utf8"),
+      readFile("app/api/public/order-tracking/route.ts", "utf8"),
+      readFile("app/api/public/payment-receipts/route.ts", "utf8"),
+      readFile(appointmentPaymentMigration, "utf8"),
+    ]);
+
+  assert.match(appointment, /module=appointment/);
+  assert.match(appointment, /PAYMENT_METHOD_LABELS/);
+  assert.doesNotMatch(appointment, /mock_card|Mock card payment/);
+  assert.match(ordering, /isRetail \? "retail" : "ordering"/);
+  assert.match(bookingRoute, /create_public_appointment_with_customer_payment/);
+  assert.match(tracking, /request_appointment_tracking_code/);
+  assert.match(tracking, /kind: "appointment"/);
+  assert.match(receiptRoute, /submit_tracked_appointment_receipt/);
+  assert.match(sql, /modules @> ARRAY\['appointment'\]/);
+  assert.match(sql, /APPOINTMENT_PAYMENT_CONFIRMED/);
+  assert.doesNotMatch(sql, /payment_transactions|subscription_invoices/i);
 });
 
 test("bank account numbers are disclosed only after verified tracking", async () => {
@@ -99,10 +125,24 @@ test("owners control verification windows and review receipts in the dashboard",
     readFile("app/services/businessPaymentService.ts", "utf8"),
   ]);
   assert.match(view, /Retail purchase reservations/);
-  assert.match(view, /Verify funds received/);
+  assert.match(view, /Confirm payment & email customer/);
+  assert.match(view, /Accept receipt \(tracker only\)/);
   assert.match(service, /retail_reservations_enabled/);
   assert.match(service, /email_verification_minutes/);
   assert.match(service, /payment_window_minutes/);
+});
+
+test("tracking payment shows one selected bank and records it with the receipt", async () => {
+  const [view, route] = await Promise.all([
+    readFile("app/components/OrderTrackingCenter.tsx", "utf8"),
+    readFile("app/api/public/payment-receipts/route.ts", "utf8"),
+  ]);
+  assert.match(view, /Choose destination bank/);
+  assert.match(view, /Copy All/);
+  assert.match(view, /bankAccountId/);
+  assert.match(view, /Upload Receipt for Approval/);
+  assert.match(route, /business_bank_accounts/);
+  assert.match(route, /Customer selected destination bank/);
 });
 
 test("superseded recovery and demo surfaces are removed", async () => {

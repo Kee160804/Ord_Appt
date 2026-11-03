@@ -398,6 +398,28 @@ export function OrderingMenu({
     Math.max(0, subtotal + tax - discount + deliveryFee - promotionDiscount),
   );
   const itemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const checkoutItems = useMemo(
+    () =>
+      cart.map((item) => ({
+        id: cartLineKey(item),
+        name: item.name,
+        image: item.image || PLACEHOLDER_IMG,
+        quantity: item.quantity,
+        lineTotal:
+          item.price * item.quantity +
+          item.addons.reduce(
+            (sum, addon) => sum + addon.price * item.quantity,
+            0,
+          ),
+        detail: [
+          item.variantLabel,
+          item.addons.map((addon) => addon.name).join(", "),
+        ]
+          .filter(Boolean)
+          .join(" · "),
+      })),
+    [cart],
+  );
 
   // A promotion must be revalidated whenever the cart value changes.
   useEffect(() => {
@@ -810,7 +832,28 @@ export function OrderingMenu({
       setConfirmation({
         orderNumber: result.orderNumber,
         total: result.total,
+        subtotal,
+        tax,
+        deliveryFee,
+        discount: moneyRound(discount + promotionDiscount),
+        customerName: customerName.trim(),
         customerEmail: customerEmail.trim(),
+        fulfillmentMethod:
+          orderType === "delivery"
+            ? "Delivery"
+            : orderType === "pickup"
+              ? "Pickup"
+              : "Dine In",
+        paymentMethodLabel:
+          paymentOptions.find((option) => option.method === paymentMethod)
+            ?.label ?? paymentMethod,
+        paymentStatus: result.paymentStatus,
+        items: checkoutItems.map(({ name, quantity, lineTotal, detail }) => ({
+          name,
+          quantity,
+          lineTotal,
+          detail,
+        })),
         emailQueued: result.emailQueued === true,
         createdAt: result.createdAt,
       });
@@ -1186,7 +1229,7 @@ export function OrderingMenu({
               onClose={() => {
                 if (!placingOrderRef.current) setCheckoutOpen(false);
               }}
-              maxWidth="max-w-6xl"
+              maxWidth="max-w-5xl"
               contentClassName="p-0 sm:p-0"
             >
               <CustomerPaymentCheckout
@@ -1903,12 +1946,23 @@ function RetailProductOptions({
         .join(" · ")
     : "";
 
-  const isOptionAvailable = (attribute: string, value: string) =>
+  const isOptionAvailable = (
+    attribute: string,
+    value: string,
+    groupIndex: number,
+  ) =>
     variants.some(
       (variant) =>
         variant.isActive &&
         variant.stock > 0 &&
-        variantSupportsOption(variant, attribute, value),
+        variantSupportsOption(variant, attribute, value) &&
+        attributeGroups.slice(0, groupIndex).every((priorGroup) => {
+          const selectedValue = selectedAttributes[priorGroup.key];
+          return (
+            !selectedValue ||
+            variantSupportsOption(variant, priorGroup.key, selectedValue)
+          );
+        }),
     );
 
   return (
@@ -1945,11 +1999,14 @@ function RetailProductOptions({
 
       {attributeGroups.length > 0 && (
         <div className="space-y-5 border-t border-[#2a3950] pt-5 light:border-slate-200">
-          {attributeGroups.map((group) => {
+          {attributeGroups.map((group, groupIndex) => {
             const isColor = ["color", "colour"].includes(
               group.key.toLowerCase(),
             );
             const label = `${group.key.charAt(0).toUpperCase()}${group.key.slice(1)}`;
+            const compatibleValues = group.values.filter((value) =>
+              isOptionAvailable(group.key, value, groupIndex),
+            );
 
             return (
               <fieldset key={group.key}>
@@ -1960,9 +2017,13 @@ function RetailProductOptions({
                   </span>
                 </legend>
                 <div className="flex flex-wrap gap-2.5">
-                  {group.values.map((value) => {
+                  {compatibleValues.map((value) => {
                     const selected = selectedAttributes[group.key] === value;
-                    const available = isOptionAvailable(group.key, value);
+                    const available = isOptionAvailable(
+                      group.key,
+                      value,
+                      groupIndex,
+                    );
 
                     return (
                       <button

@@ -33,6 +33,7 @@ import { BusinessLogo } from "./BusinessLogo";
 import { TeamAccessView } from "./TeamAccessView";
 import { StorefrontDesigner } from "./StorefrontDesigner";
 import { SubscriptionCheckoutPreview } from "./SubscriptionCheckoutPreview";
+import { PaymentFulfillmentView } from "./PaymentFulfillmentView";
 import {
   updateBusinessDetails,
   updateBusinessHours,
@@ -85,6 +86,8 @@ interface Props {
 export function SettingsView({ tenant, user, onTenantUpdated }: Props) {
   const [active, setActive] = useState<Tab>("business");
   const [hours, setHours] = useState(tenant.businessHours);
+  const supportsOrderOperations =
+    tenant.businessType === "ordering" || tenant.businessType === "retail";
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
       if (
@@ -161,7 +164,13 @@ export function SettingsView({ tenant, user, onTenantUpdated }: Props) {
             ))}
           {active === "payments" &&
             (user.role === "owner" ? (
-              <PaymentsTab tenant={tenant} onTenantUpdated={onTenantUpdated} />
+              <div className="space-y-5">
+                <PaymentsTab
+                  tenant={tenant}
+                  onTenantUpdated={onTenantUpdated}
+                />
+                <PaymentFulfillmentView tenant={tenant} />
+              </div>
             ) : (
               <Card>
                 <CardBody>
@@ -173,13 +182,13 @@ export function SettingsView({ tenant, user, onTenantUpdated }: Props) {
               </Card>
             ))}
           {active === "ordering" &&
-            (tenant.businessType === "ordering" ? (
+            (supportsOrderOperations ? (
               <OrderingTab tenant={tenant} onTenantUpdated={onTenantUpdated} />
             ) : (
               <Card>
                 <CardBody>
                   <p className="text-sm text-slate-400">
-                    Order operations apply to ordering businesses.
+                    Order operations apply to ordering and retail businesses.
                   </p>
                 </CardBody>
               </Card>

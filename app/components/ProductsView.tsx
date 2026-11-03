@@ -15,6 +15,14 @@ import {
   ChevronRight,
   Upload,
   X,
+  Eye,
+  ImageIcon,
+  Layers3,
+  Minus,
+  ChevronDown,
+  ChevronUp,
+  MoreHorizontal,
+  ShoppingCart,
 } from "lucide-react";
 import { Card } from "../components/Card";
 import { Button } from "../components/Button";
@@ -137,12 +145,10 @@ function variantColors(variant: ProductVariant) {
   return uniqueOptionValues([variantAttribute(variant.attributes, "color")]);
 }
 
-function attributesForSize(size: string, colors: string[]) {
+function attributesForVariant(size: string, color = "") {
   const attributes: Record<string, string> = {};
   if (size !== ONE_SIZE_OPTION) attributes.size = size;
-  if (colors.length > 0) {
-    attributes[COLORS_ATTRIBUTE] = JSON.stringify(uniqueOptionValues(colors));
-  }
+  if (color.trim()) attributes.color = color.trim();
   return attributes;
 }
 
@@ -154,35 +160,42 @@ function createRetailVariant(
   size: string,
   productName: string,
   productId: string,
+  color = "",
 ): ProductVariant {
   const skuBase = skuPart(productName) || "PRODUCT";
 
   return {
     id: `variant-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     productId,
-    sku: [skuBase, skuPart(size)].filter(Boolean).join("-"),
-    attributes: attributesForSize(size, []),
+    sku: [skuBase, skuPart(size), skuPart(color)].filter(Boolean).join("-"),
+    attributes: attributesForVariant(size, color),
     stock: 0,
     isActive: true,
   };
 }
 
-function collapseVariantsBySize(variants: ProductVariant[]) {
-  const groups = new Map<string, ProductVariant[]>();
-  variants.forEach((variant) => {
+function expandVariantsByColor(variants: ProductVariant[]) {
+  return variants.flatMap((variant) => {
     const size = variantSizeGroup(variant);
-    groups.set(size, [...(groups.get(size) ?? []), variant]);
-  });
+    const colors = variantColors(variant);
+    if (colors.length <= 1) {
+      return [
+        {
+          ...variant,
+          attributes: attributesForVariant(size, colors[0] ?? ""),
+        },
+      ];
+    }
 
-  return Array.from(groups, ([size, sizeVariants]) => {
-    const representative = sizeVariants[0];
-    const colors = uniqueOptionValues(sizeVariants.flatMap(variantColors));
-    return {
-      ...representative,
-      attributes: attributesForSize(size, colors),
-      stock: sizeVariants.reduce((total, variant) => total + variant.stock, 0),
-      isActive: sizeVariants.some((variant) => variant.isActive),
-    };
+    const baseStock = Math.floor(variant.stock / colors.length);
+    const stockRemainder = variant.stock % colors.length;
+    return colors.map((color, index) => ({
+      ...variant,
+      id: `${variant.id}-${skuPart(color) || index}`,
+      sku: `${variant.sku}-${skuPart(color) || index + 1}`,
+      attributes: attributesForVariant(size, color),
+      stock: baseStock + (index < stockRemainder ? 1 : 0),
+    }));
   });
 }
 
@@ -224,6 +237,10 @@ export function ProductsView({ tenant }: Props) {
   const [variantSizes, setVariantSizes] = useState<string[]>([]);
   const [sizeDraft, setSizeDraft] = useState("");
   const [colorDrafts, setColorDrafts] = useState<Record<string, string>>({});
+  const [collapsedVariantSizes, setCollapsedVariantSizes] = useState<
+    Set<string>
+  >(new Set());
+  const [productDetailsCollapsed, setProductDetailsCollapsed] = useState(false);
   const [productImageFile, setProductImageFile] = useState<File | null>(null);
   const [productImagePreview, setProductImagePreview] = useState("");
   const productImagePreviewRef = useRef("");
@@ -490,6 +507,8 @@ export function ProductsView({ tenant }: Props) {
     setVariantSizes([]);
     setSizeDraft("");
     setColorDrafts({});
+    setCollapsedVariantSizes(new Set());
+    setProductDetailsCollapsed(false);
     setError("");
     setShowAdd(true);
   };
@@ -508,7 +527,7 @@ export function ProductsView({ tenant }: Props) {
       tags: product.tags,
       addons: tenant.businessType === "retail" ? [] : (product.addons ?? []),
     });
-    const productVariants = collapseVariantsBySize(product.variants ?? []);
+    const productVariants = expandVariantsByColor(product.variants ?? []);
     const productSizes = uniqueOptionValues(
       productVariants.map(variantSizeGroup),
     );
@@ -516,6 +535,8 @@ export function ProductsView({ tenant }: Props) {
     setVariantSizes(productSizes);
     setSizeDraft("");
     setColorDrafts({});
+    setCollapsedVariantSizes(new Set(productSizes));
+    setProductDetailsCollapsed(tenant.businessType === "retail");
     setError("");
     setShowAdd(true);
   };
@@ -540,6 +561,13 @@ export function ProductsView({ tenant }: Props) {
     setColorDrafts((current) =>
       Object.fromEntries(nextSizes.map((size) => [size, current[size] ?? ""])),
     );
+    if (newSizes.length > 0) {
+      const openSize = newSizes[0];
+      setCollapsedVariantSizes(
+        new Set(nextSizes.filter((size) => size !== openSize)),
+      );
+      setProductDetailsCollapsed(true);
+    }
     setSizeDraft("");
   };
 
@@ -561,38 +589,78 @@ export function ProductsView({ tenant }: Props) {
     const additions = uniqueOptionValues((colorDrafts[size] ?? "").split(","));
     if (additions.length === 0) return;
 
-    setVariants((current) => {
-      return current.map((variant) =>
-        variantBelongsToSize(variant, size)
-          ? {
-              ...variant,
-              attributes: attributesForSize(size, [
-                ...variantColors(variant),
-                ...additions,
-              ]),
-            }
-          : variant,
-      );
-    });
+    addVariantColors(size, additions);
     setColorDrafts((current) => ({ ...current, [size]: "" }));
   };
 
+  const addVariantColors = (size: string, additions: string[]) => {
+    const normalizedAdditions = uniqueOptionValues(additions);
+    if (normalizedAdditions.length === 0) return;
+
+    setVariants((current) => {
+      const sizeVariants = current.filter((variant) =>
+        variantBelongsToSize(variant, size),
+      );
+      const currentColors = uniqueOptionValues(
+        sizeVariants.flatMap(variantColors),
+      );
+      const colorsToAdd = normalizedAdditions.filter(
+        (color) =>
+          !currentColors.some(
+            (currentColor) =>
+              currentColor.toLowerCase() === color.toLowerCase(),
+          ),
+      );
+      if (colorsToAdd.length === 0) return current;
+
+      const withoutEmptyPlaceholder = current.filter(
+        (variant) =>
+          !(
+            variantBelongsToSize(variant, size) &&
+            variantColors(variant).length === 0
+          ),
+      );
+      return [
+        ...withoutEmptyPlaceholder,
+        ...colorsToAdd.map((color) =>
+          createRetailVariant(
+            size,
+            newProduct.name,
+            editingProduct?.id ?? "",
+            color,
+          ),
+        ),
+      ];
+    });
+  };
+
+  const toggleVariantSize = (size: string) => {
+    setCollapsedVariantSizes((current) => {
+      if (!current.has(size)) return new Set(variantSizes);
+      return new Set(variantSizes.filter((candidate) => candidate !== size));
+    });
+    setProductDetailsCollapsed(true);
+  };
+
   const removeColorFromSize = (size: string, color: string) => {
-    setVariants((current) =>
-      current.map((variant) =>
-        variantBelongsToSize(variant, size)
-          ? {
-              ...variant,
-              attributes: attributesForSize(
-                size,
-                variantColors(variant).filter(
-                  (candidate) => candidate !== color,
-                ),
-              ),
-            }
-          : variant,
-      ),
-    );
+    setVariants((current) => {
+      const remaining = current.filter(
+        (variant) =>
+          !(
+            variantBelongsToSize(variant, size) &&
+            variantColors(variant).some(
+              (candidate) => candidate.toLowerCase() === color.toLowerCase(),
+            )
+          ),
+      );
+      if (remaining.some((variant) => variantBelongsToSize(variant, size))) {
+        return remaining;
+      }
+      return [
+        ...remaining,
+        createRetailVariant(size, newProduct.name, editingProduct?.id ?? ""),
+      ];
+    });
   };
 
   const handleSaveProduct = async () => {
@@ -992,6 +1060,29 @@ export function ProductsView({ tenant }: Props) {
     }
   };
 
+  const productPreviewImage = productImagePreview || newProduct.image.trim();
+  const productPreviewPrice = Number(newProduct.price) || 0;
+  const productPreviewSize = variantSizes[0] ?? "";
+  const productPreviewVariants = variants.filter(
+    (variant) =>
+      variant.isActive &&
+      (!productPreviewSize ||
+        variantBelongsToSize(variant, productPreviewSize)),
+  );
+  const productPreviewVariant = productPreviewVariants[0];
+  const productPreviewColors = uniqueOptionValues(
+    productPreviewVariants.flatMap(variantColors),
+  );
+  const activeVariantCount = variants.filter(
+    (variant) => variant.isActive,
+  ).length;
+  const totalVariantStock = variants
+    .filter((variant) => variant.isActive)
+    .reduce((total, variant) => total + variant.stock, 0);
+  const totalVariantColors = uniqueOptionValues(
+    variants.flatMap(variantColors),
+  ).length;
+
   return (
     <div className="min-h-full space-y-4 bg-[#08111f] light:bg-[#f8fafc] p-4 text-white light:text-[#14213a] md:p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1171,7 +1262,12 @@ export function ProductsView({ tenant }: Props) {
         open={showAdd}
         onClose={closeProductEditor}
         title={editingProduct ? "Edit Product" : "Add New Product"}
-        maxWidth="max-w-2xl"
+        maxWidth={
+          tenant.businessType === "retail" && canUseAdvancedCatalog
+            ? "max-w-6xl"
+            : "max-w-4xl"
+        }
+        contentClassName="bg-[#111d30] light:bg-[#f8fafc]"
         footer={
           <div className="flex gap-3">
             <Button
@@ -1195,198 +1291,254 @@ export function ProductsView({ tenant }: Props) {
           </div>
         }
       >
-        <div className="space-y-4 text-white light:text-gray-900">
-          <Input
-            label="Product Name"
-            placeholder="e.g. Sourdough Loaf"
-            value={newProduct.name}
-            onChange={(e) =>
-              setNewProduct({ ...newProduct, name: e.target.value })
-            }
-          />
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Input
-              label="Price ($)"
-              type="number"
-              placeholder="0.00"
-              value={newProduct.price}
-              onChange={(e) =>
-                setNewProduct({ ...newProduct, price: e.target.value })
-              }
-            />
-            {canUseAdvancedCatalog && (
-              <Select
-                label="Category"
-                options={[
-                  { value: "", label: "Select category..." },
-                  ...categories
-                    .filter(
-                      (category) =>
-                        category.isActive !== false ||
-                        category.id === newProduct.categoryId,
-                    )
-                    .map((category) => ({
-                      value: category.id,
-                      label:
-                        category.isActive === false
-                          ? `${category.name} (hidden)`
-                          : category.name,
-                    })),
-                ]}
-                value={newProduct.categoryId}
-                onChange={(e) =>
-                  setNewProduct({ ...newProduct, categoryId: e.target.value })
-                }
-              />
-            )}
-          </div>
-          <Textarea
-            label="Description"
-            rows={3}
-            placeholder="Describe the product..."
-            value={newProduct.description}
-            onChange={(e) =>
-              setNewProduct({ ...newProduct, description: e.target.value })
-            }
-          />
-          {canUseAdvancedCatalog ? (
-            <div className="rounded-lg border border-slate-700 light:border-slate-200 p-3 space-y-3">
-              <label className="flex cursor-pointer items-start gap-3">
-                <input
-                  type="checkbox"
-                  checked={newProduct.trackInventory}
-                  onChange={(event) =>
-                    setNewProduct({
-                      ...newProduct,
-                      trackInventory: event.target.checked,
-                      inventory: event.target.checked
-                        ? newProduct.inventory
-                        : "",
-                    })
-                  }
-                  className="mt-0.5 h-4 w-4 accent-violet-600"
-                />
-                <span>
-                  <span className="block text-xs font-semibold">
-                    Track inventory
-                  </span>
-                  <span className="block text-[10px] text-slate-400 light:text-slate-500">
-                    Checkout subtracts stock and the storefront shows Sold Out
-                    at zero.
-                  </span>
-                </span>
-              </label>
-              {newProduct.trackInventory &&
-                !(tenant.businessType === "retail" && variants.length > 0) && (
-                  <Input
-                    label="Units currently in stock"
-                    type="number"
-                    min="0"
-                    step="1"
-                    placeholder="e.g. 20"
-                    value={newProduct.inventory}
-                    onChange={(e) =>
-                      setNewProduct({
-                        ...newProduct,
-                        inventory: e.target.value,
-                      })
-                    }
-                  />
-                )}
-              {newProduct.trackInventory &&
-                tenant.businessType === "retail" &&
-                variants.length > 0 && (
-                  <div className="rounded-lg border border-violet-500/25 bg-violet-500/10 px-3 py-2 text-xs text-violet-200 light:border-violet-200 light:bg-violet-50 light:text-violet-800">
-                    Total inventory is calculated from active variants:{" "}
-                    <strong>
-                      {variants
-                        .filter((variant) => variant.isActive)
-                        .reduce((total, variant) => total + variant.stock, 0)}
-                    </strong>{" "}
-                    units.
-                  </div>
-                )}
-              {!newProduct.trackInventory && (
-                <p className="text-xs text-emerald-400 light:text-emerald-700">
-                  Unlimited inventory — orders will not reduce a stock count.
-                </p>
-              )}
-            </div>
-          ) : (
-            <div className="rounded-lg border border-violet-500/25 bg-violet-500/10 p-3 text-xs text-violet-200 light:border-violet-200 light:bg-violet-50 light:text-violet-800">
-              Upgrade to Pro to organize products into categories, track
-              inventory, and configure{" "}
-              {tenant.businessType === "retail"
-                ? "product variants"
-                : "add-ons"}
-              . Basic product details remain available on Beginner.
+        <div className="space-y-5 text-white light:text-gray-900">
+          {error && (
+            <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-xs text-red-200 light:text-red-700">
+              {error}
             </div>
           )}
-          <div className="space-y-2">
-            <div className="grid items-end gap-2 sm:grid-cols-[1fr_auto]">
-              <Input
-                label="Image URL"
-                placeholder="https://..."
-                value={newProduct.image}
-                onChange={(event) => {
-                  if (productImageFile) clearProductImageFile();
-                  setNewProduct({
-                    ...newProduct,
-                    image: event.target.value,
-                  });
-                }}
-              />
-              <label
-                htmlFor="product-image-upload"
-                className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-violet-500/50 bg-violet-500/10 px-4 text-xs font-bold text-violet-200 transition hover:bg-violet-500/20 light:text-violet-700"
-              >
-                <Upload className="h-4 w-4" /> Upload from photos
-                <input
-                  id="product-image-upload"
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  className="sr-only"
-                  onChange={(event) => {
-                    selectProductImage(event.target.files?.[0]);
-                    event.target.value = "";
-                  }}
-                />
-              </label>
-            </div>
-            {productImageFile && (
-              <div className="flex items-center gap-3 rounded-lg border border-violet-500/25 bg-violet-500/10 p-2">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={productImagePreview}
-                  alt="Selected product preview"
-                  className="h-12 w-12 rounded-md object-cover"
-                />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-xs font-semibold">
-                    {productImageFile.name}
+          <section className="space-y-4 rounded-xl border border-slate-700 bg-slate-900/25 p-4 light:border-slate-200 light:bg-white sm:p-5">
+            <button
+              type="button"
+              onClick={() => {
+                setProductDetailsCollapsed((current) => !current);
+                setCollapsedVariantSizes(new Set(variantSizes));
+              }}
+              aria-expanded={!productDetailsCollapsed}
+              className="flex w-full items-center justify-between gap-3 border-b border-slate-700/80 pb-3 text-left light:border-slate-200"
+            >
+              <span className="flex items-center gap-2">
+                <Package className="h-4 w-4 text-violet-400" />
+                <span>
+                  <h3 className="text-sm font-bold">Product details</h3>
+                  <p className="text-[10px] text-slate-400 light:text-slate-500">
+                    Add the information customers will see on the storefront.
                   </p>
+                </span>
+              </span>
+              {productDetailsCollapsed ? (
+                <ChevronDown className="h-4 w-4 text-violet-300" />
+              ) : (
+                <ChevronUp className="h-4 w-4 text-violet-300" />
+              )}
+            </button>
+            {!productDetailsCollapsed && (
+              <div className="space-y-4">
+                <Input
+                  label="Product Name"
+                  placeholder="e.g. Sourdough Loaf"
+                  value={newProduct.name}
+                  onChange={(e) =>
+                    setNewProduct({ ...newProduct, name: e.target.value })
+                  }
+                />
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <Input
+                    label="Price ($)"
+                    type="number"
+                    placeholder="0.00"
+                    value={newProduct.price}
+                    onChange={(e) =>
+                      setNewProduct({ ...newProduct, price: e.target.value })
+                    }
+                  />
+                  {canUseAdvancedCatalog && (
+                    <Select
+                      label="Category"
+                      options={[
+                        { value: "", label: "Select category..." },
+                        ...categories
+                          .filter(
+                            (category) =>
+                              category.isActive !== false ||
+                              category.id === newProduct.categoryId,
+                          )
+                          .map((category) => ({
+                            value: category.id,
+                            label:
+                              category.isActive === false
+                                ? `${category.name} (hidden)`
+                                : category.name,
+                          })),
+                      ]}
+                      value={newProduct.categoryId}
+                      onChange={(e) =>
+                        setNewProduct({
+                          ...newProduct,
+                          categoryId: e.target.value,
+                        })
+                      }
+                    />
+                  )}
+                </div>
+                <Textarea
+                  label="Description"
+                  rows={3}
+                  placeholder="Describe the product..."
+                  value={newProduct.description}
+                  onChange={(e) =>
+                    setNewProduct({
+                      ...newProduct,
+                      description: e.target.value,
+                    })
+                  }
+                />
+                {canUseAdvancedCatalog ? (
+                  <div className="rounded-lg border border-slate-700 light:border-slate-200 p-3 space-y-3">
+                    <label className="flex cursor-pointer items-start gap-3">
+                      <input
+                        type="checkbox"
+                        checked={newProduct.trackInventory}
+                        onChange={(event) =>
+                          setNewProduct({
+                            ...newProduct,
+                            trackInventory: event.target.checked,
+                            inventory: event.target.checked
+                              ? newProduct.inventory
+                              : "",
+                          })
+                        }
+                        className="mt-0.5 h-4 w-4 accent-violet-600"
+                      />
+                      <span>
+                        <span className="block text-xs font-semibold">
+                          Track inventory
+                        </span>
+                        <span className="block text-[10px] text-slate-400 light:text-slate-500">
+                          Checkout subtracts stock and the storefront shows Sold
+                          Out at zero.
+                        </span>
+                      </span>
+                    </label>
+                    {newProduct.trackInventory &&
+                      !(
+                        tenant.businessType === "retail" && variants.length > 0
+                      ) && (
+                        <Input
+                          label="Units currently in stock"
+                          type="number"
+                          min="0"
+                          step="1"
+                          placeholder="e.g. 20"
+                          value={newProduct.inventory}
+                          onChange={(e) =>
+                            setNewProduct({
+                              ...newProduct,
+                              inventory: e.target.value,
+                            })
+                          }
+                        />
+                      )}
+                    {newProduct.trackInventory &&
+                      tenant.businessType === "retail" &&
+                      variants.length > 0 && (
+                        <div className="rounded-lg border border-violet-500/25 bg-violet-500/10 px-3 py-2 text-xs text-violet-200 light:border-violet-200 light:bg-violet-50 light:text-violet-800">
+                          Total inventory is calculated from active variants:{" "}
+                          <strong>
+                            {variants
+                              .filter((variant) => variant.isActive)
+                              .reduce(
+                                (total, variant) => total + variant.stock,
+                                0,
+                              )}
+                          </strong>{" "}
+                          units.
+                        </div>
+                      )}
+                    {!newProduct.trackInventory && (
+                      <p className="text-xs text-emerald-400 light:text-emerald-700">
+                        Unlimited inventory — orders will not reduce a stock
+                        count.
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-violet-500/25 bg-violet-500/10 p-3 text-xs text-violet-200 light:border-violet-200 light:bg-violet-50 light:text-violet-800">
+                    Upgrade to Pro to organize products into categories, track
+                    inventory, and configure{" "}
+                    {tenant.businessType === "retail"
+                      ? "product variants"
+                      : "add-ons"}
+                    . Basic product details remain available on Beginner.
+                  </div>
+                )}
+                <div className="space-y-2">
+                  <div className="grid items-end gap-2 sm:grid-cols-[1fr_auto]">
+                    <Input
+                      label="Image URL"
+                      placeholder="https://..."
+                      value={newProduct.image}
+                      onChange={(event) => {
+                        if (productImageFile) clearProductImageFile();
+                        setNewProduct({
+                          ...newProduct,
+                          image: event.target.value,
+                        });
+                      }}
+                    />
+                    <label
+                      htmlFor="product-image-upload"
+                      className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-violet-500/50 bg-violet-500/10 px-4 text-xs font-bold text-violet-200 transition hover:bg-violet-500/20 light:text-violet-700"
+                    >
+                      <Upload className="h-4 w-4" /> Upload from photos
+                      <input
+                        id="product-image-upload"
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        className="sr-only"
+                        onChange={(event) => {
+                          selectProductImage(event.target.files?.[0]);
+                          event.target.value = "";
+                        }}
+                      />
+                    </label>
+                  </div>
+                  {productImageFile && (
+                    <div className="flex items-center gap-3 rounded-lg border border-violet-500/25 bg-violet-500/10 p-2">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={productImagePreview}
+                        alt="Selected product preview"
+                        className="h-12 w-12 rounded-md object-cover"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-xs font-semibold">
+                          {productImageFile.name}
+                        </p>
+                        <p className="text-[10px] text-slate-400 light:text-slate-600">
+                          This photo will be used instead of the Image URL.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={clearProductImageFile}
+                        aria-label="Remove selected product image"
+                        className="rounded-md p-1.5 text-slate-400 transition hover:bg-slate-700 hover:text-white light:hover:bg-slate-200 light:hover:text-slate-900"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  )}
                   <p className="text-[10px] text-slate-400 light:text-slate-600">
-                    This photo will be used instead of the Image URL.
+                    Paste an image URL or upload a JPG, PNG, or WebP photo up to
+                    5 MB.
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={clearProductImageFile}
-                  aria-label="Remove selected product image"
-                  className="rounded-md p-1.5 text-slate-400 transition hover:bg-slate-700 hover:text-white light:hover:bg-slate-200 light:hover:text-slate-900"
-                >
-                  <X className="h-4 w-4" />
-                </button>
               </div>
             )}
-            <p className="text-[10px] text-slate-400 light:text-slate-600">
-              Paste an image URL or upload a JPG, PNG, or WebP photo up to 5 MB.
-            </p>
-          </div>
+          </section>
           {canUseAdvancedCatalog && tenant.businessType !== "retail" && (
-            <div className="space-y-2">
+            <section className="space-y-3 rounded-xl border border-violet-500/25 bg-violet-500/5 p-4 light:bg-violet-50/50">
               <div className="flex items-center justify-between">
-                <label className="text-sm font-semibold">Add-ons</label>
+                <div className="flex items-center gap-2">
+                  <Layers3 className="h-4 w-4 text-violet-400" />
+                  <div>
+                    <h3 className="text-sm font-bold">Product options</h3>
+                    <p className="text-[10px] text-slate-400">
+                      Offer optional extras with their own prices.
+                    </p>
+                  </div>
+                </div>
                 <Button
                   type="button"
                   variant="outline"
@@ -1410,7 +1562,10 @@ export function ProductsView({ tenant }: Props) {
                 </p>
               )}
               {newProduct.addons.map((addon, index) => (
-                <div key={addon.id} className="flex items-end gap-2">
+                <div
+                  key={addon.id}
+                  className="grid items-end gap-2 rounded-lg border border-slate-700/80 bg-slate-900/30 p-3 light:border-slate-200 light:bg-white sm:grid-cols-[1fr_180px_auto]"
+                >
                   <Input
                     label={index === 0 ? "Name" : undefined}
                     placeholder="e.g. Extra cheese"
@@ -1465,231 +1620,523 @@ export function ProductsView({ tenant }: Props) {
                   </Button>
                 </div>
               ))}
-            </div>
+            </section>
           )}
           {tenant.businessType === "retail" && canUseAdvancedCatalog && (
-            <div className="space-y-3 rounded-lg border border-violet-500/25 bg-violet-500/4 p-3">
-              <div>
-                <label className="text-sm font-semibold">Product options</label>
-                <p className="text-[10px] text-slate-400">
-                  Add a size, then choose only the colors stocked in that size.
-                  Each new size starts with its own empty color list.
-                </p>
-              </div>
-              <datalist id="product-variant-color-options">
-                {Array.from(
-                  new Set([
-                    ...PRODUCT_COLOR_SUGGESTIONS,
-                    ...variants.flatMap(variantColors),
-                  ]),
-                ).map((color) => (
-                  <option key={color} value={color} />
-                ))}
-              </datalist>
-              <div className="space-y-2 rounded-lg border border-slate-700 p-3 light:border-slate-300">
-                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2">
-                  <Input
-                    label="Add product sizes"
-                    placeholder="S, M, L or 8, 9, 10"
-                    value={sizeDraft}
-                    onChange={(event) => setSizeDraft(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key !== "Enter") return;
-                      event.preventDefault();
-                      addVariantSizes();
-                    }}
-                  />
+            <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+              <section className="space-y-3 rounded-xl border border-violet-500/35 bg-violet-500/5 p-4">
+                <div className="flex flex-col gap-4 rounded-xl bg-[#0b1728] p-3 sm:flex-row sm:items-center">
+                  <div className="grid h-24 w-24 shrink-0 place-items-center overflow-hidden rounded-xl bg-slate-100">
+                    {productPreviewImage ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={productPreviewImage}
+                        alt=""
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <ImageIcon className="h-8 w-8 text-slate-500" />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="truncate text-xl font-black">
+                        {newProduct.name.trim() || "New product"}
+                      </h3>
+                      <Badge variant="purple">Variants</Badge>
+                    </div>
+                    <p className="mt-1 line-clamp-2 text-xs text-slate-400">
+                      {newProduct.description.trim() ||
+                        "Add a product description above."}
+                    </p>
+                    <p className="mt-2 text-sm font-bold">
+                      Base price:{" "}
+                      <span className="text-violet-200">
+                        {formatCurrency(productPreviewPrice)}
+                      </span>
+                    </p>
+                  </div>
                   <Button
                     type="button"
                     variant="outline"
-                    size="sm"
-                    onClick={addVariantSizes}
+                    onClick={() =>
+                      document.getElementById("new-product-size")?.focus()
+                    }
+                    className="shrink-0 border-violet-500 text-violet-200"
                   >
-                    <Plus className="h-3.5 w-3.5" /> Add size
+                    <Plus className="h-4 w-4" /> Add size
                   </Button>
                 </div>
-                <p className="text-[10px] text-slate-400">
-                  Add one size at a time or separate several sizes with commas.
-                </p>
-              </div>
-              {variantSizes.length === 0 ? (
-                <p className="rounded-lg border border-dashed border-slate-600 px-3 py-4 text-center text-xs text-slate-400 light:border-slate-300 light:text-slate-500">
-                  Add a size to configure its colors and inventory.
-                </p>
-              ) : null}
-              {variantSizes.map((size) => {
-                const sizeVariants = variants.filter((variant) =>
-                  variantBelongsToSize(variant, size),
-                );
-                const variant = sizeVariants[0];
-                const configuredColors = variant ? variantColors(variant) : [];
-                if (!variant) return null;
+                <datalist id="product-variant-color-options">
+                  {Array.from(
+                    new Set([
+                      ...PRODUCT_COLOR_SUGGESTIONS,
+                      ...variants.flatMap(variantColors),
+                    ]),
+                  ).map((color) => (
+                    <option key={color} value={color} />
+                  ))}
+                </datalist>
+                <div className="space-y-2 rounded-lg border border-slate-700 p-3 light:border-slate-300">
+                  <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2">
+                    <Input
+                      id="new-product-size"
+                      label="Add product sizes"
+                      placeholder="S, M, L or 8, 9, 10"
+                      value={sizeDraft}
+                      onChange={(event) => setSizeDraft(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key !== "Enter") return;
+                        event.preventDefault();
+                        addVariantSizes();
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={addVariantSizes}
+                    >
+                      <Plus className="h-3.5 w-3.5" /> Add size
+                    </Button>
+                  </div>
+                  <p className="text-[10px] text-slate-400">
+                    Add one size at a time or separate several sizes with
+                    commas.
+                  </p>
+                </div>
+                {variantSizes.length === 0 ? (
+                  <p className="rounded-lg border border-dashed border-slate-600 px-3 py-4 text-center text-xs text-slate-400 light:border-slate-300 light:text-slate-500">
+                    Add a size to configure its colors and inventory.
+                  </p>
+                ) : null}
+                {variantSizes.map((size) => {
+                  const sizeVariants = variants.filter((variant) =>
+                    variantBelongsToSize(variant, size),
+                  );
+                  const configuredColors = uniqueOptionValues(
+                    sizeVariants.flatMap(variantColors),
+                  );
+                  const sizeStock = sizeVariants
+                    .filter((variant) => variant.isActive)
+                    .reduce((total, variant) => total + variant.stock, 0);
+                  const sizeIsActive = sizeVariants.some(
+                    (variant) => variant.isActive,
+                  );
+                  const isCollapsed = collapsedVariantSizes.has(size);
+                  if (sizeVariants.length === 0) return null;
 
-                return (
-                  <div
-                    key={size}
-                    className="space-y-3 rounded-xl border border-slate-700 bg-slate-900/20 p-3 light:border-slate-300 light:bg-white/60"
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold">Size {size}</span>
-                        <Badge variant="purple">
-                          {configuredColors.length > 0
-                            ? `${configuredColors.length} color${configuredColors.length === 1 ? "" : "s"}`
-                            : "No color option"}
-                        </Badge>
+                  return (
+                    <article
+                      key={size}
+                      className={cn(
+                        "overflow-hidden rounded-xl border bg-[#0b1728] light:bg-white",
+                        isCollapsed
+                          ? "border-slate-700 light:border-slate-300"
+                          : "border-violet-500 shadow-[0_0_0_1px_rgba(139,92,246,0.15)]",
+                      )}
+                    >
+                      <div className="flex items-center justify-between gap-3 border-b border-slate-700/80 px-4 py-3 light:border-slate-200">
+                        <div className="flex min-w-0 items-center gap-3">
+                          <button
+                            type="button"
+                            aria-label={`${isCollapsed ? "Expand" : "Collapse"} size ${size}`}
+                            onClick={() => toggleVariantSize(size)}
+                            className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-slate-700 bg-slate-800 text-violet-300 hover:border-violet-500"
+                          >
+                            {isCollapsed ? (
+                              <ChevronDown className="h-4 w-4" />
+                            ) : (
+                              <ChevronUp className="h-4 w-4" />
+                            )}
+                          </button>
+                          <span className="text-base font-black">
+                            Size {size}
+                          </span>
+                          <button
+                            type="button"
+                            title={`${sizeIsActive ? "Deactivate" : "Activate"} size ${size}`}
+                            onClick={() =>
+                              setVariants((current) =>
+                                current.map((variant) =>
+                                  variantBelongsToSize(variant, size)
+                                    ? { ...variant, isActive: !sizeIsActive }
+                                    : variant,
+                                ),
+                              )
+                            }
+                            className={cn(
+                              "rounded-full border px-2.5 py-1 text-[10px] font-bold",
+                              sizeIsActive
+                                ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-300"
+                                : "border-slate-600 bg-slate-700/50 text-slate-300",
+                            )}
+                          >
+                            {sizeIsActive ? "Active" : "Inactive"}
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="purple">
+                            {configuredColors.length} color
+                            {configuredColors.length === 1 ? "" : "s"}
+                          </Badge>
+                          <span className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-[10px] font-bold text-emerald-300">
+                            <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                            {sizeStock} total in stock
+                          </span>
+                          <button
+                            type="button"
+                            aria-label={`Remove size ${size}`}
+                            title={`Remove size ${size}`}
+                            onClick={() => removeVariantSize(size)}
+                            className="rounded-lg p-2 text-slate-400 hover:bg-red-500/10 hover:text-red-400"
+                          >
+                            <MoreHorizontal className="h-4 w-4" />
+                          </button>
+                        </div>
                       </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="xs"
-                        aria-label={`Remove size ${size}`}
-                        title={`Remove size ${size}`}
-                        onClick={() => removeVariantSize(size)}
-                      >
-                        <Trash2 className="h-4 w-4 text-red-400" />
-                      </Button>
-                    </div>
-                    <div className="rounded-lg border border-slate-700/80 p-3 light:border-slate-200">
-                      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2">
-                        <Input
-                          label={`Add colors available in size ${size}`}
-                          list="product-variant-color-options"
-                          placeholder="Blue, Green, Navy"
-                          value={colorDrafts[size] ?? ""}
-                          onChange={(event) =>
-                            setColorDrafts((current) => ({
-                              ...current,
-                              [size]: event.target.value,
-                            }))
-                          }
-                          onKeyDown={(event) => {
-                            if (event.key !== "Enter") return;
-                            event.preventDefault();
-                            addColorsToSize(size);
-                          }}
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => addColorsToSize(size)}
-                        >
-                          <Plus className="h-3.5 w-3.5" /> Add color
-                        </Button>
+                      {!isCollapsed && (
+                        <div className="p-3">
+                          {sizeVariants.map((variant) => {
+                            const color =
+                              variantColors(variant)[0] ?? "No color";
+                            return (
+                              <div
+                                key={variant.id}
+                                className="grid items-center gap-3 border-b border-slate-800 px-1 py-3 last:border-0 light:border-slate-200 sm:grid-cols-[64px_105px_minmax(120px,1fr)_190px_minmax(130px,1fr)_44px]"
+                              >
+                                <div className="grid h-14 w-14 place-items-center overflow-hidden rounded-lg bg-slate-100">
+                                  {productPreviewImage ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img
+                                      src={productPreviewImage}
+                                      alt=""
+                                      className="h-full w-full object-cover"
+                                    />
+                                  ) : (
+                                    <ImageIcon className="h-6 w-6 text-slate-500" />
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2 text-sm font-bold">
+                                  <span
+                                    className="h-5 w-5 rounded-full border border-white/30"
+                                    style={{
+                                      backgroundColor:
+                                        color === "No color"
+                                          ? "transparent"
+                                          : color,
+                                    }}
+                                  />
+                                  <span className="truncate">{color}</span>
+                                </div>
+                                <Input
+                                  label="SKU"
+                                  placeholder="SKU-001"
+                                  value={variant.sku}
+                                  onChange={(event) =>
+                                    setVariants((current) =>
+                                      current.map((item) =>
+                                        item.id === variant.id
+                                          ? { ...item, sku: event.target.value }
+                                          : item,
+                                      ),
+                                    )
+                                  }
+                                />
+                                <div className="flex flex-col gap-1.5">
+                                  <label className="text-xs font-semibold text-slate-300">
+                                    Stock quantity
+                                  </label>
+                                  <div className="flex h-10 overflow-hidden rounded-lg border border-slate-600 bg-slate-800/70">
+                                    <input
+                                      aria-label={`Stock for ${color} in size ${size}`}
+                                      className="min-w-0 flex-1 bg-transparent px-3 text-sm outline-none"
+                                      type="number"
+                                      min="0"
+                                      value={variant.stock}
+                                      onChange={(event) =>
+                                        setVariants((current) =>
+                                          current.map((item) =>
+                                            item.id === variant.id
+                                              ? {
+                                                  ...item,
+                                                  stock: Math.max(
+                                                    0,
+                                                    Number(
+                                                      event.target.value,
+                                                    ) || 0,
+                                                  ),
+                                                }
+                                              : item,
+                                          ),
+                                        )
+                                      }
+                                    />
+                                    <button
+                                      type="button"
+                                      aria-label="Decrease stock"
+                                      className="grid w-10 place-items-center border-l border-slate-600 hover:bg-slate-700"
+                                      onClick={() =>
+                                        setVariants((current) =>
+                                          current.map((item) =>
+                                            item.id === variant.id
+                                              ? {
+                                                  ...item,
+                                                  stock: Math.max(
+                                                    0,
+                                                    item.stock - 1,
+                                                  ),
+                                                }
+                                              : item,
+                                          ),
+                                        )
+                                      }
+                                    >
+                                      <Minus className="h-3.5 w-3.5" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      aria-label="Increase stock"
+                                      className="grid w-10 place-items-center border-l border-slate-600 hover:bg-slate-700"
+                                      onClick={() =>
+                                        setVariants((current) =>
+                                          current.map((item) =>
+                                            item.id === variant.id
+                                              ? {
+                                                  ...item,
+                                                  stock: item.stock + 1,
+                                                }
+                                              : item,
+                                          ),
+                                        )
+                                      }
+                                    >
+                                      <Plus className="h-3.5 w-3.5" />
+                                    </button>
+                                  </div>
+                                </div>
+                                <Input
+                                  label="Price override"
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  placeholder="Use base price"
+                                  value={variant.price ?? ""}
+                                  onChange={(event) =>
+                                    setVariants((current) =>
+                                      current.map((item) =>
+                                        item.id === variant.id
+                                          ? {
+                                              ...item,
+                                              price: event.target.value
+                                                ? Number(event.target.value)
+                                                : undefined,
+                                            }
+                                          : item,
+                                      ),
+                                    )
+                                  }
+                                />
+                                <button
+                                  type="button"
+                                  aria-label={`Remove ${color} from size ${size}`}
+                                  onClick={() =>
+                                    removeColorFromSize(size, color)
+                                  }
+                                  className="grid h-10 w-10 place-items-center rounded-lg border border-red-500/60 bg-red-500/10 text-red-400 hover:bg-red-500/20"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </div>
+                            );
+                          })}
+                          <div className="mt-3 flex flex-col gap-3 rounded-lg bg-slate-900/45 p-3 sm:flex-row sm:items-center">
+                            <div className="grid flex-1 grid-cols-[minmax(0,1fr)_auto] gap-2">
+                              <input
+                                list="product-variant-color-options"
+                                aria-label={`Add another color to size ${size}`}
+                                placeholder={`Add another color to size ${size}`}
+                                value={colorDrafts[size] ?? ""}
+                                onChange={(event) =>
+                                  setColorDrafts((current) => ({
+                                    ...current,
+                                    [size]: event.target.value,
+                                  }))
+                                }
+                                onKeyDown={(event) => {
+                                  if (event.key === "Enter") {
+                                    event.preventDefault();
+                                    addColorsToSize(size);
+                                  }
+                                }}
+                                className="h-10 rounded-lg border border-dashed border-violet-500 bg-violet-500/5 px-3 text-xs text-violet-200 outline-none placeholder:text-violet-300/80"
+                              />
+                              <Button
+                                type="button"
+                                size="xs"
+                                onClick={() => addColorsToSize(size)}
+                              >
+                                <Plus className="h-3.5 w-3.5" /> Add
+                              </Button>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-[10px] text-slate-400">
+                                Quick add:
+                              </span>
+                              {PRODUCT_COLOR_SUGGESTIONS.slice(0, 6).map(
+                                (color) => (
+                                  <button
+                                    key={color}
+                                    type="button"
+                                    onClick={() =>
+                                      addVariantColors(size, [color])
+                                    }
+                                    className="inline-flex items-center gap-1.5 rounded-full border border-slate-600 px-2.5 py-1.5 text-[10px] hover:border-violet-500"
+                                  >
+                                    <span
+                                      className="h-3 w-3 rounded-full border border-white/30"
+                                      style={{ backgroundColor: color }}
+                                    />
+                                    {color}
+                                  </button>
+                                ),
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </article>
+                  );
+                })}
+              </section>
+              <aside className="space-y-4 lg:sticky lg:top-0">
+                <div className="rounded-xl border border-slate-700 bg-[#0b1728] p-4 light:border-slate-200 light:bg-white">
+                  <div className="mb-4 flex items-center gap-2">
+                    <Eye className="h-4 w-4 text-violet-400" />
+                    <h3 className="text-sm font-bold">Product preview</h3>
+                  </div>
+                  <div className="grid aspect-[4/3] max-h-56 place-items-center overflow-hidden rounded-xl border border-slate-700 bg-slate-100 light:border-slate-200">
+                    {productPreviewImage ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={productPreviewImage}
+                        alt={newProduct.name || "Product preview"}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center gap-2 text-slate-500">
+                        <ImageIcon className="h-10 w-10" />
+                        <span className="text-xs">Product image preview</span>
                       </div>
-                      <p className="mt-2 text-[10px] text-slate-400">
-                        These colors apply only to size {size}. Select a
-                        suggestion, type a custom color, or use commas.
+                    )}
+                  </div>
+                  <div className="mt-4 flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-base font-bold">
+                        {newProduct.name.trim() || "New product"}
+                      </p>
+                      <p className="mt-1 text-xl font-black text-violet-300 light:text-violet-700">
+                        {formatCurrency(productPreviewPrice)}
                       </p>
                     </div>
-                    <div className="rounded-lg border border-slate-700 px-3 py-2.5 light:border-slate-200">
-                      {configuredColors.length > 0 ? (
-                        <div className="flex flex-wrap gap-2">
-                          {configuredColors.map((color) => (
-                            <button
-                              key={color}
-                              type="button"
-                              aria-label={`Remove ${color} from size ${size}`}
-                              title={`Remove ${color} from size ${size}`}
-                              onClick={() => removeColorFromSize(size, color)}
-                              className="inline-flex items-center gap-2 rounded-full border border-slate-600 bg-slate-700/70 px-3 py-1.5 text-xs font-semibold text-slate-100 transition hover:border-red-400 hover:bg-red-500/10 light:border-slate-300 light:bg-slate-100 light:text-slate-700"
-                            >
-                              <span
-                                aria-hidden="true"
-                                className="h-3.5 w-3.5 rounded-full border border-white/40"
-                                style={{ backgroundColor: color }}
-                              />
-                              {color}
-                              <span aria-hidden="true" className="text-red-300">
-                                ×
-                              </span>
-                            </button>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="text-xs text-slate-400">
-                          No colors added. Customers will select only the size.
-                        </p>
-                      )}
-                    </div>
-                    <div className="grid gap-3 sm:grid-cols-3">
-                      <Input
-                        label="SKU"
-                        placeholder="SKU-001"
-                        value={variant.sku}
-                        onChange={(event) =>
-                          setVariants((current) =>
-                            current.map((item) =>
-                              item.id === variant.id
-                                ? { ...item, sku: event.target.value }
-                                : item,
-                            ),
-                          )
-                        }
-                      />
-                      <Input
-                        label="Price override"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        placeholder="Use base price"
-                        value={variant.price ?? ""}
-                        onChange={(event) =>
-                          setVariants((current) =>
-                            current.map((item) =>
-                              item.id === variant.id
-                                ? {
-                                    ...item,
-                                    price: event.target.value
-                                      ? Number(event.target.value)
-                                      : undefined,
-                                  }
-                                : item,
-                            ),
-                          )
-                        }
-                      />
-                      <Input
-                        label="Stock"
-                        type="number"
-                        min="0"
-                        step="1"
-                        value={variant.stock}
-                        onChange={(event) =>
-                          setVariants((current) =>
-                            current.map((item) =>
-                              item.id === variant.id
-                                ? {
-                                    ...item,
-                                    stock: Number(event.target.value) || 0,
-                                  }
-                                : item,
-                            ),
-                          )
-                        }
-                      />
-                    </div>
-                    <label className="flex cursor-pointer items-center gap-2 text-xs font-medium text-slate-300 light:text-slate-700">
-                      <input
-                        type="checkbox"
-                        checked={variant.isActive}
-                        onChange={(event) =>
-                          setVariants((current) =>
-                            current.map((item) =>
-                              item.id === variant.id
-                                ? { ...item, isActive: event.target.checked }
-                                : item,
-                            ),
-                          )
-                        }
-                        className="h-4 w-4 accent-violet-600"
-                      />
-                      Size available on storefront
-                    </label>
+                    <Badge
+                      variant={totalVariantStock > 0 ? "success" : "default"}
+                    >
+                      {totalVariantStock > 0 ? "In stock" : "No stock"}
+                    </Badge>
                   </div>
-                );
-              })}
+                  {variantSizes.length > 0 && (
+                    <div className="mt-5 border-t border-slate-700 pt-4 light:border-slate-200">
+                      <p className="mb-2 text-xs font-bold">Select size</p>
+                      <div className="flex flex-wrap gap-2">
+                        {variantSizes.map((size, index) => (
+                          <span
+                            key={size}
+                            className={cn(
+                              "grid min-w-10 place-items-center rounded-lg border px-3 py-2 text-xs font-bold",
+                              index === 0
+                                ? "border-violet-500 bg-violet-600 text-white"
+                                : "border-slate-600 bg-slate-800/60 light:bg-white",
+                            )}
+                          >
+                            {size}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {productPreviewColors.length > 0 && (
+                    <div className="mt-4">
+                      <p className="mb-2 text-xs font-bold">
+                        Select color{" "}
+                        {variantSizes[0] ? `(Size ${variantSizes[0]})` : ""}
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {productPreviewColors.map((color) => (
+                          <span
+                            key={color}
+                            className="inline-flex items-center gap-2 rounded-lg border border-slate-600 px-2.5 py-2 text-[11px] font-semibold"
+                          >
+                            <span
+                              className="h-3.5 w-3.5 rounded-full border border-white/40"
+                              style={{ backgroundColor: color }}
+                            />
+                            {color}
+                          </span>
+                        ))}
+                      </div>
+                      <p className="mt-2 text-[11px] italic text-slate-400">
+                        {productPreviewVariant?.stock ?? 0} available in this
+                        option
+                      </p>
+                    </div>
+                  )}
+                  <div className="mt-4 border-t border-slate-700 pt-4 light:border-slate-200">
+                    <p className="mb-2 text-xs font-bold">Quantity</p>
+                    <div className="grid w-40 grid-cols-[44px_1fr_44px] overflow-hidden rounded-lg border border-slate-600">
+                      <span className="grid h-10 place-items-center border-r border-slate-600 text-slate-400">
+                        <Minus className="h-3.5 w-3.5" />
+                      </span>
+                      <span className="grid h-10 place-items-center font-bold">
+                        1
+                      </span>
+                      <span className="grid h-10 place-items-center border-l border-slate-600 text-slate-300">
+                        <Plus className="h-3.5 w-3.5" />
+                      </span>
+                    </div>
+                  </div>
+                  <div className="mt-5 rounded-lg bg-gradient-to-r from-violet-700 to-fuchsia-600 py-3 text-center text-sm font-bold text-white">
+                    <span className="inline-flex items-center gap-2">
+                      <ShoppingCart className="h-4 w-4" /> Add to bag —{" "}
+                      {formatCurrency(productPreviewPrice)}
+                    </span>
+                  </div>
+                </div>
+                <div className="rounded-xl border border-slate-700 bg-[#0b1728] p-4 light:border-slate-200 light:bg-white">
+                  <div className="flex items-center gap-2">
+                    <Layers3 className="h-4 w-4 text-violet-400" />
+                    <h3 className="text-sm font-bold">Variant summary</h3>
+                  </div>
+                  <dl className="mt-4 space-y-2 text-xs">
+                    <div className="flex justify-between">
+                      <dt className="text-slate-400">Total sizes</dt>
+                      <dd className="font-bold">{variantSizes.length}</dd>
+                    </div>
+                    <div className="flex justify-between">
+                      <dt className="text-slate-400">Total colors</dt>
+                      <dd className="font-bold">{totalVariantColors}</dd>
+                    </div>
+                    <div className="flex justify-between">
+                      <dt className="text-slate-400">Total variants</dt>
+                      <dd className="font-bold">{activeVariantCount}</dd>
+                    </div>
+                    <div className="flex justify-between">
+                      <dt className="text-slate-400">Total stock</dt>
+                      <dd className="font-bold">{totalVariantStock}</dd>
+                    </div>
+                  </dl>
+                </div>
+              </aside>
             </div>
           )}
         </div>

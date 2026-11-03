@@ -61,6 +61,7 @@ type Submission = {
   receiptUrl: string | null;
   target: {
     order_number?: string;
+    appointment_number?: string;
     total?: number | string;
     payment_status?: string;
     fulfillment_status?: string;
@@ -179,6 +180,29 @@ export function PaymentFulfillmentView({ tenant }: { tenant: Tenant }) {
     );
   }
 
+  function addBankAccount() {
+    updateMethod("bank_transfer", { enabled: true });
+    setAccounts((current) => [
+      ...current,
+      {
+        label: `Account ${current.length + 1}`,
+        bankName: "",
+        accountHolder: "",
+        accountNumber: "",
+        accountType: "",
+        currency: "BZD",
+        instructions: "",
+        isActive: true,
+        sortOrder: current.length,
+      },
+    ]);
+    window.requestAnimationFrame(() =>
+      document
+        .getElementById("customer-bank-accounts")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" }),
+    );
+  }
+
   async function verify(
     submission: Submission,
     action: "verify" | "reject" | "request_resubmission",
@@ -213,7 +237,15 @@ export function PaymentFulfillmentView({ tenant }: { tenant: Tenant }) {
     if (!response.ok)
       setMessage(result.error || "Unable to process submission.");
     else {
-      setMessage("Payment submission updated and recorded in the audit log.");
+      setMessage(
+        action !== "verify"
+          ? "Receipt review updated in tracking. No customer email was sent."
+          : tenant.businessType === "retail"
+            ? "Payment confirmed and the retail payment-confirmation email was queued."
+            : tenant.businessType === "appointment"
+              ? "Receipt accepted in tracking. No customer email was sent; confirm the appointment separately after full payment."
+              : "Payment accepted in tracking. No customer email was sent; use Ready or Cancelled for the final order email.",
+      );
       await loadSubmissions();
     }
   }
@@ -227,6 +259,7 @@ export function PaymentFulfillmentView({ tenant }: { tenant: Tenant }) {
         item.customer_email,
         item.transaction_reference,
         item.target?.order_number,
+        item.target?.appointment_number,
         item.id,
       ].some((value) =>
         String(value ?? "")
@@ -242,6 +275,13 @@ export function PaymentFulfillmentView({ tenant }: { tenant: Tenant }) {
         Customer payments go directly to {tenant.name}. YuhBusiness does not
         collect, hold, distribute, or verify these funds. Subscription billing
         remains separate.
+        <span className="mt-2 block font-semibold text-violet-200 light:text-violet-800">
+          {tenant.businessType === "retail"
+            ? "Confirming payment sends the retail payment-confirmation email."
+            : tenant.businessType === "appointment"
+              ? "Receipt approval updates tracking only; confirm the appointment separately after full payment."
+              : "Payment approval updates tracking only; Ready or Cancelled sends the final order email."}
+        </span>
       </div>
       <div className="flex gap-2 border-b border-slate-700 light:border-slate-200">
         {(
@@ -276,6 +316,17 @@ export function PaymentFulfillmentView({ tenant }: { tenant: Tenant }) {
         </div>
       ) : tab === "settings" ? (
         <div className="space-y-6">
+          {!accounts.some((account) => account.isActive) && (
+            <div className="flex flex-col gap-3 rounded-xl border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm font-medium text-amber-300 light:text-amber-800 sm:flex-row sm:items-center sm:justify-between">
+              <span>
+                Bank transfer is selected, but the business must add an active
+                destination bank account before this request can be submitted.
+              </span>
+              <Button type="button" size="sm" onClick={addBankAccount}>
+                <Plus className="h-4 w-4" /> Add bank account
+              </Button>
+            </div>
+          )}
           <section className="rounded-2xl border border-slate-700 bg-slate-900/50 p-5 light:border-slate-200 light:bg-white">
             <h2 className="text-lg font-black">Payment methods</h2>
             <div className="mt-4 grid gap-4 lg:grid-cols-2">
@@ -333,28 +384,13 @@ export function PaymentFulfillmentView({ tenant }: { tenant: Tenant }) {
             </div>
           </section>
 
-          <section className="rounded-2xl border border-slate-700 bg-slate-900/50 p-5 light:border-slate-200 light:bg-white">
+          <section
+            id="customer-bank-accounts"
+            className="scroll-mt-24 rounded-2xl border border-slate-700 bg-slate-900/50 p-5 light:border-slate-200 light:bg-white"
+          >
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-black">Bank accounts</h2>
-              <Button
-                size="sm"
-                onClick={() =>
-                  setAccounts((current) => [
-                    ...current,
-                    {
-                      label: `Account ${current.length + 1}`,
-                      bankName: "",
-                      accountHolder: "",
-                      accountNumber: "",
-                      accountType: "",
-                      currency: "BZD",
-                      instructions: "",
-                      isActive: true,
-                      sortOrder: current.length,
-                    },
-                  ])
-                }
-              >
+              <Button size="sm" onClick={addBankAccount}>
                 <Plus className="h-4 w-4" /> Add account
               </Button>
             </div>
@@ -439,6 +475,19 @@ export function PaymentFulfillmentView({ tenant }: { tenant: Tenant }) {
                 </div>
               ))}
             </div>
+            <p className="mt-4 text-xs leading-5 text-slate-400 light:text-slate-600">
+              Active account details are shown to customers only after they
+              choose bank transfer and create a secure order or booking.
+            </p>
+            <Button
+              type="button"
+              className="mt-4"
+              onClick={() => void save()}
+              disabled={saving || accounts.length === 0}
+            >
+              <Save className="h-4 w-4" />
+              {saving ? "Saving..." : "Save bank account details"}
+            </Button>
           </section>
 
           <section className="rounded-2xl border border-slate-700 bg-slate-900/50 p-5 light:border-slate-200 light:bg-white">
@@ -526,6 +575,34 @@ export function PaymentFulfillmentView({ tenant }: { tenant: Tenant }) {
               ))}
             </div>
           </section>
+          {tenant.businessType === "appointment" && (
+            <section className="rounded-2xl border border-violet-400/30 bg-violet-500/5 p-5 light:bg-violet-50">
+              <h2 className="text-lg font-black">
+                In-person appointment deposit hold
+              </h2>
+              <p className="mt-1 text-sm text-slate-400 light:text-slate-600">
+                Appointments are first come, first served. Set how long a
+                customer has to pay an in-person deposit before the pending slot
+                can be released.
+              </p>
+              <label className="mt-4 block max-w-sm text-xs font-semibold">
+                Minutes allowed to secure the appointment
+                <input
+                  type="number"
+                  min="5"
+                  max="1440"
+                  value={fulfillment.paymentWindowMinutes}
+                  onChange={(event) =>
+                    setFulfillment((current) => ({
+                      ...current,
+                      paymentWindowMinutes: Number(event.target.value),
+                    }))
+                  }
+                  className="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-sm light:border-slate-300 light:bg-white"
+                />
+              </label>
+            </section>
+          )}
           {tenant.businessType === "retail" && (
             <section className="rounded-2xl border border-violet-400/30 bg-violet-500/5 p-5 light:bg-violet-50">
               <h2 className="text-lg font-black">
@@ -624,6 +701,7 @@ export function PaymentFulfillmentView({ tenant }: { tenant: Tenant }) {
                 <div>
                   <p className="font-black">
                     {submission.target?.order_number ??
+                      submission.target?.appointment_number ??
                       `Appointment ${submission.appointment_id?.slice(0, 8).toUpperCase()}`}
                   </p>
                   <p className="text-sm text-slate-400">
@@ -685,7 +763,9 @@ export function PaymentFulfillmentView({ tenant }: { tenant: Tenant }) {
                       onClick={() => void verify(submission, "verify")}
                     >
                       <CheckCircle2 className="h-4 w-4" />
-                      Verify funds received
+                      {tenant.businessType === "retail"
+                        ? "Confirm payment & email customer"
+                        : "Accept receipt (tracker only)"}
                     </Button>
                     <Button
                       size="sm"

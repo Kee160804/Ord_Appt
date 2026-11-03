@@ -12,6 +12,7 @@ import {
   Search,
   ChevronLeft,
   ChevronRight,
+  FolderTree,
 } from "lucide-react";
 import { Card } from "../components/Card";
 import { Button } from "../components/Button";
@@ -28,6 +29,13 @@ import {
   setServiceAvailability,
   updateService,
 } from "../services/serviceService";
+import {
+  createDepartment,
+  listDepartments,
+  setDepartmentActive,
+  updateDepartment,
+  type ServiceDepartment,
+} from "../services/businessToolsService";
 import { formatCurrency, formatDuration } from "../lib/utils";
 import { tenantHasFeature } from "../lib/plans";
 import type { Service, Tenant } from "../types/index";
@@ -61,6 +69,13 @@ export function ServicesView({ tenant }: Props) {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [departments, setDepartments] = useState<ServiceDepartment[]>([]);
+  const [showCategories, setShowCategories] = useState(false);
+  const [editingCategory, setEditingCategory] =
+    useState<ServiceDepartment | null>(null);
+  const [categoryName, setCategoryName] = useState("");
+  const [categoryPosition, setCategoryPosition] = useState("1");
+  const [isSavingCategory, setIsSavingCategory] = useState(false);
 
   // Server-backed list controls.
   const [searchInput, setSearchInput] = useState("");
@@ -169,6 +184,21 @@ export function ServicesView({ tenant }: Props) {
     void loadServicePage();
   }, [loadServicePage]);
 
+  const loadDepartments = useCallback(async () => {
+    if (!usesSupabase) return;
+    try {
+      setDepartments(await listDepartments(tenant.id));
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : "Unable to load categories.",
+      );
+    }
+  }, [tenant.id, usesSupabase]);
+
+  useEffect(() => {
+    void loadDepartments();
+  }, [loadDepartments]);
+
   // Categories shown on the current page are used only for visual grouping.
   // A tenant-wide category filter would require a separate distinct-category
   // query/RPC; deriving a global filter from one page would be misleading.
@@ -183,6 +213,98 @@ export function ServicesView({ tenant }: Props) {
     setError("");
     setSuccess("");
     setShowAdd(true);
+  };
+
+  const resetCategoryForm = () => {
+    setEditingCategory(null);
+    setCategoryName("");
+    setCategoryPosition(
+      String(Math.max(0, ...departments.map((item) => item.sortOrder)) + 1),
+    );
+  };
+
+  const saveCategory = async () => {
+    const name = categoryName.trim();
+    const position = Number(categoryPosition);
+    if (!name) return setError("Category name is required.");
+    if (!Number.isInteger(position) || position < 0)
+      return setError(
+        "Category position must be a whole number of zero or more.",
+      );
+    if (
+      departments.some(
+        (item) =>
+          item.id !== editingCategory?.id &&
+          item.name.toLowerCase() === name.toLowerCase(),
+      )
+    ) {
+      return setError("A category with that name already exists.");
+    }
+    setIsSavingCategory(true);
+    setError("");
+    try {
+      if (usesSupabase) {
+        if (editingCategory)
+          await updateDepartment(
+            tenant.id,
+            editingCategory.id,
+            name,
+            editingCategory.description,
+            position,
+          );
+        else await createDepartment(tenant.id, name, "", position);
+        await loadDepartments();
+        await loadServicePage();
+      } else {
+        const next: ServiceDepartment = {
+          id: editingCategory?.id ?? `department-${Date.now()}`,
+          tenantId: tenant.id,
+          name,
+          description: "",
+          sortOrder: position,
+          isActive: editingCategory?.isActive ?? true,
+        };
+        setDepartments((current) =>
+          (editingCategory
+            ? current.map((item) => (item.id === next.id ? next : item))
+            : [...current, next]
+          ).sort((a, b) => a.sortOrder - b.sortOrder),
+        );
+      }
+      resetCategoryForm();
+      setSuccess(editingCategory ? "Category updated." : "Category created.");
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : "Unable to save category.",
+      );
+    } finally {
+      setIsSavingCategory(false);
+    }
+  };
+
+  const toggleCategory = async (department: ServiceDepartment) => {
+    try {
+      if (usesSupabase) {
+        await setDepartmentActive(
+          tenant.id,
+          department.id,
+          !department.isActive,
+        );
+        await loadDepartments();
+      } else {
+        setDepartments((current) =>
+          current.map((item) =>
+            item.id === department.id
+              ? { ...item, isActive: !item.isActive }
+              : item,
+          ),
+        );
+      }
+    } catch (cause) {
+      setError(
+        cause instanceof Error ? cause.message : "Unable to update category.",
+      );
+    }
   };
 
   const openEdit = (service: Service) => {
@@ -328,6 +450,7 @@ export function ServicesView({ tenant }: Props) {
       requiresDeposit: form.requiresDeposit,
       depositType: form.depositType,
       depositAmount,
+      departmentId: departments.find((item) => item.name === form.category)?.id,
     };
 
     setIsSaving(true);
@@ -395,7 +518,7 @@ export function ServicesView({ tenant }: Props) {
 
   return (
     <div className="min-h-full space-y-4 bg-[#08111f] light:bg-[#f8fafc] p-4 text-white light:text-[#14213a] md:p-5">
-      <div className="flex items-center justify-end">
+      <div className="flex items-center justify-end gap-2">
         <div className="sr-only">
           <h2 className="text-sm font-bold text-white light:text-[#17223a]">
             Services
@@ -408,6 +531,16 @@ export function ServicesView({ tenant }: Props) {
                 : `${pagination.total} total`}
           </p>
         </div>
+        <Button
+          variant="outline"
+          onClick={() => {
+            resetCategoryForm();
+            setShowCategories(true);
+          }}
+          size="sm"
+        >
+          <FolderTree className="w-4 h-4" /> Manage Categories
+        </Button>
         <Button onClick={openAdd} size="sm">
           <Plus className="w-4 h-4" /> Add Service
         </Button>
@@ -613,17 +746,41 @@ export function ServicesView({ tenant }: Props) {
               }))
             }
           />
-          <Input
-            label="Category"
-            placeholder="Hair, Nails, Skincare..."
-            value={form.category}
-            onChange={(event) =>
-              setForm((current) => ({
-                ...current,
-                category: event.target.value,
-              }))
-            }
-          />
+          {departments.length ? (
+            <Select
+              label="Category"
+              value={form.category}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  category: event.target.value,
+                }))
+              }
+              options={[
+                { value: "", label: "Select category..." },
+                ...departments
+                  .filter(
+                    (item) => item.isActive || item.name === form.category,
+                  )
+                  .map((item) => ({
+                    value: item.name,
+                    label: item.isActive ? item.name : `${item.name} (hidden)`,
+                  })),
+              ]}
+            />
+          ) : (
+            <Input
+              label="Category"
+              placeholder="Hair, Nails, Skincare..."
+              value={form.category}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  category: event.target.value,
+                }))
+              }
+            />
+          )}
           <Input
             label="Image URL"
             placeholder="https://..."
@@ -690,6 +847,88 @@ export function ServicesView({ tenant }: Props) {
               can continue creating and editing basic services on Beginner.
             </div>
           )}
+        </div>
+      </Modal>
+
+      <Modal
+        open={showCategories}
+        onClose={() => setShowCategories(false)}
+        title="Manage Categories"
+        maxWidth="max-w-3xl"
+      >
+        <div className="space-y-4">
+          <div className="rounded-xl border border-slate-700 p-4 light:border-slate-200">
+            <h3 className="mb-3 text-sm font-bold">
+              {editingCategory ? "Edit category" : "Create a category"}
+            </h3>
+            <div className="grid gap-3 sm:grid-cols-[1fr_9rem_auto] sm:items-end">
+              <Input
+                label="Category name"
+                placeholder="e.g. Nail Services"
+                value={categoryName}
+                onChange={(event) => setCategoryName(event.target.value)}
+              />
+              <Input
+                label="Position"
+                type="number"
+                min="0"
+                step="1"
+                value={categoryPosition}
+                onChange={(event) => setCategoryPosition(event.target.value)}
+              />
+              <Button
+                loading={isSavingCategory}
+                onClick={() => void saveCategory()}
+              >
+                {editingCategory ? "Save" : "Add"}
+              </Button>
+            </div>
+            {editingCategory && (
+              <button
+                type="button"
+                onClick={resetCategoryForm}
+                className="mt-2 text-xs text-slate-400 underline"
+              >
+                Cancel editing
+              </button>
+            )}
+          </div>
+          <div className="space-y-2">
+            {departments.map((department) => (
+              <div
+                key={department.id}
+                className="flex items-center justify-between gap-3 rounded-xl border border-slate-700 px-4 py-3 light:border-slate-200"
+              >
+                <div>
+                  <p className="text-sm font-bold">{department.name}</p>
+                  <p className="text-xs text-slate-400">
+                    Position {department.sortOrder} ·{" "}
+                    {department.isActive ? "Visible" : "Hidden"}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    onClick={() => {
+                      setEditingCategory(department);
+                      setCategoryName(department.name);
+                      setCategoryPosition(String(department.sortOrder));
+                    }}
+                  >
+                    Edit
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="xs"
+                    onClick={() => void toggleCategory(department)}
+                  >
+                    {department.isActive ? "Hide" : "Show"}
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </Modal>
     </div>

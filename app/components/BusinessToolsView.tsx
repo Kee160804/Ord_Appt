@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import QRCode from "qrcode";
 import {
-  BellRing,
   Copy,
   Download,
   Percent,
@@ -33,28 +32,23 @@ import {
   assignServiceDepartment,
   createDepartment,
   deletePromotionFlyer,
-  getReminderSettings,
-  listAppointmentReminders,
   listDepartments,
   listPromotions,
   listServiceProviders,
   savePromotion,
-  saveReminderSettings,
   saveServiceProvider,
   setDepartmentActive,
   setPromotionActive,
   uploadPromotionFlyer,
   validatePromotionFlyer,
-  type AppointmentReminder,
   type Promotion,
   type ProviderAvailability,
-  type ReminderSettings,
   type ServiceDepartment,
   type ServiceProvider,
 } from "@/app/services/businessToolsService";
 import type { Product, Service, Tenant } from "@/app/types/index";
 
-type ToolTab = "providers" | "departments" | "promotions" | "reminders" | "qr";
+type ToolTab = "providers" | "departments" | "promotions" | "qr";
 const DAYS = [
   "Sunday",
   "Monday",
@@ -116,11 +110,6 @@ export function BusinessToolsView({ tenant }: { tenant: Tenant }) {
   const [promotions, setPromotions] = useState<Promotion[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
-  const [reminderSettings, setReminderSettings] = useState<ReminderSettings>({
-    enabled: true,
-    minutes: [1440, 120],
-  });
-  const [reminders, setReminders] = useState<AppointmentReminder[]>([]);
   const [providerForm, setProviderForm] = useState<ReturnType<
     typeof emptyProvider
   > | null>(null);
@@ -158,17 +147,12 @@ export function BusinessToolsView({ tenant }: { tenant: Tenant }) {
           throw new Error("The service catalog could not be loaded.");
         }
         setServices(inventory.services);
-        const [providerData, departmentData, settings, reminderData] =
-          await Promise.all([
-            listServiceProviders(tenant.id),
-            listDepartments(tenant.id),
-            getReminderSettings(tenant.id),
-            listAppointmentReminders(tenant.id),
-          ]);
+        const [providerData, departmentData] = await Promise.all([
+          listServiceProviders(tenant.id),
+          listDepartments(tenant.id),
+        ]);
         setProviders(providerData);
         setDepartments(departmentData);
-        setReminderSettings(settings);
-        setReminders(reminderData);
       } else {
         if (!("products" in inventory)) {
           throw new Error("The product catalog could not be loaded.");
@@ -332,9 +316,6 @@ export function BusinessToolsView({ tenant }: { tenant: Tenant }) {
         ]
       : []),
     { id: "promotions" as const, label: "Promotions", icon: Percent },
-    ...(isAppointment
-      ? [{ id: "reminders" as const, label: "Reminders", icon: BellRing }]
-      : []),
     { id: "qr" as const, label: "QR Storefront", icon: QrCode },
   ];
 
@@ -702,119 +683,6 @@ export function BusinessToolsView({ tenant }: { tenant: Tenant }) {
                 ))}
               </CardBody>
             </Card>
-          )}
-
-          {tab === "reminders" && (
-            <div className="grid gap-4 lg:grid-cols-2">
-              <Card>
-                <CardHeader>
-                  <h3 className="text-sm font-bold">
-                    Appointment Reminder Rules
-                  </h3>
-                </CardHeader>
-                <CardBody className="space-y-4">
-                  <label className="flex items-center gap-3 text-xs">
-                    <input
-                      type="checkbox"
-                      checked={reminderSettings.enabled}
-                      onChange={(event) =>
-                        setReminderSettings({
-                          ...reminderSettings,
-                          enabled: event.target.checked,
-                        })
-                      }
-                      className="h-4 w-4 accent-violet-600"
-                    />
-                    Schedule reminders when appointments are confirmed
-                  </label>
-                  <div>
-                    <p className="mb-2 text-xs font-semibold">
-                      Send before appointment
-                    </p>
-                    {[
-                      { value: 2880, label: "48 hours" },
-                      { value: 1440, label: "24 hours" },
-                      { value: 120, label: "2 hours" },
-                      { value: 60, label: "1 hour" },
-                    ].map((option) => (
-                      <label
-                        key={option.value}
-                        className="mr-4 inline-flex items-center gap-2 py-2 text-xs"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={reminderSettings.minutes.includes(
-                            option.value,
-                          )}
-                          onChange={(event) =>
-                            setReminderSettings({
-                              ...reminderSettings,
-                              minutes: event.target.checked
-                                ? [...reminderSettings.minutes, option.value]
-                                : reminderSettings.minutes.filter(
-                                    (value) => value !== option.value,
-                                  ),
-                            })
-                          }
-                          className="accent-violet-600"
-                        />
-                        {option.label}
-                      </label>
-                    ))}
-                  </div>
-                  <Button
-                    onClick={() =>
-                      void saveReminderSettings(tenant.id, reminderSettings)
-                        .then(() => done("Reminder settings saved."))
-                        .catch((cause: unknown) =>
-                          setError(
-                            cause instanceof Error
-                              ? cause.message
-                              : "Unable to save reminders.",
-                          ),
-                        )
-                    }
-                  >
-                    Save reminder settings
-                  </Button>
-                  <p className="text-[10px] leading-4 text-slate-400">
-                    Reminder rows are securely scheduled and tracked. Connect
-                    your chosen email/SMS provider to process pending
-                    deliveries.
-                  </p>
-                </CardBody>
-              </Card>
-              <Card>
-                <CardHeader>
-                  <h3 className="text-sm font-bold">Recent Reminder Status</h3>
-                </CardHeader>
-                <CardBody className="space-y-2">
-                  {reminders.length === 0 ? (
-                    <p className="py-8 text-xs text-slate-400">
-                      No reminders scheduled yet.
-                    </p>
-                  ) : (
-                    reminders.map((reminder) => (
-                      <div
-                        key={reminder.id}
-                        className="flex items-center justify-between rounded-lg border border-slate-700 px-3 py-2 text-[10px] light:border-slate-200"
-                      >
-                        <div>
-                          <p>{new Date(reminder.dueAt).toLocaleString()}</p>
-                          <p className="text-slate-400">
-                            {reminder.reminderMinutes} minutes before ·{" "}
-                            {reminder.channel}
-                          </p>
-                        </div>
-                        <span className="rounded-full bg-violet-500/15 px-2 py-1 text-violet-300">
-                          {reminder.status}
-                        </span>
-                      </div>
-                    ))
-                  )}
-                </CardBody>
-              </Card>
-            </div>
           )}
 
           {tab === "qr" && (

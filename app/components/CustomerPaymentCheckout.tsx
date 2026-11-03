@@ -8,6 +8,7 @@ import {
   CalendarDays,
   Check,
   Copy,
+  Download,
   Landmark,
   MapPin,
   PackageSearch,
@@ -25,7 +26,7 @@ import type {
   CustomerCheckoutMethod,
 } from "@/app/lib/customer-checkout";
 
-interface CheckoutItem {
+export interface CheckoutItem {
   id: string;
   name: string;
   image: string;
@@ -37,7 +38,18 @@ interface CheckoutItem {
 export interface CheckoutConfirmation {
   orderNumber: string;
   total: number;
+  subtotal: number;
+  tax: number;
+  deliveryFee: number;
+  discount: number;
+  customerName: string;
   customerEmail: string;
+  fulfillmentMethod: string;
+  paymentMethodLabel: string;
+  paymentStatus: string;
+  items: Array<
+    Pick<CheckoutItem, "name" | "quantity" | "lineTotal" | "detail">
+  >;
   emailQueued: boolean;
   createdAt: string;
 }
@@ -121,6 +133,157 @@ function paymentDescription(
   return configured || "Arrange payment directly with the business.";
 }
 
+function escapeReceiptHtml(value: string) {
+  return value.replace(
+    /[&<>"']/g,
+    (character) =>
+      ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#039;",
+      })[character] ?? character,
+  );
+}
+
+function receiptStatus(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+export function buildOrderReferenceReceiptHtml(
+  businessName: string,
+  confirmation: CheckoutConfirmation,
+) {
+  const items = confirmation.items
+    .map(
+      (item) => `
+        <tr>
+          <td>
+            <strong>${escapeReceiptHtml(item.name)}</strong>
+            ${item.detail ? `<small>${escapeReceiptHtml(item.detail)}</small>` : ""}
+          </td>
+          <td class="center">${item.quantity}</td>
+          <td class="amount">${escapeReceiptHtml(formatCurrency(item.lineTotal))}</td>
+        </tr>`,
+    )
+    .join("");
+  const discountRow =
+    confirmation.discount > 0
+      ? `<div><span>Discount</span><strong>-${escapeReceiptHtml(formatCurrency(confirmation.discount))}</strong></div>`
+      : "";
+  const issuedAt = new Intl.DateTimeFormat(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(confirmation.createdAt));
+
+  return `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Order reference ${escapeReceiptHtml(confirmation.orderNumber)}</title>
+    <style>
+      :root { color-scheme: light; font-family: Inter, Arial, sans-serif; }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: #f4f1ff; color: #172033; }
+      main { width: min(680px, calc(100% - 32px)); margin: 32px auto; background: white; border: 1px solid #ded5ff; border-radius: 20px; overflow: hidden; box-shadow: 0 20px 55px rgba(52, 22, 112, .14); }
+      header { padding: 28px; color: white; background: linear-gradient(135deg, #5e00c9, #8b2cff); }
+      h1 { margin: 0; font-size: 24px; }
+      header p { margin: 7px 0 0; color: #eee6ff; }
+      .notice { margin: 22px 28px 0; padding: 16px; border: 2px solid #f59e0b; border-radius: 12px; background: #fffbeb; color: #7c2d12; }
+      .notice strong { display: block; margin-bottom: 5px; text-transform: uppercase; letter-spacing: .05em; }
+      section { padding: 22px 28px; border-bottom: 1px solid #ece8f5; }
+      .reference { padding: 18px; border-radius: 12px; background: #24104e; color: white; }
+      .reference span { display: block; color: #cdb8ff; font-size: 12px; }
+      .reference strong { display: block; margin-top: 5px; font-size: 24px; letter-spacing: .03em; overflow-wrap: anywhere; }
+      dl { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 22px; margin: 20px 0 0; }
+      dt { color: #687086; font-size: 12px; }
+      dd { margin: 4px 0 0; font-weight: 700; overflow-wrap: anywhere; }
+      table { width: 100%; border-collapse: collapse; }
+      th, td { padding: 12px 8px; border-bottom: 1px solid #ece8f5; text-align: left; }
+      th { color: #687086; font-size: 12px; }
+      td small { display: block; margin-top: 4px; color: #687086; }
+      .center { text-align: center; }
+      .amount { text-align: right; white-space: nowrap; }
+      .summary { margin-left: auto; width: min(100%, 320px); }
+      .summary div { display: flex; justify-content: space-between; gap: 20px; padding: 6px 0; }
+      .summary .total { margin-top: 8px; padding-top: 12px; border-top: 2px solid #ded5ff; color: #5e00c9; font-size: 19px; }
+      footer { padding: 20px 28px 28px; color: #687086; font-size: 12px; line-height: 1.6; }
+      .print { display: block; margin: 0 auto 24px; border: 0; border-radius: 10px; background: #6f00ed; color: white; padding: 11px 18px; font-weight: 800; cursor: pointer; }
+      @media print { body { background: white; } main { width: 100%; margin: 0; border: 0; box-shadow: none; } .print { display: none; } }
+      @media (max-width: 520px) { dl { grid-template-columns: 1fr; } header, section, footer { padding-left: 20px; padding-right: 20px; } .notice { margin-left: 20px; margin-right: 20px; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>${escapeReceiptHtml(businessName)}</h1>
+        <p>Order reference record</p>
+      </header>
+      <div class="notice">
+        <strong>Unofficial - not proof of payment</strong>
+        This is not an official receipt. It is provided only to help you keep your tracking number and order details. Confirm payment and order status through Track Order or directly with the business.
+      </div>
+      <section>
+        <div class="reference">
+          <span>Tracking / order reference</span>
+          <strong>${escapeReceiptHtml(confirmation.orderNumber)}</strong>
+        </div>
+        <dl>
+          <div><dt>Order date</dt><dd>${escapeReceiptHtml(issuedAt)}</dd></div>
+          <div><dt>Customer</dt><dd>${escapeReceiptHtml(confirmation.customerName)}</dd></div>
+          <div><dt>Email</dt><dd>${escapeReceiptHtml(confirmation.customerEmail)}</dd></div>
+          <div><dt>Fulfillment</dt><dd>${escapeReceiptHtml(confirmation.fulfillmentMethod)}</dd></div>
+          <div><dt>Payment method</dt><dd>${escapeReceiptHtml(confirmation.paymentMethodLabel)}</dd></div>
+          <div><dt>Payment status</dt><dd>${escapeReceiptHtml(receiptStatus(confirmation.paymentStatus))}</dd></div>
+        </dl>
+      </section>
+      <section>
+        <table>
+          <thead><tr><th>Item</th><th class="center">Qty</th><th class="amount">Amount</th></tr></thead>
+          <tbody>${items}</tbody>
+        </table>
+        <div class="summary">
+          <div><span>Subtotal</span><strong>${escapeReceiptHtml(formatCurrency(confirmation.subtotal))}</strong></div>
+          <div><span>Delivery fee</span><strong>${escapeReceiptHtml(formatCurrency(confirmation.deliveryFee))}</strong></div>
+          <div><span>Tax</span><strong>${escapeReceiptHtml(formatCurrency(confirmation.tax))}</strong></div>
+          ${discountRow}
+          <div class="total"><span>Total</span><strong>${escapeReceiptHtml(formatCurrency(confirmation.total))}</strong></div>
+        </div>
+      </section>
+      <footer>
+        Keep the tracking reference above. You will need it to open Track Order, verify your email, view payment instructions, upload a payment receipt, and follow delivery or pickup progress.
+      </footer>
+      <button class="print" type="button" onclick="window.print()">Print or save as PDF</button>
+    </main>
+  </body>
+</html>`;
+}
+
+function downloadOrderReferenceReceipt(
+  businessName: string,
+  confirmation: CheckoutConfirmation,
+) {
+  const blob = new Blob(
+    [buildOrderReferenceReceiptHtml(businessName, confirmation)],
+    { type: "text/html;charset=utf-8" },
+  );
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  const safeReference = confirmation.orderNumber.replace(/[^a-z0-9_-]/gi, "-");
+  anchor.href = url;
+  anchor.download = `${safeReference}-unofficial-order-record.html`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
+}
+
 function PaymentIcon({ method }: { method: CustomerCheckoutMethod }) {
   if (method === "bank_transfer") return <Landmark className="h-5 w-5" />;
   if (method === "cash_on_delivery") return <Banknote className="h-5 w-5" />;
@@ -170,6 +333,7 @@ export function CustomerPaymentCheckout(p: CustomerPaymentCheckoutProps) {
   const heading = useRef<HTMLHeadingElement>(null);
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState("");
+  const [downloadError, setDownloadError] = useState("");
 
   useEffect(() => {
     heading.current?.focus();
@@ -287,6 +451,32 @@ export function CustomerPaymentCheckout(p: CustomerPaymentCheckoutProps) {
           </button>
           <button
             type="button"
+            onClick={() => {
+              try {
+                downloadOrderReferenceReceipt(p.businessName, p.confirmation!);
+                setDownloadError("");
+              } catch {
+                setDownloadError(
+                  "The order record could not be downloaded. Copy the reference above and try again.",
+                );
+              }
+            }}
+            className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-purple-400/70 px-4 text-sm font-black text-purple-100 transition hover:bg-purple-500/10 light:text-purple-800"
+          >
+            <Download className="h-4 w-4" />
+            Download Unofficial Order Record
+          </button>
+          <p className="mt-2 text-center text-[10px] leading-4 text-amber-200 light:text-amber-800">
+            This download is not an official receipt or proof of payment. It is
+            only for keeping your tracking number and order details.
+          </p>
+          {downloadError && (
+            <p role="alert" className="mt-2 text-xs text-rose-300">
+              {downloadError}
+            </p>
+          )}
+          <button
+            type="button"
             onClick={p.onClose}
             className="mt-3 min-h-11 w-full rounded-lg border border-cyan-500/70 px-4 text-sm font-bold text-white light:text-slate-900"
           >
@@ -298,7 +488,7 @@ export function CustomerPaymentCheckout(p: CustomerPaymentCheckoutProps) {
   }
 
   return (
-    <div className="relative min-w-0 bg-[#07111f] p-3 text-white light:bg-slate-50 light:text-slate-950 sm:p-5">
+    <div className="relative min-w-0 bg-[#07111f] p-3 text-white light:bg-slate-50 light:text-slate-950 sm:p-4">
       <button
         type="button"
         disabled={p.placingOrder}
@@ -309,9 +499,9 @@ export function CustomerPaymentCheckout(p: CustomerPaymentCheckoutProps) {
         <X className="h-5 w-5" />
       </button>
 
-      <header className="mb-4 grid gap-4 pr-8 md:grid-cols-[minmax(0,1fr)_minmax(300px,0.85fr)] md:items-center">
+      <header className="mb-3 grid gap-3 pr-8 md:grid-cols-[minmax(0,1fr)_minmax(280px,0.8fr)] md:items-center">
         <div className="flex min-w-0 items-center gap-3">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-[#7c00ff] text-xl font-black">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#7c00ff] text-lg font-black">
             {p.businessName.trim().charAt(0).toUpperCase() || "S"}
           </span>
           <div className="min-w-0">
@@ -338,9 +528,9 @@ export function CustomerPaymentCheckout(p: CustomerPaymentCheckoutProps) {
       >
         <fieldset
           disabled={p.placingOrder}
-          className="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,1.08fr)_minmax(340px,0.92fr)] lg:items-start"
+          className="grid min-w-0 gap-2 lg:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.95fr)] lg:items-start"
         >
-          <div className="space-y-3">
+          <div className="space-y-2">
             <section className={panel}>
               <div className="flex items-center gap-2 border-b border-[#263955] px-4 py-3 light:border-slate-200">
                 <span className="text-purple-400">♙</span>
@@ -406,7 +596,7 @@ export function CustomerPaymentCheckout(p: CustomerPaymentCheckoutProps) {
             </section>
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-2">
             <section className={panel}>
               <div className="flex items-center gap-2 border-b border-[#263955] px-4 py-3 light:border-slate-200">
                 <Landmark className="h-4 w-4 text-purple-400" />
@@ -489,7 +679,7 @@ export function CustomerPaymentCheckout(p: CustomerPaymentCheckoutProps) {
                 </button>
               </div>
               <div className="p-4">
-                <ul className="max-h-52 space-y-3 overflow-y-auto">
+                <ul className="max-h-44 space-y-2 overflow-y-auto">
                   {p.items.map((item) => (
                     <li key={item.id} className="flex items-center gap-3">
                       <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-white/5">
@@ -591,7 +781,7 @@ export function CustomerPaymentCheckout(p: CustomerPaymentCheckoutProps) {
         {p.error && (
           <p
             role="alert"
-            className="mt-3 rounded-lg border border-rose-400/30 bg-rose-500/10 p-3 text-sm text-rose-300 light:text-rose-700"
+            className="mt-2 rounded-lg border border-rose-400/30 bg-rose-500/10 p-2.5 text-sm text-rose-300 light:text-rose-700"
           >
             {p.error}
           </p>
@@ -599,7 +789,7 @@ export function CustomerPaymentCheckout(p: CustomerPaymentCheckoutProps) {
         <button
           type="submit"
           disabled={disabled}
-          className={`${primaryButton} mt-3 w-full`}
+          className={`${primaryButton} mt-2 w-full`}
         >
           {p.placingOrder ? "Placing Order…" : "Place Order"}
           {!p.placingOrder && <span aria-hidden="true">→</span>}

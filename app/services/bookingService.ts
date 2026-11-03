@@ -1,3 +1,5 @@
+import type { BusinessPaymentMethod } from "@/app/lib/business-payments";
+
 export interface PublicBookingInput {
   tenantId: string;
   serviceId: string;
@@ -9,13 +11,31 @@ export interface PublicBookingInput {
   notes?: string;
   providerId?: string;
   promotionCode?: string;
-  paymentMethod?: "pay_later" | "mock_card";
+  paymentMethod: BusinessPaymentMethod;
+  paymentOption: "deposit" | "full";
 }
 
 export interface PublicBookingResult {
   appointmentId: string;
+  appointmentNumber?: string;
   paymentStatus: string;
   paymentReference?: string;
+  createdAt: string;
+  depositCheckout?: {
+    accessToken: string;
+    expiresAt: string;
+    customerEmail: string;
+    amount: number;
+    bankAccounts: Array<{
+      id: string;
+      label: string;
+      bankName: string;
+      accountHolder: string;
+      accountNumber: string;
+      currency: string;
+      instructions: string;
+    }>;
+  };
 }
 
 function errorMessage(error: unknown) {
@@ -58,8 +78,11 @@ export async function createPublicAppointment(
   });
   const result = (await response.json()) as {
     appointmentId?: string;
+    appointmentNumber?: string;
     paymentStatus?: string;
     paymentReference?: string | null;
+    createdAt?: string;
+    depositCheckout?: PublicBookingResult["depositCheckout"];
     error?: string;
   };
   if (!response.ok)
@@ -70,9 +93,16 @@ export async function createPublicAppointment(
     );
   if (!result.appointmentId)
     throw new Error("The booking was created without a confirmation ID.");
+  if (input.paymentMethod === "bank_transfer" && !result.appointmentNumber)
+    throw new Error(
+      "The booking was created without an appointment reference.",
+    );
   return {
     appointmentId: result.appointmentId,
+    appointmentNumber: result.appointmentNumber,
     paymentStatus: result.paymentStatus || "UNPAID",
     paymentReference: result.paymentReference || undefined,
+    createdAt: result.createdAt || new Date().toISOString(),
+    depositCheckout: result.depositCheckout,
   };
 }

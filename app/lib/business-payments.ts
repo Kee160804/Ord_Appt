@@ -57,6 +57,7 @@ export interface FulfillmentConfiguration {
 export interface PublicBusinessPaymentConfiguration {
   methods: PaymentMethodConfiguration[];
   bankAccounts: BankAccountConfiguration[];
+  bankTransferAvailable?: boolean;
   fulfillment: FulfillmentConfiguration;
   notice: string;
 }

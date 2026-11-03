@@ -439,17 +439,15 @@ export async function setOrderStatus(
   orderId: string,
   status: OrderStatus,
 ) {
-  const { error } = await client()
-    .from("orders")
-    .update({
-      status: status.toUpperCase(),
-    })
-    .eq("id", orderId)
-    .eq("tenant_id", tenantId)
-    .select("id")
-    .single();
-
-  if (error) {
-    throw error;
+  const response = await fetch("/api/orders/status", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ tenantId, orderId, status }),
+  });
+  const result = (await response.json().catch(() => null)) as {
+    error?: string;
+  } | null;
+  if (!response.ok) {
+    throw new Error(result?.error || "Unable to update the order.");
   }
 }

@@ -38,11 +38,12 @@ async function load(path, mocks = {}) {
 }
 const tenantId = "11111111-1111-4111-8111-111111111111";
 const orderId = "22222222-2222-4222-8222-222222222222";
+const appointmentId = "44444444-4444-4444-8444-444444444444";
 const token = "a".repeat(43);
 const guest = await load("app/lib/server/guest-access.ts");
 const realSecurity = await load("app/lib/server/security.ts");
 
-function fakeClient(rows, calls) {
+function fakeClient(rows, calls, tableErrors = {}) {
   return {
     from(table) {
       const filters = [];
@@ -88,6 +89,12 @@ function fakeClient(rows, calls) {
         },
         then(resolve) {
           calls.push(query);
+          if (tableErrors[table]) {
+            return Promise.resolve({
+              data: null,
+              error: tableErrors[table],
+            }).then(resolve);
+          }
           const matching = (rows[table] ?? []).filter((row) =>
             filters.every(([op, key, value]) =>
               op === "eq"
@@ -135,6 +142,8 @@ async function harness({
   codeAccepted = true,
   paid = false,
   limited = false,
+  historyMissing = false,
+  appointment = false,
 } = {}) {
   const calls = [],
     sent = [],
@@ -150,26 +159,62 @@ async function harness({
         phone: "555-1234",
       },
     ],
-    orders: known
+    orders:
+      known && !appointment
+        ? [
+            {
+              id: orderId,
+              tenant_id: tenantId,
+              order_number: "TEST-123456",
+              customer_email: "customer@example.test",
+              customer_name: "Customer",
+              status: "PREPARING",
+              payment_status: paid ? "PAID" : "UNPAID",
+              payment_method: "bank_transfer",
+              order_type: "delivery",
+              total: 22.6,
+              subtotal: 19,
+              delivery_fee: 3,
+              tax_amount: 0.6,
+              tracking_token_hash: "NEVER-RETURN",
+              customer_verification_code_hash: "NEVER-RETURN",
+              inventory_reservation_status: paid ? "PURCHASED" : "NONE",
+              created_at: "2026-10-25T12:00:00Z",
+            },
+          ]
+        : [],
+    appointments:
+      known && appointment
+        ? [
+            {
+              id: appointmentId,
+              tenant_id: tenantId,
+              appointment_number: "AP-444444444444",
+              customer_email: "customer@example.test",
+              customer_name: "Customer",
+              status: "PENDING",
+              payment_status: "AWAITING_PAYMENT",
+              payment_method: "bank_transfer",
+              subtotal: 40,
+              total: 40,
+              amount_paid: 0,
+              deposit_required: 12,
+              outstanding_balance: 12,
+              starts_at: "2026-11-05T15:00:00Z",
+              notes: "First visit",
+              created_at: "2026-10-29T12:00:00Z",
+            },
+          ]
+        : [],
+    appointment_services: appointment
       ? [
           {
-            id: orderId,
+            id: "service-line",
             tenant_id: tenantId,
-            order_number: "TEST-123456",
-            customer_email: "customer@example.test",
-            customer_name: "Customer",
-            status: "PREPARING",
-            payment_status: paid ? "PAID" : "UNPAID",
-            payment_method: "bank_transfer",
-            order_type: "delivery",
-            total: 22.6,
-            subtotal: 19,
-            delivery_fee: 3,
-            tax_amount: 0.6,
-            tracking_token_hash: "NEVER-RETURN",
-            customer_verification_code_hash: "NEVER-RETURN",
-            inventory_reservation_status: paid ? "PURCHASED" : "NONE",
-            created_at: "2026-10-25T12:00:00Z",
+            appointment_id: appointmentId,
+            service_name: "Consultation",
+            price: 40,
+            created_at: "2026-10-29T12:00:00Z",
           },
         ]
       : [],
@@ -199,10 +244,13 @@ async function harness({
           {
             id: "receipt",
             tenant_id: tenantId,
-            order_id: orderId,
+            order_id: appointment ? null : orderId,
+            appointment_id: appointment ? appointmentId : null,
             status: "VERIFIED",
             submitted_amount: 22.6,
-            receipt_path: `${tenantId}/order/${orderId}/receipt.pdf`,
+            receipt_path: appointment
+              ? `${tenantId}/appointment/${appointmentId}/receipt.pdf`
+              : `${tenantId}/order/${orderId}/receipt.pdf`,
             receipt_mime_type: "application/pdf",
           },
         ]
@@ -210,8 +258,33 @@ async function harness({
     business_payment_methods: [
       { tenant_id: tenantId, method: "bank_transfer", enabled: true },
     ],
+    business_bank_accounts: [
+      {
+        id: "33333333-3333-4333-8333-333333333333",
+        tenant_id: tenantId,
+        label: "Main account",
+        bank_name: "Atlantic Bank",
+        account_holder: "Test shop",
+        account_number: "123456789",
+        currency: "BZD",
+        instructions: "Use the order number as reference.",
+        is_active: true,
+      },
+    ],
   };
-  const client = fakeClient(rows, calls);
+  const client = fakeClient(
+    rows,
+    calls,
+    historyMissing
+      ? {
+          order_status_history: {
+            code: "PGRST205",
+            message:
+              "Could not find the table 'public.order_status_history' in the schema cache",
+          },
+        }
+      : {},
+  );
   client.rpc = async (name, args) => {
     rpcCalls.push({ name, args });
     return {
@@ -227,7 +300,8 @@ async function harness({
       getVerifiedTrackingSession: async (tenant, accessToken) =>
         verified && tenant === tenantId && accessToken === token
           ? {
-              order_id: orderId,
+              order_id: appointment ? null : orderId,
+              appointment_id: appointment ? appointmentId : null,
               customer_email: "customer@example.test",
               expires_at: "2099-01-01",
             }
@@ -340,6 +414,40 @@ test("verified customers see all line items and totals without private hashes", 
   );
 });
 
+test("appointments use the same verified tracking and receipt-payment surface", async () => {
+  const h = await harness({ verified: true, appointment: true });
+  const lookup = await h.post({
+    action: "request",
+    orderNumber: "AP-444444444444",
+  });
+  assert.equal(lookup.status, 200);
+  assert.equal(h.rpcCalls[0].name, "request_appointment_tracking_code");
+  assert.equal(h.sent[0].payload.record_label, "booking");
+
+  const response = await h.post({ action: "details", accessToken: token });
+  assert.equal(response.status, 200);
+  const payload = await response.json();
+  assert.equal(payload.order.kind, "appointment");
+  assert.equal(payload.order.orderNumber, "AP-444444444444");
+  assert.equal(payload.order.items[0].name, "Consultation");
+  assert.equal(payload.order.paymentDue, 12);
+  assert.equal(payload.order.canUploadReceipt, true);
+});
+
+test("verified customers can load an order while optional status history is being repaired", async () => {
+  const h = await harness({ verified: true, historyMissing: true });
+  const response = await h.post({
+    action: "verify",
+    accessToken: token,
+    code: "123456",
+  });
+
+  assert.equal(response.status, 200);
+  const payload = await response.json();
+  assert.equal(payload.order.items[0].name, "Snack");
+  assert.deepEqual(payload.order.history, []);
+});
+
 test("paid orders remain trackable and receipts are signed only after verification", async () => {
   const h = await harness({ verified: true, paid: true });
   const response = await h.post({ action: "details", accessToken: token });
@@ -436,6 +544,7 @@ async function submitReceipt({
   verified = false,
   paid = false,
   email = "customer@example.test",
+  bankAccountId = "33333333-3333-4333-8333-333333333333",
 } = {}) {
   const h = await harness({ verified, paid });
   const route = await load("app/api/public/payment-receipts/route.ts", {
@@ -461,6 +570,7 @@ async function submitReceipt({
     customerEmail: email,
     amount: "22.60",
     paymentDate: "2026-10-25",
+    bankAccountId,
   }))
     form.set(key, value);
   form.set(
@@ -500,7 +610,24 @@ test("verified receipt upload uses the atomic transaction and returns awaiting v
   assert.ok(
     h.rpcCalls.some((call) => call.name === "submit_tracked_order_receipt"),
   );
+  assert.match(
+    h.rpcCalls.find((call) => call.name === "submit_tracked_order_receipt").args
+      .p_notes,
+    /Atlantic Bank \(Main account\)/,
+  );
   assert.ok(h.calls.some((call) => call.uploadedPath));
+});
+
+test("receipt upload rejects a bank account that is not active for the business", async () => {
+  const h = await submitReceipt({
+    verified: true,
+    bankAccountId: "44444444-4444-4444-8444-444444444444",
+  });
+  assert.equal(h.response.status, 409);
+  assert.equal(
+    h.calls.some((call) => call.uploadedPath),
+    false,
+  );
 });
 
 test("paid orders reject further receipts before storage writes", async () => {

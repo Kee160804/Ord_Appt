@@ -41,6 +41,7 @@ export async function POST(request: Request) {
       0,
       160,
     );
+    const bankAccountId = textValue(form, "bankAccountId");
     const notes = textValue(form, "notes").slice(0, 2000);
     const file = form.get("receipt");
 
@@ -134,12 +135,14 @@ export async function POST(request: Request) {
       .eq("id", targetId)
       .eq("tenant_id", tenantId)
       .maybeSingle();
-    const trackingSession =
-      targetType === "order"
-        ? await getVerifiedTrackingSession(tenantId, accessToken)
-        : null;
+    const trackingSession = await getVerifiedTrackingSession(
+      tenantId,
+      accessToken,
+    );
     const verifiedTrackingAccess =
-      trackingSession?.order_id === targetId &&
+      (targetType === "order"
+        ? trackingSession?.order_id === targetId
+        : trackingSession?.appointment_id === targetId) &&
       trackingSession?.customer_email === customerEmail;
     const checkoutAccess =
       target?.tracking_token_hash === hashGuestAccessToken(accessToken) &&
@@ -175,7 +178,11 @@ export async function POST(request: Request) {
         .eq("method", "bank_transfer")
         .eq("enabled", true)
         .contains("modules", [
-          tenant?.business_type === "retail" ? "retail" : "ordering",
+          targetType === "appointment"
+            ? "appointment"
+            : tenant?.business_type === "retail"
+              ? "retail"
+              : "ordering",
         ])
         .maybeSingle();
       legacyBankTransfer =
@@ -187,6 +194,37 @@ export async function POST(request: Request) {
         { status: 409 },
       );
     }
+    let selectedBankNote = "";
+    if (target.payment_method === "bank_transfer" || legacyBankTransfer) {
+      if (!isValidUuid(bankAccountId)) {
+        return Response.json(
+          { error: "Choose the bank account used for this transfer." },
+          { status: 400 },
+        );
+      }
+      const { data: bankAccount, error: bankAccountError } = await supabase
+        .from("business_bank_accounts")
+        .select("label,bank_name")
+        .eq("id", bankAccountId)
+        .eq("tenant_id", tenantId)
+        .eq("is_active", true)
+        .maybeSingle();
+      if (bankAccountError) throw bankAccountError;
+      if (!bankAccount) {
+        return Response.json(
+          {
+            error:
+              "That bank account is no longer available. Refresh and choose another account.",
+          },
+          { status: 409 },
+        );
+      }
+      selectedBankNote = `Customer selected destination bank: ${bankAccount.bank_name}${bankAccount.label && bankAccount.label !== bankAccount.bank_name ? ` (${bankAccount.label})` : ""}.`;
+    }
+    const submissionNotes = [selectedBankNote, notes]
+      .filter(Boolean)
+      .join("\n")
+      .slice(0, 2000);
     if (
       reservation?.customer_verification_status === "PENDING" &&
       !verifiedTrackingAccess
@@ -233,7 +271,12 @@ export async function POST(request: Request) {
       .from("customer_payment_submissions")
       .select("id")
       .eq(foreignKey, targetId)
-      .in("status", ["AWAITING_VERIFICATION", "VERIFIED"])
+      .in(
+        "status",
+        targetType === "appointment"
+          ? ["AWAITING_VERIFICATION"]
+          : ["AWAITING_VERIFICATION", "VERIFIED"],
+      )
       .limit(1)
       .maybeSingle();
     if (openSubmission) {
@@ -264,18 +307,31 @@ export async function POST(request: Request) {
           )
         : Number(target.total ?? 0);
     const insert = verifiedTrackingAccess
-      ? await supabase.rpc("submit_tracked_order_receipt", {
-          p_tenant_id: tenantId,
-          p_order_id: targetId,
-          p_token_hash: hashGuestAccessToken(accessToken),
-          p_submission_id: receiptId,
-          p_amount: amount,
-          p_payment_date: paymentDate,
-          p_receipt_path: receiptPath,
-          p_mime_type: file.type,
-          p_reference: transactionReference,
-          p_notes: notes,
-        })
+      ? targetType === "order"
+        ? await supabase.rpc("submit_tracked_order_receipt", {
+            p_tenant_id: tenantId,
+            p_order_id: targetId,
+            p_token_hash: hashGuestAccessToken(accessToken),
+            p_submission_id: receiptId,
+            p_amount: amount,
+            p_payment_date: paymentDate,
+            p_receipt_path: receiptPath,
+            p_mime_type: file.type,
+            p_reference: transactionReference,
+            p_notes: submissionNotes,
+          })
+        : await supabase.rpc("submit_tracked_appointment_receipt", {
+            p_tenant_id: tenantId,
+            p_appointment_id: targetId,
+            p_token_hash: hashGuestAccessToken(accessToken),
+            p_submission_id: receiptId,
+            p_amount: amount,
+            p_payment_date: paymentDate,
+            p_receipt_path: receiptPath,
+            p_mime_type: file.type,
+            p_reference: transactionReference,
+            p_notes: submissionNotes,
+          })
       : await supabase
           .from("customer_payment_submissions")
           .insert({
@@ -290,7 +346,7 @@ export async function POST(request: Request) {
             transaction_reference: transactionReference || null,
             receipt_path: receiptPath,
             receipt_mime_type: file.type,
-            notes: notes || null,
+            notes: submissionNotes || null,
           })
           .select("id")
           .single();

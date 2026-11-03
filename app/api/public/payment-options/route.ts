@@ -44,7 +44,7 @@ export async function GET(request: Request) {
       );
     }
 
-    const [methods, fulfillment] = await Promise.all([
+    const [methods, fulfillment, activeBankAccount] = await Promise.all([
       supabase
         .from("business_payment_methods")
         .select("method,instructions,external_url,modules")
@@ -58,14 +58,54 @@ export async function GET(request: Request) {
         )
         .eq("tenant_id", tenantId)
         .maybeSingle(),
+      businessModule === "appointment"
+        ? supabase.rpc("has_active_business_bank_account", {
+            p_tenant_id: tenantId,
+          })
+        : Promise.resolve({ data: null, error: null }),
     ]);
-    if (methods.error || fulfillment.error) {
-      throw methods.error ?? fulfillment.error;
+    const missingBankAvailabilityFunction =
+      activeBankAccount.error?.code === "PGRST202";
+    if (
+      methods.error ||
+      fulfillment.error ||
+      (activeBankAccount.error && !missingBankAvailabilityFunction)
+    ) {
+      throw methods.error ?? fulfillment.error ?? activeBankAccount.error;
     }
     const f = fulfillment.data;
+    const configuredMethods = methods.data ?? [];
+    // Compatibility for appointment businesses configured before appointment
+    // payment modules existed. With no explicit appointment method choices,
+    // an active bank account makes bank transfer available alongside the safe
+    // in-person fallback. Once the owner saves appointment payment settings,
+    // those explicit choices remain authoritative.
+    const availableMethods =
+      businessModule === "appointment" && configuredMethods.length === 0
+        ? [
+            ...(activeBankAccount.data === true
+              ? [
+                  {
+                    method: "bank_transfer",
+                    instructions:
+                      "Transfer the required deposit to the business and upload your receipt in Track Booking.",
+                    external_url: null,
+                    modules: ["appointment"],
+                  },
+                ]
+              : []),
+            {
+              method: "payment_at_appointment",
+              instructions:
+                "Arrange the deposit or payment directly with the business.",
+              external_url: null,
+              modules: ["appointment"],
+            },
+          ]
+        : configuredMethods;
     return Response.json(
       {
-        methods: (methods.data ?? []).map((row) => ({
+        methods: availableMethods.map((row) => ({
           method: row.method,
           enabled: true,
           modules: row.modules,
@@ -75,6 +115,8 @@ export async function GET(request: Request) {
         // Account details are disclosed only after Track Order email
         // verification. Checkout needs the available method, not credentials.
         bankAccounts: [],
+        bankTransferAvailable:
+          !missingBankAvailabilityFunction && activeBankAccount.data === true,
         fulfillment: f
           ? {
               pickupEnabled: f.pickup_enabled,

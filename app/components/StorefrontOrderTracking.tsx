@@ -38,7 +38,8 @@ async function trackingRequest<T>(
   const data = await response.json();
   if (!response.ok)
     throw new TrackingError(
-      data.error || "Unable to load your order. Please try again.",
+      data.error ||
+        "Unable to load your order or appointment. Please try again.",
       response.status,
     );
   return data as T;
@@ -48,10 +49,12 @@ export function StorefrontOrderTracking({
   tenantId,
   viewOnly = false,
   initialOrderNumber = "",
+  mode = "order",
 }: {
   tenantId: string;
   viewOnly?: boolean;
   initialOrderNumber?: string;
+  mode?: "order" | "appointment";
 }) {
   const [step, setStep] = useState<"lookup" | "verify" | "order">("lookup");
   const [reference, setReference] = useState(initialOrderNumber);
@@ -98,7 +101,7 @@ export function StorefrontOrderTracking({
         setError(
           cause instanceof Error
             ? cause.message
-            : "Unable to refresh your order.",
+            : "Unable to refresh your transaction.",
         );
       }
     },
@@ -132,7 +135,7 @@ export function StorefrontOrderTracking({
     if (busy) return;
     if (viewOnly) {
       setError(
-        "Order tracking is available on the business's live storefront.",
+        `${mode === "appointment" ? "Booking" : "Order"} tracking is available on the business's live storefront.`,
       );
       return;
     }
@@ -241,20 +244,29 @@ export function StorefrontOrderTracking({
           tabIndex={-1}
           className="mt-4 text-center text-xl font-black outline-none"
         >
-          {step === "lookup" ? "Track Your Order" : "Verify Your Order"}
+          {step === "lookup"
+            ? mode === "appointment"
+              ? "Track Your Booking"
+              : "Track Your Order"
+            : mode === "appointment"
+              ? "Verify Your Booking"
+              : "Verify Your Order"}
         </h2>
         {step === "lookup" ? (
           <>
             <p className="mt-2 text-center text-sm leading-6 text-slate-300 light:text-slate-600">
-              Enter the order reference sent to your email to view your order
-              details, payment status, and delivery or pickup progress.
+              Enter the reference provided after{" "}
+              {mode === "appointment" ? "booking" : "checkout"} to view details,
+              payment status, and progress.
             </p>
             <form className="mt-6" onSubmit={sendCode}>
               <label
                 htmlFor="order-reference"
                 className="mb-2 block text-sm font-bold"
               >
-                Order Reference
+                {mode === "appointment"
+                  ? "Booking Reference"
+                  : "Order Reference"}
               </label>
               <input
                 id="order-reference"
@@ -268,11 +280,15 @@ export function StorefrontOrderTracking({
                 onChange={(event) =>
                   setReference(event.target.value.toUpperCase())
                 }
-                placeholder="e.g. YB-ORD-1042"
+                placeholder={
+                  mode === "appointment"
+                    ? "e.g. AP-945EF35BD72C"
+                    : "e.g. TR-945EF35BD72C"
+                }
                 className={field}
               />
               <button disabled={busy} className={primary + " mt-4 w-full"}>
-                {busy ? "Sending code…" : "Find My Order"}
+                {busy ? "Sending code…" : "Find My Reference"}
                 <ArrowRight className="h-4 w-4" />
               </button>
             </form>
@@ -280,12 +296,16 @@ export function StorefrontOrderTracking({
         ) : (
           <>
             <p className="mt-2 text-center text-sm leading-6 text-slate-300 light:text-slate-600">
-              If this reference matches an order, a six-digit verification code
-              will be sent to the email used at checkout.
+              If this reference matches a{" "}
+              {mode === "appointment" ? "booking" : "order"}, a six-digit
+              verification code will be sent to the customer email on file.
             </p>
             <div className="mt-5 flex items-center gap-3 rounded-xl border border-purple-500/25 bg-[#0d0820] p-3 text-xs light:bg-purple-50">
               <Mail className="h-4 w-4 shrink-0 text-purple-400" />
-              <span>Check your checkout email, including spam.</span>
+              <span>
+                Check your {mode === "appointment" ? "booking" : "checkout"}{" "}
+                email, including spam.
+              </span>
             </div>
             <form onSubmit={verify} className="mt-5">
               <fieldset disabled={busy}>

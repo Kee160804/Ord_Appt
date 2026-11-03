@@ -12,6 +12,7 @@ import {
   requestHasAllowedOrigin,
 } from "@/app/lib/server/security";
 import { isValidPromotionCode } from "@/app/lib/promotions";
+import { processEmailQueueBestEffort } from "@/app/lib/email/process-best-effort";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -559,12 +560,38 @@ export async function POST(request: Request): Promise<Response> {
         503,
       );
     }
+    if (
+      error?.code === "42883" &&
+      /create_public_order_v[23]/i.test(error.message)
+    ) {
+      return json(
+        {
+          error: "Ordering checkout requires the latest database migration.",
+        },
+        503,
+      );
+    }
+    if (
+      error?.code === "42703" &&
+      /relation ["']?orders|orders["']? does not exist/i.test(error.message)
+    ) {
+      return json(
+        {
+          error: "Ordering checkout requires the latest database migration.",
+        },
+        503,
+      );
+    }
 
     /* ======================================================================
        15. HANDLE BUSINESS-RULE / DATABASE FAILURE
        ====================================================================== */
 
     if (error) {
+      console.error("[public-order] Order transaction rejected.", {
+        code: error.code,
+        message: error.message,
+      });
       return json(
         {
           error: publicOperationError(
@@ -590,6 +617,11 @@ export async function POST(request: Request): Promise<Response> {
         502,
       );
     }
+
+    // The order transaction queues ORDER_RECEIVED atomically. Process the
+    // queue now as a fallback when the optional database webhook is absent,
+    // matching the working appointment confirmation flow.
+    await processEmailQueueBestEffort("order creation");
 
     /* ======================================================================
        17. RETURN SAFE CONFIRMATION DATA

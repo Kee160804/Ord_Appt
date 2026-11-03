@@ -12,7 +12,24 @@ YuhBusiness uses Resend as an additional delivery channel. Supabase remains the 
 4. Successful provider IDs and failures are recorded. Jobs retry at most three times. Stale processing leases recover after 15 minutes.
 5. Resend idempotency keys provide a second layer of duplicate protection.
 
-The worker consumes the existing `order_email_deliveries`, `appointment_email_deliveries`, and `appointment_reminders` records. The new `transactional_email_deliveries` table covers only events that had no existing outbox.
+The worker consumes the existing `order_email_deliveries` and
+`appointment_email_deliveries` records. Appointment reminder delivery is
+disabled by the customer email policy. The `transactional_email_deliveries`
+table covers events that have no dedicated outbox.
+
+## Customer email policy
+
+Apply `supabase/migrations/202611030001_customer_email_policy.sql` after the
+earlier order and appointment migrations.
+
+- Appointment: booking received, customer-requested tracking code, and owner-confirmed or cancelled appointment.
+- Ordering: order received, customer-requested tracking code, and owner-marked ready or cancelled order.
+- Retail: order received, customer-requested tracking code, and owner-confirmed payment.
+
+Intermediate order statuses and appointment receipt approval update tracking
+only. Appointment confirmation remains unavailable until the full balance is
+recorded. The migration cancels unsent legacy messages outside this policy but
+retains already-sent history for auditing.
 
 ## Owner notification preferences
 
@@ -22,11 +39,22 @@ owner-only **Email Notifications** settings panel for appointment, ordering,
 retail, storefront-message, and other business alerts.
 
 The migration also ensures that notification fan-out to staff produces only
-one owner email. Customer order receipts, appointment confirmations,
-reminders, and cancellations remain transactional and cannot be disabled by
-an owner's alert preferences. Retail subjects say either `marked paid` or
+one owner email. Customer order receipts, appointment confirmations, and
+cancellations remain transactional and cannot be disabled by an owner's alert
+preferences. Retail subjects say either `marked paid` or
 `payment pending`; `marked paid` does not claim that the current mock-card
 provider settled real funds.
+
+For subscription-email deduplication and paid-period reminders, apply
+`supabase/migrations/202610300004_subscription_email_deduplication.sql` after
+the subscription billing, transactional-email, recipient-notification, and
+owner-preference migrations. Deploy the matching application version as well:
+it renders `SUBSCRIPTION_RENEWED` and `SUBSCRIPTION_EXPIRING` and cancels an
+expiry notice if the paid-through date changed before delivery. The migration
+keeps subscription changes in the dedicated owner queue, suppresses the
+duplicate generic subscription alert, and uses a stable key so polling cannot
+re-enqueue an expiration notice for the same end date. Customer appointment,
+order, and payment emails remain event-driven.
 
 ## Before purchasing a domain
 
@@ -56,6 +84,8 @@ variables are missing, which is intentional until Resend is configured.
 - `app/lib/email/worker.ts`: claiming, tenant/source validation, delivery, retry state, and safe logging.
 - `app/api/email/process/route.ts`: authenticated cron/webhook endpoint.
 - `supabase/migrations/202609050001_transactional_email_service.sql`: outbox, contact messages, triggers, checkout email support, and worker RPCs.
+- `supabase/migrations/202610300004_subscription_email_deduplication.sql`: subscription event deduplication and trial/paid-period expiry reminders.
+- `supabase/migrations/202611030001_customer_email_policy.sql`: customer email allowlists for appointment, ordering, and retail businesses.
 
 ## 1. Apply the Supabase migration
 
@@ -115,9 +145,11 @@ In Vercel → Project → Settings → Environment Variables, add the same varia
 
 Redeploy after saving. Never create `NEXT_PUBLIC_RESEND_API_KEY` or `NEXT_PUBLIC_SUPABASE_SECRET_KEY`.
 
-## 5. Schedule reminders and retries
+## 5. Schedule queue retries
 
-The endpoint must run every 1–5 minutes for accurate two-hour reminders. Supabase Cron is recommended because Vercel Hobby permits only once-daily Cron Jobs.
+The endpoint should run every 1–5 minutes so temporary delivery failures are
+retried promptly. Supabase Cron is recommended because Vercel Hobby permits
+only once-daily Cron Jobs.
 
 Enable `pg_cron`, `pg_net`, and Vault, then store the endpoint and the same `CRON_SECRET` used by Vercel:
 

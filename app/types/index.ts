@@ -20,7 +20,8 @@ export type OrderStatus =
   | "cancelled";
 export type AppointmentStatus =
   "pending" | "confirmed" | "cancelled" | "completed" | "no_show";
-export type PaymentStatus = "unpaid" | "partial" | "paid" | "refunded";
+export type PaymentStatus =
+  "unpaid" | "awaiting_verification" | "partial" | "paid" | "refunded";
 export interface BusinessHours {
   day: string;
   open: string;
@@ -247,6 +248,13 @@ export interface Appointment {
   paymentStatus: PaymentStatus;
   notes?: string;
   depositPaid?: number;
+  depositRequired?: number;
+  amountPaid?: number;
+  outstandingBalance?: number;
+  paymentMethod?: string;
+  paymentSelection?: "deposit" | "full";
+  appointmentNumber?: string;
+  paymentReservationExpiresAt?: string;
   createdAt: string;
   providerId?: string;
   providerName?: string;

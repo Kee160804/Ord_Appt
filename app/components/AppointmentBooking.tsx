@@ -11,6 +11,11 @@ import {
   MessageCircle,
   Star,
   User,
+  ClipboardList,
+  Landmark,
+  Store,
+  UploadCloud,
+  Copy,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/app/lib/utils";
 import { createPublicAppointment } from "@/app/services/bookingService";
@@ -27,6 +32,12 @@ import {
   normalizePromotionCode,
 } from "@/app/lib/promotions";
 import { validatePromotion } from "@/app/services/businessToolsService";
+import {
+  PAYMENT_METHOD_LABELS,
+  type BusinessPaymentMethod,
+  type PaymentMethodConfiguration,
+  type PublicBusinessPaymentConfiguration,
+} from "@/app/lib/business-payments";
 import type {
   BusinessReview,
   PublicPromotion,
@@ -49,6 +60,7 @@ interface AppointmentBookingProps {
   reviews?: BusinessReview[];
   promotions?: PublicPromotion[];
   viewOnly?: boolean;
+  onTrackAppointment?: (reference: string) => void;
 }
 
 // Helpers
@@ -122,6 +134,7 @@ export function AppointmentBooking({
   reviews = [],
   promotions = [],
   viewOnly = false,
+  onTrackAppointment,
 }: AppointmentBookingProps) {
   const storefrontDesign = parseStorefrontDesign(
     tenant.storefrontDesign,
@@ -141,10 +154,30 @@ export function AppointmentBooking({
   const [isBooking, setIsBooking] = useState(false);
   const [bookingError, setBookingError] = useState("");
   const [confirmationId, setConfirmationId] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState<"pay_later" | "mock_card">(
-    "pay_later",
+  const [requestSubmitted, setRequestSubmitted] = useState(false);
+  const [depositCheckout, setDepositCheckout] = useState<
+    | (NonNullable<
+        Awaited<ReturnType<typeof createPublicAppointment>>["depositCheckout"]
+      > & { appointmentId: string; appointmentNumber: string })
+    | null
+  >(null);
+  const [selectedDepositBankId, setSelectedDepositBankId] = useState("");
+  const [depositReceipt, setDepositReceipt] = useState<File | null>(null);
+  const [depositUploadError, setDepositUploadError] = useState("");
+  const [isUploadingDeposit, setIsUploadingDeposit] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<BusinessPaymentMethod>(
+    "payment_at_appointment",
+  );
+  const [paymentOption, setPaymentOption] = useState<"deposit" | "full">(
+    "deposit",
   );
   const [paymentConfirmation, setPaymentConfirmation] = useState("");
+  const [paymentConfiguration, setPaymentConfiguration] =
+    useState<PublicBusinessPaymentConfiguration | null>(null);
+  const [paymentConfigurationLoading, setPaymentConfigurationLoading] =
+    useState(true);
+  const [paymentConfigurationError, setPaymentConfigurationError] =
+    useState("");
   const [availableSlots, setAvailableSlots] = useState<string[]>([]);
   const [isLoadingAvailability, setIsLoadingAvailability] = useState(false);
   const [availabilityError, setAvailabilityError] = useState("");
@@ -163,6 +196,55 @@ export function AppointmentBooking({
   );
   const selectedService =
     services.find((service) => service.id === selectedServiceId) ?? null;
+  const appointmentPaymentOptions = useMemo<
+    Array<PaymentMethodConfiguration & { available: boolean }>
+  >(() => {
+    const configured = (paymentConfiguration?.methods ?? []).filter(
+      (method) =>
+        method.enabled &&
+        ["bank_transfer", "payment_at_appointment", "external_link"].includes(
+          method.method,
+        ),
+    );
+    if (selectedService?.requiresDeposit) {
+      const bankTransfer: PaymentMethodConfiguration & {
+        available: boolean;
+      } = {
+        ...(configured.find((method) => method.method === "bank_transfer") ?? {
+          method: "bank_transfer" as const,
+          enabled: true,
+          modules: ["appointment" as const],
+          instructions:
+            "Transfer the required deposit to the business, then upload your receipt.",
+        }),
+        available: true,
+      };
+      const inPerson: PaymentMethodConfiguration & { available: boolean } = {
+        ...(configured.find(
+          (method) => method.method === "payment_at_appointment",
+        ) ?? {
+          method: "payment_at_appointment" as const,
+          enabled: true,
+          modules: ["appointment" as const],
+          instructions:
+            "Arrange the required deposit directly with the business owner.",
+        }),
+        available: true,
+      };
+      return [bankTransfer, inPerson];
+    }
+    return configured.length
+      ? configured.map((option) => ({ ...option, available: true }))
+      : [
+          {
+            method: "payment_at_appointment" as const,
+            enabled: true,
+            modules: ["appointment" as const],
+            instructions: "Pay the business when you attend your appointment.",
+            available: true,
+          },
+        ].map((option) => ({ ...option, available: true }));
+  }, [paymentConfiguration, selectedService?.requiresDeposit]);
   const eligibleProviders = useMemo(
     () =>
       providers.filter(
@@ -171,6 +253,55 @@ export function AppointmentBooking({
       ),
     [providers, selectedServiceId],
   );
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setPaymentConfigurationLoading(true);
+    setPaymentConfigurationError("");
+    fetch(
+      `/api/public/payment-options?tenantId=${encodeURIComponent(tenant.id)}&module=appointment`,
+      { signal: controller.signal, cache: "no-store" },
+    )
+      .then(async (response) => {
+        if (!response.ok)
+          throw new Error(
+            "Business payment options are unavailable. Please try again.",
+          );
+        return response.json() as Promise<PublicBusinessPaymentConfiguration>;
+      })
+      .then((configuration) => {
+        if (!controller.signal.aborted) setPaymentConfiguration(configuration);
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted) {
+          setPaymentConfiguration(null);
+          setPaymentConfigurationError(
+            error instanceof Error
+              ? error.message
+              : "Unable to load payment options.",
+          );
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setPaymentConfigurationLoading(false);
+      });
+    return () => controller.abort();
+  }, [tenant.id]);
+
+  useEffect(() => {
+    if (
+      appointmentPaymentOptions.length > 0 &&
+      !appointmentPaymentOptions.some(
+        (option) =>
+          option.method === paymentMethod && option.available !== false,
+      )
+    ) {
+      setPaymentMethod(
+        appointmentPaymentOptions.find((option) => option.available !== false)
+          ?.method ?? "payment_at_appointment",
+      );
+    }
+  }, [appointmentPaymentOptions, paymentMethod]);
 
   /**
    * A provider selected for one service must never leak into another service.
@@ -187,6 +318,7 @@ export function AppointmentBooking({
   }, [eligibleProviders, selectedProviderId]);
   useEffect(() => {
     setAppliedPromotion(null);
+    setPaymentOption("deposit");
   }, [selectedServiceId]);
   useEffect(() => {
     if (
@@ -428,6 +560,38 @@ export function AppointmentBooking({
       return;
     }
 
+    if (paymentConfigurationLoading) {
+      setBookingError(
+        "Wait for the business payment options to finish loading.",
+      );
+      return;
+    }
+
+    if (paymentConfigurationError) {
+      setBookingError(paymentConfigurationError);
+      return;
+    }
+
+    if (
+      paymentMethod === "bank_transfer" &&
+      paymentConfiguration?.bankTransferAvailable !== true
+    ) {
+      setBookingError(
+        "Bank transfer is not available because this business has not added an active bank account. Choose pay deposit in person or contact the business.",
+      );
+      return;
+    }
+
+    if (
+      !appointmentPaymentOptions.some(
+        (option) =>
+          option.method === paymentMethod && option.available !== false,
+      )
+    ) {
+      setBookingError("Choose an available business payment method.");
+      return;
+    }
+
     setIsBooking(true);
     setBookingError("");
 
@@ -450,14 +614,33 @@ export function AppointmentBooking({
           eligibleProviders.length > 0 ? selectedProviderId : undefined,
         promotionCode: appliedPromotion?.code,
         paymentMethod,
+        paymentOption: selectedPaymentOption,
       });
 
-      setConfirmationId(result.appointmentId);
-      setPaymentConfirmation(
-        result.paymentStatus.toUpperCase() === "PAID"
-          ? `Mock payment ${result.paymentReference ?? ""} approved.`
-          : "Payment will be collected by the business.",
-      );
+      if (
+        paymentMethod === "bank_transfer" &&
+        result.appointmentNumber &&
+        result.depositCheckout
+      ) {
+        setConfirmationId(result.appointmentNumber);
+        setDepositCheckout({
+          ...result.depositCheckout,
+          appointmentId: result.appointmentId,
+          appointmentNumber: result.appointmentNumber,
+        });
+        setSelectedDepositBankId(
+          result.depositCheckout.bankAccounts[0]?.id ?? "",
+        );
+        setDepositReceipt(null);
+        setDepositUploadError("");
+        setRequestSubmitted(false);
+      } else {
+        setConfirmationId("");
+        setRequestSubmitted(true);
+        setPaymentConfirmation(
+          "Your request is awaiting the business owner's confirmation. The owner will confirm the time allowed for an in-person deposit, and you will receive an email only after the booking is confirmed.",
+        );
+      }
 
       setBookingOpen(false);
       setSelectedServiceId(null);
@@ -467,7 +650,7 @@ export function AppointmentBooking({
       setSelectedProviderId("");
       setPromotionCode("");
       setAppliedPromotion(null);
-      setPaymentMethod("pay_later");
+      setPaymentMethod("payment_at_appointment");
     } catch (submitError) {
       setBookingError(
         submitError instanceof Error
@@ -479,6 +662,52 @@ export function AppointmentBooking({
     }
   };
 
+  const uploadDepositReceipt = async () => {
+    if (!depositCheckout || !depositReceipt || !selectedDepositBankId) {
+      setDepositUploadError(
+        "Choose the destination bank and select a receipt.",
+      );
+      return;
+    }
+    setIsUploadingDeposit(true);
+    setDepositUploadError("");
+    try {
+      const form = new FormData();
+      form.set("tenantId", tenant.id);
+      form.set("targetType", "appointment");
+      form.set("targetId", depositCheckout.appointmentId);
+      form.set("accessToken", depositCheckout.accessToken);
+      form.set("customerEmail", depositCheckout.customerEmail);
+      form.set("amount", String(depositCheckout.amount));
+      form.set("paymentDate", dateKey(new Date()));
+      form.set("transactionReference", depositCheckout.appointmentNumber);
+      form.set("bankAccountId", selectedDepositBankId);
+      form.set("receipt", depositReceipt);
+      const response = await fetch("/api/public/payment-receipts", {
+        method: "POST",
+        body: form,
+      });
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        throw new Error(result.error || "Unable to upload the receipt.");
+      }
+      setDepositCheckout(null);
+      setDepositReceipt(null);
+      setRequestSubmitted(true);
+      setPaymentConfirmation(
+        "Your deposit receipt was uploaded and is awaiting verification. The business will email you after the appointment is confirmed.",
+      );
+    } catch (error) {
+      setDepositUploadError(
+        error instanceof Error
+          ? error.message
+          : "Unable to upload the receipt.",
+      );
+    } finally {
+      setIsUploadingDeposit(false);
+    }
+  };
+
   const canBook =
     !!selectedService &&
     !!selectedDate &&
@@ -487,18 +716,42 @@ export function AppointmentBooking({
     isValidBookingTime(selectedTime) &&
     (eligibleProviders.length === 0 ||
       eligibleProviders.some((provider) => provider.id === selectedProviderId));
+  const selectedTotal = Math.max(
+    0,
+    (selectedService?.price ?? 0) - (appliedPromotion?.discountAmount ?? 0),
+  );
+  const requiredDeposit = selectedService?.requiresDeposit
+    ? selectedService.depositType === "percentage"
+      ? Math.min(
+          selectedTotal,
+          selectedTotal * ((selectedService.depositAmount ?? 0) / 100),
+        )
+      : Math.min(selectedTotal, selectedService.depositAmount ?? 0)
+    : 0;
+  const selectedPaymentOption = requiredDeposit > 0 ? paymentOption : "full";
 
   return (
     <>
-      {confirmationId && (
+      {requestSubmitted && (
         <div className="mb-5 rounded-2xl border border-emerald-300 bg-emerald-50 px-5 py-4 text-emerald-900 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200">
           <p className="font-bold">Appointment requested successfully.</p>
-          <p className="mt-1 text-sm">
-            Confirmation: {confirmationId.slice(0, 8).toUpperCase()}. The
-            business will review your request.
-          </p>
+          {confirmationId && (
+            <p className="mt-1 text-sm">
+              Track Booking reference: {confirmationId}. The business will
+              review your request.
+            </p>
+          )}
           {paymentConfirmation && (
             <p className="mt-1 text-sm">{paymentConfirmation}</p>
+          )}
+          {confirmationId && onTrackAppointment && (
+            <button
+              type="button"
+              onClick={() => onTrackAppointment(confirmationId)}
+              className="mt-3 rounded-lg bg-emerald-700 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-600"
+            >
+              Track Booking
+            </button>
           )}
         </div>
       )}
@@ -1142,30 +1395,60 @@ export function AppointmentBooking({
         open={bookingOpen}
         onClose={() => !isBooking && setBookingOpen(false)}
         title="Complete your booking"
+        maxWidth="max-w-5xl"
+        contentClassName="py-3 sm:px-4"
         footer={
-          <div className="flex gap-3">
-            <Button
-              type="button"
-              variant="outline"
-              disabled={isBooking}
-              onClick={() => setBookingOpen(false)}
-              className="flex-1"
-            >
-              Cancel
-            </Button>
+          <div>
             <Button
               type="button"
               loading={isBooking}
               onClick={submitBooking}
-              className="flex-1"
+              className="min-h-12 w-full justify-center text-base"
             >
               {isBooking ? "Booking..." : "Request Appointment"}
             </Button>
           </div>
         }
       >
-        <div className="space-y-4">
-          <div className="rounded-xl bg-violet-500/10 p-4 text-sm text-violet-200">
+        <div className="grid gap-3 lg:grid-cols-2">
+          <div className="hidden">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-600 to-fuchsia-600 font-black text-white">
+                {tenant.name.charAt(0).toUpperCase()}
+              </span>
+              <div className="min-w-0">
+                <p className="truncate font-black">{tenant.name}</p>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                  Appointment checkout
+                </p>
+              </div>
+            </div>
+            <div className="hidden items-center md:flex">
+              {[
+                ["1", "Service", true],
+                ["2", "Booking", true],
+                ["3", "Review", false],
+                ["4", "Complete", false],
+              ].map(([step, label, active], index) => (
+                <div key={String(step)} className="flex items-center">
+                  {index > 0 && (
+                    <span
+                      className={`h-px w-12 lg:w-20 ${active ? "bg-violet-500" : "bg-slate-600"}`}
+                    />
+                  )}
+                  <span className="flex flex-col items-center gap-1">
+                    <span
+                      className={`flex h-7 w-7 items-center justify-center rounded-full border text-xs font-bold ${active ? "border-violet-400 bg-violet-600 text-white" : "border-slate-600 text-slate-400"}`}
+                    >
+                      {step}
+                    </span>
+                    <span className="text-[10px] text-slate-400">{label}</span>
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="hidden">
             <p className="font-bold">
               {selectedService?.name ?? "Selected service"}
             </p>
@@ -1191,59 +1474,156 @@ export function AppointmentBooking({
                 formatCurrency(selectedService?.price ?? 0)
               )}
             </p>
+            <div className="mt-3 flex flex-wrap gap-2 text-xs">
+              {requiredDeposit > 0 ? (
+                <span className="rounded-full bg-amber-500/15 px-3 py-1 font-bold text-amber-300">
+                  Deposit due: {formatCurrency(requiredDeposit)}
+                </span>
+              ) : (
+                <span className="rounded-full bg-emerald-500/15 px-3 py-1 font-bold text-emerald-300">
+                  No deposit required
+                </span>
+              )}
+              <span className="rounded-full bg-white/5 px-3 py-1 text-violet-200">
+                Balance:{" "}
+                {formatCurrency(Math.max(0, selectedTotal - requiredDeposit))}
+              </span>
+            </div>
           </div>
-          <Input
-            label="Full Name"
-            autoComplete="name"
-            value={customer.name}
-            maxLength={120}
-            onChange={(event) =>
-              setCustomer((current) => ({
-                ...current,
-                name: event.target.value,
-              }))
-            }
-          />
-          <Input
-            label="Email Address"
-            type="email"
-            autoComplete="email"
-            value={customer.email}
-            maxLength={320}
-            onChange={(event) =>
-              setCustomer((current) => ({
-                ...current,
-                email: event.target.value,
-              }))
-            }
-          />
-          <Input
-            label="Phone Number"
-            type="tel"
-            autoComplete="tel"
-            value={customer.phone}
-            maxLength={40}
-            onChange={(event) =>
-              setCustomer((current) => ({
-                ...current,
-                phone: event.target.value,
-              }))
-            }
-          />
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-slate-300">
-              Notes / Concerns (optional)
-            </label>
-            <textarea
-              value={concerns}
-              onChange={(event) => setConcerns(event.target.value)}
-              placeholder="Describe any concerns or special requests"
-              rows={3}
-              maxLength={2000}
-              className="w-full resize-none rounded-xl border border-slate-700 bg-slate-800 px-3 py-2.5 text-sm text-white outline-none placeholder:text-slate-500 focus:border-violet-500"
-            />
-          </div>
-          <div>
+          {requiredDeposit > 0 && (
+            <section className="overflow-hidden rounded-xl border border-slate-700 bg-[#0c1b2e] light:border-slate-200 light:bg-white lg:col-span-2">
+              <div className="flex items-center gap-2 border-b border-slate-700 px-4 py-3 light:border-slate-200">
+                <DollarSign className="h-5 w-5 text-violet-400" />
+                <h3 className="font-black">Choose payment amount</h3>
+              </div>
+              <div className="grid gap-3 p-4 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => setPaymentOption("deposit")}
+                  className={`rounded-xl border p-4 text-left transition ${paymentOption === "deposit" ? "border-violet-400 bg-violet-600/20" : "border-slate-600 bg-[#091525] hover:border-violet-500 light:bg-slate-50"}`}
+                >
+                  <span className="block font-bold">Pay deposit</span>
+                  <span className="mt-1 block text-sm text-slate-400 light:text-slate-600">
+                    Pay {formatCurrency(requiredDeposit)} now. Remaining
+                    balance:{" "}
+                    {formatCurrency(
+                      Math.max(0, selectedTotal - requiredDeposit),
+                    )}
+                    .
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPaymentOption("full")}
+                  className={`rounded-xl border p-4 text-left transition ${paymentOption === "full" ? "border-violet-400 bg-violet-600/20" : "border-slate-600 bg-[#091525] hover:border-violet-500 light:bg-slate-50"}`}
+                >
+                  <span className="block font-bold">Pay in full</span>
+                  <span className="mt-1 block text-sm text-slate-400 light:text-slate-600">
+                    Pay the full appointment total of{" "}
+                    {formatCurrency(selectedTotal)}.
+                  </span>
+                </button>
+              </div>
+            </section>
+          )}
+          <section className="overflow-hidden rounded-xl border border-slate-700 bg-[#0c1b2e] light:border-slate-200 light:bg-white">
+            <div className="flex items-center gap-2 border-b border-slate-700 px-4 py-3 light:border-slate-200">
+              <User className="h-5 w-5 text-violet-400" />
+              <h3 className="font-black">Customer Information</h3>
+            </div>
+            <div className="grid gap-4 p-4 sm:grid-cols-2">
+              <Input
+                label="Full Name"
+                autoComplete="name"
+                value={customer.name}
+                maxLength={120}
+                onChange={(event) =>
+                  setCustomer((current) => ({
+                    ...current,
+                    name: event.target.value,
+                  }))
+                }
+              />
+              <Input
+                label="Email Address"
+                type="email"
+                autoComplete="email"
+                value={customer.email}
+                maxLength={320}
+                onChange={(event) =>
+                  setCustomer((current) => ({
+                    ...current,
+                    email: event.target.value,
+                  }))
+                }
+              />
+              <Input
+                label="Phone Number"
+                type="tel"
+                autoComplete="tel"
+                value={customer.phone}
+                maxLength={40}
+                onChange={(event) =>
+                  setCustomer((current) => ({
+                    ...current,
+                    phone: event.target.value,
+                  }))
+                }
+              />
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-slate-300">
+                  Notes / Concerns (optional)
+                </label>
+                <textarea
+                  value={concerns}
+                  onChange={(event) => setConcerns(event.target.value)}
+                  placeholder="Describe any concerns or special requests"
+                  rows={2}
+                  maxLength={2000}
+                  className="w-full resize-none rounded-xl border border-slate-700 bg-slate-800 px-3 py-2.5 text-sm text-white outline-none placeholder:text-slate-500 focus:border-violet-500"
+                />
+              </div>
+            </div>
+          </section>
+          <div className="rounded-xl border border-slate-700 bg-[#0c1b2e] p-4 light:border-slate-200 light:bg-white">
+            <div className="mb-3 flex items-center gap-2">
+              <ClipboardList className="h-5 w-5 text-violet-400" />
+              <h3 className="font-black">Booking Details</h3>
+            </div>
+            <div className="mb-3 rounded-xl border border-violet-500/25 bg-violet-500/10 p-3">
+              <div className="flex items-start gap-3">
+                <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-violet-400/30 bg-slate-800">
+                  <Image
+                    src={selectedService?.image || PLACEHOLDER_IMG}
+                    alt={selectedService?.name || "Selected service"}
+                    fill
+                    sizes="64px"
+                    className="object-cover"
+                  />
+                </div>
+                <div>
+                  <p className="text-sm font-bold">
+                    {selectedService?.name ?? "Selected service"}
+                  </p>
+                  <p className="mt-1 text-xs text-violet-300">
+                    {selectedDate ? formatDate(selectedDate) : ""} at{" "}
+                    {selectedTime} · {selectedService?.duration ?? 0} min
+                  </p>
+                </div>
+                <span className="ml-auto shrink-0 font-black">
+                  {formatCurrency(selectedTotal)}
+                </span>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
+                <span className="rounded-full bg-amber-500/15 px-2.5 py-1 font-bold text-amber-300">
+                  Deposit {formatCurrency(requiredDeposit)}
+                </span>
+                <span className="rounded-full bg-white/5 px-2.5 py-1 text-slate-300">
+                  Balance{" "}
+                  {formatCurrency(Math.max(0, selectedTotal - requiredDeposit))}
+                </span>
+              </div>
+            </div>
             <label className="mb-1.5 block text-sm font-medium text-slate-300">
               Discount Code (optional)
             </label>
@@ -1276,38 +1656,146 @@ export function AppointmentBooking({
               </p>
             )}
           </div>
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-slate-300">
-              Payment
-            </label>
-            <select
-              value={paymentMethod}
-              onChange={(event) =>
-                setPaymentMethod(
-                  event.target.value as "pay_later" | "mock_card",
-                )
-              }
-              className="w-full rounded-xl border border-slate-700 bg-slate-800 px-3 py-2.5 text-sm text-white outline-none focus:border-violet-500"
-            >
-              <option value="pay_later">Pay at the appointment</option>
-              <option value="mock_card">
-                Mock card payment (testing only)
-              </option>
-            </select>
-            {paymentMethod === "mock_card" && (
-              <p className="mt-2 rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-300">
-                No card details or real money are used. The required deposit, or
-                the full service price when no deposit is required, is recorded
-                as a simulated payment.
+          <section className="overflow-hidden rounded-xl border border-slate-700 bg-[#0c1b2e] light:border-slate-200 light:bg-white">
+            <div className="flex items-center gap-2 border-b border-slate-700 px-4 py-3 light:border-slate-200">
+              <Landmark className="h-5 w-5 text-violet-400" />
+              <h3 className="font-black">
+                {requiredDeposit > 0 ? "Deposit Method" : "Payment Method"}
+              </h3>
+            </div>
+            <div className="grid gap-3 p-4 sm:grid-cols-2">
+              {appointmentPaymentOptions.map((option) => {
+                const selected = paymentMethod === option.method;
+                const available = option.available !== false;
+                const Icon =
+                  option.method === "bank_transfer"
+                    ? Landmark
+                    : option.method === "payment_at_appointment"
+                      ? Store
+                      : DollarSign;
+                const title =
+                  option.method === "bank_transfer"
+                    ? requiredDeposit > 0
+                      ? selectedPaymentOption === "full"
+                        ? "Pay in full by bank transfer"
+                        : "Deposit by bank transfer"
+                      : "Bank transfer"
+                    : option.method === "payment_at_appointment"
+                      ? requiredDeposit > 0
+                        ? selectedPaymentOption === "full"
+                          ? "Pay in full in person"
+                          : "Pay deposit in person"
+                        : "Pay at appointment"
+                      : PAYMENT_METHOD_LABELS[option.method];
+                return (
+                  <button
+                    key={option.method}
+                    type="button"
+                    disabled={paymentConfigurationLoading}
+                    onClick={() => {
+                      setPaymentMethod(option.method);
+                      setBookingError("");
+                    }}
+                    className={`flex min-h-20 items-center gap-2 rounded-xl border p-2.5 text-left transition ${!available ? "cursor-not-allowed border-slate-700 bg-[#091525] opacity-55" : selected ? "border-violet-400 bg-violet-600/20" : "border-slate-600 bg-[#091525] hover:border-violet-500 light:bg-slate-50"}`}
+                  >
+                    <span className="rounded-xl border border-violet-500/40 bg-violet-500/10 p-2 text-violet-300">
+                      <Icon className="h-5 w-5" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-bold">{title}</span>
+                      <span className="mt-1 block text-xs leading-5 text-slate-400 light:text-slate-600">
+                        {option.method === "bank_transfer"
+                          ? "Transfer to the business and upload your receipt."
+                          : option.instructions ||
+                            "Arrange payment directly with the business."}
+                      </span>
+                    </span>
+                    <span
+                      className={`h-5 w-5 shrink-0 rounded-full border ${selected ? "border-violet-300 bg-violet-600 ring-2 ring-violet-500/30" : "border-slate-500"}`}
+                    />
+                  </button>
+                );
+              })}
+            </div>
+            <p className="px-4 pb-3 text-xs text-slate-400">
+              {appointmentPaymentOptions.find(
+                (option) => option.method === paymentMethod,
+              )?.instructions ||
+                (paymentMethod === "bank_transfer"
+                  ? `Transfer ${formatCurrency(selectedPaymentOption === "full" ? selectedTotal : requiredDeposit || selectedTotal)} directly to the business, then upload your receipt in Track Booking for approval.`
+                  : requiredDeposit > 0
+                    ? selectedPaymentOption === "full"
+                      ? "Arrange the full payment directly with the business. The owner must record it before confirming your booking."
+                      : "Arrange the deposit directly with the business. The owner must record it before confirming your booking."
+                    : "Pay the business directly at your appointment.")}
+            </p>
+            {paymentConfigurationLoading && (
+              <p className="px-4 pb-3 text-xs text-violet-300">
+                Loading business payment options…
               </p>
             )}
-          </div>
+            {paymentConfigurationError && (
+              <p className="mt-2 rounded-lg border border-red-400/30 bg-red-400/10 px-3 py-2 text-xs text-red-300">
+                {paymentConfigurationError}
+              </p>
+            )}
+          </section>
+          <section className="overflow-hidden rounded-xl border border-slate-700 bg-[#0c1b2e] light:border-slate-200 light:bg-white lg:col-start-2">
+            <div className="flex items-center gap-2 border-b border-slate-700 px-4 py-3 light:border-slate-200">
+              <ClipboardList className="h-5 w-5 text-violet-400" />
+              <h3 className="font-black">Booking Summary</h3>
+            </div>
+            <div className="space-y-3 p-4 text-sm">
+              <div className="flex justify-between gap-4 border-b border-slate-700 pb-3 light:border-slate-200">
+                <div>
+                  <p className="font-bold">
+                    {selectedService?.name ?? "Selected service"}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-400">
+                    {selectedDate ? formatDate(selectedDate) : ""} at{" "}
+                    {selectedTime}
+                  </p>
+                </div>
+                <span className="font-black">
+                  {formatCurrency(selectedTotal)}
+                </span>
+              </div>
+              <div className="flex justify-between text-slate-400">
+                <span>
+                  {selectedPaymentOption === "full"
+                    ? "Payment due now"
+                    : "Deposit due"}
+                </span>
+                <span className="font-bold text-amber-300">
+                  {formatCurrency(
+                    selectedPaymentOption === "full"
+                      ? selectedTotal
+                      : requiredDeposit,
+                  )}
+                </span>
+              </div>
+              <div className="flex justify-between text-slate-400">
+                <span>Remaining balance</span>
+                <span className="font-bold text-white light:text-slate-950">
+                  {formatCurrency(
+                    selectedPaymentOption === "full"
+                      ? 0
+                      : Math.max(0, selectedTotal - requiredDeposit),
+                  )}
+                </span>
+              </div>
+              <div className="flex items-center justify-between rounded-xl bg-violet-600/25 px-4 py-3 text-lg font-black text-violet-200 light:text-violet-800">
+                <span>Total</span>
+                <span>{formatCurrency(selectedTotal)}</span>
+              </div>
+            </div>
+          </section>
           {bookingError && (
-            <p className="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-300">
+            <p className="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-300 lg:col-span-2">
               {bookingError}
             </p>
           )}
-          <p className="text-xs leading-5 text-slate-400">
+          <p className="text-xs leading-5 text-slate-400 lg:col-span-2">
             By requesting this appointment, you ask {tenant.name} to process
             your contact and booking details. See the{" "}
             <Link
@@ -1328,6 +1816,138 @@ export function AppointmentBooking({
             . The business&apos;s cancellation and refund terms also apply.
           </p>
         </div>
+      </Modal>
+      <Modal
+        open={!!depositCheckout}
+        onClose={() => !isUploadingDeposit && setDepositCheckout(null)}
+        title={`Upload ${selectedPaymentOption === "full" ? "full payment" : "deposit"} receipt`}
+        maxWidth="max-w-2xl"
+        contentClassName="p-4 sm:p-5"
+        footer={
+          <Button
+            type="button"
+            loading={isUploadingDeposit}
+            disabled={!depositReceipt || !selectedDepositBankId}
+            onClick={() => void uploadDepositReceipt()}
+            className="min-h-12 w-full justify-center"
+          >
+            Submit{" "}
+            {selectedPaymentOption === "full" ? "Full Payment" : "Deposit"}{" "}
+            Receipt
+          </Button>
+        }
+      >
+        {depositCheckout && (
+          <div className="grid gap-4 sm:grid-cols-2">
+            <section className="rounded-xl border border-violet-500/30 bg-violet-500/10 p-4 sm:col-span-2">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs text-violet-300">
+                    Track Booking number
+                  </p>
+                  <p className="font-black">
+                    {depositCheckout.appointmentNumber}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    void navigator.clipboard.writeText(
+                      depositCheckout.appointmentNumber,
+                    )
+                  }
+                  className="flex items-center gap-2 rounded-lg border border-violet-400 px-3 py-2 text-sm font-bold text-violet-200"
+                >
+                  <Copy className="h-4 w-4" /> Copy
+                </button>
+                <div className="text-right">
+                  <p className="text-xs text-slate-400">
+                    {selectedPaymentOption === "full"
+                      ? "Full payment due"
+                      : "Deposit due"}
+                  </p>
+                  <p className="font-black text-amber-300">
+                    {formatCurrency(depositCheckout.amount)}
+                  </p>
+                </div>
+              </div>
+            </section>
+            <section className="rounded-xl border border-slate-700 bg-[#0c1b2e] p-4">
+              <label className="mb-2 block text-sm font-bold">
+                {selectedPaymentOption === "full" ? "Pay to" : "Deposit to"}
+              </label>
+              <select
+                value={selectedDepositBankId}
+                onChange={(event) =>
+                  setSelectedDepositBankId(event.target.value)
+                }
+                className="w-full rounded-xl border border-violet-500/50 bg-[#091525] px-3 py-3 text-sm text-white outline-none"
+              >
+                {depositCheckout.bankAccounts.map((account) => (
+                  <option key={account.id} value={account.id}>
+                    {account.bankName} — {account.label}
+                  </option>
+                ))}
+              </select>
+              {depositCheckout.bankAccounts
+                .filter((account) => account.id === selectedDepositBankId)
+                .map((account) => (
+                  <dl key={account.id} className="mt-3 space-y-2 text-sm">
+                    <div>
+                      <dt className="text-xs text-slate-400">Account name</dt>
+                      <dd className="font-bold">{account.accountHolder}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-slate-400">Account number</dt>
+                      <dd className="font-bold">{account.accountNumber}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-slate-400">
+                        Reference / Memo
+                      </dt>
+                      <dd className="font-bold">
+                        {depositCheckout.appointmentNumber}
+                      </dd>
+                    </div>
+                  </dl>
+                ))}
+            </section>
+            <section className="flex min-h-52 flex-col items-center justify-center rounded-xl border border-dashed border-violet-500/60 bg-[#0c1b2e] p-5 text-center">
+              <UploadCloud className="mb-3 h-9 w-9 text-violet-400" />
+              <p className="font-bold">Upload your transfer receipt</p>
+              <p className="mt-1 text-xs text-slate-400">
+                JPG, PNG, or PDF · maximum 5 MB
+              </p>
+              <label className="mt-4 cursor-pointer rounded-lg bg-violet-600 px-4 py-2 text-sm font-bold text-white hover:bg-violet-500">
+                Choose receipt
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,application/pdf"
+                  className="sr-only"
+                  onChange={(event) => {
+                    setDepositReceipt(event.target.files?.[0] ?? null);
+                    setDepositUploadError("");
+                  }}
+                />
+              </label>
+              {depositReceipt && (
+                <p className="mt-3 max-w-full truncate text-xs text-emerald-300">
+                  {depositReceipt.name}
+                </p>
+              )}
+            </section>
+            {depositUploadError && (
+              <p className="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-300 sm:col-span-2">
+                {depositUploadError}
+              </p>
+            )}
+            <p className="text-xs leading-5 text-slate-400 sm:col-span-2">
+              Your booking remains pending until the business verifies this
+              receipt and confirms the appointment. Keep the Track Booking
+              number to view details, pay the remaining balance, or cancel.
+            </p>
+          </div>
+        )}
       </Modal>
     </>
   );

@@ -14,6 +14,8 @@ export type TransactionalEmailEvent =
   | "ORDER_COMPLETED"
   | "ORDER_CANCELLED"
   | "APPOINTMENT_CONFIRMED"
+  | "APPOINTMENT_RECEIVED"
+  | "APPOINTMENT_PAYMENT_CONFIRMED"
   | "APPOINTMENT_CANCELLED"
   | "APPOINTMENT_REMINDER"
   | "CONTACT_FORM_MESSAGE"
@@ -23,6 +25,8 @@ export type TransactionalEmailEvent =
   | "SUBSCRIPTION_ACTIVATED"
   | "SUBSCRIPTION_UPDATED"
   | "SUBSCRIPTION_PAYMENT_ISSUE"
+  | "SUBSCRIPTION_RENEWED"
+  | "SUBSCRIPTION_EXPIRING"
   | "BUSINESS_ALERT";
 
 export interface TransactionalEmailInput {
@@ -267,16 +271,27 @@ export function buildTransactionalEmail(
         `${stringValue(payload, "inviter_name", "The business owner")} invited you as ${stringValue(payload, "role", "staff")}. Sign in with this email address to accept the invitation.`,
       ) + action("Accept invitation", stringValue(payload, "invitation_url"));
   } else if (input.eventType === "ORDER_TRACKING_CODE") {
-    subject = `Your order verification code · ${business}`;
-    title = "Verify your order";
-    preview = "Use this code to securely view your order.";
+    const recordLabel = stringValue(payload, "record_label", "order");
+    const trackingPage =
+      recordLabel === "booking" ? "Track Booking" : "Track Order";
+    const reference = stringValue(
+      payload,
+      "reference",
+      stringValue(payload, "order_number"),
+    );
+    subject = `Your ${recordLabel} verification code · ${business}`;
+    title = `Verify your ${recordLabel}`;
+    preview = `Use this code to securely view your ${recordLabel}.`;
     content =
       paragraph(
-        `Hi ${name}, enter this code on ${business}'s Track Order page.`,
+        `Hi ${name}, enter this code on ${business}'s ${trackingPage} page.`,
       ) +
       detailRows([
         ["Verification code", stringValue(payload, "verification_code")],
-        ["Order reference", stringValue(payload, "order_number")],
+        [
+          `${recordLabel.charAt(0).toUpperCase()}${recordLabel.slice(1)} reference`,
+          reference,
+        ],
       ]) +
       paragraph(
         "This code expires in 10 minutes. Do not share it. If you did not request it, you can ignore this email.",
@@ -379,7 +394,51 @@ export function buildTransactionalEmail(
           "Keep your order reference. Verify your checkout email in Track Order to view your items, payment instructions, and delivery or pickup progress.",
         ) + action("Track order & payment", appActionUrl(appUrl, trackingPath));
     }
+  } else if (input.eventType === "APPOINTMENT_RECEIVED") {
+    const appointmentNumber = stringValue(
+      payload,
+      "appointment_number",
+      "your booking",
+    );
+    const storefrontSlug = stringValue(payload, "storefront_slug");
+    const trackingPath = storefrontSlug
+      ? `/store-front/${encodeURIComponent(storefrontSlug)}?tab=track-order&order=${encodeURIComponent(appointmentNumber)}`
+      : "";
+    subject =
+      input.subject?.trim() ||
+      `Booking request received · ${appointmentNumber}`;
+    title = "Booking request received";
+    preview = `${business} received your booking request.`;
+    content =
+      paragraph(
+        `Hi ${name}, ${business} received your booking request and will review it.`,
+      ) +
+      detailRows([
+        ["Service", stringValue(payload, "service_name", "Appointment")],
+        ["Requested time", dateTime(stringValue(payload, "starts_at"))],
+        ["Booking reference", appointmentNumber],
+        ["Deposit required", money(numberValue(payload, "deposit_required"))],
+        ["Total", money(numberValue(payload, "total"))],
+      ]) +
+      paragraph(
+        "Keep this booking reference. You will use it in Track Booking to pay, upload a receipt, reschedule, or cancel.",
+      ) +
+      (trackingPath
+        ? action("Track Booking", appActionUrl(appUrl, trackingPath))
+        : "");
   } else if (input.eventType === "APPOINTMENT_CONFIRMED") {
+    const supportsOnlineTracking =
+      stringValue(payload, "payment_method") === "bank_transfer";
+    const appointmentNumber = stringValue(
+      payload,
+      "appointment_number",
+      stringValue(payload, "confirmation_code"),
+    );
+    const storefrontSlug = stringValue(payload, "storefront_slug");
+    const trackingPath =
+      supportsOnlineTracking && storefrontSlug
+        ? `/store-front/${encodeURIComponent(storefrontSlug)}?tab=track-order&order=${encodeURIComponent(appointmentNumber)}`
+        : "";
     subject =
       input.subject?.trim() || `Your appointment with ${business} is confirmed`;
     title = "Appointment confirmed";
@@ -396,8 +455,62 @@ export function buildTransactionalEmail(
           ),
         ],
         ["Provider", stringValue(payload, "provider_name")],
-        ["Confirmation", stringValue(payload, "confirmation_code")],
-      ]);
+        [
+          "Appointment reference",
+          supportsOnlineTracking ? appointmentNumber : "",
+        ],
+      ]) +
+      (trackingPath
+        ? action(
+            "Track appointment & payment",
+            appActionUrl(appUrl, trackingPath),
+          )
+        : "");
+  } else if (input.eventType === "APPOINTMENT_PAYMENT_CONFIRMED") {
+    const appointmentNumber = stringValue(
+      payload,
+      "appointment_number",
+      "your appointment",
+    );
+    const storefrontSlug = stringValue(payload, "storefront_slug");
+    const trackingPath = storefrontSlug
+      ? `/store-front/${encodeURIComponent(storefrontSlug)}?tab=track-order&order=${encodeURIComponent(appointmentNumber)}`
+      : "";
+    const amountPaid = numberValue(payload, "amount_paid");
+    const outstandingBalance = numberValue(payload, "outstanding_balance");
+    const hasBalance = outstandingBalance > 0;
+    subject =
+      input.subject?.trim() ||
+      `Appointment payment confirmed · ${appointmentNumber}`;
+    title = "Your deposit is confirmed";
+    preview = hasBalance
+      ? `Your deposit was verified. Your remaining balance is ${money(outstandingBalance)}.`
+      : "Your appointment payment was verified in full.";
+    content =
+      paragraph(
+        `Hi ${name}, ${business} verified your deposit of ${money(amountPaid)} for this appointment.`,
+      ) +
+      detailRows([
+        ["Track Booking number", appointmentNumber],
+        [
+          "Payment status",
+          stringValue(payload, "payment_status").replaceAll("_", " "),
+        ],
+        ["Deposit confirmed", money(amountPaid)],
+        ["Remaining balance", money(outstandingBalance)],
+        ["Appointment time", dateTime(stringValue(payload, "starts_at"))],
+      ]) +
+      paragraph(
+        hasBalance
+          ? "Use Track Booking to view your booking and pay the remaining balance before your appointment, or arrange to pay it at the appointment."
+          : "Your appointment balance is fully paid. Keep your Track Booking number for future reference.",
+      ) +
+      (trackingPath
+        ? action(
+            hasBalance ? "Track Booking & pay balance" : "View Track Booking",
+            appActionUrl(appUrl, trackingPath),
+          )
+        : "");
   } else if (input.eventType === "APPOINTMENT_CANCELLED") {
     subject = input.subject?.trim() || `Appointment cancelled · ${business}`;
     title = "Appointment cancelled";
@@ -488,33 +601,59 @@ export function buildTransactionalEmail(
       ) + action("View plans", appActionUrl(appUrl, "/#pricing"));
   } else if (input.eventType.startsWith("SUBSCRIPTION_")) {
     const plan = stringValue(payload, "plan", "Beginner");
+    const renewed = input.eventType === "SUBSCRIPTION_RENEWED";
+    const expiring = input.eventType === "SUBSCRIPTION_EXPIRING";
+    const paymentIssue = input.eventType === "SUBSCRIPTION_PAYMENT_ISSUE";
     const status = stringValue(
       payload,
       "subscription_status",
       "updated",
     ).replaceAll("_", " ");
-    subject = input.subject?.trim() || `${business} subscription ${status}`;
-    title =
-      input.eventType === "SUBSCRIPTION_PAYMENT_ISSUE"
-        ? "Payment attention required"
-        : "Subscription updated";
+    subject =
+      input.subject?.trim() ||
+      (renewed
+        ? `${business} subscription renewed`
+        : expiring
+          ? `${business} subscription ends soon`
+          : `${business} subscription ${status}`);
+    title = paymentIssue
+      ? "Payment attention required"
+      : renewed
+        ? "Subscription renewed"
+        : expiring
+          ? "Subscription ending soon"
+          : "Subscription updated";
     preview = subject;
     content =
       paragraph(
-        input.eventType === "SUBSCRIPTION_PAYMENT_ISSUE"
+        paymentIssue
           ? `Access for ${business} may be limited until its payment is confirmed.`
-          : `The subscription for ${business} has been updated successfully.`,
+          : renewed
+            ? `The subscription for ${business} has been renewed successfully.`
+            : expiring
+              ? `The paid subscription for ${business} ends on ${dateTime(stringValue(payload, "current_period_end"))}. Renew it before then to avoid an interruption.`
+              : `The subscription for ${business} has been updated successfully.`,
       ) +
       detailRows([
         ["Business", business],
         ["Plan", plan],
         ["Status", status],
+        ...(renewed || expiring
+          ? [
+              [
+                "Paid through",
+                dateTime(stringValue(payload, "current_period_end")),
+              ] as [string, string],
+            ]
+          : []),
       ]) +
       action(
-        "Review subscription",
+        expiring ? "Renew subscription" : "Review subscription",
         appActionUrl(appUrl, "/dashboard/settings"),
       );
   } else {
+    const dashboardPath = stringValue(payload, "href", "/dashboard");
+    const ownerSignInPath = `/login?next=${encodeURIComponent(dashboardPath)}`;
     subject =
       input.subject?.trim() ||
       stringValue(payload, "title", "Important business alert");
@@ -529,12 +668,8 @@ export function buildTransactionalEmail(
         ),
       ) +
       action(
-        "Open YuhBusiness",
-        appActionUrl(
-          appUrl,
-          stringValue(payload, "href", "/dashboard"),
-          "/dashboard",
-        ),
+        "Open business dashboard",
+        appActionUrl(appUrl, ownerSignInPath, "/login?next=%2Fdashboard"),
       );
   }
 
@@ -578,8 +713,61 @@ export function buildTransactionalEmail(
     ...(input.eventType === "ORDER_TRACKING_CODE"
       ? [
           `Verification code: ${stringValue(payload, "verification_code")}`,
-          `Order reference: ${stringValue(payload, "order_number")}`,
+          `Reference: ${stringValue(payload, "reference", stringValue(payload, "order_number"))}`,
           "Expires in 10 minutes. Do not share this code.",
+        ]
+      : []),
+    ...(input.eventType === "APPOINTMENT_PAYMENT_CONFIRMED"
+      ? [
+          `Track Booking number: ${stringValue(payload, "appointment_number")}`,
+          `Payment status: ${stringValue(payload, "payment_status").replaceAll("_", " ")}`,
+          `Deposit confirmed: ${money(numberValue(payload, "amount_paid"))}`,
+          `Remaining balance: ${money(numberValue(payload, "outstanding_balance"))}`,
+          numberValue(payload, "outstanding_balance") > 0
+            ? "Use Track Booking to pay your remaining balance before the appointment, or arrange to pay it at the appointment."
+            : "Your appointment balance is fully paid.",
+        ]
+      : []),
+    ...(input.eventType === "APPOINTMENT_RECEIVED"
+      ? [
+          `Booking reference: ${stringValue(payload, "appointment_number")}`,
+          `Requested for: ${dateTime(stringValue(payload, "starts_at"))}`,
+          ...(stringValue(payload, "storefront_slug")
+            ? [
+                appActionUrl(
+                  appUrl,
+                  `/store-front/${encodeURIComponent(stringValue(payload, "storefront_slug"))}?tab=track-order&order=${encodeURIComponent(stringValue(payload, "appointment_number"))}`,
+                ),
+              ]
+            : []),
+        ]
+      : []),
+    ...(input.eventType === "APPOINTMENT_CONFIRMED"
+      ? [
+          ...(stringValue(payload, "payment_method") === "bank_transfer"
+            ? [
+                `Appointment reference: ${stringValue(payload, "appointment_number", stringValue(payload, "confirmation_code"))}`,
+              ]
+            : []),
+          `Scheduled for: ${dateTime(stringValue(payload, "starts_at"), stringValue(payload, "timezone", "America/Belize"))}`,
+          ...(stringValue(payload, "payment_method") === "bank_transfer" &&
+          stringValue(payload, "storefront_slug")
+            ? [
+                appActionUrl(
+                  appUrl,
+                  `/store-front/${encodeURIComponent(stringValue(payload, "storefront_slug"))}?tab=track-order&order=${encodeURIComponent(stringValue(payload, "appointment_number", stringValue(payload, "confirmation_code")))}`,
+                ),
+              ]
+            : []),
+        ]
+      : []),
+    ...(input.eventType === "BUSINESS_ALERT"
+      ? [
+          appActionUrl(
+            appUrl,
+            `/login?next=${encodeURIComponent(stringValue(payload, "href", "/dashboard"))}`,
+            "/login?next=%2Fdashboard",
+          ),
         ]
       : []),
     stringValue(payload, "message"),

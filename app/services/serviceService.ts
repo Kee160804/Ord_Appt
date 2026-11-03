@@ -12,6 +12,7 @@ export interface ServiceInput {
   requiresDeposit: boolean;
   depositAmount?: number;
   depositType?: "fixed" | "percentage";
+  departmentId?: string;
 }
 
 /**
@@ -162,6 +163,7 @@ function serviceValues(tenantId: string, input: ServiceInput) {
     requires_deposit: input.requiresDeposit,
     deposit_type: normalized.depositType,
     deposit_amount: normalized.depositAmount,
+    department_id: input.departmentId || null,
   };
 }
 

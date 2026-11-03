@@ -440,7 +440,7 @@ export default function StorefrontClient({
                         : []),
                       {
                         id: "track-order" as const,
-                        label: "Track Order",
+                        label: isAppt ? "Track Booking" : "Track Order",
                         icon: PackageSearch,
                       },
                     ].map((item) => {
@@ -549,7 +549,7 @@ export default function StorefrontClient({
                       : []),
                     {
                       id: "track-order" as const,
-                      label: "Track Order",
+                      label: isAppt ? "Track Booking" : "Track Order",
                       icon: PackageSearch,
                     },
                   ].map((item) => {
@@ -620,6 +620,9 @@ export default function StorefrontClient({
                     reviews={initialReviews}
                     promotions={initialPromotions}
                     viewOnly={viewOnly}
+                    onTrackAppointment={(reference) =>
+                      switchTab("track-order", undefined, reference)
+                    }
                   />
                 ) : (
                   <OrderingMenu
@@ -655,6 +658,7 @@ export default function StorefrontClient({
                   tenantId={tenant.id}
                   viewOnly={viewOnly}
                   initialOrderNumber={trackingOrderReference}
+                  mode={isAppt ? "appointment" : "order"}
                 />
               ) : (
                 <StorefrontContact tenant={tenant} viewOnly={viewOnly} />

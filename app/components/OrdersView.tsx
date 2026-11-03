@@ -619,6 +619,12 @@ export function OrdersView({ tenant }: Props) {
                         Update Status
                       </p>
 
+                      <p className="text-[11px] leading-4 text-slate-400 light:text-slate-600">
+                        {tenant.businessType === "ordering"
+                          ? "Pending, confirmed, preparing and delivered update the tracker only. Ready or cancelled also sends one customer email."
+                          : "Order statuses update the tracker only. Retail sends its customer email when payment is confirmed."}
+                      </p>
+
                       <div className="grid grid-cols-2 gap-2">
                         {statusFlow
                           .slice(
@@ -638,7 +644,10 @@ export function OrdersView({ tenant }: Props) {
                               onClick={() => void advance(selected.id, next)}
                             >
                               <RefreshCw className="mr-1 h-3 w-3" />
-                              {capitalise(next.replaceAll("_", " "))}
+                              {tenant.businessType === "ordering" &&
+                              next === "ready"
+                                ? "Ready & notify customer"
+                                : capitalise(next.replaceAll("_", " "))}
                             </Button>
                           ))}
                       </div>
@@ -651,7 +660,9 @@ export function OrdersView({ tenant }: Props) {
                         onClick={() => void advance(selected.id, "cancelled")}
                       >
                         <XCircle className="mr-1 h-3.5 w-3.5" />
-                        Cancel Order
+                        {tenant.businessType === "ordering"
+                          ? "Cancel & notify customer"
+                          : "Cancel Order"}
                       </Button>
                     </div>
                   )}

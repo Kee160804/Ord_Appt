@@ -250,6 +250,7 @@ export async function getPublicStorefront(
     productsResult,
     variantsResult,
     servicesResult,
+    departmentsResult,
     providersResult,
     assignmentsResult,
     orderingSettingsResult,
@@ -287,6 +288,11 @@ export async function getPublicStorefront(
       .eq("available", true)
       .order("name")
       .range(0, PUBLIC_SERVICE_LIMIT - 1),
+    supabase
+      .from("service_departments")
+      .select("id")
+      .eq("tenant_id", tenantRow.id)
+      .eq("is_active", true),
     supabase
       .from("staff")
       .select("id, tenant_id, display_name, bio, color")
@@ -333,10 +339,14 @@ export async function getPublicStorefront(
     hoursResult.error ??
     categoriesResult.error ??
     productsResult.error ??
-    servicesResult.error;
+    servicesResult.error ??
+    departmentsResult.error;
   if (firstError) throw firstError;
 
   const categoryRows = (categoriesResult.data ?? []) as CategoryRow[];
+  const activeDepartmentIds = new Set(
+    (departmentsResult.data ?? []).map((row) => row.id),
+  );
   const variantsByProduct = new Map<string, ProductVariantRow[]>();
   for (const variant of (variantsResult.error
     ? []
@@ -432,23 +442,28 @@ export async function getPublicStorefront(
       })),
       createdAt: row.created_at,
     })),
-    services: ((servicesResult.data ?? []) as ServiceRow[]).map((row) => ({
-      id: row.id,
-      tenantId: row.tenant_id,
-      name: row.name,
-      description: row.description ?? "",
-      duration: row.duration_minutes,
-      price: Number(row.price),
-      image: row.image_url ?? "",
-      category: row.category ?? "Services",
-      isActive: row.available,
-      requiresDeposit: row.requires_deposit ?? false,
-      depositAmount:
-        row.deposit_amount == null ? undefined : Number(row.deposit_amount),
-      depositType: row.deposit_type ?? undefined,
-      createdAt: row.created_at,
-      departmentId: row.department_id ?? undefined,
-    })),
+    services: ((servicesResult.data ?? []) as ServiceRow[])
+      .filter(
+        (row) =>
+          !row.department_id || activeDepartmentIds.has(row.department_id),
+      )
+      .map((row) => ({
+        id: row.id,
+        tenantId: row.tenant_id,
+        name: row.name,
+        description: row.description ?? "",
+        duration: row.duration_minutes,
+        price: Number(row.price),
+        image: row.image_url ?? "",
+        category: row.category ?? "Services",
+        isActive: row.available,
+        requiresDeposit: row.requires_deposit ?? false,
+        depositAmount:
+          row.deposit_amount == null ? undefined : Number(row.deposit_amount),
+        depositType: row.deposit_type ?? undefined,
+        createdAt: row.created_at,
+        departmentId: row.department_id ?? undefined,
+      })),
     providers: (providersResult.error ? [] : (providersResult.data ?? [])).map(
       (raw) => {
         const row = raw as {

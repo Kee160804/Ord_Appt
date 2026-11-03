@@ -156,6 +156,12 @@ export interface AppointmentRow {
   customer_phone: string | null;
   status: string;
   payment_status?: string | null;
+  payment_method?: string | null;
+  payment_selection?: string | null;
+  appointment_number?: string | null;
+  payment_reservation_expires_at?: string | null;
+  amount_paid?: number | string | null;
+  outstanding_balance?: number | string | null;
   notes: string | null;
   subtotal: number | string | null;
   deposit_required: number | string | null;

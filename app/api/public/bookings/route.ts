@@ -9,6 +9,12 @@ import {
   requestHasAllowedOrigin,
 } from "@/app/lib/server/security";
 import { isValidPromotionCode } from "@/app/lib/promotions";
+import {
+  isBusinessPaymentMethod,
+  type BusinessPaymentMethod,
+} from "@/app/lib/business-payments";
+import { createGuestAccessToken } from "@/app/lib/server/guest-access";
+import { processEmailQueueBestEffort } from "@/app/lib/email/process-best-effort";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,7 +38,8 @@ interface BookingRequest {
   providerId?: string;
   promotionCode?: string;
 
-  paymentMethod?: "pay_later" | "mock_card";
+  paymentMethod?: BusinessPaymentMethod;
+  paymentOption?: "deposit" | "full";
 
   /**
    * Honeypot field.
@@ -148,6 +155,10 @@ export async function POST(request: Request): Promise<Response> {
 
     const promotionCode = body.promotionCode?.trim().toUpperCase() || null;
 
+    const paymentMethod = body.paymentMethod?.trim() || "";
+
+    const paymentOption = body.paymentOption?.trim().toLowerCase() || "deposit";
+
     /* ----------------------------------------------------------------------
        Validate tenant/resource identifiers
        ---------------------------------------------------------------------- */
@@ -242,6 +253,29 @@ export async function POST(request: Request): Promise<Response> {
       );
     }
 
+    if (
+      !isBusinessPaymentMethod(paymentMethod) ||
+      !["bank_transfer", "payment_at_appointment", "external_link"].includes(
+        paymentMethod,
+      )
+    ) {
+      return json(
+        {
+          error: "Choose an available business payment method.",
+        },
+        400,
+      );
+    }
+
+    if (paymentOption !== "deposit" && paymentOption !== "full") {
+      return json(
+        {
+          error: "Choose whether to pay the deposit or the full amount.",
+        },
+        400,
+      );
+    }
+
     /* ----------------------------------------------------------------------
        Distributed rate limiting
 
@@ -279,6 +313,35 @@ export async function POST(request: Request): Promise<Response> {
       );
     }
 
+    if (paymentMethod === "bank_transfer") {
+      const { data: activeBankAccount, error: bankAccountError } =
+        await supabase
+          .from("business_bank_accounts")
+          .select("id")
+          .eq("tenant_id", tenantId)
+          .eq("is_active", true)
+          .limit(1)
+          .maybeSingle();
+      if (bankAccountError) {
+        console.error("[public-booking] Bank availability check failed.", {
+          code: bankAccountError.code,
+        });
+        return json(
+          { error: "Business payment details are temporarily unavailable." },
+          503,
+        );
+      }
+      if (!activeBankAccount) {
+        return json(
+          {
+            error:
+              "Bank transfer is not available because this business has not added an active bank account. Choose pay deposit in person or contact the business.",
+          },
+          409,
+        );
+      }
+    }
+
     /* ----------------------------------------------------------------------
        Build authoritative RPC input.
 
@@ -306,72 +369,56 @@ export async function POST(request: Request): Promise<Response> {
 
       p_promotion_code: promotionCode,
 
-      /**
-       * Real payment-provider methods are intentionally deferred.
-       */
-      p_payment_method:
-        body.paymentMethod === "mock_card" ? "mock_card" : "pay_later",
+      p_payment_method: paymentMethod,
+
+      p_payment_option: paymentOption,
     };
 
     /* ----------------------------------------------------------------------
        Create appointment using the newest payment-aware RPC.
        ---------------------------------------------------------------------- */
 
-    let { data, error } = await supabase.rpc(
-      "create_public_appointment_with_payment",
+    const { data, error } = await supabase.rpc(
+      "create_public_appointment_with_customer_payment",
       payload,
     );
-
-    /* ----------------------------------------------------------------------
-       Rolling database compatibility.
-
-       PGRST202 indicates that PostgREST could not find the newer RPC.
-
-       Keep the older provider-aware function temporarily while staged
-       migrations are being applied across environments.
-       ---------------------------------------------------------------------- */
-
-    if (error?.code === "PGRST202") {
-      const fallback = await supabase.rpc(
-        "create_public_appointment_with_provider",
-        {
-          p_tenant_id: payload.p_tenant_id,
-
-          p_service_id: payload.p_service_id,
-
-          p_appointment_date: payload.p_appointment_date,
-
-          p_appointment_time: payload.p_appointment_time,
-
-          p_customer_name: payload.p_customer_name,
-
-          p_customer_email: payload.p_customer_email,
-
-          p_customer_phone: payload.p_customer_phone,
-
-          p_notes: payload.p_notes,
-
-          p_staff_id: payload.p_staff_id,
-
-          p_promotion_code: payload.p_promotion_code,
-        },
-      );
-
-      data = fallback.data;
-      error = fallback.error;
-    }
 
     /* ----------------------------------------------------------------------
        Convert known business-rule errors into safe customer-facing messages.
        ---------------------------------------------------------------------- */
 
     if (error) {
+      if (error.code === "PGRST202") {
+        return json(
+          {
+            error:
+              "Appointment payments are pending the latest database migration.",
+          },
+          503,
+        );
+      }
+      console.error("[public-booking] Appointment RPC failed.", {
+        code: error.code,
+        message: error.message,
+        paymentMethod,
+      });
+      const safePaymentError = /active bank account/i.test(error.message)
+        ? "The business must add an active bank account before accepting bank-transfer deposits."
+        : null;
+      const bookingMigrationError = /column reference.*ambiguous/i.test(
+        error.message,
+      )
+        ? "Appointment booking needs the latest database repair migration."
+        : null;
       return json(
         {
-          error: publicOperationError(
-            error,
-            "Unable to create the appointment. Please try again.",
-          ),
+          error:
+            safePaymentError ||
+            bookingMigrationError ||
+            publicOperationError(
+              error,
+              "Unable to create the appointment. Please try again.",
+            ),
         },
         400,
       );
@@ -403,16 +450,115 @@ export async function POST(request: Request): Promise<Response> {
       );
     }
 
+    let depositCheckout: Record<string, unknown> | null = null;
+    if (paymentMethod === "bank_transfer") {
+      const access = createGuestAccessToken();
+      const [appointmentResult, accountsResult, settingsResult] =
+        await Promise.all([
+          supabase
+            .from("appointments")
+            .select("deposit_required,total,customer_email,payment_selection")
+            .eq("id", result.appointment_id)
+            .eq("tenant_id", tenantId)
+            .single(),
+          supabase
+            .from("business_bank_accounts")
+            .select(
+              "id,label,bank_name,account_holder,account_number,currency,instructions,sort_order",
+            )
+            .eq("tenant_id", tenantId)
+            .eq("is_active", true)
+            .order("sort_order"),
+          supabase
+            .from("business_fulfillment_settings")
+            .select("payment_window_minutes")
+            .eq("tenant_id", tenantId)
+            .maybeSingle(),
+        ]);
+      if (appointmentResult.error || accountsResult.error) {
+        console.error("[public-booking] Deposit checkout setup failed.", {
+          appointmentCode: appointmentResult.error?.code,
+          accountCode: accountsResult.error?.code,
+        });
+        return json(
+          {
+            error:
+              "The appointment was created, but deposit setup failed. Use Track Booking to continue.",
+          },
+          502,
+        );
+      }
+      const minutes = Math.max(
+        5,
+        Math.min(1440, settingsResult.data?.payment_window_minutes ?? 30),
+      );
+      const tokenExpiresAt = new Date(Date.now() + minutes * 60_000);
+      const tokenUpdate = await supabase
+        .from("appointments")
+        .update({
+          tracking_token_hash: access.hash,
+          tracking_token_expires_at: tokenExpiresAt.toISOString(),
+        })
+        .eq("id", result.appointment_id)
+        .eq("tenant_id", tenantId);
+      if (tokenUpdate.error) {
+        console.error("[public-booking] Deposit token setup failed.", {
+          code: tokenUpdate.error.code,
+        });
+        return json(
+          {
+            error:
+              "The appointment was created, but secure deposit setup failed. Use Track Booking to continue.",
+          },
+          502,
+        );
+      }
+      depositCheckout = {
+        accessToken: access.token,
+        expiresAt: tokenExpiresAt.toISOString(),
+        customerEmail: appointmentResult.data.customer_email,
+        amount: Number(
+          appointmentResult.data.payment_selection === "FULL"
+            ? appointmentResult.data.total || 0
+            : appointmentResult.data.deposit_required ||
+                appointmentResult.data.total ||
+                0,
+        ),
+        bankAccounts: (accountsResult.data ?? []).map((account) => ({
+          id: account.id,
+          label: account.label,
+          bankName: account.bank_name,
+          accountHolder: account.account_holder,
+          accountNumber: account.account_number,
+          currency: account.currency,
+          instructions: account.instructions ?? "",
+        })),
+      };
+    }
+
     /* ----------------------------------------------------------------------
        Return only the information required by the storefront.
        ---------------------------------------------------------------------- */
 
+    // The appointment RPC queues this email atomically. Process it now as a
+    // fallback when the optional database webhook is not configured.
+    await processEmailQueueBestEffort("appointment creation");
+
     return json({
       appointmentId: result.appointment_id,
+
+      appointmentNumber:
+        paymentMethod === "bank_transfer"
+          ? result.appointment_number ||
+            `AP-${String(result.appointment_id).replaceAll("-", "").slice(0, 12).toUpperCase()}`
+          : null,
 
       paymentStatus: result.payment_status || "UNPAID",
 
       paymentReference: result.payment_reference || null,
+
+      createdAt: result.created_at || new Date().toISOString(),
+      depositCheckout,
     });
   } catch (error) {
     /* ----------------------------------------------------------------------

@@ -69,6 +69,8 @@ export function getStatusColor(status: string): string {
     paid: "bg-emerald-500/20 light:bg-emerald-50 text-emerald-300 light:text-emerald-700 border-emerald-500/30 light:border-emerald-300",
     unpaid:
       "bg-amber-500/20 light:bg-amber-50 text-amber-300 light:text-amber-700 border-amber-500/30 light:border-amber-300",
+    awaiting_verification:
+      "bg-violet-500/20 light:bg-violet-50 text-violet-300 light:text-violet-700 border-violet-500/30 light:border-violet-300",
     partial:
       "bg-blue-500/20 light:bg-blue-50 text-blue-300 light:text-blue-700 border-blue-500/30 light:border-blue-300",
     refunded:

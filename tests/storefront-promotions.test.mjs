@@ -30,6 +30,19 @@ test("owners can save About text and upload and share promotion flyers", async (
   assert.match(service, /flyer_url: promotion\.flyerUrl/);
 });
 
+test("retail owners can manage checkout discounts from Order Operations", async () => {
+  const settings = await read("app/components/SettingsView.tsx");
+
+  assert.match(
+    settings,
+    /tenant\.businessType === "ordering" \|\| tenant\.businessType === "retail"/,
+  );
+  assert.match(settings, /supportsOrderOperations \? \(/);
+  assert.match(settings, /label="Automatic threshold discount"/);
+  assert.match(settings, /label="Discount threshold \(BZD\)"/);
+  assert.match(settings, /label="Discount rate \(%\)"/);
+});
+
 test("promotion migration adds schema, public lookup, storage policy, and plan enforcement", async () => {
   const migration = await read(
     "supabase/migrations/202610150002_storefront_promotions_and_about.sql",

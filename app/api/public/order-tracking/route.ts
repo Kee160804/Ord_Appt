@@ -67,7 +67,10 @@ export async function POST(request: Request) {
           : "";
       if (!/^[A-Z0-9-]{4,50}$/.test(orderNumber))
         return json(
-          { error: "Enter a valid order reference from your email." },
+          {
+            error:
+              "Enter a valid order or appointment reference from your email.",
+          },
           400,
         );
       // Limit all references per caller, plus an atomic per-order limit in SQL.
@@ -82,31 +85,54 @@ export async function POST(request: Request) {
       if (!rate.allowed) return rateLimitResponse(rate.retryAfter);
       const access = createGuestAccessToken();
       const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
-      const { data: order, error } = await supabase
-        .from("orders")
-        .select("id,order_number,customer_email,customer_name")
-        .eq("tenant_id", tenantId)
-        .eq("order_number", orderNumber)
-        .maybeSingle();
-      if (error) throw error;
-      if (order && isValidEmail(order.customer_email ?? "")) {
-        const challenge = await supabase.rpc("request_order_tracking_code", {
-          p_tenant_id: tenantId,
-          p_order_id: order.id,
-          p_token_hash: access.hash,
-          p_code_hash: codeHash(access.token, code),
-        });
+      const [orderLookup, appointmentLookup] = await Promise.all([
+        supabase
+          .from("orders")
+          .select("id,order_number,customer_email,customer_name")
+          .eq("tenant_id", tenantId)
+          .eq("order_number", orderNumber)
+          .maybeSingle(),
+        supabase
+          .from("appointments")
+          .select(
+            "id,appointment_number,customer_email,customer_name,payment_method",
+          )
+          .eq("tenant_id", tenantId)
+          .eq("appointment_number", orderNumber)
+          .eq("payment_method", "bank_transfer")
+          .maybeSingle(),
+      ]);
+      if (orderLookup.error || appointmentLookup.error)
+        throw orderLookup.error ?? appointmentLookup.error;
+      const target = orderLookup.data ?? appointmentLookup.data;
+      const targetKind = orderLookup.data ? "order" : "booking";
+      if (target && isValidEmail(target.customer_email ?? "")) {
+        const challenge = orderLookup.data
+          ? await supabase.rpc("request_order_tracking_code", {
+              p_tenant_id: tenantId,
+              p_order_id: target.id,
+              p_token_hash: access.hash,
+              p_code_hash: codeHash(access.token, code),
+            })
+          : await supabase.rpc("request_appointment_tracking_code", {
+              p_tenant_id: tenantId,
+              p_appointment_id: target.id,
+              p_token_hash: access.hash,
+              p_code_hash: codeHash(access.token, code),
+            });
         if (challenge.error) throw challenge.error;
         if (challenge.data) {
           try {
             await sendTransactionalEmail({
               eventType: "ORDER_TRACKING_CODE",
-              to: order.customer_email,
-              recipientName: order.customer_name,
+              to: target.customer_email,
+              recipientName: target.customer_name,
               idempotencyKey: `tracking-${challenge.data}`,
               payload: {
                 business_name: tenant.business_name,
-                order_number: order.order_number,
+                order_number: orderNumber,
+                reference: orderNumber,
+                record_label: targetKind,
                 verification_code: code,
               },
             });
@@ -132,7 +158,10 @@ export async function POST(request: Request) {
 
     const token = typeof body.accessToken === "string" ? body.accessToken : "";
     if (!/^[A-Za-z0-9_-]{43}$/.test(token))
-      return json({ error: "Verify your email to view this order." }, 401);
+      return json(
+        { error: "Verify your email to view this transaction." },
+        401,
+      );
     if (action === "verify") {
       const code = typeof body.code === "string" ? body.code : "";
       if (!/^\d{6}$/.test(code))
@@ -173,6 +202,179 @@ export async function POST(request: Request) {
         },
         401,
       );
+    if (session.appointment_id) {
+      const { data: appointment, error: appointmentError } = await supabase
+        .from("appointments")
+        .select(
+          "id,appointment_number,customer_email,created_at,status,payment_status,payment_method,subtotal,total,amount_paid,deposit_required,outstanding_balance,starts_at,notes,payment_reservation_expires_at",
+        )
+        .eq("tenant_id", tenantId)
+        .eq("id", session.appointment_id)
+        .maybeSingle();
+      if (appointmentError) throw appointmentError;
+      if (
+        !appointment ||
+        appointment.customer_email?.toLowerCase() !== session.customer_email
+      ) {
+        return json({ error: "Please verify this appointment again." }, 401);
+      }
+
+      const [services, receipts, method, accounts] = await Promise.all([
+        supabase
+          .from("appointment_services")
+          .select("id,service_name,price")
+          .eq("tenant_id", tenantId)
+          .eq("appointment_id", appointment.id)
+          .order("created_at"),
+        supabase
+          .from("customer_payment_submissions")
+          .select(
+            "id,status,submitted_amount,created_at,verified_at,transaction_reference,rejection_reason,receipt_path,receipt_mime_type",
+          )
+          .eq("tenant_id", tenantId)
+          .eq("appointment_id", appointment.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .from("business_payment_methods")
+          .select("method,instructions,external_url")
+          .eq("tenant_id", tenantId)
+          .eq("method", appointment.payment_method)
+          .eq("enabled", true)
+          .contains("modules", ["appointment"])
+          .maybeSingle(),
+        supabase
+          .from("business_bank_accounts")
+          .select(
+            "id,label,bank_name,account_holder,account_number,currency,instructions",
+          )
+          .eq("tenant_id", tenantId)
+          .eq("is_active", true)
+          .order("sort_order"),
+      ]);
+      for (const query of [services, receipts, method, accounts]) {
+        if (query.error) throw query.error;
+      }
+      const receipt = receipts.data;
+      let receiptUrl: string | null = null;
+      if (
+        receipt?.receipt_path?.startsWith(
+          `${tenantId}/appointment/${appointment.id}/`,
+        )
+      ) {
+        const signed = await supabase.storage
+          .from("payment-receipts")
+          .createSignedUrl(receipt.receipt_path, 300);
+        receiptUrl = signed.data?.signedUrl ?? null;
+      }
+      const closed =
+        ["CANCELLED", "CANCELED"].includes(
+          String(appointment.status).toUpperCase(),
+        ) ||
+        ["PAID", "REFUNDED", "CANCELLED", "CANCELED"].includes(
+          String(appointment.payment_status).toUpperCase(),
+        );
+      const amountPaid = Number(appointment.amount_paid ?? 0);
+      const total = Number(appointment.total ?? 0);
+      const paymentStatus = String(
+        appointment.payment_status ?? "UNPAID",
+      ).toUpperCase();
+      const result: TrackedOrder = {
+        kind: "appointment",
+        id: appointment.id,
+        orderNumber:
+          appointment.appointment_number ??
+          `AP-${appointment.id.replaceAll("-", "").slice(0, 12).toUpperCase()}`,
+        customerEmail: appointment.customer_email,
+        createdAt: appointment.created_at,
+        status: String(appointment.status ?? "PENDING").toUpperCase(),
+        paymentStatus,
+        paymentMethod:
+          method.data?.method ??
+          appointment.payment_method ??
+          "payment_at_appointment",
+        orderType: "appointment",
+        subtotal: Number(appointment.subtotal ?? total),
+        tax: 0,
+        deliveryFee: 0,
+        discount: Math.max(0, Number(appointment.subtotal ?? total) - total),
+        total,
+        amountPaid,
+        paymentDue: Math.max(
+          0,
+          paymentStatus === "PARTIALLY_PAID" || paymentStatus === "PARTIAL"
+            ? total - amountPaid
+            : Number(
+                appointment.outstanding_balance ??
+                  appointment.deposit_required ??
+                  total - amountPaid,
+              ),
+        ),
+        deliveryAddress: "",
+        instructions: appointment.notes ?? "",
+        requestedTime: appointment.starts_at,
+        reservationExpiresAt: appointment.payment_reservation_expires_at,
+        canUploadReceipt:
+          appointment.payment_method === "bank_transfer" &&
+          !closed &&
+          receipt?.status !== "AWAITING_VERIFICATION",
+        items: (services.data ?? []).map((service) => ({
+          id: service.id,
+          name: service.service_name,
+          image: "",
+          quantity: 1,
+          unitPrice: Number(service.price ?? 0),
+          subtotal: Number(service.price ?? 0),
+          sku: "",
+          addons: [],
+        })),
+        history: [
+          { status: appointment.status, createdAt: appointment.created_at },
+        ],
+        receipt: receipt
+          ? {
+              id: receipt.id,
+              status: receipt.status,
+              amount: Number(receipt.submitted_amount),
+              createdAt: receipt.created_at,
+              verifiedAt: receipt.verified_at,
+              reference: receipt.transaction_reference ?? "",
+              reason: receipt.rejection_reason ?? "",
+              url: receiptUrl,
+              mimeType: receipt.receipt_mime_type,
+            }
+          : null,
+        business: {
+          name: tenant.business_name,
+          phone: tenant.phone ?? "",
+          pickupLocation: tenant.address ?? "",
+          pickupInstructions: "",
+          deliveryNotes: "",
+        },
+        payment: {
+          instructions: method.data?.instructions ?? "",
+          externalUrl: method.data?.external_url?.startsWith("https://")
+            ? method.data.external_url
+            : null,
+          bankAccounts:
+            appointment.payment_method === "bank_transfer"
+              ? (accounts.data ?? []).map((account) => ({
+                  id: account.id,
+                  label: account.label || account.bank_name,
+                  bankName: account.bank_name,
+                  accountHolder: account.account_holder,
+                  accountNumber: account.account_number,
+                  currency: account.currency,
+                  instructions: account.instructions ?? "",
+                }))
+              : [],
+        },
+      };
+      return json({ order: result, expiresAt: session.expires_at });
+    }
+    if (!session.order_id)
+      return json({ error: "Please verify this transaction again." }, 401);
     const { data: order, error: orderError } = await supabase
       .from("orders")
       .select(
@@ -186,7 +388,7 @@ export async function POST(request: Request) {
       !order ||
       order.customer_email?.toLowerCase() !== session.customer_email
     )
-      return json({ error: "Please verify this order again." }, 401);
+      return json({ error: "Please verify this transaction again." }, 401);
     const [items, history, receipts, fulfillment, method, accounts] =
       await Promise.all([
         supabase
@@ -236,21 +438,27 @@ export async function POST(request: Request) {
         supabase
           .from("business_bank_accounts")
           .select(
-            "id,bank_name,account_holder,account_number,currency,instructions",
+            "id,label,bank_name,account_holder,account_number,currency,instructions",
           )
           .eq("tenant_id", tenantId)
           .eq("is_active", true)
           .order("sort_order"),
       ]);
-    for (const result of [
-      items,
-      history,
-      receipts,
-      fulfillment,
-      method,
-      accounts,
-    ]) {
+    for (const result of [items, receipts, fulfillment, method, accounts]) {
       if (result.error) throw result.error;
+    }
+    // Status history enriches the delivery timeline, but older installations
+    // can legitimately lack this table. Do not block a verified customer from
+    // seeing the rest of their order while the forward repair migration is
+    // being applied. Every other history error remains fatal.
+    if (
+      history.error &&
+      !(
+        history.error.code === "PGRST205" &&
+        history.error.message.includes("order_status_history")
+      )
+    ) {
+      throw history.error;
     }
     const receipt = receipts.data;
     let receiptUrl: string | null = null;
@@ -269,6 +477,7 @@ export async function POST(request: Request) {
       (order.inventory_reservation_expires_at &&
         Date.parse(order.inventory_reservation_expires_at) <= Date.now());
     const result: TrackedOrder = {
+      kind: "order",
       id: order.id,
       orderNumber: order.order_number,
       customerEmail: order.customer_email,
@@ -285,6 +494,10 @@ export async function POST(request: Request) {
         Number(order.promotion_discount_amount ?? 0),
       total: Number(order.total),
       amountPaid: Number(order.amount_paid ?? 0),
+      paymentDue: Math.max(
+        0,
+        Number(order.total ?? 0) - Number(order.amount_paid ?? 0),
+      ),
       deliveryAddress: order.delivery_address ?? "",
       instructions: order.delivery_instructions ?? "",
       requestedTime: order.requested_time,
@@ -354,6 +567,7 @@ export async function POST(request: Request) {
           method.data?.method === "bank_transfer"
             ? (accounts.data ?? []).map((account) => ({
                 id: account.id,
+                label: account.label || account.bank_name,
                 bankName: account.bank_name,
                 accountHolder: account.account_holder,
                 accountNumber: account.account_number,
@@ -369,7 +583,7 @@ export async function POST(request: Request) {
     return json(
       {
         error:
-          "Order tracking is temporarily unavailable. Please try again shortly.",
+          "Order and appointment tracking is temporarily unavailable. Please try again shortly.",
       },
       503,
     );

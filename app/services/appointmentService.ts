@@ -40,11 +40,15 @@ function normalizeStatus(value: string): AppointmentStatus {
  */
 function normalizePaymentStatus(value?: string | null): PaymentStatus {
   switch (value?.toUpperCase()) {
+    case "AWAITING_VERIFICATION":
+      return "awaiting_verification";
+
     case "PAID":
     case "COMPLETED":
       return "paid";
 
     case "PARTIAL":
+    case "PARTIALLY_PAID":
       return "partial";
 
     case "REFUNDED":
@@ -138,6 +142,17 @@ function mapAppointment(row: AppointmentRow): Appointment {
     paymentStatus: normalizePaymentStatus(row.payment_status),
 
     notes: row.notes ?? undefined,
+
+    depositPaid: Number(row.amount_paid ?? 0) || undefined,
+    depositRequired: Number(row.deposit_required ?? 0),
+    amountPaid: Number(row.amount_paid ?? 0),
+    outstandingBalance: Number(row.outstanding_balance ?? row.total ?? 0),
+    paymentMethod: row.payment_method ?? undefined,
+    paymentSelection:
+      row.payment_selection?.toUpperCase() === "FULL" ? "full" : "deposit",
+    appointmentNumber: row.appointment_number ?? undefined,
+    paymentReservationExpiresAt:
+      row.payment_reservation_expires_at ?? undefined,
 
     createdAt: row.created_at,
 
@@ -451,32 +466,16 @@ export async function setAppointmentStatus(
   appointmentId: string,
   status: AppointmentStatus,
 ) {
-  const now = new Date().toISOString();
-
-  const { error } = await client()
-    .from("appointments")
-    .update({
-      status: status.toUpperCase(),
-
-      /**
-       * Preserve the cancellation timestamp only while the appointment
-       * is in the cancelled state.
-       */
-      cancelled_at: status === "cancelled" ? now : null,
-
-      /**
-       * Preserve the completion timestamp only while the appointment
-       * is in the completed state.
-       */
-      completed_at: status === "completed" ? now : null,
-    })
-    .eq("id", appointmentId)
-    .eq("tenant_id", tenantId)
-    .select("id")
-    .single();
-
-  if (error) {
-    throw error;
+  const response = await fetch("/api/appointments/status", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ tenantId, appointmentId, status }),
+  });
+  const result = (await response.json().catch(() => null)) as {
+    error?: string;
+  } | null;
+  if (!response.ok) {
+    throw new Error(result?.error || "Unable to update the appointment.");
   }
 }
 

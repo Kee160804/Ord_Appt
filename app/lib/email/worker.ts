@@ -48,7 +48,9 @@ async function validateTenant(job: ClaimedEmailJob) {
   const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("tenants")
-    .select("id, business_name, email, phone, address, city, is_active, status")
+    .select(
+      "id, business_name, business_type, email, phone, address, city, is_active, status, subscription_status, current_period_end",
+    )
     .eq("id", job.tenant_id)
     .maybeSingle();
   if (error) throw error;
@@ -148,7 +150,39 @@ async function validateJob(job: ClaimedEmailJob) {
     app_url: process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") || "",
   };
 
+  if (job.event_type === "SUBSCRIPTION_EXPIRING") {
+    const queuedPeriodEnd = Date.parse(
+      stringValue(job.payload ?? {}, "current_period_end"),
+    );
+    const currentPeriodEnd = Date.parse(tenant.current_period_end ?? "");
+    const now = Date.now();
+    if (
+      tenant.subscription_status?.toLowerCase() !== "active" ||
+      !Number.isFinite(queuedPeriodEnd) ||
+      !Number.isFinite(currentPeriodEnd) ||
+      queuedPeriodEnd !== currentPeriodEnd ||
+      currentPeriodEnd <= now ||
+      currentPeriodEnd > now + 3 * 24 * 60 * 60 * 1000
+    ) {
+      throw new Error(
+        "The subscription expiration notice is no longer current.",
+      );
+    }
+  }
+
   if (job.queue_name === "order") {
+    const businessType = tenant.business_type?.toLowerCase();
+    const allowedEvents =
+      businessType === "retail"
+        ? new Set(["ORDER_RECEIVED", "PAYMENT_CONFIRMED"])
+        : businessType === "ordering"
+          ? new Set(["ORDER_RECEIVED", "ORDER_READY", "ORDER_CANCELLED"])
+          : new Set<string>();
+    if (!allowedEvents.has(job.event_type)) {
+      throw new Error(
+        "This order email is no longer eligible under the customer email policy.",
+      );
+    }
     const { data, error } = await supabase
       .from("orders")
       .select("id, customer_email, payment_status")
@@ -174,12 +208,25 @@ async function validateJob(job: ClaimedEmailJob) {
   } else if (
     job.queue_name === "appointment" ||
     job.queue_name === "reminder" ||
-    job.event_type === "APPOINTMENT_CANCELLED"
+    job.event_type === "APPOINTMENT_CANCELLED" ||
+    job.event_type === "APPOINTMENT_PAYMENT_CONFIRMED"
   ) {
+    if (
+      job.queue_name === "reminder" ||
+      job.event_type === "APPOINTMENT_PAYMENT_CONFIRMED" ||
+      (job.queue_name === "appointment" &&
+        !["APPOINTMENT_RECEIVED", "APPOINTMENT_CONFIRMED"].includes(
+          job.event_type,
+        ))
+    ) {
+      throw new Error(
+        "This appointment email is no longer eligible under the customer email policy.",
+      );
+    }
     const { data, error } = await supabase
       .from("appointments")
       .select(
-        "id, customer_email, status, starts_at, customer_name, staff_id, appointment_services(service_name), staff(display_name)",
+        "id, appointment_number, customer_email, status, payment_status, payment_method, amount_paid, outstanding_balance, starts_at, customer_name, staff_id, appointment_services(service_name), staff(display_name)",
       )
       .eq("id", job.source_id)
       .eq("tenant_id", job.tenant_id)
@@ -191,18 +238,6 @@ async function validateJob(job: ClaimedEmailJob) {
     ) {
       throw new Error(
         "The appointment recipient no longer matches the queued email.",
-      );
-    }
-    // Never send a stale reminder for an appointment that is no longer
-    // confirmed, has no valid start time, or has already started/passed.
-    if (
-      job.queue_name === "reminder" &&
-      (data.status?.toUpperCase() !== "CONFIRMED" ||
-        !data.starts_at ||
-        new Date(data.starts_at) <= new Date())
-    ) {
-      throw new Error(
-        "The appointment is no longer eligible for this reminder.",
       );
     }
     // A queued confirmation becomes invalid if the appointment is cancelled
@@ -233,6 +268,12 @@ async function validateJob(job: ClaimedEmailJob) {
       : staff?.display_name;
     payload = {
       ...payload,
+      appointment_number:
+        data.appointment_number || stringValue(payload, "appointment_number"),
+      payment_status: data.payment_status,
+      payment_method: data.payment_method,
+      amount_paid: data.amount_paid,
+      outstanding_balance: data.outstanding_balance,
       starts_at: data.starts_at,
       service_name:
         services?.[0]?.service_name || stringValue(payload, "service_name"),

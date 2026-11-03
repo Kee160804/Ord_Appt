@@ -1,4 +1,5 @@
 export interface TrackedOrder {
+  kind: "order" | "appointment";
   id: string;
   orderNumber: string;
   customerEmail: string;
@@ -13,6 +14,7 @@ export interface TrackedOrder {
   discount: number;
   total: number;
   amountPaid: number;
+  paymentDue: number;
   deliveryAddress: string;
   instructions: string;
   requestedTime: string | null;
@@ -52,6 +54,7 @@ export interface TrackedOrder {
     externalUrl: string | null;
     bankAccounts: Array<{
       id: string;
+      label: string;
       bankName: string;
       accountHolder: string;
       accountNumber: string;

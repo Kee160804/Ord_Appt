@@ -62,3 +62,13 @@ test("owner preferences never suppress customer transactional messages", async (
     /owner_email_/,
   );
 });
+
+test("owner alerts sign in to the dashboard while customer emails use the storefront", async () => {
+  const template = await readFile("app/lib/email/templates.ts", "utf8");
+  assert.match(template, /Open business dashboard/);
+  assert.match(template, /\/login\?next=/);
+  assert.match(
+    template,
+    /\/store-front\/\$\{encodeURIComponent\(storefrontSlug\)\}/,
+  );
+});

@@ -10,7 +10,7 @@ export async function getVerifiedTrackingSession(
   if (!/^[A-Za-z0-9_-]{43}$/.test(token)) return null;
   const { data, error } = await getSupabaseAdminClient()
     .from("order_tracking_sessions")
-    .select("order_id,customer_email,expires_at")
+    .select("order_id,appointment_id,customer_email,expires_at")
     .eq("tenant_id", tenantId)
     .eq("token_hash", hashGuestAccessToken(token))
     .not("verified_at", "is", null)
@@ -18,7 +18,8 @@ export async function getVerifiedTrackingSession(
     .maybeSingle();
   if (error || !data) return null;
   return data as {
-    order_id: string;
+    order_id: string | null;
+    appointment_id: string | null;
     customer_email: string;
     expires_at: string;
   };

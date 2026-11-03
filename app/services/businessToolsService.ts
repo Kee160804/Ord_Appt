@@ -251,15 +251,68 @@ export async function createDepartment(
   tenantId: string,
   name: string,
   description: string,
+  sortOrder?: number,
 ) {
-  const { error } = await client()
+  const { data, error } = await client()
     .from("service_departments")
     .insert({
       tenant_id: tenantId,
       name: name.trim(),
       description: description.trim() || null,
-    });
+      ...(sortOrder === undefined ? {} : { sort_order: sortOrder }),
+    })
+    .select("*")
+    .single();
   if (error) throw error;
+  const row = data as Row;
+  return {
+    id: textValue(row.id),
+    tenantId: textValue(row.tenant_id),
+    name: textValue(row.name),
+    description: textValue(row.description),
+    sortOrder: Number(row.sort_order ?? 0),
+    isActive: row.is_active !== false,
+  } satisfies ServiceDepartment;
+}
+
+export async function updateDepartment(
+  tenantId: string,
+  id: string,
+  name: string,
+  description: string,
+  sortOrder: number,
+) {
+  const { data, error } = await client()
+    .from("service_departments")
+    .update({
+      name: name.trim(),
+      description: description.trim() || null,
+      sort_order: sortOrder,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("tenant_id", tenantId)
+    .eq("id", id)
+    .select("*")
+    .single();
+  if (error) throw error;
+
+  // Keep the legacy category text synchronized for storefronts and searches.
+  const { error: serviceError } = await client()
+    .from("services")
+    .update({ category: name.trim() })
+    .eq("tenant_id", tenantId)
+    .eq("department_id", id);
+  if (serviceError) throw serviceError;
+
+  const row = data as Row;
+  return {
+    id: textValue(row.id),
+    tenantId: textValue(row.tenant_id),
+    name: textValue(row.name),
+    description: textValue(row.description),
+    sortOrder: Number(row.sort_order ?? 0),
+    isActive: row.is_active !== false,
+  } satisfies ServiceDepartment;
 }
 
 export async function setDepartmentActive(

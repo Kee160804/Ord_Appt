@@ -17,6 +17,7 @@ import {
   Users,
   LockKeyhole,
   BriefcaseBusiness,
+  CreditCard,
 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { tenantHasFeature } from "../lib/plans";
@@ -61,6 +62,15 @@ export function Sidebar({ tenant, user }: SidebarProps) {
         ]),
     ...(canManageBusiness
       ? [{ href: `${base}/customers`, label: "Customers", icon: Users }]
+      : []),
+    ...(canManageBusiness
+      ? [
+          {
+            href: `${base}/payments`,
+            label: "Customer Payments & Fulfillment",
+            icon: CreditCard,
+          },
+        ]
       : []),
     ...(canManageBusiness
       ? [

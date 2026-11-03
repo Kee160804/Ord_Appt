@@ -4,6 +4,7 @@ import {
   requestHasAllowedOrigin,
 } from "@/app/lib/server/security";
 import { requireTenantRole } from "@/app/lib/server/tenant-authorization";
+import { processEmailQueueBestEffort } from "@/app/lib/email/process-best-effort";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,8 +12,12 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const tenantId = url.searchParams.get("tenantId")?.trim() ?? "";
+  const appointmentId = url.searchParams.get("appointmentId")?.trim() ?? "";
   const status = url.searchParams.get("status")?.trim().toUpperCase() ?? "";
-  if (!isValidUuid(tenantId)) {
+  if (
+    !isValidUuid(tenantId) ||
+    (appointmentId && !isValidUuid(appointmentId))
+  ) {
     return Response.json({ error: "Invalid business." }, { status: 400 });
   }
   const authorization = await requireTenantRole(tenantId, [
@@ -36,6 +41,7 @@ export async function GET(request: Request) {
     .order("created_at", { ascending: false })
     .limit(200);
   if (status && status !== "ALL") query = query.eq("status", status);
+  if (appointmentId) query = query.eq("appointment_id", appointmentId);
   const { data, error } = await query;
   if (
     error &&
@@ -63,7 +69,7 @@ export async function GET(request: Request) {
       const targetId = submission.order_id ?? submission.appointment_id;
       const targetSelect = submission.order_id
         ? "order_number,total,payment_status,fulfillment_status"
-        : "id,total,payment_status,status";
+        : "id,appointment_number,total,payment_status,status";
       const [target, signed] = await Promise.all([
         admin
           .from(targetTable)
@@ -157,6 +163,23 @@ export async function POST(request: Request) {
       },
       { status: alreadyProcessed ? 409 : 500 },
     );
+  }
+  if (body.action === "verify") {
+    const tenant = await admin
+      .from("tenants")
+      .select("business_type")
+      .eq("id", tenantId)
+      .maybeSingle();
+    if (tenant.error) {
+      console.error(
+        "[payments] Unable to determine the customer email policy.",
+        {
+          code: tenant.error.code,
+        },
+      );
+    } else if (tenant.data?.business_type?.toLowerCase() === "retail") {
+      await processEmailQueueBestEffort("retail payment confirmation");
+    }
   }
   return Response.json({ status: nextStatus });
 }

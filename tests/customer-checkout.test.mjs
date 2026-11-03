@@ -119,6 +119,7 @@ test("currency rounding preserves two-decimal tax and discount amounts", () => {
 
 async function apiHarness(error = null) {
   const calls = [];
+  let emailProcessCalls = 0;
   const client = {
     from() {
       const query = {
@@ -153,6 +154,11 @@ async function apiHarness(error = null) {
     "@/app/lib/supabase/admin": { getSupabaseAdminClient: () => client },
     "@/app/lib/business-payments": payments,
     "@/app/lib/promotions": promotions,
+    "@/app/lib/email/process-best-effort": {
+      processEmailQueueBestEffort: async () => {
+        emailProcessCalls += 1;
+      },
+    },
     "@/app/lib/server/security": {
       ...security,
       enforcePublicRateLimit: async () => ({ allowed: true }),
@@ -172,6 +178,9 @@ async function apiHarness(error = null) {
   };
   return {
     calls,
+    get emailProcessCalls() {
+      return emailProcessCalls;
+    },
     post: (overrides = {}, origin = "https://shop.test") =>
       route.POST(
         new Request("https://shop.test/api/public/orders", {
@@ -194,6 +203,7 @@ test("checkout preserves fulfillment and payment choice while ignoring client pr
   assert.equal(result.total, 27.5);
   assert.equal(result.emailQueued, true);
   assert.equal(result.paymentStatus, "AWAITING_PAYMENT");
+  assert.equal(h.emailProcessCalls, 1);
   assert.equal(h.calls[0].name, "create_customer_business_order");
   assert.equal(h.calls[0].args.p_checkout_id, checkoutId);
   assert.equal(h.calls[0].args.p_checkout.p_payment_method, "bank_transfer");
@@ -224,6 +234,24 @@ test("missing checkout migration fails without falling back to mock or incomplet
   assert.equal((await h.post()).status, 503);
   assert.equal(h.calls.length, 1);
 });
+test("missing ordering RPC returns an actionable migration error", async () => {
+  const h = await apiHarness({
+    code: "42883",
+    message: "function public.create_public_order_v3(...) does not exist",
+  });
+  const response = await h.post();
+  assert.equal(response.status, 503);
+  assert.match((await response.json()).error, /latest database migration/i);
+});
+test("missing ordering columns return an actionable migration error", async () => {
+  const h = await apiHarness({
+    code: "42703",
+    message: 'column "table_number" of relation "orders" does not exist',
+  });
+  const response = await h.post();
+  assert.equal(response.status, 503);
+  assert.match((await response.json()).error, /latest database migration/i);
+});
 test("retries pass the same checkout identifier to the atomic order transaction", async () => {
   const h = await apiHarness();
   await h.post();
@@ -231,7 +259,7 @@ test("retries pass the same checkout identifier to the atomic order transaction"
   assert.equal(h.calls[0].args.p_checkout_id, h.calls[1].args.p_checkout_id);
 });
 
-const { CustomerPaymentCheckout } = await load(
+const { CustomerPaymentCheckout, buildOrderReferenceReceiptHtml } = await load(
   "app/components/CustomerPaymentCheckout.tsx",
   {
     "@/app/lib/utils": { formatCurrency: (value) => `$${value.toFixed(2)}` },
@@ -321,6 +349,11 @@ test("checkout places the configured order directly from the new flow", () => {
   assert.match(html, /aria-current="step"/);
   assert.doesNotMatch(html, /Review Order/);
 });
+test("checkout uses the compact storefront modal", async () => {
+  const source = await readFile("app/components/OrderingMenu.tsx", "utf8");
+  assert.match(source, /maxWidth="max-w-5xl"/);
+  assert.doesNotMatch(source, /maxWidth="max-w-6xl"/);
+});
 test("completion preserves the server total and reference after the cart is cleared", () => {
   const html = renderCheckout({
     stage: "complete",
@@ -329,7 +362,23 @@ test("completion preserves the server total and reference after the cart is clea
     confirmation: {
       orderNumber: "SHOP-ABC123",
       total: 27.5,
+      subtotal: 25,
+      tax: 2.5,
+      deliveryFee: 0,
+      discount: 0,
+      customerName: "Customer Name",
       customerEmail: "customer@example.test",
+      fulfillmentMethod: "Pickup",
+      paymentMethodLabel: "Bank transfer",
+      paymentStatus: "AWAITING_PAYMENT",
+      items: [
+        {
+          name: "Shoes",
+          quantity: 1,
+          lineTotal: 25,
+          detail: "Size: 10",
+        },
+      ],
       emailQueued: true,
       createdAt: "2026-10-27T15:30:00.000Z",
     },
@@ -337,8 +386,35 @@ test("completion preserves the server total and reference after the cart is clea
   assert.match(html, /SHOP-ABC123/);
   assert.match(html, /Order Placed Successfully/);
   assert.match(html, /Go to Track Order/);
+  assert.match(html, /Download Unofficial Order Record/);
+  assert.match(html, /not an official receipt or proof of payment/i);
   assert.match(html, /What&#x27;s Next/);
   assert.doesNotMatch(html, /type="submit"/);
+});
+test("downloadable order record preserves tracking details and warns it is unofficial", () => {
+  const html = buildOrderReferenceReceiptHtml("Test <Store>", {
+    orderNumber: "SHOP-ABC123",
+    total: 27.5,
+    subtotal: 25,
+    tax: 2.5,
+    deliveryFee: 0,
+    discount: 0,
+    customerName: "Customer Name",
+    customerEmail: "customer@example.test",
+    fulfillmentMethod: "Pickup",
+    paymentMethodLabel: "Bank transfer",
+    paymentStatus: "AWAITING_PAYMENT",
+    items: [{ name: "Shoes", quantity: 1, lineTotal: 25 }],
+    emailQueued: true,
+    createdAt: "2026-10-27T15:30:00.000Z",
+  });
+  assert.match(html, /SHOP-ABC123/);
+  assert.match(html, /Customer Name/);
+  assert.match(html, /Shoes/);
+  assert.match(html, /Unofficial - not proof of payment/);
+  assert.match(html, /not an official receipt/i);
+  assert.match(html, /Test &lt;Store&gt;/);
+  assert.doesNotMatch(html, /Test <Store>/);
 });
 test("confirmation email links to tracking with its order reference", async () => {
   const { buildTransactionalEmail } = await load("app/lib/email/templates.ts");
@@ -399,6 +475,69 @@ test("checkout SQL keeps idempotency, payment choice, email queue, and inventory
     /INSERT INTO public\.(?:payment_transactions|subscription_invoices)|payment_status = 'PAID'/i,
   );
 });
+test("checkout prerequisites are restored without legacy payment RPCs", async () => {
+  const sql = await readFile(
+    "supabase/migrations/202610290001_restore_checkout_prerequisites.sql",
+    "utf8",
+  );
+  assert.match(sql, /ADD COLUMN IF NOT EXISTS ordering_paused/);
+  assert.match(sql, /ADD COLUMN IF NOT EXISTS requested_time/);
+  assert.match(sql, /CREATE TABLE IF NOT EXISTS public\.public_request_limits/);
+  assert.match(
+    sql,
+    /CREATE OR REPLACE FUNCTION public\.check_public_rate_limit/,
+  );
+  assert.doesNotMatch(sql, /create_public_order_v[23]/i);
+  assert.doesNotMatch(sql, /complete_mock_subscription_checkout/i);
+});
+test("ordering checkout repairs the ambiguous order email conflict target", async () => {
+  const sql = await readFile(
+    "supabase/migrations/202611020001_ordering_checkout_and_appointment_payment_choice.sql",
+    "utf8",
+  );
+  assert.match(sql, /create_customer_business_order\(uuid,uuid,jsonb\)/);
+  assert.match(sql, /#variable_conflict use_column/);
+  assert.match(sql, /REGEXP_REPLACE/);
+});
+test("ordering checkout restores every required order creation RPC", async () => {
+  const sql = await readFile(
+    "supabase/migrations/202611020002_restore_ordering_checkout_functions.sql",
+    "utf8",
+  );
+  assert.match(
+    sql,
+    /CREATE OR REPLACE FUNCTION public\.create_public_order_v2/,
+  );
+  assert.match(
+    sql,
+    /CREATE OR REPLACE FUNCTION public\.create_public_order_v3/,
+  );
+  assert.match(sql, /LOWER\(business_type\) = 'ordering'/);
+  assert.match(sql, /TO service_role/);
+  assert.doesNotMatch(sql, /TO anon, authenticated/);
+});
+test("ordering checkout restores the complete order fulfillment schema", async () => {
+  const sql = await readFile(
+    "supabase/migrations/202611020003_restore_ordering_order_columns.sql",
+    "utf8",
+  );
+  for (const column of [
+    "order_type",
+    "requested_time",
+    "delivery_address",
+    "delivery_area",
+    "delivery_instructions",
+    "table_number",
+    "subtotal",
+    "tax_amount",
+    "discount_amount",
+    "delivery_fee",
+    "cancellation_reason",
+    "cancelled_at",
+  ]) {
+    assert.match(sql, new RegExp(`ADD COLUMN IF NOT EXISTS ${column}`));
+  }
+});
 test("paid orders queue exactly one Resend payment-confirmation event", async () => {
   const sql = await readFile(
     "supabase/migrations/202610270001_customer_checkout_notifications.sql",
@@ -409,4 +548,39 @@ test("paid orders queue exactly one Resend payment-confirmation event", async ()
   assert.match(sql, /UPPER\(COALESCE\(NEW\.payment_status, ''\)\) <> 'PAID'/);
   assert.match(sql, /ON CONFLICT \(order_id, event_type\) DO NOTHING/);
   assert.match(sql, /storefront_slug/);
+});
+
+test("ordering, retail, and appointment customer emails follow the three-message policy", async () => {
+  const [policy, orderRoute, orderDashboard, paymentDashboard, worker] =
+    await Promise.all([
+      readFile(
+        "supabase/migrations/202611030001_customer_email_policy.sql",
+        "utf8",
+      ),
+      readFile("app/api/orders/status/route.ts", "utf8"),
+      readFile("app/components/OrdersView.tsx", "utf8"),
+      readFile("app/components/PaymentFulfillmentView.tsx", "utf8"),
+      readFile("app/lib/email/worker.ts", "utf8"),
+    ]);
+
+  assert.match(policy, /WHEN 'READY' THEN 'ORDER_READY'/);
+  assert.match(policy, /WHEN 'CANCELLED' THEN 'ORDER_CANCELLED'/);
+  assert.match(policy, /business_type, ''\)\) <> 'ordering'/);
+  assert.match(policy, /v_business_type, ''\)\) <> 'retail'/);
+  assert.match(policy, /'ORDER_ACCEPTED'/);
+  assert.match(policy, /'ORDER_PREPARING'/);
+  assert.match(policy, /'ORDER_OUT_FOR_DELIVERY'/);
+  assert.match(policy, /'APPOINTMENT_PAYMENT_CONFIRMED'/);
+  assert.match(orderRoute, /requestHasAllowedOrigin/);
+  assert.match(orderRoute, /requireTenantRole/);
+  assert.match(orderRoute, /status === "READY" \|\| status === "CANCELLED"/);
+  assert.match(orderDashboard, /Ready & notify customer/);
+  assert.match(orderDashboard, /tracker only/);
+  assert.match(paymentDashboard, /Confirm payment & email customer/);
+  assert.match(paymentDashboard, /Accept receipt \(tracker only\)/);
+  assert.match(worker, /new Set\(\["ORDER_RECEIVED", "PAYMENT_CONFIRMED"\]\)/);
+  assert.match(
+    worker,
+    /new Set\(\["ORDER_RECEIVED", "ORDER_READY", "ORDER_CANCELLED"\]\)/,
+  );
 });
