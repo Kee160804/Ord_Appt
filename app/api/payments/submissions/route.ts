@@ -1,6 +1,7 @@
 import { getSupabaseAdminClient } from "@/app/lib/supabase/admin";
 import {
   isValidUuid,
+  readJsonBody,
   requestHasAllowedOrigin,
 } from "@/app/lib/server/security";
 import { requireTenantRole } from "@/app/lib/server/tenant-authorization";
@@ -106,8 +107,14 @@ export async function POST(request: Request) {
   }
   let body: VerificationRequest;
   try {
-    body = (await request.json()) as VerificationRequest;
-  } catch {
+    body = await readJsonBody<VerificationRequest>(request, 8_192);
+  } catch (error) {
+    if (error instanceof Error && error.message === "REQUEST_TOO_LARGE") {
+      return Response.json(
+        { error: "Request body is too large." },
+        { status: 413 },
+      );
+    }
     return Response.json(
       { error: "Invalid verification request." },
       { status: 400 },

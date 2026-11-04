@@ -6,6 +6,7 @@ import {
   isValidEmail,
   isValidUuid,
   rateLimitResponse,
+  readFormDataBody,
   requestHasAllowedOrigin,
 } from "@/app/lib/server/security";
 
@@ -29,7 +30,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "Invalid request origin." }, { status: 403 });
   }
   try {
-    const form = await request.formData();
+    const form = await readFormDataBody(request);
     const tenantId = textValue(form, "tenantId");
     const targetType = textValue(form, "targetType");
     const targetId = textValue(form, "targetId");
@@ -409,6 +410,18 @@ export async function POST(request: Request) {
       { status: 201 },
     );
   } catch (error) {
+    if (error instanceof Error && error.message === "REQUEST_TOO_LARGE") {
+      return Response.json(
+        { error: "The receipt upload is too large." },
+        { status: 413 },
+      );
+    }
+    if (error instanceof Error && error.message === "INVALID_FORM_DATA") {
+      return Response.json(
+        { error: "Invalid receipt upload." },
+        { status: 400 },
+      );
+    }
     console.error("[payment-receipt] Upload failed.", error);
     return Response.json(
       { error: "Unable to submit the receipt. Please try again." },

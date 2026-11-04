@@ -4,7 +4,12 @@ import {
   TRIAL_ENTITLEMENTS,
   calculateSubscriptionAmounts,
 } from "@/app/lib/plans";
-import { isValidUuid, safeServerError } from "@/app/lib/server/security";
+import {
+  isValidUuid,
+  readJsonBody,
+  requestHasAllowedOrigin,
+  safeServerError,
+} from "@/app/lib/server/security";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,6 +34,10 @@ interface SubscriptionRequest {
 }
 
 export async function PATCH(request: Request, context: RouteContext) {
+  if (!requestHasAllowedOrigin(request)) {
+    return Response.json({ error: "Invalid request origin." }, { status: 403 });
+  }
+
   try {
     const { tenantId } = await context.params;
     if (!isValidUuid(tenantId)) {
@@ -42,7 +51,18 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     const { admin, userId: callerId } = authorization;
 
-    const body = (await request.json()) as SubscriptionRequest;
+    let body: SubscriptionRequest;
+    try {
+      body = await readJsonBody<SubscriptionRequest>(request, 4_096);
+    } catch (error) {
+      if (error instanceof Error && error.message === "REQUEST_TOO_LARGE") {
+        return Response.json(
+          { error: "Request body is too large." },
+          { status: 413 },
+        );
+      }
+      return Response.json({ error: "Invalid request body." }, { status: 400 });
+    }
     const plan =
       typeof body.plan === "string" ? body.plan.trim().toLowerCase() : "";
     const status =

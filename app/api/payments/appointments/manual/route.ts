@@ -2,6 +2,7 @@ import { getSupabaseAdminClient } from "@/app/lib/supabase/admin";
 import {
   requestHasAllowedOrigin,
   isValidUuid,
+  readJsonBody,
 } from "@/app/lib/server/security";
 import { requireTenantRole } from "@/app/lib/server/tenant-authorization";
 
@@ -14,8 +15,14 @@ export async function POST(request: Request) {
   }
   let body: { tenantId?: string; appointmentId?: string };
   try {
-    body = (await request.json()) as typeof body;
-  } catch {
+    body = await readJsonBody<typeof body>(request, 4_096);
+  } catch (error) {
+    if (error instanceof Error && error.message === "REQUEST_TOO_LARGE") {
+      return Response.json(
+        { error: "Request body is too large." },
+        { status: 413 },
+      );
+    }
     return Response.json(
       { error: "Invalid payment request." },
       { status: 400 },

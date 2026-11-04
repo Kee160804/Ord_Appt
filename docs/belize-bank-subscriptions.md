@@ -16,6 +16,8 @@ customer payments for orders, appointments, or retail purchases.
    session.
 3. The server submits an `application/x-www-form-urlencoded` request to Belize
    Bank's `/register.do` endpoint using server-only platform credentials.
+   The live sandbox expects the redirect field as `returnUrl` (lower camel
+   case), despite version 1.3 of the integration PDF printing `returnURL`.
 4. The browser is redirected to the returned Belize Bank hosted payment page.
 5. Belize Bank collects all card information. YuhBusiness never receives a card
    number, expiry date, or CVV.

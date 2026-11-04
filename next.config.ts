@@ -171,6 +171,18 @@ const securityHeaders = [
     key: "Content-Security-Policy",
     value: contentSecurityPolicy,
   },
+  ...(!isDevelopment
+    ? [
+        {
+          /**
+           * Require HTTPS for the production site and its subdomains after a
+           * browser has completed one secure request.
+           */
+          key: "Strict-Transport-Security",
+          value: "max-age=31536000; includeSubDomains",
+        },
+      ]
+    : []),
   {
     /**
      * Defense-in-depth clickjacking protection.

@@ -5,6 +5,7 @@ import {
   enforcePublicRateLimit,
   isValidUuid,
   rateLimitResponse,
+  readJsonBody,
   requestHasAllowedOrigin,
 } from "@/app/lib/server/security";
 
@@ -116,8 +117,14 @@ export async function POST(request: Request) {
     time?: string;
   };
   try {
-    body = (await request.json()) as typeof body;
-  } catch {
+    body = await readJsonBody<typeof body>(request, 8_192);
+  } catch (error) {
+    if (error instanceof Error && error.message === "REQUEST_TOO_LARGE") {
+      return Response.json(
+        { error: "The booking request is too large." },
+        { status: 413 },
+      );
+    }
     return Response.json(
       { error: "Invalid booking request." },
       { status: 400 },

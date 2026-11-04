@@ -1,5 +1,10 @@
 import { authorizeActiveSuperAdmin } from "@/app/lib/server/admin-authorization";
-import { isValidUuid, safeServerError } from "@/app/lib/server/security";
+import {
+  isValidUuid,
+  readJsonBody,
+  requestHasAllowedOrigin,
+  safeServerError,
+} from "@/app/lib/server/security";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -7,6 +12,10 @@ export const dynamic = "force-dynamic";
 type RouteContext = { params: Promise<{ tenantId: string }> };
 
 export async function PATCH(request: Request, context: RouteContext) {
+  if (!requestHasAllowedOrigin(request)) {
+    return Response.json({ error: "Invalid request origin." }, { status: 403 });
+  }
+
   try {
     const { tenantId } = await context.params;
     if (!isValidUuid(tenantId)) {
@@ -20,10 +29,21 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     const { admin } = authorization;
 
-    const body = (await request.json()) as {
+    let body: {
       verified?: unknown;
       allowStorefrontUrlEdit?: unknown;
     };
+    try {
+      body = await readJsonBody(request, 4_096);
+    } catch (error) {
+      if (error instanceof Error && error.message === "REQUEST_TOO_LARGE") {
+        return Response.json(
+          { error: "Request body is too large." },
+          { status: 413 },
+        );
+      }
+      return Response.json({ error: "Invalid request body." }, { status: 400 });
+    }
     if (typeof body.allowStorefrontUrlEdit === "boolean") {
       const { data: tenant, error: updateError } = await admin
         .from("tenants")

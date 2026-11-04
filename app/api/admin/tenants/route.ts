@@ -8,6 +8,8 @@ import { slugify } from "@/app/lib/utils";
 import {
   generateSecurePassword,
   isValidEmail,
+  readJsonBody,
+  requestHasAllowedOrigin,
   safeServerError,
 } from "@/app/lib/server/security";
 
@@ -29,6 +31,10 @@ interface CreateTenantRequest {
 }
 
 export async function POST(request: Request) {
+  if (!requestHasAllowedOrigin(request)) {
+    return Response.json({ error: "Invalid request origin." }, { status: 403 });
+  }
+
   try {
     const authorization = await authorizeActiveSuperAdmin(
       "Only a platform super admin can manually create tenants.",
@@ -37,7 +43,18 @@ export async function POST(request: Request) {
 
     const { admin, userId: callerId } = authorization;
 
-    const body = (await request.json()) as CreateTenantRequest;
+    let body: CreateTenantRequest;
+    try {
+      body = await readJsonBody<CreateTenantRequest>(request, 16_384);
+    } catch (error) {
+      if (error instanceof Error && error.message === "REQUEST_TOO_LARGE") {
+        return Response.json(
+          { error: "Request body is too large." },
+          { status: 413 },
+        );
+      }
+      return Response.json({ error: "Invalid request body." }, { status: 400 });
+    }
     const businessName = body.businessName?.trim();
     const businessType =
       body.businessType?.toLowerCase() === "ordering"

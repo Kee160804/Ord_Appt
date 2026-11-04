@@ -1,6 +1,7 @@
 import { processEmailQueueBestEffort } from "@/app/lib/email/process-best-effort";
 import {
   isValidUuid,
+  readJsonBody,
   requestHasAllowedOrigin,
 } from "@/app/lib/server/security";
 import { requireTenantRole } from "@/app/lib/server/tenant-authorization";
@@ -24,8 +25,14 @@ export async function POST(request: Request) {
 
   let body: { tenantId?: string; appointmentId?: string; status?: string };
   try {
-    body = (await request.json()) as typeof body;
-  } catch {
+    body = await readJsonBody<typeof body>(request, 4_096);
+  } catch (error) {
+    if (error instanceof Error && error.message === "REQUEST_TOO_LARGE") {
+      return Response.json(
+        { error: "Request body is too large." },
+        { status: 413 },
+      );
+    }
     return Response.json(
       { error: "Invalid appointment update." },
       { status: 400 },

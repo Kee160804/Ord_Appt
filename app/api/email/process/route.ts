@@ -1,7 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 
 import { processTransactionalEmailQueue } from "@/app/lib/email/worker";
-import { safeServerError } from "@/app/lib/server/security";
+import { readJsonBody, safeServerError } from "@/app/lib/server/security";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -154,7 +154,17 @@ export async function POST(request: Request) {
      * Consume the webhook body when present, but intentionally do not use its
      * contents for authorization or email delivery decisions.
      */
-    await request.json().catch(() => null);
+    try {
+      await readJsonBody(request, 16_384);
+    } catch (error) {
+      if (error instanceof Error && error.message === "REQUEST_TOO_LARGE") {
+        return response(
+          { ok: false, error: "Request body is too large." },
+          413,
+        );
+      }
+      // The authenticated webhook payload is intentionally ignored.
+    }
 
     const result = await processTransactionalEmailQueue(WEBHOOK_BATCH_LIMIT);
 

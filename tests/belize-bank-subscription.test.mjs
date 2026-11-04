@@ -49,7 +49,7 @@ test("Belize Bank subscription checkout uses the hosted form protocol", async ()
   assert.match(gateway, /\/register\.do/);
   assert.match(gateway, /\/getOrderStatusExtended\.do/);
   assert.match(gateway, /dynamicCallbackUrl/);
-  assert.match(gateway, /returnURL/);
+  assert.match(gateway, /returnUrl/);
   assert.match(gateway, /amount: String\(minorAmount\(input\.amount\)\)/);
   assert.match(gateway, /DEFAULT_HOSTED_PAYMENT_DOMAINS/);
   assert.match(gateway, /radarpayment\.online/);
@@ -116,7 +116,7 @@ test("registration sends only server-calculated hosted-checkout fields", async (
       calls.push({ url, init });
       return Response.json({
         orderId: "bank-order-123",
-        formURL: "https://sandbox.belizebank.com/payment/hosted/123",
+        formUrl: "https://sandbox.belizebank.com/payment/hosted/123",
       });
     });
     const result = await gateway.registerBelizeBankSubscription({
@@ -148,6 +148,11 @@ test("registration sends only server-calculated hosted-checkout fields", async (
       body.get("dynamicCallbackUrl"),
       "https://app.example/api/billing/belize-bank/callback",
     );
+    assert.equal(
+      body.get("returnUrl"),
+      "https://app.example/dashboard/settings?tab=payments&billingRequest=22222222-2222-4222-8222-222222222222&tenant=11111111-1111-4111-8111-111111111111",
+    );
+    assert.equal(body.has("returnURL"), false);
     assert.equal(body.has("cardNumber"), false);
     assert.equal(body.has("cvv"), false);
   } finally {

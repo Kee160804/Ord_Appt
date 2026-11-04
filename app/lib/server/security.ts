@@ -83,6 +83,29 @@ export function publicOperationError(error: unknown, fallback: string) {
       ? error.message.trim()
       : "";
 
+  const code =
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    typeof error.code === "string"
+      ? error.code.trim().toUpperCase()
+      : "";
+
+  /**
+   * Only PostgreSQL errors deliberately raised by the public business RPCs
+   * may be considered for display. Constraint, parser, connection and
+   * PostgREST errors can contain schema or infrastructure details.
+   */
+  const publicBusinessCodes = new Set(["22023", "23505", "P0001"]);
+  if (
+    !publicBusinessCodes.has(code) ||
+    !raw ||
+    raw.length > 240 ||
+    /[\r\n\t\u0000-\u001f\u007f]/.test(raw)
+  ) {
+    return fallback;
+  }
+
   const allowed = [
     "valid",
     "required",
@@ -109,6 +132,48 @@ export function publicOperationError(error: unknown, fallback: string) {
   return allowed.some((fragment) => raw.toLowerCase().includes(fragment))
     ? raw
     : fallback;
+}
+
+async function readBoundedBody(request: Request, maximumBytes: number) {
+  const contentLengthHeader = request.headers.get("content-length");
+
+  if (contentLengthHeader) {
+    const contentLength = Number(contentLengthHeader);
+
+    if (Number.isFinite(contentLength) && contentLength > maximumBytes) {
+      throw new Error("REQUEST_TOO_LARGE");
+    }
+  }
+
+  if (!request.body) return new Uint8Array();
+
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalBytes = 0;
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      totalBytes += value.byteLength;
+      if (totalBytes > maximumBytes) {
+        await reader.cancel("Request body exceeds the configured limit.");
+        throw new Error("REQUEST_TOO_LARGE");
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const body = new Uint8Array(totalBytes);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return body;
 }
 
 /**
@@ -182,26 +247,42 @@ export async function readJsonBody<T>(
       ? Math.floor(maximumBytes)
       : 32_768;
 
-  const contentLengthHeader = request.headers.get("content-length");
-
-  if (contentLengthHeader) {
-    const contentLength = Number(contentLengthHeader);
-
-    if (Number.isFinite(contentLength) && contentLength > safeMaximumBytes) {
-      throw new Error("REQUEST_TOO_LARGE");
-    }
-  }
-
-  const text = await request.text();
-
-  if (new TextEncoder().encode(text).byteLength > safeMaximumBytes) {
-    throw new Error("REQUEST_TOO_LARGE");
-  }
+  const bytes = await readBoundedBody(request, safeMaximumBytes);
+  const text = new TextDecoder().decode(bytes);
 
   try {
     return JSON.parse(text) as T;
   } catch {
     throw new Error("INVALID_JSON");
+  }
+}
+
+/**
+ * Parses multipart/form-data without first allowing an unbounded body to be
+ * buffered by the runtime. The byte limit includes multipart boundaries and
+ * text fields in addition to the uploaded file itself.
+ */
+export async function readFormDataBody(
+  request: Request,
+  maximumBytes = 6 * 1024 * 1024,
+): Promise<FormData> {
+  const safeMaximumBytes =
+    Number.isFinite(maximumBytes) && maximumBytes > 0
+      ? Math.floor(maximumBytes)
+      : 6 * 1024 * 1024;
+  const contentType = request.headers.get("content-type")?.trim() ?? "";
+
+  if (!contentType.toLowerCase().startsWith("multipart/form-data")) {
+    throw new Error("INVALID_FORM_DATA");
+  }
+
+  const bytes = await readBoundedBody(request, safeMaximumBytes);
+  try {
+    return await new Response(bytes, {
+      headers: { "Content-Type": contentType },
+    }).formData();
+  } catch {
+    throw new Error("INVALID_FORM_DATA");
   }
 }
 

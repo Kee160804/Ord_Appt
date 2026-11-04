@@ -4,7 +4,12 @@ import { sendTransactionalEmail } from "@/app/lib/email/resend";
 import { publicAppOrigin } from "@/app/lib/platform";
 import { getSupabaseAdminClient } from "@/app/lib/supabase/admin";
 import { getSupabaseServerClient } from "@/app/lib/supabase/server";
-import { isValidUuid, safeServerError } from "@/app/lib/server/security";
+import {
+  isValidUuid,
+  readJsonBody,
+  requestHasAllowedOrigin,
+  safeServerError,
+} from "@/app/lib/server/security";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,6 +41,13 @@ function safeHashEqual(left: string, right: string): boolean {
  * The service-role client is only used after the caller has been authorized.
  */
 export async function POST(request: Request) {
+  if (!requestHasAllowedOrigin(request)) {
+    return Response.json(
+      { sent: false, error: "Invalid request origin." },
+      { status: 403 },
+    );
+  }
+
   try {
     /* ----------------------------------------------------------------------
        1. Authenticate the current user
@@ -76,8 +88,14 @@ export async function POST(request: Request) {
     };
 
     try {
-      body = (await request.json()) as typeof body;
-    } catch {
+      body = await readJsonBody<typeof body>(request, 8_192);
+    } catch (error) {
+      if (error instanceof Error && error.message === "REQUEST_TOO_LARGE") {
+        return Response.json(
+          { sent: false, error: "Request body is too large." },
+          { status: 413 },
+        );
+      }
       return Response.json(
         {
           sent: false,

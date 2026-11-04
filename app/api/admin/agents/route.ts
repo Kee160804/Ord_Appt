@@ -3,6 +3,8 @@ import { authorizeActiveSuperAdmin } from "@/app/lib/server/admin-authorization"
 import {
   generateSecurePassword,
   isValidEmail,
+  readJsonBody,
+  requestHasAllowedOrigin,
   safeServerError,
 } from "@/app/lib/server/security";
 
@@ -31,6 +33,10 @@ const ALLOWED_ROLES: AgentRole[] = [
 
 /** Creates or assigns an agent after server-side Super Admin authorization. */
 export async function POST(request: Request) {
+  if (!requestHasAllowedOrigin(request)) {
+    return Response.json({ error: "Invalid request origin." }, { status: 403 });
+  }
+
   try {
     const authorization = await authorizeActiveSuperAdmin(
       "Only an active platform super admin can manage agents.",
@@ -42,8 +48,14 @@ export async function POST(request: Request) {
     let body: CreateAgentRequest;
 
     try {
-      body = (await request.json()) as CreateAgentRequest;
-    } catch {
+      body = await readJsonBody<CreateAgentRequest>(request, 16_384);
+    } catch (error) {
+      if (error instanceof Error && error.message === "REQUEST_TOO_LARGE") {
+        return Response.json(
+          { error: "Request body is too large." },
+          { status: 413 },
+        );
+      }
       return Response.json({ error: "Invalid request body." }, { status: 400 });
     }
 

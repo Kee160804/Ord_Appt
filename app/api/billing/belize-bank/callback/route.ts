@@ -4,6 +4,7 @@ import {
 } from "@/app/lib/billing/belize-bank-checkout";
 import {
   enforcePublicRateLimit,
+  enforcePlatformRateLimit,
   rateLimitResponse,
   safeServerError,
 } from "@/app/lib/server/security";
@@ -51,6 +52,19 @@ export async function POST(request: Request) {
       !["0", "1"].includes(callbackStatus)
     ) {
       return text("Invalid callback.", 400);
+    }
+
+    // Throttle before looking up a checkout so unknown identifiers cannot be
+    // used to create an unbounded stream of database reads.
+    const preflightRate = await enforcePlatformRateLimit(
+      request,
+      "belize-bank-callback-preflight",
+      "callback",
+      120,
+      300,
+    );
+    if (!preflightRate.allowed) {
+      return rateLimitResponse(preflightRate.retryAfter);
     }
 
     const session = await findBelizeBankCheckoutForCallback(

@@ -223,7 +223,9 @@ export async function registerBelizeBankSubscription(input: {
         0,
         240,
       ),
-    returnURL: returnUrl.toString(),
+    // The current sandbox validates the lower-camel-case field name even
+    // though version 1.3 of the Belize Bank PDF labels it as `returnURL`.
+    returnUrl: returnUrl.toString(),
     orderNumber: input.requestId,
     dynamicCallbackUrl: callbackUrl.toString(),
   });
@@ -237,7 +239,12 @@ export async function registerBelizeBankSubscription(input: {
       "Belize Bank did not return a valid order reference.",
     );
   }
-  return { orderId, formUrl: safeHostedUrl(response.formURL) };
+  return {
+    orderId,
+    // Current gateway deployments use formUrl; retain formURL compatibility
+    // for the response spelling documented in Belize Bank's version 1.3 PDF.
+    formUrl: safeHostedUrl(response.formUrl ?? response.formURL),
+  };
 }
 
 export async function getBelizeBankOrderStatus(

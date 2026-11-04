@@ -28,6 +28,7 @@ async function load(path, mocks = {}) {
       Request,
       URL,
       Date,
+      TextDecoder,
       TextEncoder,
       process,
       console: { error() {} },

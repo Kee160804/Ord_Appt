@@ -23,6 +23,7 @@ async function load(path, mocks = {}) {
       require: (id) => (id === "server-only" ? {} : (mocks[id] ?? require(id))),
       Response,
       Request,
+      TextDecoder,
       TextEncoder,
       URL,
       Date,
@@ -42,6 +43,50 @@ const appointmentId = "44444444-4444-4444-8444-444444444444";
 const token = "a".repeat(43);
 const guest = await load("app/lib/server/guest-access.ts");
 const realSecurity = await load("app/lib/server/security.ts");
+
+test("shared request readers stop oversized JSON and multipart bodies", async () => {
+  await assert.rejects(
+    realSecurity.readJsonBody(
+      new Request("https://shop.test/api/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value: "x".repeat(128) }),
+      }),
+      32,
+    ),
+    /REQUEST_TOO_LARGE/,
+  );
+
+  const form = new FormData();
+  form.set("receipt", new File(["x".repeat(256)], "receipt.pdf"));
+  await assert.rejects(
+    realSecurity.readFormDataBody(
+      new Request("https://shop.test/api/test", {
+        method: "POST",
+        body: form,
+      }),
+      128,
+    ),
+    /REQUEST_TOO_LARGE/,
+  );
+});
+
+test("public operation errors expose only deliberate business failures", () => {
+  assert.equal(
+    realSecurity.publicOperationError(
+      { code: "22023", message: "Choose a valid order type." },
+      "Fallback",
+    ),
+    "Choose a valid order type.",
+  );
+  assert.equal(
+    realSecurity.publicOperationError(
+      { code: "23502", message: "Internal required column tenant_id" },
+      "Fallback",
+    ),
+    "Fallback",
+  );
+});
 
 function fakeClient(rows, calls, tableErrors = {}) {
   return {
