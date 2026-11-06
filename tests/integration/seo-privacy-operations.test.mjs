@@ -28,10 +28,14 @@ test("storefront subdomains expose consistent Google discovery signals", async (
 });
 
 test("privacy requests have a protected case workflow and audit trail", async () => {
-  const [sql, publicRoute, adminRoute, form, adminView, email] =
+  const [sql, repairSql, publicRoute, adminRoute, form, adminView, email] =
     await Promise.all([
       readFile(
         "supabase/migrations/202609230001_privacy_request_operations.sql",
+        "utf8",
+      ),
+      readFile(
+        "supabase/migrations/202611050002_repair_privacy_request_schema.sql",
         "utf8",
       ),
       readFile("app/api/privacy/requests/route.ts", "utf8"),
@@ -55,6 +59,13 @@ test("privacy requests have a protected case workflow and audit trail", async ()
   assert.match(sql, /check_platform_public_rate_limit/);
   assert.match(sql, /trg_privacy_request_submitted/);
   assert.match(sql, /trg_privacy_request_updated/);
+  assert.match(
+    repairSql,
+    /CREATE TABLE IF NOT EXISTS public\.privacy_requests/,
+  );
+  assert.match(repairSql, /ENABLE ROW LEVEL SECURITY/);
+  assert.match(repairSql, /NOTIFY pgrst, 'reload schema'/);
+  assert.match(repairSql, /trg_platform_privacy_notification/);
   assert.match(publicRoute, /requestHasAllowedOrigin/);
   assert.match(publicRoute, /enforcePlatformRateLimit/);
   assert.match(publicRoute, /PRIVACY_REQUEST_RECEIVED/);
@@ -62,6 +73,9 @@ test("privacy requests have a protected case workflow and audit trail", async ()
   assert.match(adminRoute, /requestHasAllowedOrigin/);
   assert.match(adminRoute, /readJsonBody/);
   assert.match(adminRoute, /IDENTITY_VERIFICATION/);
+  assert.match(adminRoute, /PGRST205/);
+  assert.match(adminRoute, /PRIVACY_SCHEMA_UNAVAILABLE/);
+  assert.match(publicRoute, /PRIVACY_SCHEMA_UNAVAILABLE/);
   assert.match(form, /Submit privacy request/);
   assert.match(adminView, /Privacy request queue/);
   assert.match(email, /We received your privacy request/);

@@ -102,7 +102,7 @@ export function AnalyticsView({ tenant }: Props) {
   }
 
   return (
-    <div className="min-h-full space-y-4 bg-[#08111f] light:bg-[#f8fafc] p-4 text-white light:text-[#14213a] md:p-5">
+    <div className="dashboard-page min-h-full space-y-4 p-3 text-white light:text-[#14213a] sm:p-4 md:p-6">
       <div>
         <h2 className="text-sm font-bold text-white light:text-[#17223a]">
           Analytics

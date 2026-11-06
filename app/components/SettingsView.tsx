@@ -99,7 +99,7 @@ export function SettingsView({ tenant, user, onTenantUpdated }: Props) {
     return () => window.cancelAnimationFrame(frame);
   }, []);
   return (
-    <div className="min-h-full space-y-4 bg-[#08111f] light:bg-[#f8fafc] p-4 text-white light:text-[#14213a] md:p-5">
+    <div className="dashboard-page settings-page">
       <div className="sr-only">
         <h2 className="text-sm font-bold text-white light:text-[#17223a]">
           Settings
@@ -109,10 +109,10 @@ export function SettingsView({ tenant, user, onTenantUpdated }: Props) {
         </p>
       </div>
 
-      <div className="grid items-start gap-3 lg:grid-cols-4">
+      <div className="settings-layout">
         {/* Nav */}
-        <Card className="lg:col-span-1">
-          <CardBody className="p-2 space-y-0.5">
+        <Card className="settings-navigation">
+          <CardBody className="settings-navigation-body">
             {TABS.map((tab) => {
               const Icon = tab.icon;
               return (
@@ -120,10 +120,8 @@ export function SettingsView({ tenant, user, onTenantUpdated }: Props) {
                   key={tab.id}
                   onClick={() => setActive(tab.id)}
                   className={cn(
-                    "flex h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-[10px] font-medium transition-colors",
-                    active === tab.id
-                      ? "bg-violet-600 text-white shadow-sm"
-                      : "text-slate-400 light:text-gray-600 hover:bg-slate-700 light:hover:bg-gray-100",
+                    "settings-navigation-item",
+                    active === tab.id && "active",
                   )}
                 >
                   <Icon className="h-4 w-4 shrink-0" />
@@ -138,7 +136,7 @@ export function SettingsView({ tenant, user, onTenantUpdated }: Props) {
         </Card>
 
         {/* Content */}
-        <div className="lg:col-span-3 space-y-0">
+        <div className="settings-content">
           {active === "business" && (
             <BusinessTab tenant={tenant} onTenantUpdated={onTenantUpdated} />
           )}
@@ -169,7 +167,9 @@ export function SettingsView({ tenant, user, onTenantUpdated }: Props) {
                   tenant={tenant}
                   onTenantUpdated={onTenantUpdated}
                 />
-                <PaymentFulfillmentView tenant={tenant} />
+                {tenant.businessType !== "appointment" && (
+                  <PaymentFulfillmentView tenant={tenant} />
+                )}
               </div>
             ) : (
               <Card>

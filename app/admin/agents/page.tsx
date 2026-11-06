@@ -195,7 +195,7 @@ export default function AgentsManagementPage() {
    */
   if (user?.role !== "superadmin") {
     return (
-      <div className="pwa-page-safe min-h-dvh bg-[#070b14] p-4 text-white sm:p-8">
+      <div className="admin-standalone-page pwa-page-safe min-h-dvh p-4 text-white sm:p-8">
         <p className="text-red-400">
           Access denied. This page is restricted to platform super
           administrators.
@@ -205,7 +205,7 @@ export default function AgentsManagementPage() {
   }
 
   return (
-    <div className="pwa-page-safe min-h-dvh space-y-6 bg-[#070b14] p-4 text-white light:bg-white light:text-gray-900 sm:p-8">
+    <div className="admin-standalone-page pwa-page-safe min-h-dvh space-y-6 p-4 text-white light:text-gray-900 sm:p-8">
       {/* PAGE HEADER */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>

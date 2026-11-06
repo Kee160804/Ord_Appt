@@ -3,12 +3,19 @@
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  CalendarDays,
+  CheckCircle2,
+  CheckSquare2,
   ChevronLeft,
   ChevronRight,
+  PackageOpen,
   RefreshCw,
   Search,
+  ShoppingBasket,
   ShoppingBag,
+  Truck,
   XCircle,
+  type LucideIcon,
 } from "lucide-react";
 
 import { StatusBadge } from "../components/Badge";
@@ -35,29 +42,21 @@ const BASE_STATUS_FLOW: OrderStatus[] = [
   "delivered",
 ];
 
-/**
- * Status styling shared by the summary/filter controls and order list.
- */
-const STATUS_BG: Record<OrderStatus, string> = {
-  pending:
-    "bg-amber-500/20 light:bg-amber-50 border-amber-500/30 light:border-amber-200",
-  confirmed:
-    "bg-blue-500/20 light:bg-blue-50 border-blue-500/30 light:border-blue-200",
-  preparing:
-    "bg-violet-500/20 light:bg-violet-50 border-violet-500/30 light:border-violet-200",
-  ready:
-    "bg-green-500/20 light:bg-green-50 border-green-500/30 light:border-green-200",
-  delivered:
-    "bg-slate-700/50 light:bg-slate-50 border-slate-600 light:border-slate-200",
-  out_for_delivery:
-    "bg-cyan-500/20 light:bg-cyan-50 border-cyan-500/30 light:border-cyan-200",
-  cancelled:
-    "bg-red-500/20 light:bg-red-50 border-red-500/30 light:border-red-200",
-};
-
 interface Props {
   tenant: Tenant;
+  searchInput: string;
+  onSearchInputChange: (value: string) => void;
+  onTotalChange?: (total: number) => void;
 }
+
+const STATUS_ICON: Partial<Record<OrderStatus, LucideIcon>> = {
+  pending: ShoppingBag,
+  confirmed: CheckSquare2,
+  preparing: PackageOpen,
+  ready: ShoppingBasket,
+  out_for_delivery: Truck,
+  delivered: CheckCircle2,
+};
 
 interface PaginationState {
   page: number;
@@ -76,6 +75,32 @@ const EMPTY_PAGINATION: PaginationState = {
   hasPreviousPage: false,
   hasNextPage: false,
 };
+
+const EMPTY_STATUS_COUNTS: Record<OrderStatus, number> = {
+  pending: 0,
+  confirmed: 0,
+  preparing: 0,
+  ready: 0,
+  out_for_delivery: 0,
+  delivered: 0,
+  cancelled: 0,
+};
+
+function formatOrderDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return { date: "—", time: "" };
+  return {
+    date: new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      day: "2-digit",
+      year: "numeric",
+    }).format(date),
+    time: new Intl.DateTimeFormat("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(date),
+  };
+}
 
 /**
  * Filters mock/demo orders locally.
@@ -109,7 +134,12 @@ function filterDemoOrders(
   });
 }
 
-export function OrdersView({ tenant }: Props) {
+export function OrdersView({
+  tenant,
+  searchInput,
+  onSearchInputChange,
+  onTotalChange,
+}: Props) {
   const usesSupabase = isSupabaseConfigured();
 
   const statusFlow: OrderStatus[] =
@@ -128,12 +158,14 @@ export function OrdersView({ tenant }: Props) {
    * searchInput updates immediately while typing.
    * search is debounced before it is sent to Supabase.
    */
-  const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
 
   const [page, setPage] = useState(0);
   const [pagination, setPagination] =
     useState<PaginationState>(EMPTY_PAGINATION);
+  const [allOrderTotal, setAllOrderTotal] = useState(0);
+  const [statusCounts, setStatusCounts] =
+    useState<Record<OrderStatus, number>>(EMPTY_STATUS_COUNTS);
 
   const [isLoading, setIsLoading] = useState(usesSupabase);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
@@ -258,6 +290,26 @@ export function OrdersView({ tenant }: Props) {
     void loadOrders();
   }, [loadOrders]);
 
+  useEffect(() => {
+    if (filter === "all") {
+      setAllOrderTotal(pagination.total);
+      const nextCounts = { ...EMPTY_STATUS_COUNTS };
+      orders.forEach((order) => {
+        nextCounts[order.status] += 1;
+      });
+      setStatusCounts(nextCounts);
+    } else {
+      setStatusCounts((current) => ({
+        ...current,
+        [filter]: pagination.total,
+      }));
+    }
+  }, [filter, orders, pagination.total]);
+
+  useEffect(() => {
+    onTotalChange?.(allOrderTotal);
+  }, [allOrderTotal, onTotalChange]);
+
   /**
    * The first/last displayed record numbers for the pagination summary.
    */
@@ -345,36 +397,53 @@ export function OrdersView({ tenant }: Props) {
   };
 
   return (
-    <div className="min-h-full space-y-4 bg-[#08111f] p-4 text-white light:bg-[#f8fafc] light:text-[#14213a] md:p-5">
+    <div className="orders-page dashboard-page min-h-full space-y-4 p-3 text-white light:text-[#14213a] sm:p-4">
+      <div className="flex justify-end">
+        <Button
+          variant="outline"
+          size="sm"
+          className="orders-refresh w-full justify-center sm:w-auto"
+          disabled={isLoading}
+          onClick={() => void loadOrders()}
+        >
+          <RefreshCw
+            className={cn("mr-1.5 h-3.5 w-3.5", isLoading && "animate-spin")}
+          />
+          Refresh orders
+        </Button>
+      </div>
       {/* ------------------------------------------------------------------
           Status filters
           ------------------------------------------------------------------ */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-        {statusFlow.map((status) => (
-          <button
-            key={status}
-            type="button"
-            onClick={() => changeFilter(status)}
-            className={cn(
-              "rounded-xl border p-3 text-left transition-all hover:shadow-sm",
-              STATUS_BG[status],
-              filter === status &&
-                "ring-2 ring-violet-500 ring-offset-2 ring-offset-[#0a0f1a] light:ring-violet-400 light:ring-offset-white",
-            )}
-          >
-            <p className="text-xs font-medium capitalize text-slate-400 light:text-slate-600">
-              {status.replaceAll("_", " ")}
-            </p>
-
-            <p className="mt-1 text-xl font-black text-white light:text-[#17223a]">
-              {filter === status ? pagination.total : "—"}
-            </p>
-
-            <p className="mt-0.5 text-[9px] text-slate-500 light:text-slate-500">
-              {filter === status ? "matching orders" : "select to view"}
-            </p>
-          </button>
-        ))}
+      <div className="orders-status-grid grid grid-cols-2 gap-3">
+        {statusFlow.map((status) => {
+          const Icon = STATUS_ICON[status] ?? ShoppingBag;
+          return (
+            <button
+              key={status}
+              type="button"
+              onClick={() => changeFilter(status)}
+              className={cn(
+                "order-status-card relative min-h-17 overflow-hidden rounded-xl border p-3 text-left transition-all",
+                `is-${status}`,
+                filter === status && "is-active",
+              )}
+            >
+              <span className="order-status-orb" aria-hidden="true" />
+              <span className="order-status-icon">
+                <Icon className="h-4 w-4" />
+              </span>
+              <span className="relative z-10 block min-w-0 pl-12">
+                <span className="block truncate text-[11px] font-extrabold capitalize text-white light:text-[#17223a]">
+                  {status.replaceAll("_", " ")}
+                </span>
+                <span className="mt-0.5 block text-xl font-black text-white light:text-[#17223a]">
+                  {statusCounts[status]}
+                </span>
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       {/* ------------------------------------------------------------------
@@ -392,49 +461,55 @@ export function OrdersView({ tenant }: Props) {
         </div>
       )}
 
-      {/* ------------------------------------------------------------------
-          Search + filter strip
-          ------------------------------------------------------------------ */}
       <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-        <div className="relative w-full max-w-md">
+        <div className="relative w-full xl:max-w-md">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-
           <input
             type="search"
             value={searchInput}
-            onChange={(event) => setSearchInput(event.target.value)}
+            onChange={(event) => onSearchInputChange(event.target.value)}
             placeholder="Search order, customer, email or phone..."
             maxLength={120}
-            className="h-10 w-full rounded-lg border border-slate-700/60 bg-slate-900/70 pl-9 pr-3 text-sm text-white outline-none transition focus:border-violet-500 light:border-[#e5e9f1] light:bg-white light:text-slate-900"
+            className="orders-search h-10 w-full rounded-xl border pl-9 pr-3 text-sm outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-500/10"
           />
         </div>
 
-        <div className="flex w-fit max-w-full items-center gap-1 overflow-x-auto rounded-lg border border-slate-700/60 bg-slate-900/70 p-1 light:border-[#e5e9f1] light:bg-white">
-          {(["all", ...statusTabs] as (OrderStatus | "all")[]).map((tab) => (
-            <button
-              key={tab}
-              type="button"
-              onClick={() => changeFilter(tab)}
-              className={cn(
-                "whitespace-nowrap rounded-md px-3 py-1.5 text-[10px] font-medium capitalize transition-all",
-                filter === tab
-                  ? "bg-violet-600 text-white shadow-sm light:bg-violet-600 light:text-white"
-                  : "text-slate-400 hover:text-white light:text-slate-600 light:hover:text-gray-900",
-              )}
-            >
-              {tab.replaceAll("_", " ")}
-            </button>
-          ))}
+        <div className="orders-toolbar max-w-full overflow-x-auto rounded-xl border p-1.5">
+          <div className="flex min-w-max items-center gap-1">
+            {(["all", ...statusTabs] as (OrderStatus | "all")[]).map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => changeFilter(tab)}
+                className={cn(
+                  "whitespace-nowrap rounded-lg px-4 py-2 text-[10px] font-bold capitalize transition-all",
+                  filter === tab
+                    ? "bg-violet-600 text-white shadow-sm light:bg-violet-600 light:text-white"
+                    : "text-slate-400 hover:text-white light:text-slate-600 light:hover:text-gray-900",
+                )}
+              >
+                {tab.replaceAll("_", " ")}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
       {isLoading && <p className="text-xs text-slate-400">Loading orders...</p>}
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-4 xl:grid-cols-2 xl:items-start">
         {/* ----------------------------------------------------------------
             Order list
             ---------------------------------------------------------------- */}
-        <Card className="lg:col-span-2">
+        <Card className="orders-list-panel overflow-hidden">
+          <div className="orders-table-head hidden grid-cols-[1.45fr_1.05fr_0.75fr_0.55fr_1fr_20px] gap-3 border-b px-4 py-2.5 text-[9px] font-bold uppercase tracking-wide sm:grid">
+            <span>Order</span>
+            <span>Customer</span>
+            <span>Status</span>
+            <span>Total</span>
+            <span>Date</span>
+            <span aria-hidden="true" />
+          </div>
           <div className="divide-y divide-slate-700 light:divide-slate-100">
             {!isLoading && orders.length === 0 && (
               <div className="py-16 text-center text-slate-400 light:text-gray-500">
@@ -453,45 +528,63 @@ export function OrdersView({ tenant }: Props) {
                 type="button"
                 onClick={() => setSelected(order)}
                 className={cn(
-                  "flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-slate-700 light:hover:bg-[#fafbfe]",
-                  selected?.id === order.id &&
-                    "bg-violet-900/30 light:bg-violet-50",
+                  "order-row grid w-full grid-cols-[auto_1fr_auto] items-center gap-3 px-4 py-3 text-left transition-colors sm:grid-cols-[1.45fr_1.05fr_0.75fr_0.55fr_1fr_20px]",
+                  selected?.id === order.id && "is-selected",
                 )}
               >
-                <div
-                  className={cn(
-                    "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border text-sm font-bold",
-                    STATUS_BG[order.status],
-                  )}
-                >
-                  #
-                </div>
-
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-bold text-white light:text-gray-900">
-                      {order.orderNumber}
-                    </p>
-
-                    <StatusBadge status={order.status} />
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <div className="order-number-icon flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-xs font-bold">
+                    #
                   </div>
 
-                  <p className="mt-0.5 text-xs text-slate-400 light:text-gray-600">
-                    {order.customerName} · {order.items.length} item
-                    {order.items.length !== 1 ? "s" : ""}
-                    {order.pickupTime ? ` · Pickup ${order.pickupTime}` : ""}
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-bold text-white light:text-gray-900">
+                      {order.orderNumber}
+                    </p>
+                    <p className="mt-0.5 text-[10px] text-slate-500">
+                      {order.items.length} item
+                      {order.items.length !== 1 ? "s" : ""}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="col-span-2 min-w-0 sm:col-span-1">
+                  <p className="truncate text-xs font-semibold text-white light:text-gray-900">
+                    {order.customerName}
+                  </p>
+                  <p className="mt-0.5 truncate text-[10px] text-slate-500">
+                    {order.pickupTime
+                      ? `Pickup ${order.pickupTime}`
+                      : "No pickup time"}
                   </p>
                 </div>
 
-                <div className="shrink-0 text-right">
+                <div className="col-start-2 sm:col-start-auto">
+                  <StatusBadge status={order.status} />
+                </div>
+
+                <div className="col-start-3 row-start-2 shrink-0 text-right sm:col-start-auto sm:row-start-auto sm:text-left">
                   <p className="text-sm font-bold text-white light:text-gray-900">
                     {formatCurrency(order.totalAmount)}
                   </p>
-
-                  <StatusBadge status={order.paymentStatus} />
+                  <div className="mt-1 sm:hidden">
+                    <StatusBadge status={order.paymentStatus} />
+                  </div>
                 </div>
 
-                <ChevronRight className="h-4 w-4 shrink-0 text-slate-500 light:text-gray-400" />
+                <div className="hidden min-w-0 items-center gap-2 sm:flex">
+                  <CalendarDays className="h-3.5 w-3.5 shrink-0 text-slate-400" />
+                  <span className="min-w-0 text-[10px] leading-4 text-slate-300 light:text-slate-700">
+                    <span className="block truncate">
+                      {formatOrderDate(order.createdAt).date}
+                    </span>
+                    <span className="block truncate">
+                      {formatOrderDate(order.createdAt).time}
+                    </span>
+                  </span>
+                </div>
+
+                <ChevronRight className="col-start-3 row-start-1 h-4 w-4 shrink-0 text-slate-500 light:text-gray-400 sm:col-start-auto sm:row-start-auto" />
               </button>
             ))}
           </div>
@@ -539,9 +632,14 @@ export function OrdersView({ tenant }: Props) {
         {/* ----------------------------------------------------------------
             Detail panel
             ---------------------------------------------------------------- */}
-        <div>
-          {selected ? (
-            <Card className="sticky top-6">
+        {selected && (
+          <div>
+            <Card className="order-detail-panel overflow-hidden">
+              <div className="border-b border-slate-700 px-5 py-3 light:border-slate-200">
+                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 light:text-slate-500">
+                  Order details
+                </p>
+              </div>
               <div className="space-y-4 p-5">
                 <div className="flex items-center justify-between">
                   <div>
@@ -668,13 +766,8 @@ export function OrdersView({ tenant }: Props) {
                   )}
               </div>
             </Card>
-          ) : (
-            <div className="flex h-48 flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-700 bg-slate-800/50 text-slate-400 light:border-slate-200 light:bg-slate-50 light:text-gray-500">
-              <ShoppingBag className="mb-2 h-8 w-8 opacity-40" />
-              <p className="text-sm">Select an order to view details</p>
-            </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );

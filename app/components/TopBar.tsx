@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Menu, Plus, Search, Sun } from "lucide-react";
+import { Menu, Moon, Plus, Search, Sun } from "lucide-react";
 import { useTheme } from "@/app/contexts/theme";
 import { useAuth } from "@/app/contexts/auth";
 import { NotificationCenter } from "@/app/components/NotificationCenter";
@@ -10,10 +10,21 @@ import { NotificationCenter } from "@/app/components/NotificationCenter";
 interface TopBarProps {
   title: string;
   subtitle?: string;
+  meta?: string;
+  searchValue?: string;
+  searchPlaceholder?: string;
+  onSearchChange?: (value: string) => void;
   action?: { label: string; onClick: () => void };
 }
 
-export function TopBar({ title, action }: TopBarProps) {
+export function TopBar({
+  title,
+  meta,
+  searchValue,
+  searchPlaceholder = "Search...",
+  onSearchChange,
+  action,
+}: TopBarProps) {
   const router = useRouter();
   const { theme, toggleTheme } = useTheme();
   const { user, tenant } = useAuth();
@@ -22,6 +33,7 @@ export function TopBar({ title, action }: TopBarProps) {
 
   const handleSearch = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (onSearchChange) return;
     const query = search.trim().toLowerCase();
     if (!query) return;
     const destinations = [
@@ -78,7 +90,7 @@ export function TopBar({ title, action }: TopBarProps) {
   };
 
   return (
-    <header className="sticky top-0 z-20 flex min-h-14 shrink-0 items-center justify-between gap-2 border-b border-slate-700/60 bg-[#0b1424]/95 px-2 py-2 backdrop-blur light:border-[#e7ebf2] light:bg-white/95 sm:px-4 md:px-5">
+    <header className="dashboard-topbar sticky top-0 z-20 flex min-h-[64px] shrink-0 items-center justify-between gap-2 border-b px-3 py-2 backdrop-blur sm:px-5 md:min-h-[72px] md:px-6">
       <div className="flex min-w-0 items-center gap-1.5 sm:gap-3">
         <button
           onClick={() =>
@@ -86,28 +98,36 @@ export function TopBar({ title, action }: TopBarProps) {
           }
           aria-label="Toggle sidebar"
           title="Toggle sidebar"
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-800 hover:text-white light:hover:bg-slate-100 light:hover:text-slate-900 sm:h-10 sm:w-10"
+          className="dashboard-icon-button flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-colors sm:h-10 sm:w-10"
         >
           <Menu className="h-4 w-4" />
         </button>
-        <h1 className="max-w-[30vw] truncate text-sm font-bold text-white light:text-[#111b31] sm:max-w-none">
-          {title}
-        </h1>
+        <div className="min-w-0">
+          <h1 className="max-w-[55vw] truncate text-[18px] font-extrabold leading-tight tracking-[-0.03em] sm:max-w-none md:text-[20px]">
+            {title}
+          </h1>
+          {meta && (
+            <p className="mt-0.5 text-[10px] font-medium text-slate-500 dark:text-slate-400">
+              {meta}
+            </p>
+          )}
+        </div>
       </div>
 
-      <div className="flex shrink-0 items-center gap-0.5 sm:gap-2">
+      <div className="hidden shrink-0 items-center gap-1.5 md:flex">
         <div className="relative hidden md:block">
           <form onSubmit={handleSearch}>
             <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
             <input
-              value={search}
+              value={onSearchChange ? (searchValue ?? "") : search}
               onChange={(event) => {
-                setSearch(event.target.value);
+                if (onSearchChange) onSearchChange(event.target.value);
+                else setSearch(event.target.value);
                 setSearchMessage("");
               }}
               aria-label="Search dashboard"
-              placeholder="Search..."
-              className="h-8 w-40 rounded-lg border border-slate-700 light:border-[#e3e8f0] bg-slate-900/70 light:bg-[#fbfcfe] pl-8 pr-3 text-[11px] text-white light:text-slate-800 outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-500/10 lg:w-48"
+              placeholder={searchPlaceholder}
+              className="dashboard-search h-9 w-44 rounded-xl border pl-9 pr-3 text-[12px] outline-none transition focus:border-violet-500 focus:ring-2 focus:ring-violet-500/10 lg:w-52"
             />
           </form>
           {searchMessage && (
@@ -121,14 +141,14 @@ export function TopBar({ title, action }: TopBarProps) {
 
         <button
           onClick={toggleTheme}
-          className="flex h-11 w-11 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-800 light:hover:bg-slate-100 hover:text-white light:hover:text-slate-900 sm:h-9 sm:w-9"
+          className="dashboard-icon-button flex h-9 w-9 items-center justify-center rounded-xl transition-colors"
           aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
           title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
         >
           {theme === "dark" ? (
-            <Sun className="h-4 w-4 text-amber-400" />
+            <Sun className="h-4 w-4 text-amber-300" />
           ) : (
-            <Sun className="h-4 w-4 text-amber-500" />
+            <Moon className="h-4 w-4 text-slate-700" />
           )}
         </button>
 

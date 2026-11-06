@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  BarChart3,
+  CalendarDays,
   ChevronLeft,
   ChevronRight,
   Download,
   DollarSign,
-  History,
-  Search,
+  Pencil,
   UserRoundCheck,
   Users,
 } from "lucide-react";
@@ -33,6 +34,7 @@ import type { Tenant } from "../types/index";
 
 interface Props {
   tenant: Tenant;
+  searchInput: string;
 }
 
 function demoCustomers(tenant: Tenant): CustomerSummary[] {
@@ -74,13 +76,12 @@ function demoCustomers(tenant: Tenant): CustomerSummary[] {
   return [...grouped.values()];
 }
 
-export function CustomersView({ tenant }: Props) {
+export function CustomersView({ tenant, searchInput }: Props) {
   const usesSupabase = isSupabaseConfigured();
 
   const [customers, setCustomers] = useState<CustomerSummary[]>(
     usesSupabase ? [] : demoCustomers(tenant),
   );
-  const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState<boolean | "all">("all");
   const [page, setPage] = useState(0);
@@ -480,59 +481,8 @@ export function CustomersView({ tenant }: Props) {
   };
 
   return (
-    <div className="min-h-full space-y-4 bg-[#08111f] light:bg-[#f8fafc] p-4 text-white light:text-[#14213a] md:p-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-sm font-bold text-white light:text-[#17223a]">
-            Customers
-          </h2>
-          <p className="mt-0.5 text-[10px] text-slate-400 light:text-[#71809a]">
-            {pagination.total} unique customer
-            {pagination.total === 1 ? "" : "s"}
-          </p>
-        </div>
-        <div className="flex w-full items-center gap-2 sm:w-auto">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={!customers.length}
-            onClick={exportCustomers}
-          >
-            <Download className="h-3.5 w-3.5" /> Export Page CSV
-          </Button>
-          {isSupabaseConfigured() && (
-            <Button
-              className="bg-violet-600 text-white"
-              onClick={() =>
-                setEditing({
-                  id: "",
-                  name: "",
-                  email: "",
-                  phone: "",
-                  notes: "",
-                  isActive: true,
-                  createdAt: new Date().toISOString(),
-                })
-              }
-            >
-              Add Customer
-            </Button>
-          )}
-          <div className="relative min-w-0 flex-1 sm:flex-none">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 light:text-gray-500" />
-            <input
-              value={searchInput}
-              onChange={(event) => setSearchInput(event.target.value)}
-              placeholder="Search customers..."
-              aria-label="Search customers"
-              maxLength={120}
-              className="h-8 w-full rounded-lg border border-slate-700 light:border-[#e3e8f0] bg-slate-900/70 light:bg-white pl-9 pr-3 text-[10px] text-white light:text-[#17223a] outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/10 placeholder:text-slate-500 sm:w-52"
-            />
-          </div>
-        </div>
-      </div>
-
-      <div className="flex w-fit max-w-full items-center gap-1 overflow-x-auto rounded-lg border border-slate-700/60 bg-slate-900/70 p-1 light:border-[#e5e9f1] light:bg-white">
+    <div className="customers-page dashboard-page min-h-full space-y-4 p-3 text-white light:text-[#14213a] sm:p-4 md:p-6">
+      <div className="customers-filter-bar flex w-fit max-w-full items-center gap-1 overflow-x-auto rounded-lg border p-1">
         {[
           { label: "All", value: "all" as const },
           { label: "Active", value: true as const },
@@ -545,7 +495,7 @@ export function CustomersView({ tenant }: Props) {
               setActiveFilter(option.value);
               setPage(0);
             }}
-            className={`rounded-md px-3 py-1.5 text-[10px] font-medium transition-all ${
+            className={`rounded-md px-4 py-2 text-[11px] font-bold transition-all ${
               activeFilter === option.value
                 ? "bg-violet-600 text-white shadow-sm"
                 : "text-slate-400 hover:text-white light:text-slate-600 light:hover:text-gray-900"
@@ -553,10 +503,39 @@ export function CustomersView({ tenant }: Props) {
           >
             {option.label}
             {activeFilter === option.value && (
-              <span className="ml-1 opacity-75">({pagination.total})</span>
+              <span className="ml-1 opacity-80">({pagination.total})</span>
             )}
           </button>
         ))}
+      </div>
+
+      <div className="sr-only focus-within:not-sr-only focus-within:flex focus-within:gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={!customers.length}
+          onClick={exportCustomers}
+        >
+          <Download className="h-3.5 w-3.5" /> Export Page CSV
+        </Button>
+        {isSupabaseConfigured() && (
+          <Button
+            className="bg-violet-600 text-white"
+            onClick={() =>
+              setEditing({
+                id: "",
+                name: "",
+                email: "",
+                phone: "",
+                notes: "",
+                isActive: true,
+                createdAt: new Date().toISOString(),
+              })
+            }
+          >
+            Add Customer
+          </Button>
+        )}
       </div>
 
       {error && (
@@ -576,41 +555,50 @@ export function CustomersView({ tenant }: Props) {
             label: "Returning Customers",
             value: String(returningCustomers),
             icon: UserRoundCheck,
+            tone: "violet",
           },
           {
             label: "Customer Lifetime Value",
             value: formatCurrency(lifetimeValue),
             icon: DollarSign,
+            tone: "blue",
           },
           {
             label: "Average Customer Value",
             value: formatCurrency(averageValue),
-            icon: Users,
+            icon: BarChart3,
+            tone: "emerald",
           },
-        ].map(({ label, value, icon: Icon }) => (
-          <Card key={label} className="p-4">
-            <div className="flex items-center gap-3">
-              <span className="rounded-lg bg-violet-500/15 p-2 text-violet-400">
+        ].map(({ label, value, icon: Icon, tone }) => (
+          <Card
+            key={label}
+            className={`customer-metric is-${tone} relative min-h-27 overflow-hidden p-4`}
+          >
+            <span className="customer-metric-wave" aria-hidden="true" />
+            <div className="relative z-10 flex items-start gap-3">
+              <span className="customer-metric-icon rounded-lg p-2">
                 <Icon className="h-4 w-4" />
               </span>
               <div>
-                <p className="text-[10px] text-slate-400">{label}</p>
-                <p className="mt-1 text-sm font-bold">{value}</p>
+                <p className="text-[10px] font-bold text-slate-400 light:text-slate-700">
+                  {label}
+                </p>
+                <p className="mt-2 text-lg font-black">{value}</p>
               </div>
             </div>
           </Card>
         ))}
       </div>
 
-      <Card className="overflow-x-auto">
-        <div className="grid min-w-150 grid-cols-4 gap-4 border-b border-slate-700 light:border-[#e8ecf3] px-5 py-3">
-          <p className="text-xs font-semibold text-slate-400 light:text-gray-600 uppercase tracking-wider col-span-2">
+      <Card className="customer-table overflow-x-auto">
+        <div className="customer-table-head grid min-w-150 grid-cols-[1.55fr_0.8fr_0.75fr] gap-4 border-b px-5 py-3">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 light:text-gray-600">
             Customer
           </p>
-          <p className="text-xs font-semibold text-slate-400 light:text-gray-600 uppercase tracking-wider">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 light:text-gray-600">
             Last Activity
           </p>
-          <p className="text-xs font-semibold text-slate-400 light:text-gray-600 uppercase tracking-wider text-right">
+          <p className="text-right text-[10px] font-bold uppercase tracking-wider text-slate-400 light:text-gray-600">
             Total Spend
           </p>
         </div>
@@ -635,9 +623,15 @@ export function CustomersView({ tenant }: Props) {
           {customers.map((customer) => (
             <div
               key={customer.key}
-              className="grid min-w-150 grid-cols-4 items-center gap-4 px-5 py-3 transition-colors hover:bg-slate-700/60 light:hover:bg-[#fafbfe]"
+              className="customer-table-row grid min-w-150 grid-cols-[1.55fr_0.8fr_0.75fr] items-center gap-4 px-5 py-3 transition-colors"
             >
-              <div className="col-span-2 flex items-center gap-3 min-w-0">
+              <button
+                type="button"
+                className="flex min-w-0 items-center gap-3 text-left"
+                title="View customer history"
+                aria-label={`View ${customer.name} history`}
+                onClick={() => setHistoryCustomer(customer)}
+              >
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-violet-500 to-indigo-600 text-xs font-bold text-white">
                   {customer.name
                     .split(" ")
@@ -671,27 +665,19 @@ export function CustomersView({ tenant }: Props) {
                     {customer.activityCount === 1 ? "" : "s"}
                   </p>
                 </div>
-              </div>
-              <p className="text-xs text-slate-300 light:text-[#566681]">
-                {formatDate(customer.lastActivity)}
+              </button>
+              <p className="flex items-center gap-2 text-xs text-slate-300 light:text-[#566681]">
+                <CalendarDays className="h-3.5 w-3.5 shrink-0" />
+                <span>{formatDate(customer.lastActivity)}</span>
               </p>
-              <div className="flex items-center justify-end gap-2">
+              <div className="flex items-center justify-end gap-3">
                 <p className="text-right text-xs font-bold text-white light:text-[#17223a]">
                   {formatCurrency(customer.totalValue)}
                 </p>
-                <button
-                  type="button"
-                  className="text-violet-400"
-                  title="View customer history"
-                  aria-label={`View ${customer.name} history`}
-                  onClick={() => setHistoryCustomer(customer)}
-                >
-                  <History className="h-4 w-4" />
-                </button>
                 {customer.id && (
                   <button
                     type="button"
-                    className="text-[10px] text-violet-400"
+                    className="inline-flex items-center gap-1 text-[11px] font-bold text-violet-400 light:text-violet-700"
                     onClick={() => {
                       const record = records.find(
                         (candidate) => candidate.id === customer.id,
@@ -699,6 +685,7 @@ export function CustomersView({ tenant }: Props) {
                       if (record) setEditing(record);
                     }}
                   >
+                    <Pencil className="h-3.5 w-3.5" />
                     Edit
                   </button>
                 )}
@@ -706,43 +693,42 @@ export function CustomersView({ tenant }: Props) {
             </div>
           ))}
         </div>
-      </Card>
+        <div className="customer-pagination flex flex-col gap-3 border-t px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs text-slate-400 light:text-slate-600">
+            {pagination.total === 0
+              ? "0 customers"
+              : `Showing ${pageRange.first}-${pageRange.last} of ${pagination.total} customers`}
+          </p>
 
-      <div className="flex flex-col gap-3 rounded-xl border border-slate-700/60 bg-slate-900/40 px-4 py-3 light:border-slate-200 light:bg-white sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-xs text-slate-400 light:text-slate-600">
-          {pagination.total === 0
-            ? "0 customers"
-            : `Showing ${pageRange.first}-${pageRange.last} of ${pagination.total} customers`}
-        </p>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={isLoading || !pagination.hasPreviousPage}
+              onClick={() => setPage((current) => Math.max(0, current - 1))}
+            >
+              <ChevronLeft className="mr-1 h-3.5 w-3.5" />
+              Previous
+            </Button>
 
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={isLoading || !pagination.hasPreviousPage}
-            onClick={() => setPage((current) => Math.max(0, current - 1))}
-          >
-            <ChevronLeft className="mr-1 h-3.5 w-3.5" />
-            Previous
-          </Button>
+            <span className="min-w-20 text-center text-xs text-slate-400 light:text-slate-600">
+              {pagination.totalPages === 0
+                ? "Page 0 of 0"
+                : `Page ${pagination.page + 1} of ${pagination.totalPages}`}
+            </span>
 
-          <span className="min-w-20 text-center text-xs text-slate-400 light:text-slate-600">
-            {pagination.totalPages === 0
-              ? "Page 0 of 0"
-              : `Page ${pagination.page + 1} of ${pagination.totalPages}`}
-          </span>
-
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={isLoading || !pagination.hasNextPage}
-            onClick={() => setPage((current) => current + 1)}
-          >
-            Next
-            <ChevronRight className="ml-1 h-3.5 w-3.5" />
-          </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={isLoading || !pagination.hasNextPage}
+              onClick={() => setPage((current) => current + 1)}
+            >
+              Next
+              <ChevronRight className="ml-1 h-3.5 w-3.5" />
+            </Button>
+          </div>
         </div>
-      </div>
+      </Card>
 
       <Modal
         open={!!editing}

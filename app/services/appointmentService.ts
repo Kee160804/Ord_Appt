@@ -419,26 +419,26 @@ export async function listPublicAppointmentAvailability(
   date: string,
   providerId?: string,
 ): Promise<string[]> {
-  const { data, error } = await client().rpc(
-    providerId
-      ? "get_public_provider_availability"
-      : "get_public_appointment_availability",
-    {
-      p_tenant_id: tenantId,
-      p_service_id: serviceId,
-      p_appointment_date: date,
+  const query = new URLSearchParams({ tenantId, serviceId, date });
+  if (providerId) query.set("providerId", providerId);
 
-      ...(providerId ? { p_staff_id: providerId } : {}),
-    },
-  );
+  const response = await fetch(`/api/public/availability?${query}`, {
+    method: "GET",
+    credentials: "omit",
+    headers: { Accept: "application/json" },
+  });
+  const body = (await response.json().catch(() => null)) as {
+    slots?: string[];
+    error?: string;
+  } | null;
 
-  if (error) {
-    throw availabilityError(error);
+  if (!response.ok) {
+    throw availabilityError(
+      new Error(body?.error || "Unable to load available times."),
+    );
   }
 
-  return ((data ?? []) as { appointment_time: string }[]).map((slot) =>
-    slot.appointment_time.slice(0, 5),
-  );
+  return Array.isArray(body?.slots) ? body.slots : [];
 }
 
 /**

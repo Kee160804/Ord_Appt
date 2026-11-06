@@ -8,9 +8,7 @@ import {
   Trash2,
   Search,
   Package,
-  ToggleLeft,
-  ToggleRight,
-  FolderTree,
+  LayoutGrid,
   ChevronLeft,
   ChevronRight,
   Upload,
@@ -512,6 +510,16 @@ export function ProductsView({ tenant }: Props) {
     setError("");
     setShowAdd(true);
   };
+
+  useEffect(() => {
+    const handlePrimaryAction = () => openAdd();
+    window.addEventListener("dashboard-primary-action", handlePrimaryAction);
+    return () =>
+      window.removeEventListener(
+        "dashboard-primary-action",
+        handlePrimaryAction,
+      );
+  });
 
   const openEdit = (product: Product) => {
     clearProductImageFile();
@@ -1084,21 +1092,22 @@ export function ProductsView({ tenant }: Props) {
   ).length;
 
   return (
-    <div className="min-h-full space-y-4 bg-[#08111f] light:bg-[#f8fafc] p-4 text-white light:text-[#14213a] md:p-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="products-page min-h-full space-y-4 p-3 text-white light:text-[#14213a] sm:p-4 md:p-6">
+      <div className="flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-sm font-bold text-white light:text-[#17223a]">
+          <h2 className="text-[20px] font-extrabold tracking-[-0.04em] text-white light:text-[#17223a]">
             Products
           </h2>
-          <p className="mt-0.5 text-[10px] text-slate-400 light:text-[#71809a]">
+          <p className="mt-0.5 text-[12px] text-slate-400 light:text-[#71809a]">
             {pagination.total} product{pagination.total === 1 ? "" : "s"}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <Button
             onClick={openCategoryManager}
             size="sm"
             variant="outline"
+            className="product-action-button h-10"
             disabled={!canUseAdvancedCatalog}
             title={
               canUseAdvancedCatalog
@@ -1106,12 +1115,14 @@ export function ProductsView({ tenant }: Props) {
                 : "Available on the Pro plan"
             }
           >
-            <FolderTree className="w-4 h-4" /> Manage Categories
+            <LayoutGrid className="h-4 w-4" />{" "}
+            <span className="hidden min-[390px]:inline">Manage Categories</span>
+            <span className="min-[390px]:hidden">Categories</span>
           </Button>
           <Button
             onClick={openAdd}
             size="sm"
-            className="bg-violet-600 hover:bg-violet-700 text-white"
+            className="product-action-button hidden h-10 bg-violet-600 px-4 text-white hover:bg-violet-700 md:inline-flex"
           >
             <Plus className="w-4 h-4" /> Add Product
           </Button>
@@ -1131,20 +1142,20 @@ export function ProductsView({ tenant }: Props) {
       )}
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1 max-w-sm">
+      <div className="flex flex-col gap-3 md:flex-row">
+        <div className="relative w-full md:max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 light:text-gray-500" />
           <input
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             placeholder="Search products..."
             maxLength={120}
-            className="h-8 w-full rounded-lg border border-slate-700 light:border-[#e3e8f0] bg-slate-800 light:bg-white pl-9 pr-3 text-[10px]
+            className="product-search h-10 w-full rounded-xl border pl-9 pr-3 text-[11px]
                        focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500
                        text-white light:text-gray-900 placeholder:text-slate-500 light:placeholder:text-gray-400"
           />
         </div>
-        <div className="flex gap-1.5 flex-wrap">
+        <div className="no-scrollbar flex gap-1.5 overflow-x-auto pb-1 md:flex-wrap md:overflow-visible md:pb-0">
           <button
             type="button"
             onClick={() => {
@@ -1152,10 +1163,8 @@ export function ProductsView({ tenant }: Props) {
               setPage(0);
             }}
             className={cn(
-              "rounded-lg px-3 py-1.5 text-[10px] font-medium transition-colors",
-              categoryId === "all"
-                ? "bg-violet-600 text-white"
-                : "bg-slate-800 light:bg-gray-100 text-slate-300 light:text-gray-700 hover:bg-slate-700 light:hover:bg-gray-200",
+              "filter-pill shrink-0 rounded-lg px-3 py-2 text-[10px] font-semibold transition-colors",
+              categoryId === "all" ? "bg-violet-600 text-white" : "",
             )}
           >
             All
@@ -1169,10 +1178,8 @@ export function ProductsView({ tenant }: Props) {
                 setPage(0);
               }}
               className={cn(
-                "rounded-lg px-3 py-1.5 text-[10px] font-medium transition-colors",
-                categoryId === category.id
-                  ? "bg-violet-600 text-white"
-                  : "bg-slate-800 light:bg-gray-100 text-slate-300 light:text-gray-700 hover:bg-slate-700 light:hover:bg-gray-200",
+                "filter-pill shrink-0 rounded-lg px-3 py-2 text-[10px] font-semibold transition-colors",
+                categoryId === category.id ? "bg-violet-600 text-white" : "",
               )}
             >
               {category.name}
@@ -1192,10 +1199,8 @@ export function ProductsView({ tenant }: Props) {
                 setPage(0);
               }}
               className={cn(
-                "rounded-lg px-3 py-1.5 text-[10px] font-medium transition-colors",
-                availability === option.value
-                  ? "bg-violet-600 text-white"
-                  : "bg-slate-800 light:bg-gray-100 text-slate-300 light:text-gray-700 hover:bg-slate-700 light:hover:bg-gray-200",
+                "filter-pill shrink-0 rounded-lg px-3 py-2 text-[10px] font-semibold transition-colors",
+                availability === option.value ? "bg-violet-600 text-white" : "",
               )}
             >
               {option.label}
@@ -1211,7 +1216,7 @@ export function ProductsView({ tenant }: Props) {
           <p className="text-sm">No products found</p>
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="products-grid grid grid-cols-2 gap-2.5 sm:gap-x-3 sm:gap-y-4 lg:grid-cols-3">
           {products.map((p) => (
             <ProductCard
               key={p.id}
@@ -1224,7 +1229,7 @@ export function ProductsView({ tenant }: Props) {
         </div>
       )}
 
-      <div className="flex flex-col gap-3 rounded-xl border border-slate-700/60 bg-slate-900/40 px-4 py-3 light:border-slate-200 light:bg-white sm:flex-row sm:items-center sm:justify-between">
+      <div className="pagination-panel flex flex-col gap-3 rounded-xl border px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-xs text-slate-400 light:text-slate-600">
           {pagination.total === 0
             ? "0 products"
@@ -2301,8 +2306,8 @@ function ProductCard({
   const isLowStock = tracksInventory && stock > 0 && stock <= 5;
 
   return (
-    <Card className="group overflow-hidden">
-      <div className="relative h-40 overflow-hidden bg-slate-700 light:bg-slate-100">
+    <Card className="product-card group flex h-full flex-col overflow-hidden">
+      <div className="relative aspect-[8/5] overflow-hidden bg-slate-700 light:bg-slate-100">
         {product.image ? (
           <Image
             src={product.image}
@@ -2317,47 +2322,45 @@ function ProductCard({
             <Package className="h-10 w-10" />
           </div>
         )}
-        <div className="absolute top-3 left-3 flex gap-1.5 flex-wrap">
-          {product.tags.map((tag) => (
-            <span
-              key={tag}
-              className="px-2 py-0.5 bg-black/60 light:bg-white/90 text-white light:text-gray-800 text-[10px] font-semibold rounded-full backdrop-blur-sm capitalize"
-            >
-              {tag}
-            </span>
-          ))}
-        </div>
-        <div className="absolute top-3 right-3">
+        <div className="absolute right-2 top-2">
           <Badge
             variant={
               !product.isActive ? "default" : isSoldOut ? "danger" : "success"
             }
+            className={cn(
+              "product-state-badge border-0 px-2 py-1 text-[9px] text-white shadow-sm",
+              !product.isActive
+                ? "is-paused"
+                : isSoldOut
+                  ? "is-sold-out"
+                  : "is-live",
+            )}
           >
             {!product.isActive ? "Paused" : isSoldOut ? "Sold Out" : "Live"}
           </Badge>
         </div>
       </div>
-      <div className="p-4 space-y-3">
+      <div className="flex flex-1 flex-col p-2.5 sm:p-3">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
-            <h4 className="font-semibold text-white light:text-gray-900 text-sm truncate">
+            <h4 className="line-clamp-2 text-[11px] font-bold leading-tight text-white light:text-gray-900 sm:text-sm">
               {product.name}
             </h4>
-            <p className="text-xs text-slate-400 light:text-gray-600 mt-0.5 line-clamp-2">
+            <p className="mt-1.5 line-clamp-3 min-h-10 text-[9px] leading-[1.4] text-slate-400 light:text-gray-600 sm:text-[10px]">
               {product.description}
             </p>
           </div>
-          <span className="shrink-0 text-sm font-black text-white light:text-gray-900">
+          <span className="shrink-0 text-[10px] font-black text-white light:text-gray-900 sm:text-sm">
             {formatCurrency(product.price)}
           </span>
         </div>
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-slate-400 light:text-gray-500 bg-slate-700 light:bg-gray-100 px-2 py-1 rounded-lg">
+        <div className="mt-2 flex items-center justify-between">
+          <span className="max-w-[55%] truncate rounded-full bg-slate-700 px-2.5 py-1 text-[9px] text-slate-300 light:bg-violet-100 light:text-violet-800 sm:text-[10px]">
             {product.categoryName}
           </span>
           <span
             className={cn(
-              "text-xs font-semibold",
+              "text-[9px] font-semibold sm:text-[10px]",
               isSoldOut || isLowStock
                 ? "text-red-400 light:text-red-600"
                 : "text-slate-400 light:text-gray-500",
@@ -2372,15 +2375,14 @@ function ProductCard({
                   : `${stock} left`}
           </span>
         </div>
-        <div className="flex items-center gap-1 pt-1 border-t border-slate-700 light:border-slate-100">
+        <div className="mt-auto flex items-center gap-1 border-t border-slate-700 pt-2.5 light:border-slate-200">
           <Button
             variant="ghost"
             size="xs"
-            className="flex-1 justify-center text-white light:text-gray-800 hover:bg-slate-700 light:hover:bg-slate-100"
+            className="flex-1 justify-center px-1 text-[10px] text-violet-300 hover:bg-violet-500/10 light:text-violet-700 light:hover:bg-violet-50 sm:px-2.5 sm:text-[11px]"
             onClick={() => onEdit(product)}
           >
-            <Edit2 className="w-3.5 h-3.5 mr-1" />{" "}
-            {tracksInventory && stock <= 5 ? "Restock" : "Edit"}
+            <Edit2 className="w-3.5 h-3.5 mr-1" /> Edit
           </Button>
           <div className="w-px h-5 bg-slate-700 light:bg-slate-200" />
           <Button
@@ -2395,7 +2397,7 @@ function ProductCard({
           <button
             type="button"
             onClick={() => onToggle(product.id)}
-            className="text-slate-400 light:text-gray-500 hover:text-white light:hover:text-gray-900 transition-colors"
+            className="product-toggle-button transition-transform active:scale-95"
             aria-label={
               product.isActive
                 ? `Pause ${product.name}`
@@ -2407,11 +2409,15 @@ function ProductCard({
                 : "Publish storefront listing"
             }
           >
-            {product.isActive ? (
-              <ToggleRight className="w-5 h-5 text-emerald-400 light:text-emerald-600" />
-            ) : (
-              <ToggleLeft className="w-5 h-5" />
-            )}
+            <span
+              className={cn(
+                "product-toggle-track",
+                product.isActive && "is-active",
+              )}
+              aria-hidden="true"
+            >
+              <span className="product-toggle-knob" />
+            </span>
           </button>
         </div>
       </div>

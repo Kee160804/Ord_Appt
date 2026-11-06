@@ -32,7 +32,7 @@ export default function DashboardPage() {
   return (
     <>
       <TopBar
-        title="Dashboard"
+        title="Overview"
         subtitle={`${tenant.name} — ${tenant.businessType === "appointment" ? "Appointment" : tenant.businessType === "retail" ? "Retail" : "Ordering"} Business`}
       />
       <DashboardOverview tenant={tenant} />

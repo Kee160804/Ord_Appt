@@ -907,7 +907,7 @@ export function OrderingMenu({
 
   return (
     <>
-      <div className="grid min-w-0 grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_400px] xl:items-start">
+      <div className="storefront-catalog grid min-w-0 grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_400px] xl:items-start">
         {/* LEFT: Menu */}
         <div className="min-w-0">
           <div className="mb-6">

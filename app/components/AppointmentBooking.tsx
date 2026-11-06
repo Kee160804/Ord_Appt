@@ -41,7 +41,9 @@ import {
 } from "@/app/lib/business-payments";
 import type {
   BusinessReview,
+  Category,
   PublicPromotion,
+  PublicServiceDepartment,
   PublicServiceProvider,
   Service,
   Tenant,
@@ -57,6 +59,8 @@ interface ExtendedService extends Service {
 interface AppointmentBookingProps {
   tenant: Tenant;
   services: Service[];
+  serviceCategories?: Category[];
+  departments?: PublicServiceDepartment[];
   providers?: PublicServiceProvider[];
   reviews?: BusinessReview[];
   promotions?: PublicPromotion[];
@@ -131,6 +135,8 @@ function buildTimeSlots(
 export function AppointmentBooking({
   tenant,
   services,
+  serviceCategories: positionedServiceCategories = [],
+  departments = [],
   providers = [],
   reviews = [],
   promotions = [],
@@ -149,6 +155,7 @@ export function AppointmentBooking({
   );
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
+  const [departmentFilter, setDepartmentFilter] = useState("");
   const [concerns, setConcerns] = useState("");
   const [bookingOpen, setBookingOpen] = useState(false);
   const [customer, setCustomer] = useState({ name: "", email: "", phone: "" });
@@ -197,6 +204,11 @@ export function AppointmentBooking({
   );
   const selectedService =
     services.find((service) => service.id === selectedServiceId) ?? null;
+  const selectedDepartment = selectedService?.departmentId
+    ? (departments.find(
+        (department) => department.id === selectedService.departmentId,
+      ) ?? null)
+    : null;
   const appointmentPaymentOptions = useMemo<
     Array<PaymentMethodConfiguration & { available: boolean }>
   >(() => {
@@ -417,20 +429,46 @@ export function AppointmentBooking({
     () =>
       services.filter(
         (s) =>
+          (!departmentFilter || s.departmentId === departmentFilter) &&
           (!categoryFilter || s.category === categoryFilter) &&
           (s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
             (s.description ?? "")
               .toLowerCase()
               .includes(searchQuery.toLowerCase())),
       ),
-    [categoryFilter, services, searchQuery],
+    [categoryFilter, departmentFilter, services, searchQuery],
   );
-  const serviceCategories = useMemo(
-    () => [
-      ...new Set(services.map((service) => service.category).filter(Boolean)),
-    ],
-    [services],
-  );
+  const serviceCategories = useMemo(() => {
+    const usedNames = new Set(
+      services
+        .map((service) => service.category.trim().toLowerCase())
+        .filter((name) => name && name !== "services"),
+    );
+    const positioned = positionedServiceCategories
+      .filter(
+        (item) =>
+          item.name.trim().toLowerCase() !== "services" &&
+          usedNames.has(item.name.trim().toLowerCase()),
+      )
+      .sort(
+        (first, second) =>
+          first.sortOrder - second.sortOrder ||
+          first.name.localeCompare(second.name),
+      )
+      .map((item) => item.name);
+    const positionedNames = new Set(
+      positioned.map((name) => name.trim().toLowerCase()),
+    );
+    const remaining = services
+      .map((service) => service.category.trim())
+      .filter(
+        (name) =>
+          name &&
+          name.toLowerCase() !== "services" &&
+          !positionedNames.has(name.toLowerCase()),
+      );
+    return [...positioned, ...new Set(remaining)];
+  }, [positionedServiceCategories, services]);
 
   const extendedServices = filteredServices as ExtendedService[];
   const detailService =
@@ -766,7 +804,7 @@ export function AppointmentBooking({
           }}
         />
       )}
-      <div className="grid min-w-0 grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_340px] xl:items-start">
+      <div className="storefront-booking grid min-w-0 grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_340px] xl:items-start">
         {/* Left sidebar: Calendar, Time slots, Notes */}
         <aside
           id="appointment-booking-panel"
@@ -1098,19 +1136,26 @@ export function AppointmentBooking({
                     aria-label="Search services"
                   />
                 </div>
-                <select
-                  value={categoryFilter}
-                  onChange={(event) => setCategoryFilter(event.target.value)}
-                  aria-label="Filter services by department"
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 outline-none hover:border-violet-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
-                >
-                  <option value="">All departments</option>
-                  {serviceCategories.map((category) => (
-                    <option key={category} value={category}>
-                      {category}
-                    </option>
-                  ))}
-                </select>
+                {departments.length > 0 && (
+                  <select
+                    value={departmentFilter}
+                    onChange={(event) => {
+                      setDepartmentFilter(event.target.value);
+                      setSelectedServiceId(null);
+                      setSelectedProviderId("");
+                      setSelectedTime(null);
+                    }}
+                    aria-label="Filter services by department"
+                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 outline-none hover:border-violet-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                  >
+                    <option value="">All departments</option>
+                    {departments.map((department) => (
+                      <option key={department.id} value={department.id}>
+                        {department.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
             </div>
 
@@ -1610,6 +1655,11 @@ export function AppointmentBooking({
                     {selectedDate ? formatDate(selectedDate) : ""} at{" "}
                     {selectedTime} · {selectedService?.duration ?? 0} min
                   </p>
+                  {selectedDepartment && (
+                    <p className="mt-1 text-xs font-semibold text-slate-300 light:text-slate-700">
+                      Department: {selectedDepartment.name}
+                    </p>
+                  )}
                 </div>
                 <span className="ml-auto shrink-0 font-black">
                   {formatCurrency(selectedTotal)}
@@ -1756,6 +1806,11 @@ export function AppointmentBooking({
                     {selectedDate ? formatDate(selectedDate) : ""} at{" "}
                     {selectedTime}
                   </p>
+                  {selectedDepartment && (
+                    <p className="mt-1 text-xs font-semibold text-violet-300 light:text-violet-700">
+                      Department: {selectedDepartment.name}
+                    </p>
+                  )}
                 </div>
                 <span className="font-black">
                   {formatCurrency(selectedTotal)}

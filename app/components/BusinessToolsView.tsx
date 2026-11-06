@@ -6,11 +6,14 @@ import QRCode from "qrcode";
 import {
   Copy,
   Download,
+  Link,
+  Pencil,
   Percent,
   Plus,
   QrCode,
   Share2,
   Tags,
+  Trash2,
   Upload,
   Users,
 } from "lucide-react";
@@ -32,6 +35,7 @@ import {
   assignServiceDepartment,
   createDepartment,
   deletePromotionFlyer,
+  deleteServiceDepartment,
   listDepartments,
   listPromotions,
   listServiceProviders,
@@ -126,6 +130,9 @@ export function BusinessToolsView({ tenant }: { tenant: Tenant }) {
   const [qrData, setQrData] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [deletingDepartmentId, setDeletingDepartmentId] = useState<
+    string | null
+  >(null);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
@@ -134,6 +141,7 @@ export function BusinessToolsView({ tenant }: { tenant: Tenant }) {
     [tenant.domain, tenant.slug],
   );
   const hasPromotionFeature = tenantHasFeature(tenant, "storefront_promotions");
+  const hasDepartmentFeature = tenantHasFeature(tenant, "team_management");
   const reload = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -187,6 +195,30 @@ export function BusinessToolsView({ tenant }: { tenant: Tenant }) {
   const done = (value: string) => {
     setMessage(value);
     window.setTimeout(() => setMessage(""), 3500);
+  };
+  const removeDepartment = async (department: ServiceDepartment) => {
+    const confirmed = window.confirm(
+      `Delete “${department.name}”? Its services will not be deleted or recategorized. They will remain visible in the storefront under All.`,
+    );
+    if (!confirmed) return;
+
+    setDeletingDepartmentId(department.id);
+    setError("");
+    try {
+      await deleteServiceDepartment(tenant.id, department.id);
+      await reload();
+      done(
+        `Department “${department.name}” deleted. Its services remain publicly available.`,
+      );
+    } catch (deleteError) {
+      setError(
+        deleteError instanceof Error
+          ? deleteError.message
+          : "Unable to delete department.",
+      );
+    } finally {
+      setDeletingDepartmentId(null);
+    }
   };
   const saveProvider = async () => {
     if (!providerForm?.name.trim())
@@ -312,7 +344,12 @@ export function BusinessToolsView({ tenant }: { tenant: Tenant }) {
     ...(isAppointment
       ? [
           { id: "providers" as const, label: "Providers", icon: Users },
-          { id: "departments" as const, label: "Departments", icon: Tags },
+          {
+            id: "departments" as const,
+            label: "Departments",
+            icon: Tags,
+            locked: !hasDepartmentFeature,
+          },
         ]
       : []),
     { id: "promotions" as const, label: "Promotions", icon: Percent },
@@ -320,12 +357,10 @@ export function BusinessToolsView({ tenant }: { tenant: Tenant }) {
   ];
 
   return (
-    <div className="min-h-full space-y-4 bg-[#08111f] p-4 text-white light:bg-[#f8fafc] light:text-[#14213a] md:p-5">
-      <div>
-        <h2 className="text-sm font-bold">Business Tools</h2>
-        <p className="mt-1 text-[10px] text-slate-400">
-          Owner-controlled growth and operations for {tenant.name}.
-        </p>
+    <div className="dashboard-page business-tools-page">
+      <div className="business-tools-intro">
+        <h2>Business Tools</h2>
+        <p>Owner-controlled growth and operations for {tenant.name}.</p>
       </div>
       {error && (
         <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-xs text-red-300 light:text-red-700">
@@ -337,12 +372,19 @@ export function BusinessToolsView({ tenant }: { tenant: Tenant }) {
           {message}
         </div>
       )}
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        {tabs.map(({ id, label, icon: Icon }) => (
+      <div className="business-tools-tabs">
+        {tabs.map(({ id, label, icon: Icon, ...item }) => (
           <button
             key={id}
+            type="button"
+            disabled={"locked" in item && item.locked}
+            title={
+              "locked" in item && item.locked
+                ? "A multi-seat subscription is required for departments."
+                : undefined
+            }
             onClick={() => setTab(id)}
-            className={`flex min-h-11 flex-none items-center gap-2 rounded-xl px-4 text-xs font-semibold ${tab === id ? "bg-violet-600 text-white" : "border border-slate-700 bg-slate-900/60 text-slate-300 light:border-slate-200 light:bg-white light:text-slate-600"}`}
+            className={`${tab === id ? "active" : ""} disabled:cursor-not-allowed disabled:opacity-40`}
           >
             <Icon className="h-4 w-4" />
             {label}
@@ -414,7 +456,7 @@ export function BusinessToolsView({ tenant }: { tenant: Tenant }) {
             </Card>
           )}
 
-          {tab === "departments" && (
+          {tab === "departments" && hasDepartmentFeature && (
             <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
               <Card>
                 <CardHeader>
@@ -482,16 +524,16 @@ export function BusinessToolsView({ tenant }: { tenant: Tenant }) {
                       <div>
                         <p className="text-xs font-semibold">{service.name}</p>
                         <p className="text-[10px] text-slate-400">
-                          Current: {service.category}
+                          Current:{" "}
+                          {departments.find(
+                            (department) =>
+                              department.id === service.departmentId,
+                          )?.name ?? "Unassigned"}
                         </p>
                       </div>
                       <select
                         aria-label={`Department for ${service.name}`}
-                        value={
-                          departments.find(
-                            (item) => item.name === service.category,
-                          )?.id ?? ""
-                        }
+                        value={service.departmentId ?? ""}
                         onChange={(event) => {
                           const department =
                             departments.find(
@@ -531,24 +573,47 @@ export function BusinessToolsView({ tenant }: { tenant: Tenant }) {
                         className="flex items-center justify-between py-2"
                       >
                         <span className="text-xs">{department.name}</span>
-                        <button
-                          onClick={() =>
-                            void setDepartmentActive(
-                              tenant.id,
-                              department.id,
-                              !department.isActive,
-                            ).then(reload)
-                          }
-                          className="text-[10px] font-semibold text-violet-400"
-                        >
-                          {department.isActive ? "Deactivate" : "Activate"}
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            disabled={deletingDepartmentId !== null}
+                            onClick={() =>
+                              void setDepartmentActive(
+                                tenant.id,
+                                department.id,
+                                !department.isActive,
+                              ).then(reload)
+                            }
+                            className="text-[10px] font-semibold text-violet-400 disabled:opacity-50"
+                          >
+                            {department.isActive ? "Deactivate" : "Activate"}
+                          </button>
+                          <Button
+                            type="button"
+                            variant="danger"
+                            size="xs"
+                            loading={deletingDepartmentId === department.id}
+                            disabled={deletingDepartmentId !== null}
+                            onClick={() => void removeDepartment(department)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            Delete
+                          </Button>
+                        </div>
                       </div>
                     ))}
                   </div>
                 </CardBody>
               </Card>
             </div>
+          )}
+
+          {tab === "departments" && !hasDepartmentFeature && (
+            <PlanFeatureRequired
+              feature="team_management"
+              title="Departments require multi-seat access"
+              description="Choose a subscription with staff seats to organize services by department. Categories and the full All-services view remain unchanged."
+            />
           )}
 
           {tab === "promotions" && !hasPromotionFeature && (
@@ -559,144 +624,154 @@ export function BusinessToolsView({ tenant }: { tenant: Tenant }) {
             />
           )}
 
-          {tab === "promotions" && hasPromotionFeature && (
-            <Card>
-              <CardHeader>
-                <div>
-                  <h3 className="text-sm font-bold">
-                    Promotions & Discount Codes
-                  </h3>
-                  <p className="mt-1 text-[10px] text-slate-400">
-                    Checkout validates every code securely in Supabase.
-                  </p>
-                </div>
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    setPromotionFlyerFile(null);
-                    setPromotionForm(emptyPromotion());
-                  }}
-                >
-                  <Plus className="h-3 w-3" /> Add promotion
-                </Button>
-              </CardHeader>
-              <CardBody className="grid gap-3 md:grid-cols-2">
-                {promotions.length === 0 && (
-                  <p className="py-8 text-xs text-slate-400 md:col-span-2">
-                    No promotions yet.
-                  </p>
-                )}
-                {promotions.map((promotion) => (
-                  <div
-                    key={promotion.id}
-                    className="rounded-xl border border-slate-700 p-4 light:border-slate-200"
-                  >
-                    {promotion.flyerUrl && (
-                      <div className="relative mb-4 aspect-[16/9] overflow-hidden rounded-lg bg-slate-900 light:bg-slate-100">
-                        <Image
-                          src={promotion.flyerUrl}
-                          alt={`${promotion.name} flyer`}
-                          fill
-                          className="object-contain"
-                          sizes="(min-width: 768px) 45vw, 100vw"
-                          unoptimized
-                        />
-                      </div>
-                    )}
-                    <div className="flex justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-bold text-violet-400">
-                          {promotion.code}
-                        </p>
-                        <p className="text-xs">{promotion.name}</p>
-                        {promotion.description && (
-                          <p className="mt-1 line-clamp-2 text-[10px] text-slate-400">
-                            {promotion.description}
-                          </p>
-                        )}
-                      </div>
-                      <span className="text-xs font-bold">
-                        {promotion.discountType === "PERCENTAGE"
-                          ? `${promotion.discountValue}%`
-                          : `$${promotion.discountValue.toFixed(2)}`}
+          {(tab === "promotions" || (!isAppointment && tab === "qr")) &&
+            hasPromotionFeature && (
+              <Card className="business-tool-panel promotions-panel">
+                <CardHeader className="business-tool-panel-header">
+                  <div>
+                    <h3>
+                      <span className="business-tool-title-icon">
+                        <Tags />
                       </span>
-                    </div>
-                    <p className="mt-3 text-[10px] text-slate-400">
-                      Applies to:{" "}
-                      {promotion.discountScope === "TOTAL"
-                        ? "entire purchase total"
-                        : "selected items or services"}
-                    </p>
-                    <p className="mt-1 text-[10px] text-slate-400">
-                      Used {promotion.usageCount}
-                      {promotion.usageLimit
-                        ? ` of ${promotion.usageLimit}`
-                        : " times"}
-                    </p>
-                    <div className="mt-3 flex gap-3">
-                      <button
-                        className="text-[10px] font-semibold text-violet-400"
-                        onClick={() => {
-                          setPromotionFlyerFile(null);
-                          setPromotionForm({
-                            id: promotion.id,
-                            code: promotion.code,
-                            name: promotion.name,
-                            discountType: promotion.discountType,
-                            discountValue: promotion.discountValue,
-                            discountScope: promotion.discountScope,
-                            description: promotion.description,
-                            flyerUrl: promotion.flyerUrl,
-                            startsAt: promotion.startsAt,
-                            endsAt: promotion.endsAt,
-                            usageLimit: promotion.usageLimit,
-                            applicableProductIds:
-                              promotion.applicableProductIds,
-                            applicableServiceIds:
-                              promotion.applicableServiceIds,
-                            isActive: promotion.isActive,
-                          });
-                        }}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        className="text-[10px] font-semibold text-violet-400"
-                        onClick={() =>
-                          void setPromotionActive(
-                            tenant.id,
-                            promotion.id,
-                            !promotion.isActive,
-                          ).then(reload)
-                        }
-                      >
-                        {promotion.isActive ? "Deactivate" : "Activate"}
-                      </button>
-                      <button
-                        className="inline-flex items-center gap-1 text-[10px] font-semibold text-violet-400"
-                        onClick={() => void sharePromotion(promotion)}
-                      >
-                        <Share2 className="h-3 w-3" /> Share
-                      </button>
-                    </div>
+                      Promotions & Discount Codes
+                    </h3>
+                    <p>Checkout validates every code securely in Supabase.</p>
                   </div>
-                ))}
-              </CardBody>
-            </Card>
-          )}
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setPromotionFlyerFile(null);
+                      setPromotionForm(emptyPromotion());
+                    }}
+                  >
+                    <Plus className="h-3 w-3" /> Add promotion
+                  </Button>
+                </CardHeader>
+                <CardBody className="promotion-list">
+                  {promotions.length === 0 && (
+                    <p className="py-8 text-xs text-slate-400 md:col-span-2">
+                      No promotions yet.
+                    </p>
+                  )}
+                  {promotions.map((promotion) => (
+                    <div key={promotion.id} className="promotion-row">
+                      {promotion.flyerUrl && (
+                        <div className="promotion-flyer">
+                          <Image
+                            src={promotion.flyerUrl}
+                            alt={`${promotion.name} flyer`}
+                            fill
+                            className="object-cover"
+                            sizes="(min-width: 768px) 45vw, 100vw"
+                            unoptimized
+                          />
+                        </div>
+                      )}
+                      <div className="promotion-content">
+                        <div className="promotion-summary">
+                          <p className="promotion-code">{promotion.code}</p>
+                          <p className="promotion-name">{promotion.name}</p>
+                          {promotion.description && (
+                            <p className="promotion-description">
+                              {promotion.description}
+                            </p>
+                          )}
+                        </div>
+                        <span className="promotion-value">
+                          {promotion.discountType === "PERCENTAGE"
+                            ? `${promotion.discountValue}%`
+                            : `$${promotion.discountValue.toFixed(2)}`}
+                        </span>
+                        <div className="promotion-meta">
+                          <span
+                            className={
+                              promotion.isActive ? "active" : "inactive"
+                            }
+                          >
+                            <i /> {promotion.isActive ? "Active" : "Inactive"}
+                          </span>
+                          <b />
+                          <p>
+                            {promotion.discountScope === "TOTAL"
+                              ? "Applies to entire purchase total."
+                              : "Applies to selected items or services."}
+                          </p>
+                          <small>
+                            Used {promotion.usageCount}
+                            {promotion.usageLimit
+                              ? ` of ${promotion.usageLimit}`
+                              : " times"}
+                          </small>
+                        </div>
+                        <div className="promotion-actions">
+                          <button
+                            aria-label={`Edit ${promotion.code}`}
+                            onClick={() => {
+                              setPromotionFlyerFile(null);
+                              setPromotionForm({
+                                id: promotion.id,
+                                code: promotion.code,
+                                name: promotion.name,
+                                discountType: promotion.discountType,
+                                discountValue: promotion.discountValue,
+                                discountScope: promotion.discountScope,
+                                description: promotion.description,
+                                flyerUrl: promotion.flyerUrl,
+                                startsAt: promotion.startsAt,
+                                endsAt: promotion.endsAt,
+                                usageLimit: promotion.usageLimit,
+                                applicableProductIds:
+                                  promotion.applicableProductIds,
+                                applicableServiceIds:
+                                  promotion.applicableServiceIds,
+                                isActive: promotion.isActive,
+                              });
+                            }}
+                          >
+                            <Pencil />
+                          </button>
+                          <button
+                            aria-label={`${promotion.isActive ? "Deactivate" : "Activate"} ${promotion.code}`}
+                            className="promotion-delete-action"
+                            onClick={() =>
+                              void setPromotionActive(
+                                tenant.id,
+                                promotion.id,
+                                !promotion.isActive,
+                              ).then(reload)
+                            }
+                          >
+                            <Trash2 />
+                          </button>
+                          <button
+                            aria-label={`Share ${promotion.code}`}
+                            onClick={() => void sharePromotion(promotion)}
+                          >
+                            <Share2 />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </CardBody>
+              </Card>
+            )}
 
-          {tab === "qr" && (
-            <Card>
-              <CardHeader>
+          {(tab === "qr" || (!isAppointment && tab === "promotions")) && (
+            <Card className="business-tool-panel qr-storefront-panel">
+              <CardHeader className="business-tool-panel-header">
                 <div>
-                  <h3 className="text-sm font-bold">QR Storefront</h3>
-                  <p className="mt-1 text-[10px] text-slate-400">
-                    Download for signs, menus, cards, and social posts.
-                  </p>
+                  <h3>
+                    <span className="business-tool-title-icon">
+                      <QrCode />
+                    </span>
+                    QR Storefront
+                  </h3>
+                  <p>Download for signs, menus, cards, and social posts.</p>
                 </div>
               </CardHeader>
-              <CardBody>
-                <div className="mx-auto flex max-w-xl flex-col items-center gap-5 text-center">
+              <CardBody className="qr-storefront-body">
+                <div className="qr-storefront-layout">
                   {qrData && (
                     <Image
                       unoptimized
@@ -704,34 +779,37 @@ export function BusinessToolsView({ tenant }: { tenant: Tenant }) {
                       height={224}
                       src={qrData}
                       alt={`QR code for ${tenant.name} storefront`}
-                      className="h-56 w-56 rounded-2xl bg-white p-3"
+                      className="qr-storefront-image"
                     />
                   )}
-                  <div className="w-full rounded-xl border border-slate-700 px-3 py-3 text-left text-[10px] text-slate-400 light:border-slate-200">
-                    {storefrontUrl}
-                  </div>
-                  <div className="flex flex-wrap justify-center gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={() =>
-                        void navigator.clipboard
-                          .writeText(storefrontUrl)
-                          .then(() => done("Storefront link copied."))
-                      }
-                    >
-                      <Copy className="h-4 w-4" /> Copy link
-                    </Button>
-                    <Button
-                      disabled={!qrData}
-                      onClick={() => {
-                        const link = document.createElement("a");
-                        link.href = qrData;
-                        link.download = `${tenant.slug}-storefront-qr.png`;
-                        link.click();
-                      }}
-                    >
-                      <Download className="h-4 w-4" /> Download PNG
-                    </Button>
+                  <div className="qr-storefront-controls">
+                    <div className="qr-storefront-link">
+                      <Link />
+                      {storefrontUrl}
+                    </div>
+                    <div className="qr-storefront-actions">
+                      <Button
+                        variant="outline"
+                        onClick={() =>
+                          void navigator.clipboard
+                            .writeText(storefrontUrl)
+                            .then(() => done("Storefront link copied."))
+                        }
+                      >
+                        <Copy className="h-4 w-4" /> Copy link
+                      </Button>
+                      <Button
+                        disabled={!qrData}
+                        onClick={() => {
+                          const link = document.createElement("a");
+                          link.href = qrData;
+                          link.download = `${tenant.slug}-storefront-qr.png`;
+                          link.click();
+                        }}
+                      >
+                        <Download className="h-4 w-4" /> Download PNG
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </CardBody>

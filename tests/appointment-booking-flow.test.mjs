@@ -4,14 +4,60 @@ import test from "node:test";
 
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), "utf8");
 
-test("appointment storefront uses categories and Track Booking without changing order tracking", async () => {
-  const [services, store, tracking] = await Promise.all([
+test("appointment storefront keeps categories separate from entitled departments", async () => {
+  const [
+    services,
+    serviceData,
+    categoryMigration,
+    booking,
+    storefrontService,
+    toolsService,
+    store,
+    tracking,
+  ] = await Promise.all([
     read("app/components/ServicesView.tsx"),
+    read("app/services/serviceService.ts"),
+    read("supabase/migrations/202611060001_service_categories.sql"),
+    read("app/components/AppointmentBooking.tsx"),
+    read("app/services/storefrontService.ts"),
+    read("app/services/businessToolsService.ts"),
     read("app/components/store.tsx"),
     read("app/components/StorefrontOrderTracking.tsx"),
   ]);
   assert.match(services, /Manage Categories/);
+  assert.match(services, /Manage Service Categories/);
+  assert.match(services, /Choose a category for this service/);
+  assert.doesNotMatch(
+    services,
+    /Departments are optional and managed separately/,
+  );
+  assert.match(services, /categoryOnlyItems/);
+  assert.match(services, /label="Position"/);
+  assert.match(services, /cannot be a category/);
   assert.match(services, /listDepartments/);
+  assert.match(services, /Category/);
+  assert.match(services, /Department \(optional\)/);
+  assert.match(serviceData, /listServiceCategories/);
+  assert.match(serviceData, /listLegacyServiceCategories/);
+  assert.match(serviceData, /PGRST205/);
+  assert.match(serviceData, /renameServiceCategory/);
+  assert.match(serviceData, /separateDepartmentServiceCategories/);
+  assert.match(
+    categoryMigration,
+    /CREATE TABLE IF NOT EXISTS public\.service_categories/,
+  );
+  assert.match(categoryMigration, /trg_services_require_category/);
+  assert.match(categoryMigration, /trg_services_department_admin/);
+  assert.match(categoryMigration, /Move services to another category/);
+  assert.match(booking, /All departments/);
+  assert.match(booking, /positionedServiceCategories/);
+  assert.match(booking, /name\.toLowerCase\(\) !== "services"/);
+  assert.match(booking, /s\.departmentId === departmentFilter/);
+  assert.match(booking, /Department:/);
+  assert.match(storefrontService, /tenantHasFeature/);
+  assert.match(storefrontService, /"team_management"/);
+  assert.match(toolsService, /department_id: null/);
+  assert.doesNotMatch(toolsService, /category: "Services"/);
   assert.match(store, /isAppt \? "Track Booking" : "Track Order"/);
   assert.match(tracking, /mode\?: "order" \| "appointment"/);
 });

@@ -1,0 +1,23 @@
+
+> ord-appt@0.1.0 dev
+> next dev
+
+▲ Next.js 16.4.3 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.18.204:3000
+- Environments: .env.local
+✓ Ready in 483ms
+✓ Running next.config.ts took 34ms
+Creating turbopack project { dir: 'C:\\Development\\Personal\\Ord_Appt', testMode: true }
+- Experiments (use with caution):
+  ✓ serverComponentsHmrCancellation
+
+ GET /dashboard/customers 200 in 1543ms (next.js: 840ms, proxy.ts: 484ms, application-code: 219ms)
+ GET /manifest.webmanifest 200 in 102ms (next.js: 74ms, proxy.ts: 13ms, application-code: 15ms)
+ GET /manifest.webmanifest 200 in 21ms (next.js: 5ms, proxy.ts: 9ms, application-code: 7ms)
+ GET /dashboard/payments 200 in 726ms (next.js: 160ms, proxy.ts: 528ms, application-code: 38ms)
+ GET /manifest.webmanifest 200 in 28ms (next.js: 12ms, proxy.ts: 9ms, application-code: 7ms)
+ GET /api/payments/submissions?tenantId=3c3dab22-64ef-496e-a290-fbe2f9a6d40a&status=AWAITING_VERIFICATION 200 in 2.0s (next.js: 157ms, proxy.ts: 1268ms, application-code: 621ms)
+✓ Compiled in 726ms
+✓ Compiled in 427ms
+[?25h

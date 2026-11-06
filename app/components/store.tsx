@@ -44,6 +44,7 @@ import type {
   Service,
   Product,
   PublicPromotion,
+  PublicServiceDepartment,
   PublicServiceProvider,
 } from "@/app/types/index";
 
@@ -111,6 +112,8 @@ interface StorefrontClientProps {
   initialCategories?: Category[];
   initialProducts?: Product[];
   initialServices?: Service[];
+  initialServiceCategories?: Category[];
+  initialDepartments?: PublicServiceDepartment[];
   initialProviders?: PublicServiceProvider[];
   initialReviews?: BusinessReview[];
   initialPromotions?: PublicPromotion[];
@@ -122,6 +125,8 @@ export default function StorefrontClient({
   initialCategories,
   initialProducts,
   initialServices,
+  initialServiceCategories = [],
+  initialDepartments = [],
   initialProviders = [],
   initialReviews = [],
   initialPromotions = [],
@@ -347,12 +352,12 @@ export default function StorefrontClient({
     );
 
   return (
-    <div className="min-h-dvh bg-[#060b14] text-white transition-colors duration-200 light:bg-[#f6f7fb] light:text-slate-950">
+    <div className="storefront-shell min-h-dvh text-white transition-colors duration-200 light:text-slate-950">
       <div className="min-h-dvh">
         <div className="min-w-0">
           {/* Header */}
-          <header className="pwa-header-inset sticky top-0 z-20 px-2 pt-2 sm:px-4 sm:pt-3">
-            <div className="mx-auto max-w-365 rounded-2xl border border-[#25344c] bg-[#07111f]/95 px-3 py-3 shadow-[0_20px_50px_rgba(4,8,18,0.35)] backdrop-blur-xl light:border-slate-200 light:bg-white/95 sm:px-5">
+          <header className="storefront-header pwa-header-inset sticky top-0 z-20 px-2 pt-2 sm:px-4 sm:pt-3">
+            <div className="storefront-header-inner mx-auto max-w-365 rounded-2xl border px-3 py-3 backdrop-blur-xl sm:px-5">
               <div className="flex min-w-0 items-center gap-3">
                 {viewOnly && (
                   <Link
@@ -610,12 +615,14 @@ export default function StorefrontClient({
 
           {/* Main content */}
           {(!viewOnly || activeDemoView === "storefront") && (
-            <main className="mx-auto max-w-365 px-4 py-5 sm:px-6 sm:py-6">
+            <main className="storefront-main mx-auto max-w-365 px-3 py-4 sm:px-6 sm:py-6">
               {activeTab === "catalog" ? (
                 isAppt ? (
                   <AppointmentBooking
                     tenant={tenant}
                     services={services}
+                    serviceCategories={initialServiceCategories}
+                    departments={initialDepartments}
                     providers={initialProviders}
                     reviews={initialReviews}
                     promotions={initialPromotions}
@@ -684,6 +691,75 @@ export default function StorefrontClient({
                 <span>Secure storefront powered by YuhBusiness</span>
               </div>
             </footer>
+          )}
+
+          {(!viewOnly || activeDemoView === "storefront") && (
+            <nav className="storefront-mobile-nav fixed inset-x-0 bottom-0 z-40 grid h-[68px] grid-cols-5 items-center border-t px-2 pb-[env(safe-area-inset-bottom,0px)] md:hidden">
+              <button
+                type="button"
+                onClick={() => switchTab("catalog")}
+                className={`mobile-nav-item ${activeTab === "catalog" ? "is-active" : ""}`}
+              >
+                <Store className="h-[18px] w-[18px]" />
+                <span>{catalogLabel}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  switchTab(
+                    storefrontDesign.sections.about ? "about" : "contact",
+                  )
+                }
+                className={`mobile-nav-item ${activeTab === "about" ? "is-active" : ""}`}
+              >
+                <Info className="h-[18px] w-[18px]" />
+                <span>About</span>
+              </button>
+              <button
+                type="button"
+                aria-label={isAppt ? `Browse ${catalogLabel}` : "View cart"}
+                className="mobile-nav-add relative"
+                onClick={() => {
+                  switchTab("catalog");
+                  if (!isAppt) {
+                    window.setTimeout(
+                      () =>
+                        document
+                          .getElementById("order-summary")
+                          ?.scrollIntoView({ behavior: "smooth" }),
+                      60,
+                    );
+                  }
+                }}
+              >
+                {isAppt ? (
+                  <Store className="h-5 w-5" />
+                ) : (
+                  <ShoppingCart className="h-5 w-5" />
+                )}
+                {!isAppt && itemCount > 0 && (
+                  <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-rose-500 px-1 text-[9px] font-black text-white">
+                    {itemCount > 99 ? "99+" : itemCount}
+                  </span>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => switchTab("track-order")}
+                className={`mobile-nav-item ${activeTab === "track-order" ? "is-active" : ""}`}
+              >
+                <PackageSearch className="h-[18px] w-[18px]" />
+                <span>Track</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => switchTab("contact")}
+                className={`mobile-nav-item ${activeTab === "contact" ? "is-active" : ""}`}
+              >
+                <Phone className="h-[18px] w-[18px]" />
+                <span>Contact</span>
+              </button>
+            </nav>
           )}
 
           {/* Image Gallery Modal */}

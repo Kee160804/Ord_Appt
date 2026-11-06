@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Calendar,
+  CalendarCheck2,
   Clock,
   User,
   Phone,
@@ -46,6 +47,14 @@ interface Props {
   tenant: Tenant;
 }
 
+const EMPTY_STATUS_COUNTS: Record<AppointmentStatus, number> = {
+  pending: 0,
+  confirmed: 0,
+  cancelled: 0,
+  completed: 0,
+  no_show: 0,
+};
+
 function isFullyPaid(appointment: Appointment) {
   const total = Number(appointment.servicePrice ?? 0);
   const paid = Number(appointment.amountPaid ?? 0);
@@ -75,6 +84,8 @@ export function AppointmentsView({ tenant }: Props) {
     hasPreviousPage: false,
     hasNextPage: false,
   });
+  const [statusCounts, setStatusCounts] =
+    useState<Record<AppointmentStatus, number>>(EMPTY_STATUS_COUNTS);
 
   /**
    * Debounce free-text search so Supabase is not queried on every keystroke.
@@ -233,6 +244,22 @@ export function AppointmentsView({ tenant }: Props) {
       }
     };
   }, [loadAppointments, tenant.id, usesSupabase]);
+
+  useEffect(() => {
+    if (filter === "all") {
+      const nextCounts = { ...EMPTY_STATUS_COUNTS };
+      apts.forEach((appointment) => {
+        nextCounts[appointment.status] += 1;
+      });
+      setStatusCounts(nextCounts);
+      return;
+    }
+
+    setStatusCounts((current) => ({
+      ...current,
+      [filter]: pagination.total,
+    }));
+  }, [apts, filter, pagination.total]);
 
   /**
    * Provider management is owner-only and independent of appointment paging.
@@ -425,42 +452,59 @@ export function AppointmentsView({ tenant }: Props) {
   };
 
   return (
-    <div className="min-h-full space-y-4 bg-[#08111f] light:bg-[#f8fafc] p-4 text-white light:text-[#14213a] md:p-5">
+    <div className="dashboard-page min-h-full space-y-4 p-3 text-white light:text-[#14213a] sm:p-4 md:p-6">
       {/* Summary chips */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="appointment-summary-grid grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
           {
             label: "Today",
             value: apts.filter((a) => a.date === today).length,
-            bg: "bg-blue-500/10 light:bg-blue-50 border-blue-400/20 light:border-blue-100",
-            text: "text-blue-400 light:text-blue-700",
+            tone: "today",
+            icon: Calendar,
           },
           {
             label: "Pending",
-            value: filter === "pending" ? pagination.total : "—",
-            bg: "bg-amber-500/10 light:bg-amber-50 border-amber-400/20 light:border-amber-100",
-            text: "text-amber-400 light:text-amber-700",
+            value: statusCounts.pending,
+            tone: "pending",
+            icon: Clock,
           },
           {
             label: "Confirmed",
-            value: filter === "confirmed" ? pagination.total : "—",
-            bg: "bg-green-500/10 light:bg-emerald-50 border-green-400/20 light:border-emerald-100",
-            text: "text-green-400 light:text-green-700",
+            value: statusCounts.confirmed,
+            tone: "confirmed",
+            icon: CheckCircle,
           },
           {
             label: "Completed",
-            value: filter === "completed" ? pagination.total : "—",
-            bg: "bg-slate-700/40 light:bg-slate-50 border-slate-600/40 light:border-slate-200",
-            text: "text-slate-300 light:text-slate-700",
+            value: statusCounts.completed,
+            tone: "completed",
+            icon: CalendarCheck2,
           },
-        ].map((s) => (
-          <div key={s.label} className={cn("rounded-xl border p-3.5", s.bg)}>
-            <p className="text-[10px] font-medium text-slate-400 light:text-[#61708a]">
-              {s.label}
-            </p>
-            <p className={cn("mt-1 text-xl font-black", s.text)}>{s.value}</p>
-          </div>
-        ))}
+        ].map((summary) => {
+          const Icon = summary.icon;
+          return (
+            <div
+              key={summary.label}
+              className={cn(
+                "appointment-summary-card order-status-card relative min-h-17 overflow-hidden rounded-xl border p-3",
+                `is-${summary.tone}`,
+              )}
+            >
+              <span className="order-status-orb" aria-hidden="true" />
+              <span className="order-status-icon">
+                <Icon className="h-4 w-4" />
+              </span>
+              <span className="relative z-10 block min-w-0 pl-12">
+                <span className="block truncate text-[11px] font-extrabold text-white light:text-[#17223a]">
+                  {summary.label}
+                </span>
+                <span className="mt-0.5 block text-xl font-black text-white light:text-[#17223a]">
+                  {summary.value}
+                </span>
+              </span>
+            </div>
+          );
+        })}
       </div>
 
       {error && (

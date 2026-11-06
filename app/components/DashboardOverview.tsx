@@ -4,17 +4,16 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
+  BarChart3,
   Calendar,
   ChevronDown,
-  Clock,
   DollarSign,
+  PackageCheck,
   ShoppingBag,
+  Tags,
   TrendingUp,
   Users,
-  WalletCards,
 } from "lucide-react";
-import { StatCard } from "../components/StatCard";
-import { Card, CardBody, CardHeader } from "../components/Card";
 import { StatusBadge } from "../components/Badge";
 import {
   getAppointmentsByTenant,
@@ -84,11 +83,16 @@ export function DashboardOverview({ tenant }: OverviewProps) {
   const recentOrders = data.orders.slice(0, 4);
   const chartData = data.analytics.revenueData.slice(-7);
   const maxRevenue = Math.max(1, ...chartData.map((point) => point.revenue));
+  const chartCeiling = Math.max(100, Math.ceil(maxRevenue / 100) * 100);
+  const chartTicks = [1, 0.75, 0.5, 0.25, 0].map((ratio) =>
+    Math.round(chartCeiling * ratio),
+  );
   const firstName = user?.name.split(" ")[0] || "there";
   const todayLabel = new Date().toLocaleDateString("en-BZ", {
     weekday: "long",
+    day: "2-digit",
     month: "long",
-    day: "numeric",
+    year: "numeric",
   });
 
   useEffect(() => {
@@ -117,38 +121,14 @@ export function DashboardOverview({ tenant }: OverviewProps) {
   }, [tenant]);
 
   return (
-    <div className="space-y-3.5 p-4 md:p-5">
-      <section className="relative min-h-31 overflow-hidden rounded-xl border border-slate-700/60 bg-slate-900 shadow-sm light:border-[#e4e9f1] light:bg-white">
-        <div
-          className="absolute inset-y-0 right-0 w-[58%] bg-cover opacity-50 light:opacity-75"
-          style={{
-            backgroundImage: `url("${tenant.coverImage}")`,
-            backgroundPosition: `${tenant.coverImagePositionX ?? 50}% ${tenant.coverImagePositionY ?? 50}%`,
-            transform: `scale(${(tenant.coverImageZoom ?? 100) / 100})`,
-          }}
-        />
-        <div className="absolute inset-0 bg-linear-to-r from-slate-950 via-slate-950/95 to-slate-950/25 light:from-white light:via-white/95 light:to-white/15" />
-        <div className="relative z-10 flex min-h-31 items-center justify-between gap-4 px-6 py-5">
-          <div>
-            <p className="text-xs font-medium text-slate-400 light:text-[#566681]">
-              Gud maanin, {firstName}! <span aria-hidden="true">👋</span>
-            </p>
-            <h2 className="mt-2 text-xl font-bold tracking-tight text-white light:text-[#111b31]">
-              Welcome bak to {tenant.name}
-            </h2>
-            <p className="mt-1 text-xs text-slate-400 light:text-[#71809a]">
-              {pendingCount
-                ? `You have ${pendingCount} pending ${isAppt ? "appointment" : "order"}${pendingCount === 1 ? "" : "s"} today.`
-                : `Here’s what’s happening with your business today.`}
-            </p>
-          </div>
-          <div className="hidden items-center gap-2 rounded-lg border border-slate-700/80 light:border-violet-200 bg-slate-900/90 light:bg-white/95 px-3 py-2 text-[10px] font-semibold text-slate-200 light:text-violet-700 shadow-sm sm:flex">
-            <Calendar className="h-3.5 w-3.5" />
-            <span suppressHydrationWarning>{todayLabel}</span>
-            <ChevronDown className="h-3 w-3" />
-          </div>
-        </div>
-      </section>
+    <div className="overview-page dashboard-page min-h-full space-y-4 p-3 sm:p-4 md:p-5">
+      <OverviewHero
+        tenant={tenant}
+        firstName={firstName}
+        pendingCount={pendingCount}
+        isAppointment={isAppt}
+        todayLabel={todayLabel}
+      />
 
       {error && (
         <div className="rounded-lg border border-red-400/30 bg-red-500/10 px-4 py-3 text-xs text-red-300 light:text-red-700">
@@ -161,105 +141,109 @@ export function DashboardOverview({ tenant }: OverviewProps) {
         </p>
       )}
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
+      <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4 lg:gap-3">
+        <OverviewMetric
           label={isAppt ? "Total Revenue" : "Delivered Value"}
           value={formatCurrency(data.analytics.totalRevenue)}
-          icon={<DollarSign className="h-4 w-4 text-violet-600" />}
-          iconBg="bg-violet-500/15 light:bg-violet-50"
-          chartColor="text-violet-500"
+          icon={<DollarSign className="h-4 w-4" />}
+          tone="violet"
+          change={data.analytics.revenueChange}
         />
-        <StatCard
+        <OverviewMetric
           label={isAppt ? "Total Bookings" : "Total Orders"}
           value={String(data.analytics.totalActivity)}
           icon={
             isAppt ? (
-              <Calendar className="h-4 w-4 text-blue-600" />
+              <Calendar className="h-4 w-4" />
             ) : (
-              <ShoppingBag className="h-4 w-4 text-orange-600" />
+              <ShoppingBag className="h-4 w-4" />
             )
           }
-          iconBg={
-            isAppt
-              ? "bg-blue-500/15 light:bg-blue-50"
-              : "bg-orange-500/15 light:bg-orange-50"
-          }
-          chartColor="text-blue-500"
+          tone={isAppt ? "blue" : "orange"}
+          change={data.analytics.activityChange}
         />
-        <StatCard
+        <OverviewMetric
           label="New Customers"
           value={String(data.analytics.newCustomers)}
-          icon={<Users className="h-4 w-4 text-emerald-600" />}
-          iconBg="bg-emerald-500/15 light:bg-emerald-50"
-          chartColor="text-emerald-500"
+          icon={<Users className="h-4 w-4" />}
+          tone="emerald"
+          change={0}
         />
-        <StatCard
+        <OverviewMetric
           label="Avg. Value"
           value={formatCurrency(data.analytics.avgOrderValue)}
-          icon={<WalletCards className="h-4 w-4 text-orange-600" />}
-          iconBg="bg-orange-500/15 light:bg-orange-50"
-          chartColor="text-orange-500"
+          icon={<BarChart3 className="h-4 w-4" />}
+          tone="amber"
+          change={data.analytics.revenueChange}
         />
       </div>
 
       <div className="grid gap-3 lg:grid-cols-5">
-        <Card className="lg:col-span-3">
-          <CardHeader className="py-3">
-            <div>
-              <h3 className="text-xs font-bold text-white light:text-[#17223a]">
-                Revenue Overview
-              </h3>
-              <p className="mt-1 text-[10px] text-slate-400 light:text-[#7b879d]">
-                Last 7 days
-              </p>
-            </div>
-            <div className="rounded-lg border border-slate-700 light:border-[#e3e8f0] px-3 py-2 text-[10px] text-slate-400 light:text-[#5f6d85]">
-              Last 7 days <ChevronDown className="ml-2 inline h-3 w-3" />
-            </div>
-          </CardHeader>
-          <CardBody className="min-h-55">
+        <section className="overview-panel overflow-hidden rounded-xl border lg:col-span-3">
+          <PanelHeader
+            icon={<BarChart3 className="h-4 w-4" />}
+            title="Revenue Overview"
+            subtitle="Last 7 days"
+            action={
+              <span className="overview-select rounded-lg border px-3 py-2 text-[10px] font-semibold">
+                Last 7 days <ChevronDown className="ml-2 inline h-3 w-3" />
+              </span>
+            }
+          />
+          <div className="min-h-56 px-4 pb-4 pt-3">
             {chartData.every((point) => point.revenue === 0) ? (
               <EmptyState
-                icon={<WalletCards className="h-5 w-5" />}
+                icon={<BarChart3 className="h-5 w-5" />}
                 title="No revenue data yet"
-                description="Your revenue stats will appear here once you start receiving bookings."
+                description="Your revenue stats will appear here once you start receiving completed activity."
               />
             ) : (
-              <div className="flex h-44 items-end gap-3 border-b border-l border-slate-700/70 light:border-[#e8ecf3] px-3">
-                {chartData.map((point) => (
-                  <div
-                    key={point.date}
-                    className="group relative flex h-full flex-1 items-end justify-center"
-                  >
-                    <div
-                      className="w-full max-w-8 rounded-t bg-violet-500 transition-colors group-hover:bg-violet-600"
-                      style={{
-                        height: `${Math.max((point.revenue / maxRevenue) * 100, 4)}%`,
-                      }}
-                    />
-                    <span className="absolute top-full mt-2 text-[9px] text-slate-400 light:text-[#78859b]">
-                      {point.date.slice(5)}
+              <div className="grid h-44 grid-cols-[38px_1fr] gap-2">
+                <div className="flex flex-col justify-between pb-5 text-right text-[9px] font-semibold text-slate-500 dark:text-slate-400">
+                  {chartTicks.map((tick) => (
+                    <span key={tick}>
+                      {formatCurrency(tick).replace(/\.00$/, "")}
                     </span>
-                  </div>
-                ))}
+                  ))}
+                </div>
+                <div className="overview-chart-grid relative flex items-end gap-2 border-b border-l px-2 pb-5 sm:gap-4">
+                  {chartData.map((point) => (
+                    <div
+                      key={point.date}
+                      className="group relative flex h-full flex-1 items-end justify-center"
+                    >
+                      <div
+                        className="overview-bar w-full max-w-8 rounded-t"
+                        style={{
+                          height: `${Math.max((point.revenue / chartCeiling) * 100, 3)}%`,
+                        }}
+                        title={`${point.date}: ${formatCurrency(point.revenue)}`}
+                      />
+                      <span className="absolute top-full mt-2 whitespace-nowrap text-[8px] font-medium text-slate-500 dark:text-slate-400 sm:text-[9px]">
+                        {point.date.slice(5)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
-          </CardBody>
-        </Card>
+          </div>
+        </section>
 
-        <Card className="lg:col-span-2">
-          <CardHeader className="py-3">
-            <h3 className="text-xs font-bold text-white light:text-[#17223a]">
-              {isAppt ? "Top Services" : "Top Products"}
-            </h3>
-            <Link
-              href={isAppt ? "/dashboard/services" : "/dashboard/products"}
-              className="text-[10px] font-semibold text-violet-400 light:text-violet-600 hover:text-violet-500"
-            >
-              View all
-            </Link>
-          </CardHeader>
-          <CardBody className="min-h-55">
+        <section className="overview-panel overflow-hidden rounded-xl border lg:col-span-2">
+          <PanelHeader
+            icon={<Tags className="h-4 w-4" />}
+            title={isAppt ? "Top Services" : "Top Products"}
+            action={
+              <Link
+                href={isAppt ? "/dashboard/services" : "/dashboard/products"}
+                className="inline-flex items-center gap-1 text-[10px] font-bold text-violet-500"
+              >
+                View all <ArrowRight className="h-3 w-3" />
+              </Link>
+            }
+          />
+          <div className="min-h-56 px-4 py-3">
             {data.analytics.topItems.length === 0 ? (
               <EmptyState
                 icon={<TrendingUp className="h-5 w-5" />}
@@ -271,180 +255,347 @@ export function DashboardOverview({ tenant }: OverviewProps) {
                 }
               />
             ) : (
-              <div className="space-y-4">
-                {data.analytics.topItems.map((item, index) => (
+              <div className="space-y-2.5">
+                {data.analytics.topItems.slice(0, 4).map((item, index) => (
                   <div key={item.name} className="flex items-center gap-3">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-500/15 text-[10px] font-bold text-violet-400 light:bg-violet-50 light:text-violet-700">
+                    <span className="overview-rank flex h-7 w-7 items-center justify-center rounded-lg text-[10px] font-extrabold">
                       {index + 1}
                     </span>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-xs font-semibold text-white light:text-[#17223a]">
+                      <p className="truncate text-[11px] font-bold">
                         {item.name}
                       </p>
-                      <p className="mt-0.5 text-[10px] text-slate-400 light:text-[#7b879d]">
-                        {item.count} bookings
+                      <p className="mt-0.5 text-[9px] text-slate-500 dark:text-slate-400">
+                        {item.count} {isAppt ? "bookings" : "orders"}
                       </p>
                     </div>
-                    <p className="text-xs font-bold text-white light:text-[#17223a]">
+                    <p className="text-[11px] font-extrabold">
                       {formatCurrency(item.revenue)}
                     </p>
                   </div>
                 ))}
               </div>
             )}
-          </CardBody>
-        </Card>
+          </div>
+        </section>
       </div>
 
       <div className="grid gap-3 lg:grid-cols-2">
-        <Card>
-          <CardHeader className="py-3">
-            <h3 className="text-xs font-bold text-white light:text-[#17223a]">
-              {isAppt ? "Upcoming Appointments" : "Recent Orders"}
-            </h3>
-            <Link
-              href={isAppt ? "/dashboard/appointments" : "/dashboard/orders"}
-              className="flex items-center gap-1 text-[10px] font-semibold text-violet-400 light:text-violet-600"
-            >
-              View all {isAppt ? "appointments" : "orders"}{" "}
-              <ArrowRight className="h-3 w-3" />
-            </Link>
-          </CardHeader>
-          <div className="min-h-43 divide-y divide-slate-700/60 light:divide-[#edf0f5]">
-            {!isLoading &&
-              (isAppt
-                ? recentAppointments.length === 0
-                : recentOrders.length === 0) && (
-                <EmptyState
-                  icon={
-                    isAppt ? (
-                      <Calendar className="h-5 w-5" />
-                    ) : (
-                      <ShoppingBag className="h-5 w-5" />
-                    )
-                  }
-                  iconBg={
-                    isAppt
-                      ? "bg-blue-500/15 text-blue-400 light:bg-blue-50 light:text-blue-600"
-                      : "bg-orange-500/15 text-orange-400 light:bg-orange-50 light:text-orange-600"
-                  }
-                  title={
-                    isAppt ? "No upcoming appointments" : "No recent orders"
-                  }
-                  description={
-                    isAppt
-                      ? "When you get bookings, they’ll show up here."
-                      : "When customers order, they’ll show up here."
-                  }
-                  action={
-                    isAppt ? (
-                      <Link
-                        href="/dashboard/appointments"
-                        className="mt-3 inline-flex items-center justify-center rounded-lg bg-violet-600 px-3.5 py-2 text-[11px] font-semibold text-white shadow-sm transition-colors hover:bg-violet-700"
-                      >
-                        Create Appointment
-                      </Link>
-                    ) : undefined
-                  }
-                />
-              )}
-            {isAppt
-              ? recentAppointments.map((appointment) => (
-                  <div
-                    key={appointment.id}
-                    className="flex items-center gap-3 px-5 py-3"
-                  >
-                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-500/15 text-blue-400 light:bg-blue-50 light:text-blue-600">
-                      <Clock className="h-4 w-4" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-xs font-semibold text-white light:text-[#17223a]">
-                        {appointment.customerName}
-                      </p>
-                      <p className="mt-0.5 truncate text-[10px] text-slate-400 light:text-[#7b879d]">
-                        {appointment.serviceName} ·{" "}
-                        {formatDate(appointment.date)} at{" "}
-                        {formatTime(appointment.time)}
-                      </p>
-                    </div>
-                    <StatusBadge
-                      status={appointment.status}
-                      className="text-[9px]"
-                    />
-                  </div>
-                ))
-              : recentOrders.map((order) => (
-                  <div
-                    key={order.id}
-                    className="flex items-center gap-3 px-5 py-3"
-                  >
-                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-orange-500/15 text-orange-400 light:bg-orange-50 light:text-orange-600">
-                      <ShoppingBag className="h-4 w-4" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-xs font-semibold text-white light:text-[#17223a]">
-                        {order.customerName}
-                      </p>
-                      <p className="mt-0.5 text-[10px] text-slate-400 light:text-[#7b879d]">
-                        {order.orderNumber}
-                      </p>
-                    </div>
-                    <StatusBadge status={order.status} className="text-[9px]" />
-                  </div>
-                ))}
-          </div>
-        </Card>
-
-        <Card>
-          <CardHeader className="py-3">
-            <h3 className="text-xs font-bold text-white light:text-[#17223a]">
-              Recent Customers
-            </h3>
-            <Link
-              href="/dashboard/customers"
-              className="text-[10px] font-semibold text-violet-400 light:text-violet-600"
-            >
-              View all
-            </Link>
-          </CardHeader>
-          <div className="min-h-43 divide-y divide-slate-700/60 light:divide-[#edf0f5]">
-            {!isLoading && data.customers.length === 0 && (
-              <EmptyState
-                icon={<Users className="h-5 w-5" />}
-                iconBg="bg-emerald-500/15 text-emerald-400 light:bg-emerald-50 light:text-emerald-600"
-                title="No customers yet"
-                description="Add customers to build relationships and grow your business."
-              />
-            )}
-            {data.customers.slice(0, 4).map((customer) => (
-              <div
-                key={customer.key}
-                className="flex items-center gap-3 px-5 py-3"
-              >
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500/15 text-[10px] font-bold text-emerald-400 light:bg-emerald-50 light:text-emerald-700">
-                  {customer.name
-                    .split(" ")
-                    .map((part) => part[0])
-                    .join("")
-                    .slice(0, 2)}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-xs font-semibold text-white light:text-[#17223a]">
-                    {customer.name}
-                  </p>
-                  <p className="truncate text-[10px] text-slate-400 light:text-[#7b879d]">
-                    {customer.email || customer.phone}
-                  </p>
-                </div>
-                <p className="text-[10px] font-semibold text-slate-300 light:text-[#526079]">
-                  {formatCurrency(customer.totalValue)}
-                </p>
-              </div>
-            ))}
-          </div>
-        </Card>
+        <RecentActivityPanel
+          isAppointment={isAppt}
+          isLoading={isLoading}
+          recentAppointments={recentAppointments}
+          recentOrders={recentOrders}
+        />
+        <RecentCustomersPanel
+          data={data}
+          isAppointment={isAppt}
+          isLoading={isLoading}
+        />
       </div>
     </div>
+  );
+}
+
+function OverviewHero({
+  tenant,
+  firstName,
+  pendingCount,
+  isAppointment,
+  todayLabel,
+}: {
+  tenant: Tenant;
+  firstName: string;
+  pendingCount: number;
+  isAppointment: boolean;
+  todayLabel: string;
+}) {
+  return (
+    <section className="overview-hero relative min-h-32 overflow-hidden rounded-xl border">
+      <div
+        className="absolute inset-y-0 right-0 w-[62%] bg-cover bg-center"
+        style={{
+          backgroundImage: `url("${tenant.coverImage}")`,
+          backgroundPosition: `${tenant.coverImagePositionX ?? 50}% ${tenant.coverImagePositionY ?? 50}%`,
+          transform: `scale(${(tenant.coverImageZoom ?? 100) / 100})`,
+        }}
+      />
+      <div className="overview-hero-overlay absolute inset-0" />
+      <div className="relative z-10 flex min-h-32 items-center justify-between gap-4 px-5 py-5 sm:px-6">
+        <div>
+          <p className="text-[13px] font-medium text-white/90">
+            Gud mawnin, {firstName}! <span aria-hidden="true">👋</span>
+          </p>
+          <h2 className="mt-2 text-[20px] font-extrabold tracking-[-0.035em] text-white sm:text-[22px]">
+            Welcome back to {tenant.name}
+          </h2>
+          <p className="mt-1.5 text-[11px] text-white/90">
+            {pendingCount
+              ? `You have ${pendingCount} pending ${isAppointment ? "appointment" : "order"}${pendingCount === 1 ? "" : "s"} today.`
+              : "Here's what's happening with your business today."}
+          </p>
+        </div>
+        <div className="overview-date hidden items-center gap-2 rounded-lg border px-3 py-2 text-[10px] font-semibold text-white shadow-sm sm:flex">
+          <Calendar className="h-3.5 w-3.5" />
+          <span suppressHydrationWarning>{todayLabel}</span>
+          <ChevronDown className="h-3 w-3" />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function OverviewMetric({
+  label,
+  value,
+  change,
+  icon,
+  tone,
+}: {
+  label: string;
+  value: string;
+  change: number;
+  icon: React.ReactNode;
+  tone: "violet" | "blue" | "orange" | "emerald" | "amber";
+}) {
+  const positive = change >= 0;
+  return (
+    <section className="overview-metric rounded-xl border p-3 sm:p-3.5">
+      <div className="flex items-center gap-2">
+        <span
+          className={`overview-metric-icon is-${tone} flex h-8 w-8 shrink-0 items-center justify-center rounded-lg`}
+        >
+          {icon}
+        </span>
+        <span className="line-clamp-2 text-[10px] font-extrabold leading-tight sm:text-[11px]">
+          {label}
+        </span>
+      </div>
+      <div className="mt-3 flex items-end justify-between gap-2">
+        <strong className="text-lg font-black tracking-[-0.04em] sm:text-[22px]">
+          {value}
+        </strong>
+        <MetricSparkline tone={tone} />
+      </div>
+      <p className="mt-2 truncate text-[8px] font-semibold sm:text-[9px]">
+        <span className={positive ? "text-emerald-500" : "text-rose-500"}>
+          {positive ? "↑" : "↓"} {positive ? "+" : ""}
+          {change.toFixed(1)}%
+        </span>{" "}
+        <span className="text-slate-500 dark:text-slate-400">
+          from last 7 days
+        </span>
+      </p>
+    </section>
+  );
+}
+
+function MetricSparkline({
+  tone,
+}: {
+  tone: "violet" | "blue" | "orange" | "emerald" | "amber";
+}) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 64 30"
+      className={`overview-sparkline is-${tone} hidden h-8 w-14 shrink-0 sm:block`}
+    >
+      <path
+        d="M1 25 10 19 17 23 25 11 33 24 42 14 50 20 62 5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function PanelHeader({
+  icon,
+  title,
+  subtitle,
+  action,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  subtitle?: string;
+  action?: React.ReactNode;
+}) {
+  return (
+    <header className="overview-panel-header flex items-center justify-between gap-3 border-b px-4 py-3">
+      <div>
+        <h3 className="flex items-center gap-2 text-[13px] font-extrabold">
+          <span className="text-violet-500">{icon}</span>
+          {title}
+        </h3>
+        {subtitle && (
+          <p className="ml-6 mt-0.5 text-[9px] text-slate-500 dark:text-slate-400">
+            {subtitle}
+          </p>
+        )}
+      </div>
+      {action}
+    </header>
+  );
+}
+
+function RecentActivityPanel({
+  isAppointment,
+  isLoading,
+  recentAppointments,
+  recentOrders,
+}: {
+  isAppointment: boolean;
+  isLoading: boolean;
+  recentAppointments: DashboardData["appointments"];
+  recentOrders: DashboardData["orders"];
+}) {
+  const hasRows = isAppointment
+    ? recentAppointments.length > 0
+    : recentOrders.length > 0;
+  return (
+    <section className="overview-panel overflow-hidden rounded-xl border">
+      <PanelHeader
+        icon={<PackageCheck className="h-4 w-4" />}
+        title={isAppointment ? "Upcoming Appointments" : "Recent Orders"}
+        action={
+          <Link
+            href={
+              isAppointment ? "/dashboard/appointments" : "/dashboard/orders"
+            }
+            className="inline-flex items-center gap-1 text-[10px] font-bold text-violet-500"
+          >
+            View all {isAppointment ? "appointments" : "orders"}{" "}
+            <ArrowRight className="h-3 w-3" />
+          </Link>
+        }
+      />
+      <div className="min-h-44 overflow-x-auto">
+        {!isLoading && !hasRows && (
+          <EmptyState
+            icon={<PackageCheck className="h-5 w-5" />}
+            title={
+              isAppointment ? "No upcoming appointments" : "No recent orders"
+            }
+            description="New activity will appear here automatically."
+          />
+        )}
+        {hasRows && (
+          <div className="overview-table-head grid min-w-125 grid-cols-[1fr_1.35fr_0.8fr_0.85fr] gap-3 px-4 py-2 text-[9px] font-bold">
+            <span>{isAppointment ? "Appointment" : "Order #"}</span>
+            <span>Customer</span>
+            <span>{isAppointment ? "Time" : "Total"}</span>
+            <span>Status</span>
+          </div>
+        )}
+        {isAppointment
+          ? recentAppointments.map((appointment) => (
+              <div
+                key={appointment.id}
+                className="overview-table-row grid min-w-125 grid-cols-[1fr_1.35fr_0.8fr_0.85fr] items-center gap-3 border-t px-4 py-2.5 text-[10px]"
+              >
+                <span className="truncate font-bold">
+                  {appointment.serviceName}
+                </span>
+                <span className="truncate font-semibold">
+                  {appointment.customerName}
+                </span>
+                <span>
+                  {formatDate(appointment.date)} {formatTime(appointment.time)}
+                </span>
+                <StatusBadge
+                  status={appointment.status}
+                  className="w-fit text-[8px]"
+                />
+              </div>
+            ))
+          : recentOrders.map((order) => (
+              <div
+                key={order.id}
+                className="overview-table-row grid min-w-125 grid-cols-[1fr_1.35fr_0.8fr_0.85fr] items-center gap-3 border-t px-4 py-2.5 text-[10px]"
+              >
+                <span className="font-bold">#{order.orderNumber}</span>
+                <span className="truncate font-semibold">
+                  {order.customerName}
+                </span>
+                <span className="font-bold">
+                  {formatCurrency(order.totalAmount)}
+                </span>
+                <StatusBadge
+                  status={order.status}
+                  className="w-fit text-[8px]"
+                />
+              </div>
+            ))}
+      </div>
+    </section>
+  );
+}
+
+function RecentCustomersPanel({
+  data,
+  isAppointment,
+  isLoading,
+}: {
+  data: DashboardData;
+  isAppointment: boolean;
+  isLoading: boolean;
+}) {
+  return (
+    <section className="overview-panel overflow-hidden rounded-xl border">
+      <PanelHeader
+        icon={<Users className="h-4 w-4" />}
+        title="Recent Customers"
+        action={
+          <Link
+            href="/dashboard/customers"
+            className="inline-flex items-center gap-1 text-[10px] font-bold text-violet-500"
+          >
+            View all <ArrowRight className="h-3 w-3" />
+          </Link>
+        }
+      />
+      <div className="min-h-44 overflow-x-auto">
+        {!isLoading && data.customers.length === 0 && (
+          <EmptyState
+            icon={<Users className="h-5 w-5" />}
+            title="No customers yet"
+            description="Customer activity will appear here automatically."
+          />
+        )}
+        {data.customers.length > 0 && (
+          <div className="overview-table-head grid min-w-110 grid-cols-[1.5fr_0.65fr_0.85fr] gap-3 px-4 py-2 text-[9px] font-bold">
+            <span>Customer</span>
+            <span>{isAppointment ? "Bookings" : "Orders"}</span>
+            <span>Total Spent</span>
+          </div>
+        )}
+        {data.customers.slice(0, 4).map((customer) => (
+          <div
+            key={customer.key}
+            className="overview-table-row grid min-w-110 grid-cols-[1.5fr_0.65fr_0.85fr] items-center gap-3 border-t px-4 py-2 text-[10px]"
+          >
+            <div className="flex min-w-0 items-center gap-2.5">
+              <span className="overview-avatar flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[8px] font-extrabold">
+                {customer.name
+                  .split(" ")
+                  .map((part) => part[0])
+                  .join("")
+                  .slice(0, 2)}
+              </span>
+              <span className="truncate font-bold">{customer.name}</span>
+            </div>
+            <span className="font-semibold">{customer.activityCount}</span>
+            <span className="font-extrabold">
+              {formatCurrency(customer.totalValue)}
+            </span>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -452,32 +603,27 @@ function EmptyState({
   icon,
   title,
   description,
-  iconBg = "bg-violet-500/15 text-violet-400 light:bg-violet-50 light:text-violet-600",
-  action,
+  iconBg = "bg-violet-500/15 text-violet-500",
 }: {
   icon: React.ReactNode;
   title: string;
   description: string;
   iconBg?: string;
-  action?: React.ReactNode;
 }) {
   return (
     <div className="flex min-h-42.5 flex-col items-center justify-center px-6 py-4 text-center">
       <div
         className={cn(
-          "flex h-12 w-12 items-center justify-center rounded-full",
+          "flex h-11 w-11 items-center justify-center rounded-full",
           iconBg,
         )}
       >
         {icon}
       </div>
-      <p className="mt-3 text-xs font-bold text-white light:text-[#17223a]">
-        {title}
-      </p>
-      <p className="mt-1 max-w-56 text-[10px] leading-4 text-slate-400 light:text-[#7b879d]">
+      <p className="mt-3 text-xs font-bold">{title}</p>
+      <p className="mt-1 max-w-56 text-[10px] leading-4 text-slate-500 dark:text-slate-400">
         {description}
       </p>
-      {action}
     </div>
   );
 }

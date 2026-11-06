@@ -291,6 +291,8 @@ export default async function StorePage({
           initialCategories={storefront.categories}
           initialProducts={storefront.products}
           initialServices={storefront.services}
+          initialServiceCategories={storefront.serviceCategories}
+          initialDepartments={storefront.departments}
           initialProviders={storefront.providers}
           initialReviews={storefront.reviews}
           initialPromotions={storefront.promotions}

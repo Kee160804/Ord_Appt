@@ -192,6 +192,10 @@ export interface PublicServiceProvider {
   color: string;
   serviceIds: string[];
 }
+export interface PublicServiceDepartment {
+  id: string;
+  name: string;
+}
 export interface Category {
   id: string;
   tenantId: string;

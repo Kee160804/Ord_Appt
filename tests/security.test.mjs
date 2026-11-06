@@ -121,3 +121,44 @@ test("production responses enable HSTS", async () => {
   assert.match(source, /max-age=31536000; includeSubDomains/);
   assert.match(source, /!isDevelopment/);
 });
+
+test("anonymous users cannot enumerate database tables or call SQL directly", async () => {
+  const migration = await readFile(
+    "supabase/migrations/202611050001_close_anonymous_database_access.sql",
+    "utf8",
+  );
+  const storefront = await readFile(
+    "app/services/storefrontService.ts",
+    "utf8",
+  );
+  const availability = await readFile(
+    "app/services/appointmentService.ts",
+    "utf8",
+  );
+
+  assert.match(migration, /ENABLE ROW LEVEL SECURITY/);
+  assert.match(migration, /REVOKE ALL PRIVILEGES ON TABLE[^;]+FROM anon/);
+  assert.match(migration, /REVOKE EXECUTE ON ALL FUNCTIONS[^;]+PUBLIC, anon/);
+  assert.match(
+    migration,
+    /get_public_appointment_availability[\s\S]+FROM authenticated/,
+  );
+  assert.match(migration, /pg_catalog\.pg_policies/);
+  assert.match(storefront, /getSupabaseAdminClient/);
+  assert.doesNotMatch(storefront, /getSupabasePublicClient/);
+  assert.doesNotMatch(storefront, /\.from\("tenants"\)\s*\.select\("\*"\)/);
+  assert.doesNotMatch(storefront, /provider_customer_id/);
+  assert.match(availability, /\/api\/public\/availability/);
+  assert.doesNotMatch(
+    availability,
+    /client\(\)\.rpc\([\s\S]*get_public_(?:provider|appointment)_availability/,
+  );
+});
+
+test("public availability is server-side and rate limited", async () => {
+  const source = await readFile("app/api/public/availability/route.ts", "utf8");
+  assert.match(source, /getSupabaseAdminClient/);
+  assert.match(source, /enforcePublicRateLimit/);
+  assert.match(source, /isValidUuid/);
+  assert.match(source, /Cache-Control/);
+});

@@ -215,14 +215,14 @@ export default function RolesManagementPage() {
    */
   if (user?.role !== "superadmin") {
     return (
-      <div className="pwa-page-safe min-h-dvh bg-[#070b14] p-4 text-white sm:p-8">
+      <div className="admin-standalone-page pwa-page-safe min-h-dvh p-4 text-white sm:p-8">
         <p className="text-red-400">Access denied. Super admin only.</p>
       </div>
     );
   }
 
   return (
-    <div className="pwa-page-safe min-h-dvh space-y-6 bg-[#070b14] p-4 text-white light:bg-white light:text-gray-900 sm:p-8">
+    <div className="admin-standalone-page pwa-page-safe min-h-dvh space-y-6 p-4 text-white light:text-gray-900 sm:p-8">
       {/* ============================================================
           PAGE HEADER
           ============================================================ */}

@@ -141,30 +141,26 @@ const { data: inactiveTenant, error: inactiveReadError } = await anonymous
   .from("tenants")
   .select("id")
   .eq("id", inactiveTenantId);
-if (inactiveReadError) throw inactiveReadError;
-if (inactiveTenant.length !== 0)
+if (!inactiveReadError && inactiveTenant.length !== 0)
   throw new Error("RLS failure: anon can read an inactive tenant.");
 
-const [publicTenants, publicProducts, publicServices] = await Promise.all([
-  anonymous.from("tenants").select("id,is_active,status"),
-  anonymous.from("products").select("id,available"),
-  anonymous.from("services").select("id,available"),
-]);
-for (const result of [publicTenants, publicProducts, publicServices]) {
-  if (result.error) throw result.error;
-}
-if (
-  publicTenants.data.some(
-    (tenant) => !tenant.is_active || tenant.status !== "ACTIVE",
-  )
-) {
-  throw new Error("RLS failure: anon can read inactive storefront tenants.");
-}
-if (publicProducts.data.some((product) => !product.available)) {
-  throw new Error("RLS failure: anon can read unavailable products.");
-}
-if (publicServices.data.some((service) => !service.available)) {
-  throw new Error("RLS failure: anon can read unavailable services.");
+const anonymousBaseTables = [
+  "tenants",
+  "business_settings",
+  "business_hours",
+  "categories",
+  "products",
+  "product_variants",
+  "services",
+  "staff",
+  "staff_services",
+  "business_reviews",
+];
+for (const table of anonymousBaseTables) {
+  const { data, error } = await anonymous.from(table).select("*").limit(1);
+  if (!error && (data?.length ?? 0) > 0) {
+    throw new Error(`RLS failure: anon can enumerate ${table}.`);
+  }
 }
 
 const futureDate = new Date(Date.now() + 366 * 86_400_000)

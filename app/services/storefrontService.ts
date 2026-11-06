@@ -1,6 +1,6 @@
 import "server-only";
 
-import { getSupabasePublicClient } from "@/app/lib/supabase/server";
+import { getSupabaseAdminClient } from "@/app/lib/supabase/admin";
 import { parseSocialLinks } from "@/app/lib/social-links";
 import { parseStorefrontDesign } from "@/app/lib/storefront-design";
 import type {
@@ -8,10 +8,12 @@ import type {
   Category,
   Product,
   PublicPromotion,
+  PublicServiceDepartment,
   PublicServiceProvider,
   Service,
   Tenant,
 } from "@/app/types/index";
+import { tenantHasFeature } from "@/app/lib/plans";
 import type {
   BusinessHourRow,
   BusinessReviewRow,
@@ -27,6 +29,8 @@ export interface PublicStorefrontData {
   categories: Category[];
   products: Product[];
   services: Service[];
+  serviceCategories: Category[];
+  departments: PublicServiceDepartment[];
   providers: PublicServiceProvider[];
   reviews: BusinessReview[];
   promotions: PublicPromotion[];
@@ -128,7 +132,7 @@ function mapTenant(row: TenantRow, hours: BusinessHourRow[]): Tenant {
       : undefined,
     customDomain: row.custom_domain ?? undefined,
     customDomainVerified: Boolean(row.custom_domain_verified_at),
-    storefrontUrlEditAllowed: row.allow_storefront_url_edit === true,
+    storefrontUrlEditAllowed: false,
     businessType,
     logo: row.logo ?? businessName.charAt(0).toUpperCase(),
     logoImage: row.logo_url ?? undefined,
@@ -162,37 +166,19 @@ function mapTenant(row: TenantRow, hours: BusinessHourRow[]): Tenant {
     ),
     createdAt: row.created_at ?? new Date().toISOString(),
     isActive: row.is_active && row.status.toUpperCase() === "ACTIVE",
-    plan:
-      row.plan === "pro" || row.plan === "enterprise" ? row.plan : "starter",
-    stripeConnected: row.stripe_connected ?? false,
-    subscriptionStatus:
-      row.subscription_status === "active" ||
-      row.subscription_status === "cancelled" ||
-      row.subscription_status === "canceled" ||
-      row.subscription_status === "past_due" ||
-      row.subscription_status === "expired" ||
-      row.subscription_status === "trialing"
-        ? row.subscription_status
-        : "trial",
-    trialEndsAt: row.trial_ends_at ?? undefined,
-    currentPeriodStart: row.current_period_start ?? undefined,
-    currentPeriodEnd: row.current_period_end ?? undefined,
-    cancelAtPeriodEnd: row.cancel_at_period_end ?? false,
-    canceledAt: row.canceled_at ?? undefined,
-    providerCustomerId: row.provider_customer_id ?? undefined,
-    providerSubscriptionId: row.provider_subscription_id ?? undefined,
-    subscriptionBaseAmount: Number(row.subscription_base_amount ?? 0),
-    subscriptionSeatAmount: Number(row.subscription_seat_amount ?? 0),
-    subscriptionRecurringTotal: Number(row.subscription_recurring_total ?? 0),
-    subscriptionPaidStaffSeats: row.subscription_paid_staff_seats ?? 0,
+    // Billing and entitlement data is deliberately excluded from the public
+    // storefront projection. These required Tenant fields are neutral UI
+    // defaults and are not authorization inputs.
+    plan: "starter",
+    stripeConnected: false,
+    subscriptionStatus: "trial",
   };
 }
 
 export async function listPublicStorefrontEntries(): Promise<
   PublicStorefrontEntry[]
 > {
-  const supabase = getSupabasePublicClient();
-  if (!supabase) return [];
+  const supabase = getSupabaseAdminClient();
   const { data, error } = await supabase
     .from("tenants")
     .select("slug, updated_at, custom_domain, custom_domain_verified_at")
@@ -218,11 +204,9 @@ export async function listPublicStorefrontEntries(): Promise<
 export async function getPublicStorefront(
   slug: string,
 ): Promise<PublicStorefrontData | null> {
-  // Storefront reads intentionally use an anonymous client even when the
-  // browser also has an owner session. Dashboard identities therefore never
-  // need cross-tenant table policies just to view a public storefront.
-  const supabase = getSupabasePublicClient();
-  if (!supabase) return null;
+  // Public pages are rendered on the server. Keep the database's base tables
+  // private and expose only this deliberately selected storefront projection.
+  const supabase = getSupabaseAdminClient();
 
   const storefrontSlug = normalizedSlug(slug);
   if (!storefrontSlug || storefrontSlug.length > 100) return null;
@@ -234,7 +218,9 @@ export async function getPublicStorefront(
    */
   const { data: tenantData, error: tenantError } = await supabase
     .from("tenants")
-    .select("*")
+    .select(
+      "id,business_name,business_type,slug,custom_domain,custom_domain_verified_at,logo,logo_url,logo_bg,primary_color,accent_color,description,about_text,phone,email,address,city,cover_image,cover_image_position_x,cover_image_position_y,cover_image_zoom,social_links,storefront_design,plan,subscription_status,trial_ends_at,current_period_end,created_at,is_active,status",
+    )
     .eq("slug", storefrontSlug)
     .eq("is_active", true)
     .eq("status", "ACTIVE")
@@ -250,6 +236,7 @@ export async function getPublicStorefront(
     productsResult,
     variantsResult,
     servicesResult,
+    serviceCategoriesResult,
     departmentsResult,
     providersResult,
     assignmentsResult,
@@ -289,8 +276,15 @@ export async function getPublicStorefront(
       .order("name")
       .range(0, PUBLIC_SERVICE_LIMIT - 1),
     supabase
+      .from("service_categories")
+      .select("id,tenant_id,name,sort_order")
+      .eq("tenant_id", tenantRow.id)
+      .order("sort_order")
+      .order("name")
+      .range(0, PUBLIC_CATEGORY_LIMIT - 1),
+    supabase
       .from("service_departments")
-      .select("id")
+      .select("id,name,sort_order")
       .eq("tenant_id", tenantRow.id)
       .eq("is_active", true),
     supabase
@@ -344,6 +338,17 @@ export async function getPublicStorefront(
   if (firstError) throw firstError;
 
   const categoryRows = (categoriesResult.data ?? []) as CategoryRow[];
+  const serviceCategoryRows = (
+    serviceCategoriesResult.error
+      ? categoryRows
+      : (serviceCategoriesResult.data ?? [])
+  ) as Array<{
+    id: string;
+    tenant_id: string;
+    name: string;
+    sort_order: number;
+    is_active?: boolean;
+  }>;
   const activeDepartmentIds = new Set(
     (departmentsResult.data ?? []).map((row) => row.id),
   );
@@ -373,6 +378,27 @@ export async function getPublicStorefront(
   const tenant = mapTenant(
     tenantRow,
     (hoursResult.data ?? []) as BusinessHourRow[],
+  );
+  const departmentFeatureEnabled = tenantHasFeature(
+    {
+      plan:
+        tenantRow.plan === "pro" || tenantRow.plan === "enterprise"
+          ? tenantRow.plan
+          : "starter",
+      subscriptionStatus:
+        tenantRow.subscription_status === "active" ||
+        tenantRow.subscription_status === "cancelled" ||
+        tenantRow.subscription_status === "canceled" ||
+        tenantRow.subscription_status === "past_due" ||
+        tenantRow.subscription_status === "expired" ||
+        tenantRow.subscription_status === "trialing"
+          ? tenantRow.subscription_status
+          : "trial",
+      trialEndsAt: tenantRow.trial_ends_at ?? undefined,
+      createdAt: tenantRow.created_at ?? new Date().toISOString(),
+      currentPeriodEnd: tenantRow.current_period_end ?? undefined,
+    },
+    "team_management",
   );
   const ordering = (
     orderingSettingsResult.error ? {} : (orderingSettingsResult.data ?? {})
@@ -442,28 +468,37 @@ export async function getPublicStorefront(
       })),
       createdAt: row.created_at,
     })),
-    services: ((servicesResult.data ?? []) as ServiceRow[])
-      .filter(
-        (row) =>
-          !row.department_id || activeDepartmentIds.has(row.department_id),
-      )
+    services: ((servicesResult.data ?? []) as ServiceRow[]).map((row) => ({
+      id: row.id,
+      tenantId: row.tenant_id,
+      name: row.name,
+      description: row.description ?? "",
+      duration: row.duration_minutes,
+      price: Number(row.price),
+      image: row.image_url ?? "",
+      category: row.category ?? "Services",
+      isActive: row.available,
+      requiresDeposit: row.requires_deposit ?? false,
+      depositAmount:
+        row.deposit_amount == null ? undefined : Number(row.deposit_amount),
+      depositType: row.deposit_type ?? undefined,
+      createdAt: row.created_at,
+      departmentId: row.department_id ?? undefined,
+    })),
+    serviceCategories: serviceCategoryRows
+      .filter((row) => row.name.trim().toLowerCase() !== "services")
       .map((row) => ({
         id: row.id,
         tenantId: row.tenant_id,
         name: row.name,
-        description: row.description ?? "",
-        duration: row.duration_minutes,
-        price: Number(row.price),
-        image: row.image_url ?? "",
-        category: row.category ?? "Services",
-        isActive: row.available,
-        requiresDeposit: row.requires_deposit ?? false,
-        depositAmount:
-          row.deposit_amount == null ? undefined : Number(row.deposit_amount),
-        depositType: row.deposit_type ?? undefined,
-        createdAt: row.created_at,
-        departmentId: row.department_id ?? undefined,
+        sortOrder: row.sort_order,
+        isActive: row.is_active ?? true,
       })),
+    departments: departmentFeatureEnabled
+      ? (departmentsResult.data ?? [])
+          .map((row) => ({ id: row.id, name: row.name }))
+          .filter((department) => activeDepartmentIds.has(department.id))
+      : [],
     providers: (providersResult.error ? [] : (providersResult.data ?? [])).map(
       (raw) => {
         const row = raw as {

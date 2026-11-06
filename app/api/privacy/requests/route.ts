@@ -53,6 +53,15 @@ function referenceCode() {
   return `PRIV-${date}-${randomBytes(5).toString("hex").toUpperCase()}`;
 }
 
+function privacySchemaUnavailable(error: unknown) {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    error.code === "PGRST205"
+  );
+}
+
 export async function POST(request: Request) {
   if (!requestHasAllowedOrigin(request)) {
     return json({ error: "Invalid request origin." }, 403);
@@ -163,6 +172,16 @@ export async function POST(request: Request) {
     }
     if (error instanceof Error && error.message === "INVALID_JSON") {
       return json({ error: "Invalid request." }, 400);
+    }
+    if (privacySchemaUnavailable(error)) {
+      return json(
+        {
+          error:
+            "Privacy request storage is temporarily unavailable. Please try again shortly.",
+          code: "PRIVACY_SCHEMA_UNAVAILABLE",
+        },
+        503,
+      );
     }
     console.error("[privacy-request] Unable to record request.", error);
     return json(

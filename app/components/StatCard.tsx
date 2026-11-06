@@ -23,7 +23,7 @@ export function StatCard({
   return (
     <div
       className={cn(
-        "min-h-31.5 min-w-0 rounded-xl border border-slate-700/50 bg-slate-900/70 p-4 shadow-sm light:border-[#e4e9f1] light:bg-white light:shadow-[0_1px_3px_rgba(15,23,42,0.04)]",
+        "dashboard-stat-card min-h-31.5 min-w-0 rounded-xl border p-4 shadow-sm",
         className,
       )}
     >

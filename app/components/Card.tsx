@@ -10,7 +10,7 @@ export function Card({ children, className, hover }: CardProps) {
   return (
     <div
       className={cn(
-        "min-w-0 bg-slate-900/70 light:bg-white rounded-xl border border-slate-700/60 light:border-[#e4e9f1] shadow-sm light:shadow-[0_1px_3px_rgba(15,23,42,0.04)]",
+        "dashboard-panel min-w-0 rounded-xl border bg-slate-900/70 shadow-sm light:bg-white",
         hover &&
           "hover:shadow-md hover:-translate-y-0.5 transition-all duration-200",
         className,

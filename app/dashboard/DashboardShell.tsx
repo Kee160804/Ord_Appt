@@ -6,6 +6,10 @@ import { Sidebar } from "@/app/components/Sidebar";
 import { SubscriptionRequired } from "@/app/components/SubscriptionRequired";
 import { TrialStatusBanner } from "@/app/components/TrialStatusBanner";
 import { PlanUsageBanner } from "@/app/components/PlanUsageBanner";
+import {
+  MobileBottomNav,
+  MobileDashboardHeader,
+} from "@/app/components/MobileDashboardChrome";
 import { useAuth } from "@/app/contexts/auth";
 import { getTenantEntitlement } from "@/app/lib/subscription";
 
@@ -78,14 +82,16 @@ export default function DashboardShell({
   }
 
   return (
-    <div className="flex h-dvh min-h-0 overflow-hidden bg-[#f8fafc] dark:bg-[#08111f]">
+    <div className="dashboard-shell flex h-dvh min-h-0 overflow-hidden">
       <Sidebar tenant={tenant} user={user} />
-      <main className="pwa-shell-safe flex min-w-0 flex-1 flex-col overflow-hidden bg-[#f8fafc] text-[#14213a] dark:bg-[#08111f] dark:text-white">
+      <main className="pwa-shell-safe dashboard-main flex min-w-0 flex-1 flex-col overflow-hidden">
+        <MobileDashboardHeader />
         <TrialStatusBanner tenant={tenant} />
         <PlanUsageBanner tenant={tenant} />
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-[68px] md:pb-0">
           {children}
         </div>
+        <MobileBottomNav />
       </main>
     </div>
   );

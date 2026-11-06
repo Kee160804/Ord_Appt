@@ -30,6 +30,26 @@ interface UpdateRequest {
   resolutionNotes?: string;
 }
 
+function privacySchemaUnavailable(error: unknown) {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    error.code === "PGRST205"
+  );
+}
+
+function privacySchemaResponse() {
+  return Response.json(
+    {
+      error:
+        "Privacy request storage is being configured. Apply the latest database migrations and try again.",
+      code: "PRIVACY_SCHEMA_UNAVAILABLE",
+    },
+    { status: 503, headers: { "Cache-Control": "no-store" } },
+  );
+}
+
 export async function GET() {
   try {
     const authorization = await authorizeActiveSuperAdmin(
@@ -49,6 +69,7 @@ export async function GET() {
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {
+    if (privacySchemaUnavailable(error)) return privacySchemaResponse();
     return safeServerError(
       "admin-privacy-request-list",
       error,
@@ -161,6 +182,7 @@ export async function PATCH(request: Request) {
     if (error instanceof Error && error.message === "INVALID_JSON") {
       return Response.json({ error: "Invalid request." }, { status: 400 });
     }
+    if (privacySchemaUnavailable(error)) return privacySchemaResponse();
     return safeServerError(
       "admin-privacy-request-update",
       error,

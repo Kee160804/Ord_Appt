@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertCircle,
@@ -136,6 +136,7 @@ export function NotificationCenter({
   const tenantId = propTenantId ?? tenant?.id;
   const userId = propUserId ?? user?.id;
   const scopeKey = `${tenantId ?? ""}:${userId ?? ""}`;
+  const realtimeInstanceId = useId().replace(/:/g, "");
 
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<BusinessNotification[]>([]);
@@ -145,6 +146,7 @@ export function NotificationCenter({
   const containerRef = useRef<HTMLDivElement>(null);
   const locallyReadIdsRef = useRef(new Set<string>());
   const locallyDeletedIdsRef = useRef(new Set<string>());
+  const channelSequenceRef = useRef(0);
   const activeScopeRef = useRef(scopeKey);
   activeScopeRef.current = scopeKey;
 
@@ -183,8 +185,11 @@ export function NotificationCenter({
       return () => window.clearTimeout(initialLoad);
     }
 
+    const channelSequence = ++channelSequenceRef.current;
     const channel = supabase
-      .channel(`business-notifications-${tenantId}-${userId}`)
+      .channel(
+        `business-notifications-${tenantId}-${userId}-${realtimeInstanceId}-${channelSequence}`,
+      )
       .on(
         "postgres_changes",
         {
@@ -265,7 +270,7 @@ export function NotificationCenter({
       window.clearTimeout(initialLoad);
       void supabase.removeChannel(channel);
     };
-  }, [refresh, tenantId, userId]);
+  }, [realtimeInstanceId, refresh, tenantId, userId]);
 
   // Handle outside click and Escape key to close
   useEffect(() => {

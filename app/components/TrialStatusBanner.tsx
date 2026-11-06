@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Clock3 } from "lucide-react";
+import { ArrowRight, CalendarDays } from "lucide-react";
 import { getTenantEntitlement, getTrialEndDate } from "@/app/lib/subscription";
 import type { Tenant } from "@/app/types";
 
@@ -37,8 +37,8 @@ export function TrialStatusBanner({ tenant }: { tenant: Tenant }) {
   });
 
   return (
-    <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 border-b border-amber-500/25 bg-amber-500/10 px-4 py-2 text-center text-[11px] text-amber-200 light:border-amber-200 light:bg-amber-50 light:text-amber-800">
-      <Clock3 className="h-3.5 w-3.5" />
+    <div className="trial-status-banner flex min-h-[56px] items-center justify-center gap-x-3 border-b px-4 py-2 text-[11px] md:min-h-[62px] md:text-[13px]">
+      <CalendarDays className="h-[18px] w-[18px] shrink-0 text-violet-600 dark:text-violet-300" />
       <span>
         Free trial ends {expirationLabel ? `on ${expirationLabel}` : "soon"}{" "}
         with{" "}
@@ -50,9 +50,9 @@ export function TrialStatusBanner({ tenant }: { tenant: Tenant }) {
       </span>
       <Link
         href="/home#pricing"
-        className="font-bold underline decoration-amber-400/60 underline-offset-2 hover:text-white light:hover:text-amber-950"
+        className="ml-auto inline-flex shrink-0 items-center gap-1.5 font-bold text-violet-700 underline decoration-violet-400/50 underline-offset-2 hover:text-violet-900 dark:text-violet-300 dark:hover:text-white md:ml-4"
       >
-        View plans
+        View plans <ArrowRight className="h-3.5 w-3.5" />
       </Link>
     </div>
   );

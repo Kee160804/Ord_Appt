@@ -296,14 +296,6 @@ export async function updateDepartment(
     .single();
   if (error) throw error;
 
-  // Keep the legacy category text synchronized for storefronts and searches.
-  const { error: serviceError } = await client()
-    .from("services")
-    .update({ category: name.trim() })
-    .eq("tenant_id", tenantId)
-    .eq("department_id", id);
-  if (serviceError) throw serviceError;
-
   const row = data as Row;
   return {
     id: textValue(row.id),
@@ -328,6 +320,24 @@ export async function setDepartmentActive(
   if (error) throw error;
 }
 
+export async function deleteServiceDepartment(tenantId: string, id: string) {
+  // Department membership is independent of service categories. Services
+  // remain active and keep their category when the department is removed.
+  const { error: serviceError } = await client()
+    .from("services")
+    .update({ department_id: null })
+    .eq("tenant_id", tenantId)
+    .eq("department_id", id);
+  if (serviceError) throw serviceError;
+
+  const { error } = await client()
+    .from("service_departments")
+    .delete()
+    .eq("tenant_id", tenantId)
+    .eq("id", id);
+  if (error) throw error;
+}
+
 export async function assignServiceDepartment(
   tenantId: string,
   serviceId: string,
@@ -337,7 +347,6 @@ export async function assignServiceDepartment(
     .from("services")
     .update({
       department_id: department?.id ?? null,
-      category: department?.name ?? "Services",
     })
     .eq("tenant_id", tenantId)
     .eq("id", serviceId);

@@ -162,7 +162,7 @@ export default function AdminPage() {
     NAVIGATION.find((item) => item.id === activeView) ?? NAVIGATION[0];
 
   return (
-    <div className="min-h-dvh bg-[#070d19] text-slate-100 light:bg-[#f5f7fb] light:text-slate-900">
+    <div className="admin-shell min-h-dvh text-slate-100 light:text-slate-900">
       {mobileSidebarOpen && (
         <button
           aria-label="Close navigation"
@@ -190,7 +190,7 @@ export default function AdminPage() {
           theme={theme}
           userId={user?.id}
         />
-        <main className="mx-auto max-w-400 px-4 pb-10 pt-5 sm:px-6 lg:px-8">
+        <main className="mx-auto max-w-400 px-4 pb-24 pt-5 sm:px-6 lg:px-8 lg:pb-10">
           {error && (
             <div className="mb-5 flex items-start gap-3 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300 light:text-red-700">
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -242,6 +242,35 @@ export default function AdminPage() {
           {activeView === "settings" && <PlatformSettingsView />}
           {activeView === "integrations" && <IntegrationsView />}
         </main>
+        <nav className="admin-mobile-nav fixed inset-x-0 bottom-0 z-40 grid h-[68px] grid-cols-5 items-center border-t px-2 pb-[env(safe-area-inset-bottom,0px)] lg:hidden">
+          {[NAVIGATION[0], NAVIGATION[1], NAVIGATION[2], NAVIGATION[7]].map(
+            (item) => {
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => selectView(item.id)}
+                  className={cn(
+                    "mobile-nav-item",
+                    activeView === item.id && "is-active",
+                  )}
+                >
+                  <Icon className="h-[18px] w-[18px]" />
+                  <span>{item.label.split(" ")[0]}</span>
+                </button>
+              );
+            },
+          )}
+          <button
+            type="button"
+            onClick={() => setMobileSidebarOpen(true)}
+            className="mobile-nav-item"
+          >
+            <Menu className="h-[18px] w-[18px]" />
+            <span>More</span>
+          </button>
+        </nav>
       </div>
     </div>
   );
@@ -267,7 +296,7 @@ function AdminSidebar({
   return (
     <aside
       className={cn(
-        "pwa-admin-sidebar-safe fixed inset-y-0 left-0 z-50 flex w-64 flex-col overflow-hidden border-r border-slate-800 bg-[#09101d] px-4 transition-transform duration-200 light:border-slate-200 light:bg-white lg:translate-x-0",
+        "admin-sidebar pwa-admin-sidebar-safe fixed inset-y-0 left-0 z-50 flex w-64 flex-col overflow-hidden border-r px-4 transition-transform duration-200 lg:translate-x-0",
         isOpen ? "translate-x-0" : "-translate-x-full",
       )}
     >
@@ -357,7 +386,7 @@ function AdminHeader({
   userId?: string;
 }) {
   return (
-    <header className="pwa-admin-header-safe sticky top-0 z-30 border-b border-slate-800/80 bg-[#070d19]/90 px-4 pb-4 backdrop-blur-xl light:border-slate-200 light:bg-[#f5f7fb]/90 sm:px-6 lg:px-8">
+    <header className="admin-header pwa-admin-header-safe sticky top-0 z-30 border-b px-4 pb-4 backdrop-blur-xl sm:px-6 lg:px-8">
       <div className="mx-auto flex max-w-400 items-center justify-between gap-2 sm:gap-4">
         <div className="flex min-w-0 items-center gap-3">
           <button

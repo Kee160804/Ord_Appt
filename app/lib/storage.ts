@@ -37,3 +37,28 @@ export const setStoredServices = (tenantId: string, services: Service[]) => {
   if (typeof window === "undefined") return;
   localStorage.setItem(`tenant_${tenantId}_services`, JSON.stringify(services));
 };
+
+export const getStoredServiceCategories = (
+  tenantId: string,
+): string[] | null => {
+  if (typeof window === "undefined") return null;
+  const stored = localStorage.getItem(`tenant_${tenantId}_service_categories`);
+  if (!stored) return null;
+  try {
+    return JSON.parse(stored) as string[];
+  } catch (error) {
+    console.error("Failed to parse stored service categories", error);
+    return null;
+  }
+};
+
+export const setStoredServiceCategories = (
+  tenantId: string,
+  categories: string[],
+) => {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(
+    `tenant_${tenantId}_service_categories`,
+    JSON.stringify(categories),
+  );
+};

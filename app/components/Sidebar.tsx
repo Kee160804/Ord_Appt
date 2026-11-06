@@ -17,7 +17,6 @@ import {
   Users,
   LockKeyhole,
   BriefcaseBusiness,
-  CreditCard,
 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { tenantHasFeature } from "../lib/plans";
@@ -62,15 +61,6 @@ export function Sidebar({ tenant, user }: SidebarProps) {
         ]),
     ...(canManageBusiness
       ? [{ href: `${base}/customers`, label: "Customers", icon: Users }]
-      : []),
-    ...(canManageBusiness
-      ? [
-          {
-            href: `${base}/payments`,
-            label: "Customer Payments & Fulfillment",
-            icon: CreditCard,
-          },
-        ]
       : []),
     ...(canManageBusiness
       ? [
@@ -128,26 +118,26 @@ export function Sidebar({ tenant, user }: SidebarProps) {
       )}
       <aside
         className={cn(
-          "pwa-sidebar-safe fixed inset-y-0 left-0 z-50 flex h-dvh w-[min(86vw,280px)] shrink-0 flex-col overflow-hidden bg-[#111a35] text-white shadow-[6px_0_28px_rgba(8,20,44,0.18)] transition-[transform,width] duration-300 md:relative md:z-30 md:translate-x-0",
+          "pwa-sidebar-safe dashboard-sidebar fixed inset-y-0 left-0 z-50 flex h-dvh w-[min(86vw,280px)] shrink-0 flex-col overflow-hidden shadow-[6px_0_28px_rgba(8,20,44,0.12)] transition-[transform,width] duration-300 md:relative md:z-30 md:translate-x-0",
           mobileOpen ? "translate-x-0" : "-translate-x-full",
           collapsed ? "md:w-18" : "md:w-54",
         )}
       >
         <div
           className={cn(
-            "flex h-16.5 items-center gap-3 border-b border-white/6 px-5 pt-[max(0.25rem,env(safe-area-inset-top))]",
+            "sidebar-brand flex h-[76px] items-center gap-3 border-b px-5 pt-[max(0.25rem,env(safe-area-inset-top))]",
             collapsed && "justify-center px-3",
           )}
         >
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-linear-to-br from-violet-500 to-purple-700 shadow-lg shadow-violet-950/30">
+          <div className="brand-mark flex h-10 w-10 shrink-0 items-center justify-center rounded-xl">
             <Sparkles className="h-4 w-4 text-white" />
           </div>
           {!collapsed && (
             <div className="leading-none">
-              <p className="text-[13px] font-bold tracking-tight text-white">
+              <p className="sidebar-strong text-[14px] font-extrabold tracking-[-0.03em]">
                 YuhBusiness
               </p>
-              <p className="mt-1 text-[7px] font-semibold uppercase tracking-[0.2em] text-slate-400">
+              <p className="sidebar-muted mt-1 text-[8px] font-semibold uppercase tracking-[0.2em]">
                 Platform
               </p>
             </div>
@@ -156,7 +146,7 @@ export function Sidebar({ tenant, user }: SidebarProps) {
 
         <div
           className={cn(
-            "border-b border-white/6 px-4 py-4",
+            "sidebar-divider border-b px-4 py-4",
             collapsed && "px-3",
           )}
         >
@@ -180,19 +170,15 @@ export function Sidebar({ tenant, user }: SidebarProps) {
                 onClick={() => setMobileOpen(false)}
                 title={collapsed ? item.label : undefined}
                 className={cn(
-                  "group flex h-10 items-center gap-3 rounded-lg px-3 text-[12px] font-medium transition-colors",
-                  active
-                    ? "bg-violet-500/20 text-white"
-                    : "text-slate-300 hover:bg-white/6 hover:text-white",
+                  "sidebar-nav-item group flex min-h-11 items-center gap-3 rounded-xl px-3 text-[12px] font-semibold transition-colors",
+                  active ? "is-active" : "",
                   collapsed && "justify-center px-2",
                 )}
               >
                 <Icon
                   className={cn(
                     "h-3.75 w-3.75 shrink-0",
-                    active
-                      ? "text-violet-300"
-                      : "text-slate-400 group-hover:text-white",
+                    active ? "text-violet-500 dark:text-violet-300" : "",
                   )}
                 />
                 {!collapsed && <span className="flex-1">{item.label}</span>}
@@ -204,14 +190,14 @@ export function Sidebar({ tenant, user }: SidebarProps) {
           })}
         </nav>
 
-        <div className="border-t border-white/6 px-3 py-2">
+        <div className="sidebar-divider border-t px-3 py-2">
           <Link
             href={`/store-front/${tenant.slug}`}
             target="_blank"
             rel="noopener noreferrer"
             title={collapsed ? "View Storefront" : undefined}
             className={cn(
-              "flex h-9 items-center gap-3 rounded-lg px-3 text-[11px] font-medium text-slate-400 transition-colors hover:bg-white/6 hover:text-white",
+              "sidebar-secondary flex h-10 items-center gap-3 rounded-xl px-3 text-[11px] font-semibold transition-colors",
               collapsed && "justify-center px-2",
             )}
           >
@@ -220,10 +206,12 @@ export function Sidebar({ tenant, user }: SidebarProps) {
           </Link>
         </div>
 
-        <div className={cn("border-t border-white/6 p-3", collapsed && "px-2")}>
+        <div
+          className={cn("sidebar-divider border-t p-3", collapsed && "px-2")}
+        >
           <div
             className={cn(
-              "flex flex-col gap-2 rounded-2xl border border-white/4 bg-white/2 px-3 py-2.5",
+              "sidebar-account flex flex-col gap-2 rounded-2xl border px-3 py-2.5",
               collapsed && "items-center px-2 py-2.5",
             )}
           >
@@ -236,7 +224,7 @@ export function Sidebar({ tenant, user }: SidebarProps) {
                   {user.avatar}
                 </div>
                 <div className="min-w-0">
-                  <p className="truncate text-[11px] font-semibold text-white">
+                  <p className="sidebar-strong truncate text-[11px] font-semibold">
                     {user.name}
                   </p>
                   <p className="mt-0.5 text-[9px] capitalize text-slate-400">

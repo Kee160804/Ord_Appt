@@ -1,0 +1,34 @@
+
+> ord-appt@0.1.0 dev
+> next dev
+
+▲ Next.js 16.4.3 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.18.204:3000
+- Environments: .env.local
+✓ Ready in 452ms
+✓ Running next.config.ts took 32ms
+Creating turbopack project { dir: 'C:\\Development\\Personal\\Ord_Appt', testMode: true }
+- Experiments (use with caution):
+  ✓ serverComponentsHmrCancellation
+
+ GET /dashboard/services 200 in 2.0s (next.js: 1068ms, proxy.ts: 623ms, application-code: 332ms)
+ GET /manifest.webmanifest 200 in 162ms (next.js: 113ms, proxy.ts: 18ms, application-code: 31ms)
+ GET /manifest.webmanifest 200 in 30ms (next.js: 10ms, proxy.ts: 13ms, application-code: 6ms)
+ GET /login?next=%2Fdashboard%2Fservices 200 in 191ms (next.js: 73ms, proxy.ts: 6ms, application-code: 112ms)
+ GET /dashboard/customers 200 in 691ms (next.js: 244ms, proxy.ts: 408ms, application-code: 39ms)
+ GET /manifest.webmanifest 200 in 30ms (next.js: 18ms, proxy.ts: 4ms, application-code: 8ms)
+ GET /dashboard/payments 200 in 220ms (next.js: 86ms, proxy.ts: 104ms, application-code: 30ms)
+ GET /manifest.webmanifest 200 in 22ms (next.js: 8ms, proxy.ts: 8ms, application-code: 6ms)
+ GET /dashboard/analytics 200 in 251ms (next.js: 126ms, proxy.ts: 94ms, application-code: 31ms)
+ GET /manifest.webmanifest 200 in 24ms (next.js: 8ms, proxy.ts: 9ms, application-code: 7ms)
+ GET /dashboard 200 in 906ms (next.js: 531ms, proxy.ts: 287ms, application-code: 88ms)
+ GET /dashboard 200 in 358ms (next.js: 64ms, proxy.ts: 263ms, application-code: 31ms)
+ GET /manifest.webmanifest 200 in 68ms (next.js: 46ms, proxy.ts: 13ms, application-code: 9ms)
+ GET /dashboard/orders 200 in 316ms (next.js: 151ms, proxy.ts: 130ms, application-code: 35ms)
+ GET /manifest.webmanifest 200 in 24ms (next.js: 11ms, proxy.ts: 7ms, application-code: 6ms)
+ GET /dashboard/products 200 in 306ms (next.js: 134ms, proxy.ts: 123ms, application-code: 49ms)
+ GET /dashboard/products 200 in 163ms (next.js: 9ms, proxy.ts: 115ms, application-code: 40ms)
+ GET /dashboard/products 200 in 827ms (next.js: 14ms, proxy.ts: 770ms, application-code: 42ms)
+ GET /dashboard/products 200 in 237ms (next.js: 16ms, proxy.ts: 197ms, application-code: 24ms)
+[?25h

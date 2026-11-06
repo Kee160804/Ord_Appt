@@ -126,5 +126,5 @@ export default async function AdminLayout({
      5. RENDER PROTECTED ADMIN AREA
      ================================================================ */
 
-  return <div className="min-h-dvh bg-slate-50 light:bg-white">{children}</div>;
+  return <div className="admin-layout min-h-dvh">{children}</div>;
 }
