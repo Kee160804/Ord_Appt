@@ -33,7 +33,6 @@ import { BusinessLogo } from "./BusinessLogo";
 import { TeamAccessView } from "./TeamAccessView";
 import { StorefrontDesigner } from "./StorefrontDesigner";
 import { SubscriptionCheckoutPreview } from "./SubscriptionCheckoutPreview";
-import { PaymentFulfillmentView } from "./PaymentFulfillmentView";
 import {
   updateBusinessDetails,
   updateBusinessHours,
@@ -162,15 +161,7 @@ export function SettingsView({ tenant, user, onTenantUpdated }: Props) {
             ))}
           {active === "payments" &&
             (user.role === "owner" ? (
-              <div className="space-y-5">
-                <PaymentsTab
-                  tenant={tenant}
-                  onTenantUpdated={onTenantUpdated}
-                />
-                {tenant.businessType !== "appointment" && (
-                  <PaymentFulfillmentView tenant={tenant} />
-                )}
-              </div>
+              <PaymentsTab tenant={tenant} onTenantUpdated={onTenantUpdated} />
             ) : (
               <Card>
                 <CardBody>

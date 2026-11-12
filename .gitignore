@@ -44,3 +44,10 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 /app/types/database.generated.ts.tmp
+
+.vercel
+
+# local development output
+*.log
+__pycache__/
+*.py[cod]
