@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { createPortal } from "react-dom";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   CalendarDays,
@@ -14,6 +15,7 @@ import {
   ShoppingBasket,
   ShoppingBag,
   Truck,
+  X,
   XCircle,
   type LucideIcon,
 } from "lucide-react";
@@ -151,6 +153,24 @@ export function OrdersView({
 
   const [orders, setOrders] = useState<Order[]>([]);
   const [selected, setSelected] = useState<Order | null>(null);
+  const [isMobileViewport, setIsMobileViewport] = useState(false);
+
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 767px)");
+    const updateViewport = () => setIsMobileViewport(media.matches);
+    updateViewport();
+    media.addEventListener("change", updateViewport);
+    return () => media.removeEventListener("change", updateViewport);
+  }, []);
+
+  useEffect(() => {
+    if (!selected) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSelected(null);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selected]);
 
   const [filter, setFilter] = useState<OrderStatus | "all">("all");
 
@@ -632,13 +652,30 @@ export function OrdersView({
         {/* ----------------------------------------------------------------
             Detail panel
             ---------------------------------------------------------------- */}
-        {selected && (
-          <div>
+        {selected && (() => {
+          const details = (
+          <div
+            className="order-detail-container"
+            role="dialog"
+            aria-modal={isMobileViewport ? true : undefined}
+            aria-label={`Order details for ${selected.orderNumber}`}
+            onClick={(event) => {
+              if (event.target === event.currentTarget) setSelected(null);
+            }}
+          >
             <Card className="order-detail-panel overflow-hidden">
-              <div className="border-b border-slate-700 px-5 py-3 light:border-slate-200">
+              <div className="flex items-center justify-between border-b border-slate-700 px-5 py-3 light:border-slate-200">
                 <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400 light:text-slate-500">
                   Order details
                 </p>
+                <button
+                  type="button"
+                  className="order-detail-close"
+                  onClick={() => setSelected(null)}
+                  aria-label="Close order details"
+                >
+                  <X className="h-5 w-5" />
+                </button>
               </div>
               <div className="space-y-4 p-5">
                 <div className="flex items-center justify-between">
@@ -767,7 +804,11 @@ export function OrdersView({
               </div>
             </Card>
           </div>
-        )}
+          );
+          return isMobileViewport
+            ? createPortal(details, document.body)
+            : details;
+        })()}
       </div>
     </div>
   );
