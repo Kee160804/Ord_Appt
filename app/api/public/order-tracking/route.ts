@@ -222,7 +222,7 @@ export async function POST(request: Request) {
       const [services, receipts, method, accounts] = await Promise.all([
         supabase
           .from("appointment_services")
-          .select("id,service_name,price")
+          .select("id,service_name,price,services(image_url)")
           .eq("tenant_id", tenantId)
           .eq("appointment_id", appointment.id)
           .order("created_at"),
@@ -319,16 +319,23 @@ export async function POST(request: Request) {
           appointment.payment_method === "bank_transfer" &&
           !closed &&
           receipt?.status !== "AWAITING_VERIFICATION",
-        items: (services.data ?? []).map((service) => ({
-          id: service.id,
-          name: service.service_name,
-          image: "",
-          quantity: 1,
-          unitPrice: Number(service.price ?? 0),
-          subtotal: Number(service.price ?? 0),
-          sku: "",
-          addons: [],
-        })),
+        items: (services.data ?? []).map((service) => {
+          const linkedService = (
+            Array.isArray(service.services)
+              ? service.services[0]
+              : service.services
+          ) as { image_url?: string | null } | null;
+          return {
+            id: service.id,
+            name: service.service_name,
+            image: linkedService?.image_url ?? "",
+            quantity: 1,
+            unitPrice: Number(service.price ?? 0),
+            subtotal: Number(service.price ?? 0),
+            sku: "",
+            addons: [],
+          };
+        }),
         history: [
           { status: appointment.status, createdAt: appointment.created_at },
         ],

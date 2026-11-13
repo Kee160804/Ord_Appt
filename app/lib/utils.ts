@@ -59,9 +59,9 @@ export function getStatusColor(status: string): string {
     ready:
       "bg-emerald-500/20 light:bg-emerald-50 text-emerald-300 light:text-emerald-700 border-emerald-500/30 light:border-emerald-300",
     delivered:
-      "bg-slate-500/20 light:bg-slate-100 text-slate-400 light:text-slate-600 border-slate-500/30 light:border-slate-300",
+      "bg-emerald-500/20 light:bg-emerald-50 text-emerald-300 light:text-emerald-700 border-emerald-500/30 light:border-emerald-300",
     completed:
-      "bg-slate-500/20 light:bg-slate-100 text-slate-400 light:text-slate-600 border-slate-500/30 light:border-slate-300",
+      "bg-emerald-500/20 light:bg-emerald-50 text-emerald-300 light:text-emerald-700 border-emerald-500/30 light:border-emerald-300",
     cancelled:
       "bg-red-500/20 light:bg-red-50 text-red-400 light:text-red-700 border-red-500/30 light:border-red-300",
     no_show:

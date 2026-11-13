@@ -414,10 +414,10 @@ function OrderPayment({
     <div className="space-y-4">
       {(paid || receipt) && (
         <div
-          className={`flex items-start gap-3 rounded-xl border p-3 ${paid || receipt?.status === "VERIFIED" ? "border-emerald-500/30 bg-emerald-500/10" : "border-purple-500/30 bg-purple-500/10"}`}
+          className={`flex items-start gap-3 rounded-xl border p-3 ${paid || ["VERIFIED", "AWAITING_VERIFICATION"].includes(receipt?.status ?? "") ? "border-emerald-500/30 bg-emerald-500/10" : "border-purple-500/30 bg-purple-500/10"}`}
         >
           <CheckCircle2
-            className={`mt-0.5 h-6 w-6 shrink-0 ${paid ? "text-emerald-400" : "text-purple-400"}`}
+            className={`mt-0.5 h-6 w-6 shrink-0 ${paid || ["VERIFIED", "AWAITING_VERIFICATION"].includes(receipt?.status ?? "") ? "text-emerald-400" : "text-purple-400"}`}
           />
           <div>
             <h3 className="font-bold">
